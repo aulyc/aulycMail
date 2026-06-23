@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/hkdb/aerion/internal/message"
-	"github.com/hkdb/aerion/internal/sync"
+	"github.com/aulyc/aulycmail/internal/message"
+	"github.com/aulyc/aulycmail/internal/sync"
 )
 
 // ============================================================================

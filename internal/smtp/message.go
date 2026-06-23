@@ -1,4 +1,4 @@
-// Package smtp provides SMTP client functionality for Aerion
+// Package smtp provides SMTP client functionality for aulycmail
 package smtp
 
 import (
@@ -104,7 +104,7 @@ func (m *ComposeMessage) ToRFC822() ([]byte, error) {
 	var buf bytes.Buffer
 
 	// Generate Message-ID
-	messageID := fmt.Sprintf("<%s@aerion>", uuid.New().String())
+	messageID := fmt.Sprintf("<%s@aulycmail>", uuid.New().String())
 
 	// Write headers
 	writeHeader(&buf, "From", m.From.String())
@@ -120,7 +120,7 @@ func (m *ComposeMessage) ToRFC822() ([]byte, error) {
 	writeHeader(&buf, "Date", time.Now().Format(time.RFC1123Z))
 	writeHeader(&buf, "Message-ID", messageID)
 	writeHeader(&buf, "MIME-Version", "1.0")
-	writeHeader(&buf, "User-Agent", "Aerion Email Client")
+	writeHeader(&buf, "User-Agent", "aulycmail Email Client")
 
 	// Threading headers
 	if m.InReplyTo != "" {

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hkdb/aerion/internal/database"
+	"github.com/aulyc/aulycmail/internal/database"
 )
 
 // Store provides account storage operations

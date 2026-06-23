@@ -6,14 +6,14 @@ import (
 	"io"
 
 	gomessage "github.com/emersion/go-message"
-	"github.com/hkdb/aerion/internal/account"
-	"github.com/hkdb/aerion/internal/email"
-	"github.com/hkdb/aerion/internal/folder"
-	imapPkg "github.com/hkdb/aerion/internal/imap"
-	"github.com/hkdb/aerion/internal/logging"
-	"github.com/hkdb/aerion/internal/message"
-	"github.com/hkdb/aerion/internal/pgp"
-	"github.com/hkdb/aerion/internal/smime"
+	"github.com/aulyc/aulycmail/internal/account"
+	"github.com/aulyc/aulycmail/internal/email"
+	"github.com/aulyc/aulycmail/internal/folder"
+	imapPkg "github.com/aulyc/aulycmail/internal/imap"
+	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/aulyc/aulycmail/internal/message"
+	"github.com/aulyc/aulycmail/internal/pgp"
+	"github.com/aulyc/aulycmail/internal/smime"
 	"github.com/rs/zerolog"
 )
 

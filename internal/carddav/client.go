@@ -13,8 +13,8 @@ import (
 	"github.com/emersion/go-vcard"
 	"github.com/emersion/go-webdav"
 	"github.com/emersion/go-webdav/carddav"
-	"github.com/hkdb/aerion/internal/kit/davutil"
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/kit/davutil"
+	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 

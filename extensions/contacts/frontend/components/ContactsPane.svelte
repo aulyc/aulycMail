@@ -72,7 +72,7 @@
     // source that has its writable flag enabled. Google/Microsoft sources
     // are gated to read-only until 2b.3 ships their write paths.
     const writable =
-      contact.sourceId === 'aerion' || contactSourcesStore.isSourceWritable(contact.sourceId)
+      contact.sourceId === 'aulycmail' || contactSourcesStore.isSourceWritable(contact.sourceId)
     if (!writable) return
     editTarget = contact
     showEdit = true

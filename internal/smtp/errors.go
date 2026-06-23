@@ -1,4 +1,4 @@
-// Package smtp provides SMTP client functionality for Aerion
+// Package smtp provides SMTP client functionality for aulycmail
 package smtp
 
 import "errors"

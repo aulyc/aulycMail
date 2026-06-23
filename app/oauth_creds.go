@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hkdb/aerion/internal/carddav"
-	"github.com/hkdb/aerion/internal/oauth2"
+	"github.com/aulyc/aulycmail/internal/carddav"
+	"github.com/aulyc/aulycmail/internal/oauth2"
 )
 
 // AuthContextInfo describes a single authenticated identity (email account or
@@ -88,7 +88,7 @@ func fingerprintClientID(found bool, id string) string {
 // flow at OAuth time. Choices have stable IDs for persistence; labels are
 // user-visible strings.
 type OAuthCredsChoice struct {
-	// ID is the stable identifier ("custom" | "aerion-shipped" | "aerion-mail").
+	// ID is the stable identifier ("custom" | "aulycmail-shipped" | "aulycmail-mail").
 	// Stored in the credentials store as the user's pick for this slot.
 	ID string `json:"id"`
 	// Label is the user-visible string shown in the dropdown.
@@ -112,7 +112,7 @@ type OAuthCredsChoices struct {
 	//   - placeholder copy ("Leave empty to keep current" vs "Paste …")
 	//   - "Clear saved Custom credentials" button visibility
 	//   - the "You also have a saved Custom override" hint when the
-	//     user is currently on an Aerion choice but Custom is still on file
+	//     user is currently on an aulycmail choice but Custom is still on file
 	// Under the pre-active-choice architecture this was equivalent to
 	// `Current == "custom"` because the picker wiped the row when the
 	// user switched away from Custom. With explicit active-choice
@@ -128,13 +128,13 @@ type OAuthCredsChoices struct {
 // slot. The choice set depends on:
 //
 //   - Whether the slot's own shipped creds resolve to non-empty (always
-//     adds an "aerion-shipped" option labeled per provider).
+//     adds an "aulycmail-shipped" option labeled per provider).
 //   - Whether the extension's manifest declares the OAuth provider of this
 //     slot in first_party_uses_core_for_scopes AND the mail slot has
-//     shipped creds (adds "aerion-mail" — reuse mail's verified client).
+//     shipped creds (adds "aulycmail-mail" — reuse mail's verified client).
 //
 // extensionID is the manifest id ("contacts", "calendar"); pass "" when
-// the caller is mail's own settings UI (no manifest, no aerion-mail option).
+// the caller is mail's own settings UI (no manifest, no aulycmail-mail option).
 //
 // Wails-bound.
 func (a *App) GetOAuthCredsChoices(configID, extensionID string) (OAuthCredsChoices, error) {
@@ -150,12 +150,12 @@ func (a *App) GetOAuthCredsChoices(configID, extensionID string) (OAuthCredsChoi
 
 	if hasShipped {
 		out.Choices = append(out.Choices, OAuthCredsChoice{
-			ID:    "aerion-shipped",
+			ID:    "aulycmail-shipped",
 			Label: shippedLabelForSlot(configID),
 		})
 	}
 
-	// Mail-reuse option ("Aerion - Google"): use Aerion's mail client
+	// Mail-reuse option ("aulycmail - Google"): use aulycmail's mail client
 	// id/secret for THIS extension slot (via the slot alias). This is purely
 	// about which client app mints the slot's tokens — the tokens still live
 	// in the extension's own slot and need their own consent. It is therefore
@@ -168,15 +168,15 @@ func (a *App) GetOAuthCredsChoices(configID, extensionID string) (OAuthCredsChoi
 	// `microsoft-calendar` are core-registered aliases of `microsoft-mail`
 	// (microsoft-mail's client IS the consolidated Microsoft client), so
 	// showing a separate "use mail's client" option would be a redundant
-	// duplicate of the "Aerion - Microsoft" shipped choice already added
+	// duplicate of the "aulycmail - Microsoft" shipped choice already added
 	// above.
 	if extensionID != "" && providerFromConfigID(configID) == "google" {
 		const mailSlot = "google-mail"
 		_, mailHasShipped := oauth2.ShippedClientConfigForID(mailSlot)
 		if mailSlot != configID && mailHasShipped {
 			out.Choices = append(out.Choices, OAuthCredsChoice{
-				ID:    "aerion-mail",
-				Label: "Aerion - Google",
+				ID:    "aulycmail-mail",
+				Label: "aulycmail - Google",
 			})
 		}
 	}
@@ -184,7 +184,7 @@ func (a *App) GetOAuthCredsChoices(configID, extensionID string) (OAuthCredsChoi
 	// Determine the Current selection from credStore state.
 	out.Current = a.resolveCurrentChoice(configID)
 	// Independent of the active choice — the row may exist while the
-	// user is currently routed to Aerion-shipped or Aerion-mail.
+	// user is currently routed to aulycmail-shipped or aulycmail-mail.
 	out.HasUserOverride = a.credStore != nil && a.credStore.HasUserClientCreds(configID)
 
 	// Fingerprint of whatever currently resolves.
@@ -202,12 +202,12 @@ func (a *App) GetOAuthCredsChoices(configID, extensionID string) (OAuthCredsChoi
 //   - "custom"          → record marker. Caller invokes SetOAuthCreds
 //                          separately (via the editor's Save button) to
 //                          write or replace the actual credentials.
-//   - "aerion-shipped"  → record marker. The resolver skips override +
+//   - "aulycmail-shipped"  → record marker. The resolver skips override +
 //                          alias and routes to the slot's own shipped
 //                          creds. Any user_oauth_clients / alias rows
 //                          remain in storage so switching back to Custom
 //                          restores the user's saved values.
-//   - "aerion-mail"     → record marker AND ensure the alias row exists.
+//   - "aulycmail-mail"     → record marker AND ensure the alias row exists.
 //                          The user_oauth_clients row is preserved for
 //                          the same round-trip restore reason.
 //
@@ -223,9 +223,9 @@ func (a *App) SetOAuthCredsChoice(configID, choiceID string) error {
 	switch choiceID {
 	case "custom":
 		return a.credStore.SetOAuthActiveChoice(configID, "custom")
-	case "aerion-shipped":
-		return a.credStore.SetOAuthActiveChoice(configID, "aerion-shipped")
-	case "aerion-mail":
+	case "aulycmail-shipped":
+		return a.credStore.SetOAuthActiveChoice(configID, "aulycmail-shipped")
+	case "aulycmail-mail":
 		provider := providerFromConfigID(configID)
 		if provider == "" {
 			return fmt.Errorf("cannot derive provider from config id %q", configID)
@@ -235,7 +235,7 @@ func (a *App) SetOAuthCredsChoice(configID, choiceID string) error {
 		if err := a.credStore.SetOAuthSlotAlias(configID, provider+"-mail"); err != nil {
 			return err
 		}
-		return a.credStore.SetOAuthActiveChoice(configID, "aerion-mail")
+		return a.credStore.SetOAuthActiveChoice(configID, "aulycmail-mail")
 	}
 	return fmt.Errorf("unknown choice id %q", choiceID)
 }
@@ -247,10 +247,10 @@ func (a *App) SetOAuthCredsChoice(configID, choiceID string) error {
 // inference branch will stop running for a slot the first time
 // SetOAuthCredsChoice writes its marker).
 //
-// Returned ID is one of "custom" / "aerion-mail" / "aerion-shipped".
+// Returned ID is one of "custom" / "aulycmail-mail" / "aulycmail-shipped".
 func (a *App) resolveCurrentChoice(configID string) string {
 	if a.credStore == nil {
-		return "aerion-shipped"
+		return "aulycmail-shipped"
 	}
 	if marker, err := a.credStore.GetOAuthActiveChoice(configID); err == nil && marker != "" {
 		return marker
@@ -263,11 +263,11 @@ func (a *App) resolveCurrentChoice(configID string) string {
 	}
 	target, ok, _ := a.credStore.GetOAuthSlotAlias(configID)
 	if ok && target != "" {
-		// Only "aerion-mail" is exposed today; any alias maps to that
+		// Only "aulycmail-mail" is exposed today; any alias maps to that
 		// label. Future alias targets would need their own choice IDs.
-		return "aerion-mail"
+		return "aulycmail-mail"
 	}
-	return "aerion-shipped"
+	return "aulycmail-shipped"
 }
 
 // providerFromConfigID strips the well-known prefix from a slot id.
@@ -287,20 +287,20 @@ func providerFromConfigID(configID string) string {
 // shippedLabelForSlot returns the user-visible label for the slot's own
 // shipped option. Google extension slots are the un-Google-verified test
 // clients (broader scopes than the mail-app's verified client) — labeled
-// "Aerion - Google (Testing)" so users understand they may see Google's
+// "aulycmail - Google (Testing)" so users understand they may see Google's
 // unverified-app warning during OAuth consent. Once Google verifies the
 // mail project for the extension scopes, the default switches to
-// "Aerion - Google" (the aerion-mail choice — mail's verified client).
+// "aulycmail - Google" (the aulycmail-mail choice — mail's verified client).
 func shippedLabelForSlot(configID string) string {
 	switch configID {
 	case "google-contacts", "google-calendar":
-		return "Aerion - Google (Testing)"
+		return "aulycmail - Google (Testing)"
 	case "google-mail":
-		return "Aerion - Google"
+		return "aulycmail - Google"
 	case "microsoft-mail", "microsoft-contacts", "microsoft-calendar":
-		return "Aerion - Microsoft"
+		return "aulycmail - Microsoft"
 	}
-	return "Aerion - Default"
+	return "aulycmail - Default"
 }
 
 // SetOAuthCreds saves user-supplied OAuth client credentials for the given
@@ -329,7 +329,7 @@ func (a *App) ClearOAuthCreds(configID string) error {
 // (mail accounts + standalone contacts sources) that match the given OAuth
 // provider. Used by the Contacts extension's write-access picker to let the
 // user attach a write grant to one of their EXISTING reads, rather than
-// adding a new account from inside the extension (which Aerion's design
+// adding a new account from inside the extension (which aulycmail's design
 // forbids — new accounts always come through core setup paths).
 //
 // Wails-bound. Returns an empty slice when nothing matches — the picker

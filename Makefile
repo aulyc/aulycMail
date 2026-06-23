@@ -1,7 +1,7 @@
-# Aerion Email Client - Build System (macOS-only slim build)
+# aulycmail Email Client - Build System (macOS-only slim build)
 #
 # Usage:
-#   make build    - Build production binary (Aerion.app)
+#   make build    - Build production binary (aulycmail.app)
 #   make dev      - Run in development mode
 #   make help     - Show all available targets
 #
@@ -20,7 +20,7 @@
 export
 
 # Go module path
-MODULE := github.com/hkdb/aerion
+MODULE := github.com/aulyc/aulycmail
 
 # Build flags for injecting OAuth credentials at compile time.
 #
@@ -29,19 +29,19 @@ MODULE := github.com/hkdb/aerion
 #                               manifest declares in
 #                               first_party_uses_core_for_scopes (today:
 #                               contacts.readonly). Surfaced as
-#                               "Aerion - Google" in the picker.
+#                               "aulycmail - Google" in the picker.
 #   MICROSOFT_CLIENT_ID       — mail's Azure AD app registration. Also
 #                               backs microsoft-contacts and
 #                               microsoft-calendar (Microsoft Graph
 #                               doesn't gate scopes behind verification).
-#                               Surfaced as "Aerion - Microsoft".
+#                               Surfaced as "aulycmail - Microsoft".
 #   GOOGLE_TESTING_CLIENT_ID/SECRET — shared un-Google-verified test
 #                               project for extensions that need broader
 #                               scopes than the mail project carries
 #                               (contacts.readwrite, full Calendar).
 #                               Single client backs google-contacts AND
 #                               google-calendar slots. Surfaced as
-#                               "Aerion - Google (Testing)".
+#                               "aulycmail - Google (Testing)".
 LDFLAGS := -X '$(MODULE)/internal/oauth2.GoogleClientID=$(GOOGLE_CLIENT_ID)' \
            -X '$(MODULE)/internal/oauth2.GoogleClientSecret=$(GOOGLE_CLIENT_SECRET)' \
            -X '$(MODULE)/internal/oauth2.MicrosoftClientID=$(MICROSOFT_CLIENT_ID)' \
@@ -56,21 +56,21 @@ all: build
 
 ## Build Targets
 
-# Build production binary (Aerion.app) and ad-hoc sign it
+# Build production binary (aulycmail.app) and ad-hoc sign it
 # (ad-hoc signature is required for macOS notifications to work).
 build:
-	@echo "Building Aerion..."
+	@echo "Building aulycmail..."
 	@if [ -z "$(GOOGLE_CLIENT_ID)" ] && [ -z "$(MICROSOFT_CLIENT_ID)" ]; then \
 		echo "Warning: No OAuth credentials configured. Gmail/Outlook OAuth will not work."; \
 		echo "See .env.example for required variables."; \
 	fi
 	wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
-	@echo "Ad-hoc signing Aerion.app (required for macOS notifications)..."
-	codesign --force --deep --sign - build/bin/Aerion.app
+	@echo "Ad-hoc signing aulycmail.app (required for macOS notifications)..."
+	codesign --force --deep --sign - build/bin/aulycmail.app
 
 # Run in development mode with hot reload
 dev:
-	@echo "Starting Aerion in development mode..."
+	@echo "Starting aulycmail in development mode..."
 	wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
 
 # Run in development mode with Go's race detector enabled. Builds significantly
@@ -79,7 +79,7 @@ dev:
 # shared-memory access. Use this when chasing a suspected data race —
 # reproduce the crash and the detector report points right at it.
 dev-race:
-	@echo "Starting Aerion in development mode with -race..."
+	@echo "Starting aulycmail in development mode with -race..."
 	wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
 
 # Generate Wails TypeScript bindings
@@ -119,7 +119,7 @@ clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf build/bin
 	rm -rf frontend/dist
-	rm -f aerion
+	rm -f aulycmail
 
 # Install frontend dependencies
 frontend-deps:
@@ -133,45 +133,45 @@ frontend-update:
 
 ## Installation (macOS)
 
-# Install Aerion to /Applications
+# Install aulycmail to /Applications
 install: install-darwin
 uninstall: uninstall-darwin
 
-# Install Aerion on macOS
+# Install aulycmail on macOS
 install-darwin: build
-	@echo "Installing Aerion.app to /Applications..."
-	@if [ -d "/Applications/Aerion.app" ]; then \
+	@echo "Installing aulycmail.app to /Applications..."
+	@if [ -d "/Applications/aulycmail.app" ]; then \
 		echo "Removing existing installation..."; \
-		rm -rf "/Applications/Aerion.app"; \
+		rm -rf "/Applications/aulycmail.app"; \
 	fi
-	cp -R "build/bin/Aerion.app" "/Applications/"
+	cp -R "build/bin/aulycmail.app" "/Applications/"
 	@echo "Re-signing installed copy..."
-	codesign --force --deep --sign - "/Applications/Aerion.app"
+	codesign --force --deep --sign - "/Applications/aulycmail.app"
 	@echo ""
 	@echo "Installation complete!"
-	@echo "Aerion is now available in /Applications."
+	@echo "aulycmail is now available in /Applications."
 
-# Uninstall Aerion from macOS
+# Uninstall aulycmail from macOS
 uninstall-darwin:
-	@echo "Uninstalling Aerion from /Applications..."
-	rm -rf "/Applications/Aerion.app"
+	@echo "Uninstalling aulycmail from /Applications..."
+	rm -rf "/Applications/aulycmail.app"
 	@echo "Uninstallation complete!"
 
 ## Help
 
 # Show available targets
 help:
-	@echo "Aerion Email Client - Build System (macOS-only)"
+	@echo "aulycmail Email Client - Build System (macOS-only)"
 	@echo ""
 	@echo "Build Targets:"
-	@echo "  make build        - Build production binary (Aerion.app)"
+	@echo "  make build        - Build production binary (aulycmail.app)"
 	@echo "  make dev          - Run in development mode with hot reload"
 	@echo "  make dev-race     - Run in development mode with race detector"
 	@echo "  make generate     - Generate Wails TypeScript bindings"
 	@echo ""
 	@echo "Installation:"
-	@echo "  make install      - Build and install Aerion to /Applications"
-	@echo "  make uninstall    - Uninstall Aerion from /Applications"
+	@echo "  make install      - Build and install aulycmail to /Applications"
+	@echo "  make uninstall    - Uninstall aulycmail from /Applications"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make test          - Run Go tests"

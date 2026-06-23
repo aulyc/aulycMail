@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 

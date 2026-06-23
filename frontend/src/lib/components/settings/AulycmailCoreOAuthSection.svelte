@@ -1,9 +1,9 @@
 <script lang="ts">
-  // AerionCoreOAuthSection — Settings → Accounts disclosure section for
-  // Aerion CORE's OAuth client credentials (google-mail, microsoft-mail).
+  // aulycmailCoreOAuthSection — Settings → Accounts disclosure section for
+  // aulycmail CORE's OAuth client credentials (google-mail, microsoft-mail).
   //
   // COLLAPSED by default — this is advanced power-user territory. Most users
-  // never expand it; Aerion ships verified mail creds out of the box.
+  // never expand it; aulycmail ships verified mail creds out of the box.
   //
   // Per-extension OAuth slots (google-contacts, microsoft-contacts, etc.)
   // live inside that extension's own settings dialog, NOT here.
@@ -39,7 +39,7 @@
         Override the OAuth Client ID and Secret used for adding Google and Microsoft
         email accounts. Most users should leave these on the shipped defaults.
         Use your own credentials if your organization requires it, or to bypass
-        Aerion's quota / verification status.
+        aulycmail's quota / verification status.
       </p>
       <OAuthCredsSlotEditor
         configID="google-mail"

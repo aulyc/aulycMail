@@ -94,7 +94,7 @@ func deriveKey(salt []byte) []byte {
 	}
 
 	// Combine machine-specific data
-	machineData := fmt.Sprintf("aerion:%s:%s:%d", hostname, username, os.Getuid())
+	machineData := fmt.Sprintf("aulycmail:%s:%s:%d", hostname, username, os.Getuid())
 
 	// Derive key using PBKDF2
 	return pbkdf2.Key([]byte(machineData), salt, pbkdf2Iterations, keySize, sha256.New)

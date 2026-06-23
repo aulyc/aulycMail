@@ -8,7 +8,7 @@ If your language translation does not currently exist and you'd like to submit a
 
 Use this checklist to ensure your submission is complete:
 
-- [ ] **Claimed language** — filed a [Translation issue](https://github.com/hkdb/aerion/issues/new?template=translation.yml) to avoid duplicate efforts
+- [ ] **Claimed language** — filed a [Translation issue](https://github.com/aulyc/aulycmail/issues/new?template=translation.yml) to avoid duplicate efforts
 - [ ] **Core locale JSON** — `frontend/src/lib/i18n/locales/<code>.json` created with all core mail/UI keys translated
 - [ ] **Extension locale JSONs** — one `extensions/<name>/frontend/i18n/locales/<code>.json` per shipping extension (e.g., `extensions/contacts/frontend/i18n/locales/<code>.json`). Optional per locale — extensions you skip fall back to English at runtime; see [§ Extension translations](#extension-translations).
 - [ ] **Register locale** — added `register()` call in `frontend/src/lib/i18n/index.ts` (core locale only — extensions self-register via Vite glob)
@@ -21,9 +21,9 @@ Use this checklist to ensure your submission is complete:
 
 ## Claim Your Language
 
-Check [existing translation issues](https://github.com/hkdb/aerion/issues?q=label%3Atranslate) first — if someone is already working on your language, consider collaborating with them instead.
+Check [existing translation issues](https://github.com/aulyc/aulycmail/issues?q=label%3Atranslate) first — if someone is already working on your language, consider collaborating with them instead.
 
-Before starting any translation work, **file a [Translation issue](https://github.com/hkdb/aerion/issues/new?template=translation.yml)** to declare your intent. This prevents duplicate efforts and lets maintainers coordinate with contributors.
+Before starting any translation work, **file a [Translation issue](https://github.com/aulyc/aulycmail/issues/new?template=translation.yml)** to declare your intent. This prevents duplicate efforts and lets maintainers coordinate with contributors.
 
 ## Branch Target
 
@@ -62,9 +62,9 @@ Include in your PR:
 
 ---
 
-## Adding a New Language to Aerion
+## Adding a New Language to aulycmail
 
-The following sections walk through adding a new language to Aerion's frontend. The i18n system uses `svelte-i18n` with JSON locale files and lazy loading — only the active locale is loaded at runtime.
+The following sections walk through adding a new language to aulycmail's frontend. The i18n system uses `svelte-i18n` with JSON locale files and lazy loading — only the active locale is loaded at runtime.
 
 ## Prerequisites
 
@@ -207,7 +207,7 @@ No backend changes are needed. The language setting is stored via the existing `
 
 ## Extension translations
 
-Aerion's extensions (Contacts today; Calendar and others over time) own their UI strings separately from the core mail locale files. This keeps each extension self-contained and lets translators pick up an extension independently of the core file.
+aulycmail's extensions (Contacts today; Calendar and others over time) own their UI strings separately from the core mail locale files. This keeps each extension self-contained and lets translators pick up an extension independently of the core file.
 
 ### Layout per extension
 

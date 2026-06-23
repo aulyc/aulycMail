@@ -11,7 +11,7 @@ import (
 	"unicode/utf8"
 
 	msgcharset "github.com/emersion/go-message/charset"
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/logging"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding/htmlindex"
 )

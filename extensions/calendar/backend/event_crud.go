@@ -128,7 +128,7 @@ func (a *API) CreateEvent(in EventInput) (string, error) {
 		return "", ErrNotWritable
 	}
 
-	uid := uuid.NewString() + "@aerion-" + src.Type
+	uid := uuid.NewString() + "@aulycmail-" + src.Type
 	icsBlob, err := serializeVEVENT(uid, in)
 	if err != nil {
 		return "", fmt.Errorf("serialize event: %w", err)
@@ -160,7 +160,7 @@ func (a *API) CreateEvent(in EventInput) (string, error) {
 	// place attendee data ends up — EventDetail / EventComposerDialog
 	// read the JSON columns, not the parsed ICS, so attendees disappear
 	// from the UI even though the provider received them and sent
-	// invitations. (Bug: invitee got the email but Aerion's UI lost them.)
+	// invitations. (Bug: invitee got the email but aulycmail's UI lost them.)
 	ev.Attendees, ev.Organizer = attendeesFromInput(in)
 
 	provider := ProviderForSource(*src, ProviderDeps{Store: a.store, Secrets: a.secrets, Auth: a.auth})
@@ -389,7 +389,7 @@ func (a *API) persistThisAndFutureUpdateLocally(master Event, in EventInput, res
 		newProviderEventID = result.NewSeries.ProviderEventID
 	}
 	if newUID == "" {
-		newUID = uuid.NewString() + "@aerion-local"
+		newUID = uuid.NewString() + "@aulycmail-local"
 	}
 	newICS, err := serializeVEVENT(newUID, in)
 	if err != nil {
@@ -878,7 +878,7 @@ func serializeVEVENT(uid string, in EventInput) (string, error) {
 
 	cal := ical.NewCalendar()
 	cal.Props.SetText(ical.PropVersion, "2.0")
-	cal.Props.SetText(ical.PropProductID, "-//Aerion//Calendar Extension//EN")
+	cal.Props.SetText(ical.PropProductID, "-//aulycmail//Calendar Extension//EN")
 	cal.Children = append(cal.Children, event.Component)
 
 	var buf bytes.Buffer

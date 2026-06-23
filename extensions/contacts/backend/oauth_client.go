@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/hkdb/aerion/internal/carddav"
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
+	"github.com/aulyc/aulycmail/internal/carddav"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
 )
 
 // httpClientForSource returns an authenticated *http.Client for a Google /

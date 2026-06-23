@@ -1,4 +1,4 @@
-module github.com/hkdb/aerion
+module github.com/aulyc/aulycmail
 
 go 1.25.0
 
@@ -67,4 +67,4 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 )
 
-// replace github.com/wailsapp/wails/v2 v2.11.0 => /home/hkdb/go/pkg/mod
+// replace github.com/wailsapp/wails/v2 v2.11.0 => /home/aulyc/go/pkg/mod

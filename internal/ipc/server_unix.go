@@ -68,9 +68,9 @@ func (s *UnixServer) Stop() error {
 
 // createSocketPath creates the socket directory and returns the socket path.
 func (s *UnixServer) createSocketPath() (string, error) {
-	// Use /tmp/aerion-{uid}/ directory
+	// Use /tmp/aulycmail-{uid}/ directory
 	uid := os.Getuid()
-	socketDir := filepath.Join(os.TempDir(), fmt.Sprintf("aerion-%d", uid))
+	socketDir := filepath.Join(os.TempDir(), fmt.Sprintf("aulycmail-%d", uid))
 
 	// Create directory with restrictive permissions (0700)
 	if err := os.MkdirAll(socketDir, 0700); err != nil {

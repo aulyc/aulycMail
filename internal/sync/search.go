@@ -9,7 +9,7 @@ import (
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
-	"github.com/hkdb/aerion/internal/message"
+	"github.com/aulyc/aulycmail/internal/message"
 )
 
 // IMAPSearchResponse wraps search results with the total count of matching UIDs.

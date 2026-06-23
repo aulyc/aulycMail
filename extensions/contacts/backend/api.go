@@ -8,13 +8,13 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	"github.com/hkdb/aerion/extensions/contacts/backend/imaging"
-	"github.com/hkdb/aerion/internal/carddav"
-	"github.com/hkdb/aerion/internal/contact"
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
+	"github.com/aulyc/aulycmail/extensions/contacts/backend/imaging"
+	"github.com/aulyc/aulycmail/internal/carddav"
+	"github.com/aulyc/aulycmail/internal/contact"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
 )
 
-// Source IDs for Aerion's core local contact store. CardDAV sources use their
+// Source IDs for aulycmail's core local contact store. CardDAV sources use their
 // own UUIDs (one per configured source).
 //
 // The local source has two sub-categories distinguished by `contacts.kind`:

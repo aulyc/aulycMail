@@ -7,7 +7,7 @@ import (
 	"runtime"
 )
 
-const appName = "aerion"
+const appName = "aulycmail"
 
 // Paths holds the application data paths
 type Paths struct {
@@ -68,8 +68,8 @@ func getDarwinPaths() (*Paths, error) {
 		return nil, err
 	}
 
-	appSupport := filepath.Join(home, "Library", "Application Support", "Aerion")
-	caches := filepath.Join(home, "Library", "Caches", "Aerion")
+	appSupport := filepath.Join(home, "Library", "Application Support", "aulycmail")
+	caches := filepath.Join(home, "Library", "Caches", "aulycmail")
 
 	return &Paths{
 		Config: appSupport,
@@ -101,9 +101,9 @@ func getWindowsPaths() (*Paths, error) {
 	}
 
 	return &Paths{
-		Config: filepath.Join(appData, "Aerion"),
-		Data:   filepath.Join(appData, "Aerion"),
-		Cache:  filepath.Join(localAppData, "Aerion", "Cache"),
+		Config: filepath.Join(appData, "aulycmail"),
+		Data:   filepath.Join(appData, "aulycmail"),
+		Cache:  filepath.Join(localAppData, "aulycmail", "Cache"),
 	}, nil
 }
 
@@ -138,7 +138,7 @@ func (p *Paths) EnsureDirectories() error {
 
 // DatabasePath returns the path to the main database
 func (p *Paths) DatabasePath() string {
-	return filepath.Join(p.Data, "aerion.db")
+	return filepath.Join(p.Data, "aulycmail.db")
 }
 
 // ContactsDatabasePath returns the path to the contacts database

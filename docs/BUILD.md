@@ -27,11 +27,11 @@ wails doctor
 cp .env.example .env.local
 # Fill in your own creds
 
-# Build (produces build/bin/Aerion.app, ad-hoc signed)
+# Build (produces build/bin/aulycmail.app, ad-hoc signed)
 make build
 
 # Run
-open build/bin/Aerion.app
+open build/bin/aulycmail.app
 
 # Or install to /Applications
 make install-darwin

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	gomessage "github.com/emersion/go-message"
-	"github.com/hkdb/aerion/internal/message"
-	"github.com/hkdb/aerion/internal/pgp"
-	"github.com/hkdb/aerion/internal/smime"
+	"github.com/aulyc/aulycmail/internal/message"
+	"github.com/aulyc/aulycmail/internal/pgp"
+	"github.com/aulyc/aulycmail/internal/smime"
 )
 
 // parseMessageBodyFull parses a raw email and extracts text, HTML, and attachment metadata.

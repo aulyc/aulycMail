@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hkdb/aerion/internal/contact"
+	"github.com/aulyc/aulycmail/internal/contact"
 	"github.com/rs/zerolog"
 )
 

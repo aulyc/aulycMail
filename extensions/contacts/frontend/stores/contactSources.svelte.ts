@@ -84,7 +84,7 @@ function createContactSourcesStore() {
   }
 
   // Synchronous boolean derived from the cached list. Returns false for
-  // unknown ids (the "aerion" local sentinel, OAuth sources not yet
+  // unknown ids (the "aulycmail" local sentinel, OAuth sources not yet
   // writable, etc.) — callers OR with their own local-source check.
   function isSourceWritable(sourceId: string | undefined): boolean {
     if (!sourceId) return false

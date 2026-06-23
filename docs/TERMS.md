@@ -4,11 +4,11 @@
 
 ## Acceptance of Terms
 
-By downloading, installing, or using Aerion ("the Application"), you agree to be bound by these Terms of Use ("Terms"). If you do not agree to these Terms, do not use the Application.
+By downloading, installing, or using aulycmail ("the Application"), you agree to be bound by these Terms of Use ("Terms"). If you do not agree to these Terms, do not use the Application.
 
 ## Description of Service
 
-Aerion is an open-source desktop email client. The official Aerion website and online documentation is hosted at [https://aerion.3df.io](https://aerion.3df.io). Aerion allows you to:
+aulycmail is an open-source desktop email client. The official aulycmail website and online documentation is hosted at [https://github.com/aulyc/aulycmail](https://github.com/aulyc/aulycmail). aulycmail allows you to:
 
 - Connect to email accounts via IMAP/SMTP
 - Send and receive emails
@@ -16,32 +16,32 @@ Aerion is an open-source desktop email client. The official Aerion website and o
 - Sync contacts from CardDAV, Google, and Microsoft services
 - Use OAuth authentication for Gmail and Outlook
 
-Aerion is a local application that runs on your computer. We do not provide any cloud services, email hosting, or server infrastructure.
+aulycmail is a local application that runs on your computer. We do not provide any cloud services, email hosting, or server infrastructure.
 
 ## Open Source License
 
-Aerion is licensed under the Apache License 2.0. You can:
+aulycmail is licensed under the Apache License 2.0. You can:
 
 - Use the software for any purpose
 - Distribute copies of the software
 - Modify the software and distribute your modifications
 - Use the software commercially
 
-Subject to the conditions of the Apache License 2.0, including preservation of copyright notices and disclaimers. The full license text is available in the LICENSE file included with the Application and at [https://github.com/hkdb/aerion](https://github.com/hkdb/aerion).
+Subject to the conditions of the Apache License 2.0, including preservation of copyright notices and disclaimers. The full license text is available in the LICENSE file included with the Application and at [https://github.com/aulyc/aulycmail](https://github.com/aulyc/aulycmail).
 
 ## User Responsibilities
 
 You are responsible for:
 
 1. **Account Security** - Maintaining the security of your email account credentials
-2. **Device Security** - Securing the device on which Aerion is installed
+2. **Device Security** - Securing the device on which aulycmail is installed
 3. **Legal Compliance** - Using the Application in compliance with applicable laws
 4. **Email Provider Terms** - Complying with your email provider's terms of service
 5. **Backup** - Maintaining backups of important data
 
 ## Acceptable Use
 
-You agree not to use Aerion to:
+You agree not to use aulycmail to:
 
 - Send spam, malware, or phishing emails
 - Violate any applicable laws or regulations
@@ -61,11 +61,11 @@ To the fullest extent permitted by law, we disclaim all warranties, including bu
 - Accuracy or reliability of the Application
 - That the Application will be uninterrupted, secure, or error-free
 
-**Aerion is pre-release software currently in active development. Features may change, and bugs may exist. Use at your own risk.**
+**aulycmail is pre-release software currently in active development. Features may change, and bugs may exist. Use at your own risk.**
 
 ## Limitation of Liability
 
-**TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE DEVELOPERS, CONTRIBUTORS, OR SPONSORS OF AERION BE LIABLE FOR:**
+**TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE DEVELOPERS, CONTRIBUTORS, OR SPONSORS OF AULYCMAIL BE LIABLE FOR:**
 
 - Any indirect, incidental, special, consequential, or punitive damages
 - Loss of profits, data, use, goodwill, or other intangible losses
@@ -80,7 +80,7 @@ To the fullest extent permitted by law, we disclaim all warranties, including bu
 
 ## Indemnification
 
-You agree to indemnify, defend, and hold harmless the developers, contributors, and sponsors of Aerion from any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising from:
+You agree to indemnify, defend, and hold harmless the developers, contributors, and sponsors of aulycmail from any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising from:
 
 - Your use of the Application
 - Your violation of these Terms
@@ -89,7 +89,7 @@ You agree to indemnify, defend, and hold harmless the developers, contributors, 
 
 ## Third-Party Services
 
-Aerion integrates with third-party services including:
+aulycmail integrates with third-party services including:
 
 - Email providers (via IMAP/SMTP)
 - Google APIs
@@ -100,7 +100,7 @@ Your use of these services is subject to their respective terms of service and p
 
 ## Modifications to the Application
 
-As an open-source project, Aerion is continuously evolving. We may:
+As an open-source project, aulycmail is continuously evolving. We may:
 
 - Add, modify, or remove features at any time
 - Release updates that change functionality
@@ -118,12 +118,12 @@ If any provision of these Terms is found to be unenforceable, the remaining prov
 
 ## Entire Agreement
 
-These Terms constitute the entire agreement between you and the developers of Aerion regarding the use of the Application, superseding any prior agreements.
+These Terms constitute the entire agreement between you and the developers of aulycmail regarding the use of the Application, superseding any prior agreements.
 
 ## Contact Us
 
 If you have questions about these Terms of Use, please contact us at:
 
-**Email:** aerion@3df.io
+**Email:** xaulyc@gmail.com
 
-**GitHub Issues:** [https://github.com/hkdb/aerion/issues](https://github.com/hkdb/aerion/issues)
+**GitHub Issues:** [https://github.com/aulyc/aulycmail/issues](https://github.com/aulyc/aulycmail/issues)

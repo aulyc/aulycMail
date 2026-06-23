@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hkdb/aerion/internal/contact"
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/contact"
+	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 

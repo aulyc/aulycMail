@@ -80,7 +80,7 @@
       "namePlaceholder": "z. B. Private Nextcloud",
       "urlLabel": "Server-URL",
       "urlPlaceholder": "https://cloud.example.com/remote.php/dav",
-      "urlHelp": "Geben Sie die Basis-URL oder die vollständige Kalender-Haupt-URL ein. Aerion wird gängige Pfade automatisch prüfen.",
+      "urlHelp": "Geben Sie die Basis-URL oder die vollständige Kalender-Haupt-URL ein. aulycmail wird gängige Pfade automatisch prüfen.",
       "usernameLabel": "Benutzername",
       "passwordLabel": "Passwort",
       "submit": "Suchen & Verbinden",
@@ -104,7 +104,7 @@
       "providerLabelMicrosoft": "Outlook",
       "organizerEmailLabel": "E-Mail des Organisators",
       "organizerEmailPlaceholder": "ihre-adresse@example.com",
-      "organizerEmailPrompt": "Ihr Server hat keine Kalender-Benutzeradresse bereitgestellt. Geben Sie die E-Mail-Adresse ein, die Aerion als Organisator für Besprechungen in dieser Quelle verwenden soll.",
+      "organizerEmailPrompt": "Ihr Server hat keine Kalender-Benutzeradresse bereitgestellt. Geben Sie die E-Mail-Adresse ein, die aulycmail als Organisator für Besprechungen in dieser Quelle verwenden soll.",
       "organizerEmailHelp": "Dies ist die Adresse, die bei von Ihnen erstellten Terminen als ORGANISATOR angezeigt wird.",
       "organizerEmailInvalid": "Geben Sie eine gültige E-Mail-Adresse ein."
     },
@@ -176,7 +176,7 @@
       "providerDefaultsLabel": "Standardwerte pro Konto",
       "noDefaultsHint": "Fügen Sie einen Kalender hinzu, um Standardwerte festzulegen.",
       "oauthSection": "OAuth-Anmeldedaten (erweitert)",
-      "oauthHelp": "Wählen Sie den Google- oder Microsoft-OAuth-Client, den diese Erweiterung verwendet. Der Standardwert (Aerion Testing für Google, Aerion - Microsoft für Microsoft) ist für die meisten Benutzer optimal.",
+      "oauthHelp": "Wählen Sie den Google- oder Microsoft-OAuth-Client, den diese Erweiterung verwendet. Der Standardwert (aulycmail Testing für Google, aulycmail - Microsoft für Microsoft) ist für die meisten Benutzer optimal.",
       "oauthGoogleLabel": "Google",
       "oauthMicrosoftLabel": "Microsoft",
       "intervalMinutes": "{n} Minuten",
@@ -236,7 +236,7 @@
       "renameTitle": "Quelle umbenennen",
       "renameToastSuccess": "Umbenannt in „{name}“",
       "timezoneSection": "Anzeige-Zeitzone",
-      "timezoneHelp": "Wählen Sie die Zeitzone, die Aerion zur Darstellung der Termine verwenden soll. 'Automatisch' nutzt Ihre Systemzeitzone."
+      "timezoneHelp": "Wählen Sie die Zeitzone, die aulycmail zur Darstellung der Termine verwenden soll. 'Automatisch' nutzt Ihre Systemzeitzone."
     },
     "localCalendar": {
       "title": "Lokalen Kalender hinzufügen",

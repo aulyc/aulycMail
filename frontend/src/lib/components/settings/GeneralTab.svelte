@@ -66,13 +66,13 @@
 
   // Title bar options
   const titleBarOptions = $derived([
-    { value: 'aerion', label: $_('settingsGeneral.titleBarAerion'), description: $_('settingsGeneral.titleBarAerionDesc') },
+    { value: 'aulycmail', label: $_('settingsGeneral.titleBaraulycmail'), description: $_('settingsGeneral.titleBaraulycmailDesc') },
     { value: 'native', label: $_('settingsGeneral.titleBarNative'), description: $_('settingsGeneral.titleBarNativeDesc') },
     { value: 'disable', label: $_('settingsGeneral.titleBarDisable'), description: $_('settingsGeneral.titleBarDisableDesc') },
   ])
 
   const titleBarValue = $derived(
-    nativeTitleBar ? 'native' : showTitleBar ? 'aerion' : 'disable'
+    nativeTitleBar ? 'native' : showTitleBar ? 'aulycmail' : 'disable'
   )
 
   // Theme mode options
@@ -133,7 +133,7 @@
 
   function handleTitleBarChange(value: string) {
     switch (value) {
-      case 'aerion':
+      case 'aulycmail':
         nativeTitleBar = false
         showTitleBar = true
         break

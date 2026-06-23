@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/hkdb/aerion/internal/appstate"
-	"github.com/hkdb/aerion/internal/platform"
+	"github.com/aulyc/aulycmail/internal/appstate"
+	"github.com/aulyc/aulycmail/internal/platform"
 )
 
 // ============================================================================
@@ -23,7 +23,7 @@ func (a *App) SaveUIState(state *appstate.UIState) error {
 // App Info API - Exposed to frontend via Wails bindings
 // ============================================================================
 
-// Version is the Aerion release version. Bump on each release; consumed by
+// Version is the aulycmail release version. Bump on each release; consumed by
 // the About dialog via GetAppInfo() and by the --version CLI flag in main.go.
 // (wails.json, frontend/package.json, and metainfo.xml each carry their own
 // version strings for their respective tooling.)
@@ -41,10 +41,10 @@ type AppInfo struct {
 // GetAppInfo returns application metadata for the About dialog
 func (a *App) GetAppInfo() AppInfo {
 	return AppInfo{
-		Name:        "Aerion",
+		Name:        "aulycmail",
 		Version:     Version,
 		Description: "An Open Source Lightweight E-Mail Client",
-		Website:     "https://github.com/hkdb/aerion",
+		Website:     "https://github.com/aulyc/aulycmail",
 		License:     "Apache 2.0",
 	}
 }
@@ -55,7 +55,7 @@ func (a *App) IsFlatpak() bool {
 }
 
 // GetPendingMailto returns and clears any pending mailto: URL data.
-// This is used when Aerion is launched with a mailto: URL argument.
+// This is used when aulycmail is launched with a mailto: URL argument.
 func (a *App) GetPendingMailto() *MailtoData {
 	data := a.PendingMailto
 	a.PendingMailto = nil // Clear after reading

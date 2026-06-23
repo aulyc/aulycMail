@@ -20,9 +20,9 @@
 import { logger } from '$extensions/calendar/frontend/lib/logger'
 import { calendarSources } from '$extensions/calendar/frontend/stores/calendarSources.svelte'
 
-const STORAGE_KEY_TZ        = 'aerion:calendar:displayTimezone'
-const STORAGE_KEY_GLOBAL    = 'aerion:calendar:globalDefaultCalendarId'
-const STORAGE_KEY_PROVIDER  = 'aerion:calendar:providerDefaults'
+const STORAGE_KEY_TZ        = 'aulycmail:calendar:displayTimezone'
+const STORAGE_KEY_GLOBAL    = 'aulycmail:calendar:globalDefaultCalendarId'
+const STORAGE_KEY_PROVIDER  = 'aulycmail:calendar:providerDefaults'
 
 let displayTimezone = $state<string>('')
 let globalDefault = $state<string>('')

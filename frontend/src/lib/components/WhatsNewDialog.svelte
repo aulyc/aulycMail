@@ -1,6 +1,6 @@
 <script lang="ts">
   // Per-version release announcement. Shown once after the user upgrades
-  // to a new Aerion version. Only the explicit OK click records
+  // to a new aulycmail version. Only the explicit OK click records
   // acknowledgement (via onAcknowledge → SetLastSeenVersion in App.svelte).
   // Closing via ESC or outside-click leaves the version unrecorded, so
   // the dialog fires again on next launch.
@@ -21,7 +21,7 @@
 
   let { open = $bindable(false), onAcknowledge }: Props = $props()
 
-  const CHANGELOG_URL = 'https://github.com/hkdb/aerion/blob/main/CHANGELOG.md'
+  const CHANGELOG_URL = 'https://github.com/aulyc/aulycmail/blob/main/CHANGELOG.md'
 
   function openChangelog() {
     BrowserOpenURL(CHANGELOG_URL)
@@ -45,7 +45,7 @@
       </div>
 
       <div class="space-y-4 max-h-[60vh] overflow-y-auto text-sm">
-        <p>🚀 Welcome to Aerion v0.3.0!</p>
+        <p>🚀 Welcome to aulycmail v0.3.0!</p>
 
         <p>Some big changes have gone into this release. Here's a TL;DR summary:</p>
 
@@ -65,7 +65,7 @@
             class="text-primary hover:underline break-all focus:outline-none focus-visible:outline-none focus:ring-0"
             onclick={openChangelog}
           >
-            https://github.com/hkdb/aerion/blob/main/CHANGELOG.md
+            https://github.com/aulyc/aulycmail/blob/main/CHANGELOG.md
           </button>
         </p>
       </div>

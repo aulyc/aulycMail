@@ -6,11 +6,11 @@ import (
 	"time"
 
 	goImap "github.com/emersion/go-imap/v2"
-	"github.com/hkdb/aerion/internal/folder"
-	"github.com/hkdb/aerion/internal/imap"
-	"github.com/hkdb/aerion/internal/logging"
-	"github.com/hkdb/aerion/internal/message"
-	"github.com/hkdb/aerion/internal/undo"
+	"github.com/aulyc/aulycmail/internal/folder"
+	"github.com/aulyc/aulycmail/internal/imap"
+	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/aulyc/aulycmail/internal/message"
+	"github.com/aulyc/aulycmail/internal/undo"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

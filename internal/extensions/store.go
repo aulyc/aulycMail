@@ -1,4 +1,4 @@
-// Package extensions provides infrastructure for Aerion's first-party
+// Package extensions provides infrastructure for aulycmail's first-party
 // extension system. The per-extension Store opens an isolated SQLite file
 // per extension under <dataDir>/extensions/<name>/data.db and exposes a
 // scoped KV namespace alongside whatever extension-specific tables the
@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/hkdb/aerion/internal/database"
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/database"
+	"github.com/aulyc/aulycmail/internal/logging"
 
 	"github.com/rs/zerolog"
 )

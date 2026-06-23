@@ -4,10 +4,10 @@
 extern void goNotificationCallback(char *accountId, char *folderId, char *threadId);
 
 // Delegate that handles notification interactions and foreground presentation
-@interface AerionNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
+@interface aulycmailNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
 @end
 
-@implementation AerionNotificationDelegate
+@implementation aulycmailNotificationDelegate
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
 didReceiveNotificationResponse:(UNNotificationResponse *)response
@@ -40,7 +40,7 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 
 @end
 
-static AerionNotificationDelegate *notifDelegate = nil;
+static aulycmailNotificationDelegate *notifDelegate = nil;
 
 // setupNotifications initializes UNUserNotificationCenter and requests authorization.
 // Dispatches to the main queue since UNUserNotificationCenter delegate must be
@@ -48,16 +48,16 @@ static AerionNotificationDelegate *notifDelegate = nil;
 void setupNotifications(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
-        notifDelegate = [[AerionNotificationDelegate alloc] init];
+        notifDelegate = [[aulycmailNotificationDelegate alloc] init];
         center.delegate = notifDelegate;
 
         [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
                               completionHandler:^(BOOL granted, NSError *error) {
             if (error != nil) {
-                NSLog(@"[Aerion] Notification authorization error: %@", error);
+                NSLog(@"[aulycmail] Notification authorization error: %@", error);
                 return;
             }
-            NSLog(@"[Aerion] Notification authorization granted: %d", granted);
+            NSLog(@"[aulycmail] Notification authorization granted: %d", granted);
         }];
     });
 }
@@ -95,7 +95,7 @@ void showNotification(const char *title, const char *body,
             addNotificationRequest:request
              withCompletionHandler:^(NSError *error) {
                 if (error != nil) {
-                    NSLog(@"[Aerion] Failed to deliver notification: %@", error);
+                    NSLog(@"[aulycmail] Failed to deliver notification: %@", error);
                 }
             }];
     });

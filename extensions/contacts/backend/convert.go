@@ -1,14 +1,14 @@
 package backend
 
 import (
-	"github.com/hkdb/aerion/internal/contact"
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
+	"github.com/aulyc/aulycmail/internal/contact"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
 )
 
 // fromLocal converts a core contact.Contact into the API-surface Contact.
 //
 // Core contacts are keyed by email, so we use the email itself as the ID. The
-// Source field (e.g. "aerion", "google", "vcard", "carddav") becomes SourceID
+// Source field (e.g. "aulycmail", "google", "vcard", "carddav") becomes SourceID
 // for search results where the user hasn't picked a specific source. Used by
 // the autocomplete-style per-email row paths; multi-field fromRecord is the
 // path the Contacts pane uses for its list + detail views.
@@ -32,8 +32,8 @@ func fromLocal(c *contact.Contact) coreapi.Contact {
 // Emails/Phones/Addresses/URLs/IMPPs/Categories slices.
 //
 // SourceID semantics:
-//   - For local records: returns the legacy-mapped Source value ("aerion") so
-//     the ContactDetail.svelte gate `sourceId === 'aerion'` keeps working for
+//   - For local records: returns the legacy-mapped Source value ("aulycmail") so
+//     the ContactDetail.svelte gate `sourceId === 'aulycmail'` keeps working for
 //     Edit/Delete on local contacts.
 //   - For CardDAV records: returns the addressbook-or-source id from
 //     rec.SourceRef (when available). Phase 2b.2.b refines this so the
@@ -60,12 +60,12 @@ func fromRecord(rec *contact.Record) coreapi.Contact {
 		UpdatedAt: rec.UpdatedAt,
 	}
 
-	// Source mapping: 'local' → 'aerion' (legacy compat for the detail-pane
+	// Source mapping: 'local' → 'aulycmail' (legacy compat for the detail-pane
 	// gate). 'carddav' stays as 'carddav' or is overridden by the caller when
 	// it knows a specific source id.
 	out.SourceID = rec.Source
 	if rec.Source == "local" {
-		out.SourceID = "aerion"
+		out.SourceID = "aulycmail"
 	}
 
 	// Flat email list (legacy autocomplete shape) + structured email items.

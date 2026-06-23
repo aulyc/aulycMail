@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/hkdb/aerion/internal/folder"
-	"github.com/hkdb/aerion/internal/imap"
-	"github.com/hkdb/aerion/internal/logging"
-	"github.com/hkdb/aerion/internal/notification"
-	"github.com/hkdb/aerion/internal/platform"
-	"github.com/hkdb/aerion/internal/sync"
+	"github.com/aulyc/aulycmail/internal/folder"
+	"github.com/aulyc/aulycmail/internal/imap"
+	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/aulyc/aulycmail/internal/notification"
+	"github.com/aulyc/aulycmail/internal/platform"
+	"github.com/aulyc/aulycmail/internal/sync"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -346,7 +346,7 @@ func (a *App) sendSystemNotification(info sync.NewMailInfo, subject, fromName, f
 func (a *App) initNotifications(ctx context.Context) {
 	log := logging.WithComponent("app.notify")
 
-	a.notifier = notification.New("Aerion", a.useDirectDBus)
+	a.notifier = notification.New("aulycmail", a.useDirectDBus)
 
 	// Set click handler. Dispatcher routes based on which NotificationData
 	// fields are populated: ExtensionID set → extension click (raise window

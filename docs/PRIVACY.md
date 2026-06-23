@@ -4,13 +4,13 @@
 
 ## Introduction
 
-Aerion ("we," "our," or "the Application") is an open-source desktop email client. The official Aerion website and online documentation is hosted at [https://aerion.3df.io](https://aerion.3df.io). This Privacy Policy explains how Aerion handles your information. Because Aerion is a desktop application that runs entirely on your computer, our approach to privacy is fundamentally different from cloud-based services.
+aulycmail ("we," "our," or "the Application") is an open-source desktop email client. The official aulycmail website and online documentation is hosted at [https://github.com/aulyc/aulycmail](https://github.com/aulyc/aulycmail). This Privacy Policy explains how aulycmail handles your information. Because aulycmail is a desktop application that runs entirely on your computer, our approach to privacy is fundamentally different from cloud-based services.
 
-**Key Point:** Aerion does not operate any servers that collect, store, or process your data. All your information stays on your device.
+**Key Point:** aulycmail does not operate any servers that collect, store, or process your data. All your information stays on your device.
 
 ## Information We Do Not Collect
 
-Unlike many applications, Aerion:
+Unlike many applications, aulycmail:
 
 - **Does not collect** any personal information on external servers
 - **Does not transmit** your emails, contacts, or credentials to us
@@ -20,7 +20,7 @@ Unlike many applications, Aerion:
 
 ## Information Stored Locally on Your Device
 
-Aerion stores the following information locally on your computer:
+aulycmail stores the following information locally on your computer:
 
 ### Email Data
 - Email messages synchronized from your email accounts
@@ -46,7 +46,7 @@ Aerion stores the following information locally on your computer:
 
 ## Google API Services
 
-Aerion uses Google APIs to provide Gmail integration. Our use of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+aulycmail uses Google APIs to provide Gmail integration. Our use of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
 
 ### Google API Scopes Used
 
@@ -55,18 +55,18 @@ Aerion uses Google APIs to provide Gmail integration. Our use of information rec
 
 ### Limited Use Disclosure
 
-Aerion's use and transfer of information received from Google APIs to any other app will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+aulycmail's use and transfer of information received from Google APIs to any other app will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
 
 Specifically:
-- Aerion only uses Google data to provide email functionality to you
-- Aerion does not transfer Google data to third parties
-- Aerion does not use Google data for advertising
-- Aerion does not use Google data to train AI/ML models
+- aulycmail only uses Google data to provide email functionality to you
+- aulycmail does not transfer Google data to third parties
+- aulycmail does not use Google data for advertising
+- aulycmail does not use Google data to train AI/ML models
 - Human access to Google data is limited to debugging with user consent
 
 ## Microsoft API Services
 
-Aerion uses Microsoft Graph APIs to provide Outlook/Microsoft 365 integration.
+aulycmail uses Microsoft Graph APIs to provide Outlook/Microsoft 365 integration.
 
 ### Microsoft API Scopes Used
 
@@ -81,14 +81,14 @@ All Microsoft data is stored locally and used solely for email functionality.
 
 Your data security depends on:
 
-1. **Your device security** - Aerion stores data locally, so your device's security measures (disk encryption, password protection, etc.) protect your email data
+1. **Your device security** - aulycmail stores data locally, so your device's security measures (disk encryption, password protection, etc.) protect your email data
 2. **Secure connections** - All connections to email servers use TLS/SSL encryption
 3. **System keyring** - Sensitive credentials are stored in your operating system's secure credential storage
 4. **No cloud exposure** - Your data is never transmitted to our servers because we don't operate any
 
 ## Third-Party Services
 
-Aerion only connects to services you explicitly configure:
+aulycmail only connects to services you explicitly configure:
 
 - Your email provider (via IMAP/SMTP)
 - Google APIs (if you use Gmail)
@@ -102,25 +102,25 @@ We do not integrate with any advertising networks, analytics services, or other 
 Since all data is stored locally on your device:
 
 - **You control retention** - Data remains until you delete it
-- **Uninstalling Aerion** - Removes the application but may leave data in your local application data directory
-- **Complete removal** - Delete the Aerion data directory to remove all locally stored data
+- **Uninstalling aulycmail** - Removes the application but may leave data in your local application data directory
+- **Complete removal** - Delete the aulycmail data directory to remove all locally stored data
 
 ## Children's Privacy
 
-Aerion is not directed at children under 13. We do not knowingly collect information from children. Since Aerion stores all data locally and does not transmit data to external servers, parental supervision of the device itself is the appropriate safeguard.
+aulycmail is not directed at children under 13. We do not knowingly collect information from children. Since aulycmail stores all data locally and does not transmit data to external servers, parental supervision of the device itself is the appropriate safeguard.
 
 ## Changes to This Privacy Policy
 
-We may update this Privacy Policy from time to time. Changes will be reflected in the "Last Updated" date. Since Aerion is open source, you can review any changes in our public repository.
+We may update this Privacy Policy from time to time. Changes will be reflected in the "Last Updated" date. Since aulycmail is open source, you can review any changes in our public repository.
 
 ## Open Source Transparency
 
-Aerion is open-source software. You can review exactly how we handle your data by examining our source code at [https://github.com/hkdb/aerion](https://github.com/hkdb/aerion).
+aulycmail is open-source software. You can review exactly how we handle your data by examining our source code at [https://github.com/aulyc/aulycmail](https://github.com/aulyc/aulycmail).
 
 ## Contact Us
 
 If you have questions about this Privacy Policy, please contact us at:
 
-**Email:** aerion@3df.io
+**Email:** xaulyc@gmail.com
 
-**GitHub Issues:** [https://github.com/hkdb/aerion/issues](https://github.com/hkdb/aerion/issues)
+**GitHub Issues:** [https://github.com/aulyc/aulycmail/issues](https://github.com/aulyc/aulycmail/issues)

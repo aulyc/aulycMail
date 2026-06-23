@@ -1,16 +1,16 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "aerion",
-  "outputfilename": "aerion",
+  "name": "aulycmail",
+  "outputfilename": "aulycmail",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "info": {
-    "companyName": "Aerion",
-    "productName": "Aerion",
+    "companyName": "aulycmail",
+    "productName": "aulycmail",
     "productVersion": "0.3.0",
-    "copyright": "Copyright 2024-2025",
+    "copyright": "Copyright © 2026 aulyc",
     "comments": "A modern, cross-platform email client",
     "protocols": [
       {
@@ -20,7 +20,7 @@
     ]
   },
   "author": {
-    "name": "hkdb",
-    "email": "hkdb@3df.io"
+    "name": "aulyc",
+    "email": "xaulyc@gmail.com"
   }
 }

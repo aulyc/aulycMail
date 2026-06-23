@@ -4,7 +4,7 @@ package backend
 //
 // Implements the Provider interface for Microsoft Graph Calendar
 // (Outlook.com + Microsoft 365) using coreapi.Auth's OAuth-vended
-// *http.Client. Translation between Graph's event JSON and Aerion's
+// *http.Client. Translation between Graph's event JSON and aulycmail's
 // ICS blob lives in provider_microsoft_translate.go.
 //
 // Storage model unchanged from Google: events.ics_blob holds a
@@ -39,7 +39,7 @@ import (
 
 	"github.com/google/uuid"
 
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
 )
 
 const (
@@ -616,7 +616,7 @@ func (p microsoftProvider) PushEvent(ctx context.Context, src Source, cal Calend
 }
 
 // graphEventToAttendees converts the Graph response's attendees +
-// organizer fields into Aerion's shape. Mirrors googleEventToAttendees
+// organizer fields into aulycmail's shape. Mirrors googleEventToAttendees
 // in provider_google.go — round-trips through ICS so the parser is the
 // single source of truth.
 func graphEventToAttendees(out graphEvent) ([]Attendee, *Organizer) {
@@ -817,7 +817,7 @@ func (p microsoftProvider) pushThisAndFuture(ctx context.Context, client *http.C
 	}
 
 	// POST new event with the new series.
-	newUID := uuid.NewString() + "@aerion-microsoft"
+	newUID := uuid.NewString() + "@aulycmail-microsoft"
 	newICS, serr := serializeVEVENT(newUID, payload.In)
 	if serr != nil {
 		return PushInstanceResult{}, fmt.Errorf("serialize new series: %w", serr)

@@ -80,7 +80,7 @@
       "namePlaceholder": "es. Nextcloud personale",
       "urlLabel": "URL del server",
       "urlPlaceholder": "https://cloud.esempio.com/remote.php/dav",
-      "urlHelp": "Inserisci l'URL di base o l'URL completo della pagina iniziale del calendario. Aerion verificherà i percorsi più comuni.",
+      "urlHelp": "Inserisci l'URL di base o l'URL completo della pagina iniziale del calendario. aulycmail verificherà i percorsi più comuni.",
       "usernameLabel": "Nome utente",
       "passwordLabel": "Password",
       "submit": "Scopri e connettiti",
@@ -104,7 +104,7 @@
       "providerLabelMicrosoft": "Outlook",
       "organizerEmailLabel": "Indirizzo di posta elettronica dell'organizzatore",
       "organizerEmailPlaceholder": "tu@esempio.com",
-      "organizerEmailPrompt": "Il tuo server non ha pubblicato l'indirizzo di posta elettronica dell'utente del calendario. Inserisci l'indirizzo di posta elettronica che Aerion dovrà utilizzare come organizzatore della riunione per gli eventi di questa fonte.",
+      "organizerEmailPrompt": "Il tuo server non ha pubblicato l'indirizzo di posta elettronica dell'utente del calendario. Inserisci l'indirizzo di posta elettronica che aulycmail dovrà utilizzare come organizzatore della riunione per gli eventi di questa fonte.",
       "organizerEmailHelp": "Questo è l'indirizzo che apparirà come ORGANIZZATORE negli eventi che creerai qui.",
       "organizerEmailInvalid": "Inserisci un indirizzo e-mail valido."
     },
@@ -176,7 +176,7 @@
       "providerDefaultsLabel": "Impostazioni predefinite per account",
       "noDefaultsHint": "Aggiungi un calendario per impostare i valori predefiniti.",
       "oauthSection": "Credenziali OAuth (livello avanzato)",
-      "oauthHelp": "Scegli il client OAuth di Google o Microsoft utilizzato da questa estensione. L'impostazione predefinita (Aerion testing per Google, Aerion - Microsoft per Microsoft) è adeguata per la maggior parte degli utenti.",
+      "oauthHelp": "Scegli il client OAuth di Google o Microsoft utilizzato da questa estensione. L'impostazione predefinita (aulycmail testing per Google, aulycmail - Microsoft per Microsoft) è adeguata per la maggior parte degli utenti.",
       "oauthGoogleLabel": "Google",
       "oauthMicrosoftLabel": "Microsoft",
       "intervalMinutes": "{n} minuti",
@@ -236,7 +236,7 @@
       "renameTitle": "Rinomina fonte",
       "renameToastSuccess": "Rinominata in \"{name}\"",
       "timezoneSection": "Visualizza fuso orario",
-      "timezoneHelp": "Scegli il fuso orario che Aerion deve utilizzare per visualizzare gli orari degli eventi. L'opzione “Rilevamento automatico” utilizza il fuso orario del tuo sistema."
+      "timezoneHelp": "Scegli il fuso orario che aulycmail deve utilizzare per visualizzare gli orari degli eventi. L'opzione “Rilevamento automatico” utilizza il fuso orario del tuo sistema."
     },
     "localCalendar": {
       "title": "Aggiungi un calendario locale",

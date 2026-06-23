@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hkdb/aerion/internal/database"
+	"github.com/aulyc/aulycmail/internal/database"
 )
 
 // newBodyFailedTestStore opens a migrated temp DB, seeds one (account, folder)

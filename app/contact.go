@@ -3,9 +3,9 @@ package app
 import (
 	"strings"
 
-	"github.com/hkdb/aerion/internal/account"
-	"github.com/hkdb/aerion/internal/contact"
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/account"
+	"github.com/aulyc/aulycmail/internal/contact"
+	"github.com/aulyc/aulycmail/internal/logging"
 )
 
 // ============================================================================

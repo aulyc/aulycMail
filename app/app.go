@@ -11,34 +11,34 @@ import (
 	goSync "sync"
 	"time"
 
-	"github.com/hkdb/aerion/internal/account"
-	"github.com/hkdb/aerion/internal/appstate"
-	"github.com/hkdb/aerion/internal/carddav"
-	"github.com/hkdb/aerion/internal/certificate"
-	"github.com/hkdb/aerion/internal/contact"
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
-	"github.com/hkdb/aerion/internal/credentials"
-	"github.com/hkdb/aerion/internal/database"
-	"github.com/hkdb/aerion/internal/draft"
-	extcalendarbe "github.com/hkdb/aerion/extensions/calendar/backend"
-	extcontactsbe "github.com/hkdb/aerion/extensions/contacts/backend"
-	extauth "github.com/hkdb/aerion/internal/extensions/auth"
-	extcompose "github.com/hkdb/aerion/internal/extensions/compose"
-	extmail "github.com/hkdb/aerion/internal/extensions/mail"
-	extui "github.com/hkdb/aerion/internal/extensions/ui"
-	"github.com/hkdb/aerion/internal/folder"
-	"github.com/hkdb/aerion/internal/imap"
-	"github.com/hkdb/aerion/internal/ipc"
-	"github.com/hkdb/aerion/internal/logging"
-	"github.com/hkdb/aerion/internal/message"
-	"github.com/hkdb/aerion/internal/notification"
-	"github.com/hkdb/aerion/internal/oauth2"
-	"github.com/hkdb/aerion/internal/platform"
-	"github.com/hkdb/aerion/internal/settings"
-	"github.com/hkdb/aerion/internal/pgp"
-	"github.com/hkdb/aerion/internal/smime"
-	"github.com/hkdb/aerion/internal/sync"
-	"github.com/hkdb/aerion/internal/undo"
+	"github.com/aulyc/aulycmail/internal/account"
+	"github.com/aulyc/aulycmail/internal/appstate"
+	"github.com/aulyc/aulycmail/internal/carddav"
+	"github.com/aulyc/aulycmail/internal/certificate"
+	"github.com/aulyc/aulycmail/internal/contact"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	"github.com/aulyc/aulycmail/internal/credentials"
+	"github.com/aulyc/aulycmail/internal/database"
+	"github.com/aulyc/aulycmail/internal/draft"
+	extcalendarbe "github.com/aulyc/aulycmail/extensions/calendar/backend"
+	extcontactsbe "github.com/aulyc/aulycmail/extensions/contacts/backend"
+	extauth "github.com/aulyc/aulycmail/internal/extensions/auth"
+	extcompose "github.com/aulyc/aulycmail/internal/extensions/compose"
+	extmail "github.com/aulyc/aulycmail/internal/extensions/mail"
+	extui "github.com/aulyc/aulycmail/internal/extensions/ui"
+	"github.com/aulyc/aulycmail/internal/folder"
+	"github.com/aulyc/aulycmail/internal/imap"
+	"github.com/aulyc/aulycmail/internal/ipc"
+	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/aulyc/aulycmail/internal/message"
+	"github.com/aulyc/aulycmail/internal/notification"
+	"github.com/aulyc/aulycmail/internal/oauth2"
+	"github.com/aulyc/aulycmail/internal/platform"
+	"github.com/aulyc/aulycmail/internal/settings"
+	"github.com/aulyc/aulycmail/internal/pgp"
+	"github.com/aulyc/aulycmail/internal/smime"
+	"github.com/aulyc/aulycmail/internal/sync"
+	"github.com/aulyc/aulycmail/internal/undo"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -368,14 +368,14 @@ type StartupDialogInfo struct {
 // Other backends show the URL as selectable plain text and use the
 // ActionURL field to drive an "Open Docs" button.
 func StartupDialogInfoFor(err error) StartupDialogInfo {
-	const docsRollbackURL = "https://github.com/hkdb/aerion/blob/main/docs/SQL_ROLLBACK.md"
+	const docsRollbackURL = "https://github.com/aulyc/aulycmail/blob/main/docs/SQL_ROLLBACK.md"
 
 	var schemaTooNew *database.ErrSchemaTooNew
 	if errors.As(err, &schemaTooNew) {
 		text := fmt.Sprintf(
-			"Aerion cannot open your database because its schema (version %d) is newer "+
-				"than this build of Aerion supports (max version %d).\n\n"+
-				"This usually means you downgraded Aerion. To recover, either reinstall "+
+			"aulycmail cannot open your database because its schema (version %d) is newer "+
+				"than this build of aulycmail supports (max version %d).\n\n"+
+				"This usually means you downgraded aulycmail. To recover, either reinstall "+
 				"the newer version, or follow the rollback instructions to bring your "+
 				"database back to version %d:\n\n"+
 				"%s",
@@ -383,15 +383,15 @@ func StartupDialogInfoFor(err error) StartupDialogInfo {
 			docsRollbackURL,
 		)
 		return StartupDialogInfo{
-			Title:       "Aerion could not start",
+			Title:       "aulycmail could not start",
 			Text:        text,
 			ActionLabel: "Open Docs",
 			ActionURL:   docsRollbackURL,
 		}
 	}
 	return StartupDialogInfo{
-		Title: "Aerion could not start",
-		Text:  fmt.Sprintf("Aerion could not start.\n\nDetails: %v", err),
+		Title: "aulycmail could not start",
+		Text:  fmt.Sprintf("aulycmail could not start.\n\nDetails: %v", err),
 	}
 }
 
@@ -465,7 +465,7 @@ func (a *App) Preflight() error {
 
 	// Wire user-picked slot aliases into the oauth2 resolver chain. When the
 	// user has chosen a non-default shipped option for a given config id
-	// (e.g., contacts settings → "Aerion mail client" reroutes google-contacts
+	// (e.g., contacts settings → "aulycmail mail client" reroutes google-contacts
 	// onto google-mail), the resolver consults this hook after the user-
 	// override step and before the provider chain.
 	oauth2.SlotAliasLookup = func(configID string) (string, bool) {
@@ -476,8 +476,8 @@ func (a *App) Preflight() error {
 		return target, true
 	}
 
-	// Wire the user's explicit picker choice ("custom" / "aerion-shipped"
-	// / "aerion-mail") into the resolver. When recorded, this routes the
+	// Wire the user's explicit picker choice ("custom" / "aulycmail-shipped"
+	// / "aulycmail-mail") into the resolver. When recorded, this routes the
 	// resolver by choice rather than by row presence — so switching the
 	// picker between options no longer requires destroying stored values
 	// to make the new option take effect.
@@ -806,7 +806,7 @@ func (a *App) Startup(ctx context.Context) {
 	// Initialize autostart manager
 	a.autostartMgr = platform.NewAutostartManager()
 
-	log.Info().Msg("Aerion started successfully")
+	log.Info().Msg("aulycmail started successfully")
 }
 
 // IsReady reports whether Startup has fully completed. The frontend calls
@@ -1024,7 +1024,7 @@ func (a *App) Shutdown(ctx context.Context) {
 		log.Info().Msg("Database closed")
 	}
 
-	log.Info().Msg("Aerion shutdown complete")
+	log.Info().Msg("aulycmail shutdown complete")
 }
 
 // updateDBConnectionPool scales the database connection pool based on account count.

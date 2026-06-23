@@ -244,7 +244,7 @@
     const messageIds = checked ? selectedMessageIds : ownMessageIds
     if (messageIds.length === 0) return
     const payload = JSON.stringify({ messageIds, sourceAccountId: accountId })
-    e.dataTransfer.setData('application/x-aerion-messages', payload)
+    e.dataTransfer.setData('application/x-aulycmail-messages', payload)
     e.dataTransfer.effectAllowed = 'move'
   }
 </script>

@@ -7,15 +7,15 @@ import (
 	"time"
 
 	goImap "github.com/emersion/go-imap/v2"
-	"github.com/hkdb/aerion/internal/account"
-	"github.com/hkdb/aerion/internal/draft"
-	"github.com/hkdb/aerion/internal/folder"
-	"github.com/hkdb/aerion/internal/imap"
-	"github.com/hkdb/aerion/internal/logging"
-	"github.com/hkdb/aerion/internal/message"
-	"github.com/hkdb/aerion/internal/pgp"
-	"github.com/hkdb/aerion/internal/smime"
-	"github.com/hkdb/aerion/internal/smtp"
+	"github.com/aulyc/aulycmail/internal/account"
+	"github.com/aulyc/aulycmail/internal/draft"
+	"github.com/aulyc/aulycmail/internal/folder"
+	"github.com/aulyc/aulycmail/internal/imap"
+	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/aulyc/aulycmail/internal/message"
+	"github.com/aulyc/aulycmail/internal/pgp"
+	"github.com/aulyc/aulycmail/internal/smime"
+	"github.com/aulyc/aulycmail/internal/smtp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -783,7 +783,7 @@ func (a *App) GetDraft(id string) (*smtp.ComposeMessage, error) {
 		return a.draftToComposeMessage(d), nil
 	}
 
-	// No draft found - this might be a draft that was created outside Aerion
+	// No draft found - this might be a draft that was created outside aulycmail
 	// (e.g., from webmail). Build a ComposeMessage from the message itself.
 	log.Debug().Str("messageID", id).Msg("No local draft found, building from message")
 	return a.messageToComposeMessage(msg), nil

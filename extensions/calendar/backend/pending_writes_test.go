@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
 )
 
 // --- recordingEventBus ----------------------------------------------------
@@ -122,7 +122,7 @@ func TestPendingQueue_Enqueue(t *testing.T) {
 		CalendarID:  calID,
 		Op:          PendingOpCreate,
 		CalendarURL: "primary",
-		UID:         "evt-uid@aerion-google",
+		UID:         "evt-uid@aulycmail-google",
 		Summary:     "Test",
 		DTStartUnix: 1700000000,
 		DTEndUnix:   1700003600,
@@ -146,7 +146,7 @@ func TestPendingQueue_Enqueue(t *testing.T) {
 	if row.Op != string(PendingOpCreate) {
 		t.Errorf("row.Op = %q, want create", row.Op)
 	}
-	if row.Payload.UID != "evt-uid@aerion-google" {
+	if row.Payload.UID != "evt-uid@aulycmail-google" {
 		t.Errorf("row.Payload.UID = %q", row.Payload.UID)
 	}
 	if row.Attempt != 0 {
@@ -166,7 +166,7 @@ func TestPendingQueue_Drain_SuccessUpdatesEventAndDeletesRow(t *testing.T) {
 		hits++
 		_ = json.NewEncoder(w).Encode(googleEvent{
 			ID:      "server-event-id",
-			ICalUID: "evt-uid@aerion-google",
+			ICalUID: "evt-uid@aulycmail-google",
 			ETag:    `"server-etag"`,
 		})
 	}))
@@ -182,7 +182,7 @@ func TestPendingQueue_Drain_SuccessUpdatesEventAndDeletesRow(t *testing.T) {
 	now := time.Now().Unix()
 	_ = store.WithTx(func(tx *sql.Tx) error {
 		return store.UpsertEventTx(tx, Event{
-			ID: "evt-row-1", CalendarID: calID, UID: "evt-uid@aerion-google",
+			ID: "evt-row-1", CalendarID: calID, UID: "evt-uid@aulycmail-google",
 			Summary: "Test", DTStartUnix: now, DTEndUnix: now + 3600,
 			ICSBlob: "BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n",
 		})
@@ -191,7 +191,7 @@ func TestPendingQueue_Drain_SuccessUpdatesEventAndDeletesRow(t *testing.T) {
 	if _, err := queue.Enqueue(PendingOp{
 		SourceID: srcID, CalendarID: calID,
 		Op: PendingOpCreate, CalendarURL: "primary",
-		UID: "evt-uid@aerion-google", ICSBlob: minimalGoogleICS(t, "evt-uid@aerion-google"),
+		UID: "evt-uid@aulycmail-google", ICSBlob: minimalGoogleICS(t, "evt-uid@aulycmail-google"),
 	}); err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestPendingQueue_Drain_TransportFailureKeepsRowAndBumpsAttempt(t *testing.T
 	if _, err := queue.Enqueue(PendingOp{
 		SourceID: srcID, CalendarID: calID,
 		Op: PendingOpCreate, CalendarURL: "primary",
-		UID: "evt@aerion-google", ICSBlob: minimalGoogleICS(t, "evt@aerion-google"),
+		UID: "evt@aulycmail-google", ICSBlob: minimalGoogleICS(t, "evt@aulycmail-google"),
 	}); err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
@@ -303,10 +303,10 @@ func TestPendingQueue_Drain_ConflictDropsRowAndPublishesEvent(t *testing.T) {
 		Op:              PendingOpUpdate,
 		Scope:           EditScopeAll,
 		CalendarURL:     "primary",
-		UID:             "evt@aerion-google",
+		UID:             "evt@aulycmail-google",
 		ProviderEventID: "existing-id",
 		ETag:            `"stale"`,
-		ICSBlob:         minimalGoogleICS(t, "evt@aerion-google"),
+		ICSBlob:         minimalGoogleICS(t, "evt@aulycmail-google"),
 	}); err != nil {
 		t.Fatalf("Enqueue: %v", err)
 	}
@@ -342,8 +342,8 @@ func TestPendingQueue_Drain_SkipsExhaustedRows(t *testing.T) {
 	srcID, calID := seedGoogleSource(t, store, "primary")
 	id, err := queue.Enqueue(PendingOp{
 		SourceID: srcID, CalendarID: calID, Op: PendingOpCreate,
-		CalendarURL: "primary", UID: "evt@aerion-google",
-		ICSBlob: minimalGoogleICS(t, "evt@aerion-google"),
+		CalendarURL: "primary", UID: "evt@aulycmail-google",
+		ICSBlob: minimalGoogleICS(t, "evt@aulycmail-google"),
 	})
 	if err != nil {
 		t.Fatalf("Enqueue: %v", err)

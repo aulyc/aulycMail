@@ -13,7 +13,7 @@ import (
 
 	gomessage "github.com/emersion/go-message"
 	"github.com/google/uuid"
-	"github.com/hkdb/aerion/internal/message"
+	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/teamwork/tnef"
 )
 

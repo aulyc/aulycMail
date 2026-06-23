@@ -27,7 +27,7 @@
   // access"). Google / Microsoft sources gain write capability in 2b.3
   // alongside the provider-specific write paths.
   let isWritable = $derived(
-    contact?.sourceId === 'aerion' || contactSourcesStore.isSourceWritable(contact?.sourceId),
+    contact?.sourceId === 'aulycmail' || contactSourcesStore.isSourceWritable(contact?.sourceId),
   )
 
   // Read-only hint discriminator. We want to surface WHY a contact has no
@@ -38,7 +38,7 @@
   //   - Local → never read-only.
   let readonlyKind = $derived.by<'none' | 'carddav' | 'oauth'>(() => {
     if (!contact || isWritable) return 'none'
-    if (!contact.sourceId || contact.sourceId === 'aerion') return 'none'
+    if (!contact.sourceId || contact.sourceId === 'aulycmail') return 'none'
     const src = contactSourcesStore.sources.find(s => s.id === contact.sourceId)
     if (src?.type === 'google' || src?.type === 'microsoft') return 'oauth'
     return 'carddav'
@@ -282,7 +282,7 @@
   bind:open={showDeleteConfirm}
   title={$_('contacts.delete.title')}
   description={contact
-    ? contact.sourceId === 'aerion'
+    ? contact.sourceId === 'aulycmail'
       ? $_('contacts.delete.descriptionLocal', { values: { name: contact.name || primaryEmail || $_('contacts.common.unnamed') } })
       : $_('contacts.delete.descriptionCardDAV', { values: { name: contact.name || primaryEmail || $_('contacts.common.unnamed') } })
     : ''}

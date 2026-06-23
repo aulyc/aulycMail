@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hkdb/aerion/internal/carddav"
-	"github.com/hkdb/aerion/internal/contact"
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
-	"github.com/hkdb/aerion/internal/credentials"
-	"github.com/hkdb/aerion/internal/database"
+	"github.com/aulyc/aulycmail/internal/carddav"
+	"github.com/aulyc/aulycmail/internal/contact"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	"github.com/aulyc/aulycmail/internal/credentials"
+	"github.com/aulyc/aulycmail/internal/database"
 )
 
 // fakeCore is the minimal coreapi.Core fake the contacts tests need: it
@@ -126,8 +126,8 @@ func TestAPI_SearchContacts_LocalOnly(t *testing.T) {
 	if got[0].Name != "Alice" {
 		t.Fatalf("expected name=Alice, got %q", got[0].Name)
 	}
-	if got[0].SourceID != "aerion" {
-		t.Fatalf("expected source=aerion, got %q", got[0].SourceID)
+	if got[0].SourceID != "aulycmail" {
+		t.Fatalf("expected source=aulycmail, got %q", got[0].SourceID)
 	}
 }
 
@@ -641,7 +641,7 @@ func TestAPI_CreateContact_Conflict(t *testing.T) {
 func TestAPI_CreateContact_UnknownSourceErrors(t *testing.T) {
 	// Post-Track-B: unknown CardDAV-shaped source UUIDs surface a "not found"
 	// error rather than ErrUnimplemented. ErrUnimplemented is reserved for
-	// known sources of types Aerion hasn't wired write paths for (Google /
+	// known sources of types aulycmail hasn't wired write paths for (Google /
 	// Microsoft); see TestAPI_CreateContact_OAuthSourceUnimplemented.
 	api, _, _ := setupAPI(t)
 	_, err := api.CreateContact(coreapi.ContactCreateInput{

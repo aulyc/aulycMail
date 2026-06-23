@@ -1,4 +1,4 @@
--- Aerion: rollback the v0.3.0 schema (migrations 31 + 32 + 33 + 34 + 35 + 36 + 37 + 38 + 39) back to v0.2.5 (v30).
+-- aulycmail: rollback the v0.3.0 schema (migrations 31 + 32 + 33 + 34 + 35 + 36 + 37 + 38 + 39) back to v0.2.5 (v30).
 --
 -- This script reconstructs the v30 schema (`contacts` + `carddav_contacts` tables)
 -- from the v39 schema (`contact_records` + `contact_emails` + sidecars +
@@ -8,7 +8,7 @@
 -- DROPs / DROP COLUMNs. No external backup file is needed — the unified
 -- schema IS the data; the old shape is just a denormalized projection of it.
 --
--- Aerion versions and the schemas they ship with:
+-- aulycmail versions and the schemas they ship with:
 --   - v0.2.5 (last released) → schema v30 (separate `contacts`, `carddav_contacts`)
 --   - v0.3.0 (upcoming)      → schema v39 (unified contact_records + UUID identity
 --                                          + carddav_record_state.addressbook_id FK
@@ -81,7 +81,7 @@
 --   - The `vcard_raw` round-trip preservation is dropped (same reason).
 --   - CardDAV record IDs are reshaped: each (record, email) pair becomes its own
 --     row again, with synthetic IDs of the form `<record_id>:<email>`. Older
---     Aerion identifies contacts during sync by `href` (via GetContactByHref),
+--     aulycmail identifies contacts during sync by `href` (via GetContactByHref),
 --     not by ID, so this works correctly — only the IDs differ.
 --   - Local-record UUIDs are reduced back to email-keyed rows. Since v30's
 --     `contacts` table was already keyed by email, this is the natural form
@@ -91,14 +91,14 @@
 --     legacy `carddav_contacts.addressbook_id` FK.
 --
 -- USAGE
---   1. Quit Aerion completely.
---   2. Back up your aerion.db file just in case:
---        cp ~/.local/share/aerion/aerion.db ~/.local/share/aerion/aerion.db.bak
---      (or whatever your DB path is — `~/Library/Application Support/Aerion/`
---       on macOS, `%LOCALAPPDATA%\aerion\` on Windows).
+--   1. Quit aulycmail completely.
+--   2. Back up your aulycmail.db file just in case:
+--        cp ~/.local/share/aulycmail/aulycmail.db ~/.local/share/aulycmail/aulycmail.db.bak
+--      (or whatever your DB path is — `~/Library/Application Support/aulycmail/`
+--       on macOS, `%LOCALAPPDATA%\aulycmail\` on Windows).
 --   3. Run this script against your DB:
---        sqlite3 ~/.local/share/aerion/aerion.db < rollback-v39-to-v30.sql
---   4. Launch the older Aerion (v0.2.5). It should start normally and your
+--        sqlite3 ~/.local/share/aulycmail/aulycmail.db < rollback-v39-to-v30.sql
+--   4. Launch the older aulycmail (v0.2.5). It should start normally and your
 --      contacts autocomplete should work.
 --
 -- If anything goes wrong, restore from the backup you made in step 2.
@@ -106,7 +106,7 @@
 BEGIN TRANSACTION;
 
 -- 1. Recreate legacy `contacts` table with the v30 / pre-v0.3.0 shape.
---    Older Aerion's contact.Store.ensureTable created this table with five
+--    Older aulycmail's contact.Store.ensureTable created this table with five
 --    columns only (no name_overridden, no kind). Migration 31 was updated
 --    to backfill name_overridden / kind from literal defaults rather than
 --    selecting them from this table, so there's no longer any reason to
@@ -158,7 +158,7 @@ CREATE INDEX idx_carddav_contacts_email ON carddav_contacts(email);
 
 -- 4. Restore carddav-contact rows. Re-introduces the fan-out: one row per
 --    (record, email) pair. Synthetic ID `<record_id>:<email>` ensures uniqueness;
---    older Aerion matches contacts on next sync via (addressbook_id, href).
+--    older aulycmail matches contacts on next sync via (addressbook_id, href).
 INSERT INTO carddav_contacts (id, addressbook_id, email, display_name, href, etag, synced_at)
 SELECT
     cr.id || ':' || ce.email,
@@ -200,7 +200,7 @@ DELETE FROM oauth_tokens
  WHERE client_config_id NOT IN ('google-mail', 'microsoft-mail');
 
 --    7b. Drop the encrypted fallback columns added in v36. SQLite supports
---        DROP COLUMN since 3.35 — modernc.org/sqlite (Aerion's driver) is well
+--        DROP COLUMN since 3.35 — modernc.org/sqlite (aulycmail's driver) is well
 --        past that. If you're on a stock CLI older than 3.35 these will fail;
 --        upgrade sqlite3 or skip these two statements (the columns being
 --        present is harmless to v0.2.5 — v0.2.5 just ignores unknown columns
@@ -238,8 +238,8 @@ ALTER TABLE accounts DROP COLUMN reply_forward_identity_id;
 --     which is the state the user was in before the v0.3.0 fix.
 ALTER TABLE messages DROP COLUMN body_failed;
 
--- 11. Roll back the migration tracker so older Aerion doesn't think v31..v39
---     have been applied. After this, older Aerion sees schema_version=30 and
+-- 11. Roll back the migration tracker so older aulycmail doesn't think v31..v39
+--     have been applied. After this, older aulycmail sees schema_version=30 and
 --     starts normally. The `>= 31` bound catches all v0.3.0 migrations plus
 --     any future intermediate schemas.
 DELETE FROM migrations WHERE version >= 31;
@@ -247,4 +247,4 @@ DELETE FROM migrations WHERE version >= 31;
 COMMIT;
 
 -- Verify (optional, run separately to confirm):
---   sqlite3 aerion.db "SELECT COUNT(*) FROM contacts; SELECT COUNT(*) FROM carddav_contacts; SELECT MAX(version) FROM migrations;"
+--   sqlite3 aulycmail.db "SELECT COUNT(*) FROM contacts; SELECT COUNT(*) FROM carddav_contacts; SELECT MAX(version) FROM migrations;"

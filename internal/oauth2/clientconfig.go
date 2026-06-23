@@ -14,13 +14,13 @@ type ClientCredentials struct {
 	ClientSecret string
 }
 
-// CredentialsProvider is the source-of-credentials interface that Aerion core
+// CredentialsProvider is the source-of-credentials interface that aulycmail core
 // and each extension implement. ClientConfigForID walks the registered chain
 // at lookup time; first provider that knows the requested configID wins.
 //
 // Each extension owns its OWN credential injection at build time (per-extension
 // .env / shim + a small creds.go in the extension package that registers a
-// CredentialsProvider during Extension.Register()). Aerion core compiles in
+// CredentialsProvider during Extension.Register()). aulycmail core compiles in
 // only its own *-mail creds via the built-in core provider.
 type CredentialsProvider interface {
 	// Lookup returns the credentials for the given client config id, or
@@ -36,7 +36,7 @@ type CredentialsProvider interface {
 var UserOverrideLookup func(configID string) (ClientCredentials, bool)
 
 // SlotAliasLookup is an optional pluggable hook that maps one slot id onto
-// another (Settings → OAuth Credentials → pick "Aerion mail client"). When
+// another (Settings → OAuth Credentials → pick "aulycmail mail client"). When
 // non-nil and the user has set an alias for the given configID, the lookup
 // resolves to the aliased target instead of the slot's own creds. Checked
 // AFTER UserOverrideLookup (custom creds win over an alias) and BEFORE the
@@ -44,8 +44,8 @@ var UserOverrideLookup func(configID string) (ClientCredentials, bool)
 var SlotAliasLookup func(configID string) (target string, ok bool)
 
 // ActiveChoiceLookup is an optional pluggable hook that returns the user's
-// explicit picker selection for the slot ("custom" / "aerion-shipped" /
-// "aerion-mail"). When set AND the user has recorded a choice, the resolver
+// explicit picker selection for the slot ("custom" / "aulycmail-shipped" /
+// "aulycmail-mail"). When set AND the user has recorded a choice, the resolver
 // routes by choice — independent of which underlying rows exist — so picker
 // switches no longer have to destroy stored values to take effect. When the
 // hook is nil OR returns ok=false (no choice recorded), the resolver falls
@@ -63,7 +63,7 @@ var (
 // RegisterCredentialsProvider appends a provider to the resolution chain.
 // Safe to call from package init() functions or from Extension.Register().
 // Order matters: providers are queried in registration order, first-hit wins.
-// Aerion core registers itself early (init); extensions register at their
+// aulycmail core registers itself early (init); extensions register at their
 // Register() time, after core. Result: core's *-mail slots always resolve
 // before any extension's slots — but since slot names don't collide between
 // core and extensions, the order is purely a performance hint.
@@ -79,8 +79,8 @@ func RegisterCredentialsProvider(p CredentialsProvider) {
 //  1. ActiveChoiceLookup — the user's explicit picker selection. When
 //     present, routes:
 //       - "custom"          → UserOverrideLookup only
-//       - "aerion-mail"     → SlotAliasLookup only (recursive)
-//       - "aerion-shipped"  → straight to provider chain
+//       - "aulycmail-mail"     → SlotAliasLookup only (recursive)
+//       - "aulycmail-shipped"  → straight to provider chain
 //     If the routed source returns nothing (e.g., choice="custom" but no
 //     creds saved yet), falls through to the provider chain so OAuth
 //     doesn't error out — the UI still shows "Custom" so the user knows
@@ -95,7 +95,7 @@ func RegisterCredentialsProvider(p CredentialsProvider) {
 //
 //  3. (zero, false) if nothing matches.
 //
-// Known config ids today: 'google-mail' / 'microsoft-mail' (Aerion core
+// Known config ids today: 'google-mail' / 'microsoft-mail' (aulycmail core
 // owns both, plus microsoft-contacts + microsoft-calendar which are
 // registered as core aliases of microsoft-mail), 'google-contacts'
 // (Contacts extension), 'google-calendar' (Calendar extension).
@@ -118,7 +118,7 @@ func ClientConfigForID(id string) (ClientCredentials, bool) {
 // and survives future refactors.
 func clientConfigForIDDepth(id string, depth int) (ClientCredentials, bool) {
 	// 1. Explicit active-choice routing. Bypasses the row-presence
-	//    inference entirely — if the user has picked "aerion-shipped",
+	//    inference entirely — if the user has picked "aulycmail-shipped",
 	//    their saved Custom row is still in storage but the resolver
 	//    deliberately skips it.
 	if choiceHook := ActiveChoiceLookup; choiceHook != nil {
@@ -133,7 +133,7 @@ func clientConfigForIDDepth(id string, depth int) (ClientCredentials, bool) {
 				// Fall through to provider chain — Custom selected but
 				// no creds saved yet.
 				return providerChainLookup(id)
-			case "aerion-mail":
+			case "aulycmail-mail":
 				if depth == 0 {
 					if alias := SlotAliasLookup; alias != nil {
 						if target, found := alias(id); found && target != "" && target != id {
@@ -143,7 +143,7 @@ func clientConfigForIDDepth(id string, depth int) (ClientCredentials, bool) {
 				}
 				// Fall through to provider chain — alias row missing.
 				return providerChainLookup(id)
-			case "aerion-shipped":
+			case "aulycmail-shipped":
 				// Skip override + alias entirely.
 				return providerChainLookup(id)
 			}

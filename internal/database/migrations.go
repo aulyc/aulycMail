@@ -809,7 +809,7 @@ var migrations = []Migration{
 			-- sure it exists so the backfill SELECTs below don't error.
 			--
 			-- Shape matches the LEGACY (pre-v0.3.0) ensureTable schema — no
-			-- kind, no name_overridden. Older Aerion installs (≤ v0.2.4) have
+			-- kind, no name_overridden. Older aulycmail installs (≤ v0.2.4) have
 			-- the table in this shape, so referencing those columns in the
 			-- backfill SELECTs would fail on real production DBs. Defaults
 			-- for the post-migration columns are supplied as literals in the
@@ -916,7 +916,7 @@ var migrations = []Migration{
 			-- record-grain for local contacts today; multi-field expansion for local
 			-- happens via the new sub-tables which start empty).
 			-- record id: derived from email so subsequent linking via record_id is
-			-- stable. Older Aerion never exposed contact ids externally; this just
+			-- stable. Older aulycmail never exposed contact ids externally; this just
 			-- needs to be unique + deterministic within the migration.
 			-- kind / name_overridden are hardcoded literals here rather than
 			-- selected from the contacts table because legacy v0.2.x DBs

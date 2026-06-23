@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/hkdb/aerion/internal/carddav"
-	"github.com/hkdb/aerion/internal/contact"
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/carddav"
+	"github.com/aulyc/aulycmail/internal/contact"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	"github.com/aulyc/aulycmail/internal/logging"
 )
 
 // google_api.go holds the Phase 2b.3 Google People API write path — the

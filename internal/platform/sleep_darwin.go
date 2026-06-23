@@ -78,7 +78,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/logging"
 )
 
 // DarwinSleepWakeMonitor monitors sleep/wake events on macOS using IOKit

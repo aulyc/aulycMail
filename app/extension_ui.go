@@ -1,8 +1,8 @@
 package app
 
 import (
-	coreapi "github.com/hkdb/aerion/internal/core/api/v1"
-	"github.com/hkdb/aerion/internal/settings"
+	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	"github.com/aulyc/aulycmail/internal/settings"
 )
 
 // ListEnabledExtensions returns the names of all enabled first-party
@@ -89,7 +89,7 @@ type ExtensionInfo struct {
 	Version          string   `json:"version"`
 	Description      string   `json:"description"`
 	Author           string   `json:"author"`
-	MinAerionVersion string   `json:"minAerionVersion"`
+	MinaulycmailVersion string   `json:"minaulycmailVersion"`
 	Capabilities     []string `json:"capabilities"`
 	Enabled          bool     `json:"enabled"`
 }
@@ -114,7 +114,7 @@ func (a *App) ListExtensions() ([]ExtensionInfo, error) {
 			Version:          m.Version,
 			Description:      m.Description,
 			Author:           m.Author,
-			MinAerionVersion: m.MinAerionVersion,
+			MinaulycmailVersion: m.MinaulycmailVersion,
 			Capabilities:     m.Capabilities,
 			Enabled:          enabled,
 		})

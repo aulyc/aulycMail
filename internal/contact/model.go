@@ -9,7 +9,7 @@ import "time"
 type Contact struct {
 	Email       string    `json:"email"`
 	DisplayName string    `json:"display_name"`
-	Source      string    `json:"source"` // legacy: "aerion", "carddav", "vcard"; new unified mapping: "local"→"aerion", "carddav"→"carddav"
+	Source      string    `json:"source"` // legacy: "aulycmail", "carddav", "vcard"; new unified mapping: "local"→"aulycmail", "carddav"→"carddav"
 	Kind        string    `json:"kind,omitempty"` // "manual" | "collected" — only set on local contacts
 	AvatarURL   string    `json:"avatar_url,omitempty"`
 	SendCount   int       `json:"send_count"`
@@ -30,7 +30,7 @@ type LocalContact struct {
 // ContactSource describes a contact source (mostly used by older code paths).
 type ContactSource struct {
 	ID      string `json:"id"`
-	Type    string `json:"type"` // "aerion", "google", "vcard"
+	Type    string `json:"type"` // "aulycmail", "google", "vcard"
 	Name    string `json:"name"`
 	Enabled bool   `json:"enabled"`
 	Path    string `json:"path,omitempty"`

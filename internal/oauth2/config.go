@@ -11,10 +11,10 @@ import (
 // Build-time variables injected via ldflags
 // These are set during compilation using:
 //
-//	go build -ldflags "-X 'github.com/hkdb/aerion/internal/oauth2.GoogleClientID=xxx'"
+//	go build -ldflags "-X 'github.com/aulyc/aulycmail/internal/oauth2.GoogleClientID=xxx'"
 //
 // See Makefile for the complete build command.
-// If ldflags are not set, credentials are loaded from the aerion-creds shim binary.
+// If ldflags are not set, credentials are loaded from the aulycmail-creds shim binary.
 var (
 	// GoogleClientID is the OAuth2 client ID for Google/Gmail (Mail-scoped project).
 	// Same client also backs first-party extensions' Google flows for any scopes
@@ -37,10 +37,10 @@ var (
 	// verified for (e.g., contacts.readwrite, full Calendar). Single un-
 	// Google-verified test client backs both google-contacts and
 	// google-calendar slots. Surfaced in the picker as
-	// "Aerion - Google (Testing)" so users understand the verification
+	// "aulycmail - Google (Testing)" so users understand the verification
 	// status before consenting. When the mail project eventually gets
 	// verified with these scopes, the default in the picker UI switches
-	// to "Aerion - Google" (which reuses GoogleClientID via a manifest-
+	// to "aulycmail - Google" (which reuses GoogleClientID via a manifest-
 	// declared scope route) and this slot becomes a fallback.
 	GoogleTestingClientID string
 
@@ -59,12 +59,12 @@ func init() {
 func loadFromShim() {
 	// Search for the shim binary in known locations
 	paths := []string{
-		"/app/lib/aerion/aerion-creds", // Flatpak
+		"/app/lib/aulycmail/aulycmail-creds", // Flatpak
 	}
 
 	// Also check next to the main binary
 	if exe, err := os.Executable(); err == nil {
-		paths = append(paths, filepath.Join(filepath.Dir(exe), "aerion-creds"))
+		paths = append(paths, filepath.Join(filepath.Dir(exe), "aulycmail-creds"))
 	}
 
 	for _, p := range paths {

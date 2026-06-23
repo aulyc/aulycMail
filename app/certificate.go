@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/hkdb/aerion/internal/certificate"
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/certificate"
+	"github.com/aulyc/aulycmail/internal/logging"
 )
 
 // ============================================================================

@@ -29,7 +29,7 @@ import (
 )
 
 // graphEvent is the JSON shape for /me/events resource. Only fields
-// Aerion reads/writes are modeled.
+// aulycmail reads/writes are modeled.
 type graphEvent struct {
 	ID          string     `json:"id,omitempty"`
 	ICalUID     string     `json:"iCalUId,omitempty"` // Graph's mixed-case key
@@ -422,7 +422,7 @@ func buildGraphRange(parts map[string]string, dtstart time.Time) graphRange {
 }
 
 // parseBYDAY splits a BYDAY value like "MO,WE,FR" into Graph day names.
-// Strips ordinal prefixes like "2MO" → "monday" (Aerion composer doesn't
+// Strips ordinal prefixes like "2MO" → "monday" (aulycmail composer doesn't
 // emit ordinals today; defensive for server-originated values).
 func parseBYDAY(byday string) []string {
 	if byday == "" {
@@ -647,7 +647,7 @@ func translateGraphEventToICS(ev graphEvent) (string, error) {
 
 	cal := ical.NewCalendar()
 	cal.Props.SetText(ical.PropVersion, "2.0")
-	cal.Props.SetText(ical.PropProductID, "-//Aerion//Calendar Extension//EN")
+	cal.Props.SetText(ical.PropProductID, "-//aulycmail//Calendar Extension//EN")
 	cal.Children = append(cal.Children, icalEv.Component)
 
 	var buf bytes.Buffer

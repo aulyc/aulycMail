@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hkdb/aerion/internal/contact"
-	"github.com/hkdb/aerion/internal/credentials"
-	"github.com/hkdb/aerion/internal/logging"
+	"github.com/aulyc/aulycmail/internal/contact"
+	"github.com/aulyc/aulycmail/internal/credentials"
+	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 
