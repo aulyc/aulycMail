@@ -580,7 +580,7 @@ func (a *App) Startup(ctx context.Context) {
 	}
 
 	// Initialize sync engine
-	a.syncEngine = sync.NewEngine(a.imapPool, a.accountStore, a.folderStore, a.messageStore, a.attachmentStore)
+	a.syncEngine = sync.NewEngine(a.imapPool, a.accountStore, a.folderStore, a.messageStore, a.attachmentStore, a.contactStore)
 
 	// Wire S/MIME and PGP verifiers into sync engine for signature verification during body parsing
 	a.syncEngine.SetSMIMEVerifier(a.smimeVerifier)

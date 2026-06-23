@@ -7,6 +7,7 @@ import (
 
 	gomessage "github.com/emersion/go-message"
 	"github.com/aulyc/aulycmail/internal/account"
+	"github.com/aulyc/aulycmail/internal/contact"
 	"github.com/aulyc/aulycmail/internal/email"
 	"github.com/aulyc/aulycmail/internal/folder"
 	imapPkg "github.com/aulyc/aulycmail/internal/imap"
@@ -85,6 +86,7 @@ type Engine struct {
 	folderStore      *folder.Store
 	messageStore     *message.Store
 	attachmentStore  *message.AttachmentStore
+	contactStore     *contact.Store
 	attachExtractor  *email.AttachmentExtractor
 	sanitizer        *email.Sanitizer
 	log              zerolog.Logger
@@ -94,13 +96,14 @@ type Engine struct {
 }
 
 // NewEngine creates a new sync engine
-func NewEngine(pool *imapPkg.Pool, accountStore *account.Store, folderStore *folder.Store, messageStore *message.Store, attachmentStore *message.AttachmentStore) *Engine {
+func NewEngine(pool *imapPkg.Pool, accountStore *account.Store, folderStore *folder.Store, messageStore *message.Store, attachmentStore *message.AttachmentStore, contactStore *contact.Store) *Engine {
 	return &Engine{
 		pool:            pool,
 		accountStore:    accountStore,
 		folderStore:     folderStore,
 		messageStore:    messageStore,
 		attachmentStore: attachmentStore,
+		contactStore:    contactStore,
 		attachExtractor: email.NewAttachmentExtractor(),
 		sanitizer:       email.NewSanitizer(),
 		log:             logging.WithComponent("sync"),

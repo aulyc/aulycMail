@@ -585,6 +585,22 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 
 	e.log.Debug().Int("count", len(uids)).Msg("Fetching message headers")
 
+	// Decide whether to auto-collect senders into local contacts for this
+	// folder. Only folders that hold *received* mail qualify — skip
+	// Sent/Drafts/Spam/Trash so we don't harvest our own address or draft
+	// noise. Best-effort; failures never block the sync.
+	collectSenders := false
+	if e.contactStore != nil {
+		if f, ferr := e.folderStore.Get(folderID); ferr == nil && f != nil {
+			switch f.Type {
+			case folder.TypeSent, folder.TypeDrafts, folder.TypeSpam, folder.TypeTrash:
+				collectSenders = false
+			default:
+				collectSenders = true
+			}
+		}
+	}
+
 	// Convert to imap.UIDSet
 	uidSet := imap.UIDSet{}
 	for _, uid := range uids {
@@ -705,6 +721,13 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 		}
 		savedMessages = append(savedMessages, m)
 		fetchedCount++
+
+		// Auto-collect the sender into local contacts (received mail only).
+		// Idempotent + best-effort — fetchMessageHeaders only runs for NEW
+		// UIDs, so this fires once when a message first arrives.
+		if collectSenders && m.FromEmail != "" {
+			_ = e.contactStore.AddOrUpdate(m.FromEmail, m.FromName)
+		}
 	}
 
 	if err := fetchCmd.Close(); err != nil {
