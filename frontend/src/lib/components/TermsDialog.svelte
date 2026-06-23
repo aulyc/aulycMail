@@ -2,7 +2,6 @@
   import { Dialog as DialogPrimitive } from 'bits-ui'
   import { cn } from '$lib/utils'
   import { Button } from '$lib/components/ui/button'
-  import Switch from '$lib/components/ui/switch/Switch.svelte'
   // @ts-ignore - wailsjs path
   import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
   import { _ } from '$lib/i18n'
@@ -95,11 +94,13 @@
           </button>
         </div>
 
-        <!-- Toggle -->
+        <!-- Agreement checkbox -->
         <div class="flex items-center gap-3">
-          <Switch
+          <input
+            type="checkbox"
             bind:checked={agreed}
             id="agree-terms"
+            class="w-4 h-4 rounded border-border accent-primary cursor-pointer"
           />
           <label for="agree-terms" class="text-sm cursor-pointer">
             {$_('terms.agreeLabel')}

@@ -39,7 +39,7 @@ const defaultState: UIState = {
   selectedThreadId: null,
   selectedConversationAccountId: null,
   selectedConversationFolderId: null,
-  sidebarWidth: 240,
+  sidebarWidth: 280,
   listWidth: 420,
   expandedAccounts: {},
   unifiedInboxExpanded: true,
@@ -81,7 +81,7 @@ export async function loadUIState(): Promise<UIState> {
         selectedConversationAccountId: state.selectedConversationAccountId || null,
         selectedConversationFolderId: state.selectedConversationFolderId || null,
         // Validate and clamp pane widths
-        sidebarWidth: clamp(state.sidebarWidth || 240, SIDEBAR_MIN, SIDEBAR_MAX),
+        sidebarWidth: clamp(state.sidebarWidth || 280, SIDEBAR_MIN, SIDEBAR_MAX),
         listWidth: clamp(state.listWidth || 420, LIST_MIN, LIST_MAX),
         // Sidebar expand/collapse states
         expandedAccounts: state.expandedAccounts || {},

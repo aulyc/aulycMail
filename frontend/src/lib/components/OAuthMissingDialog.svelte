@@ -2,11 +2,10 @@
   // Launch-time warning shown when one or more OAuth provider credentials
   // weren't compiled into this build of aulycmail. Sign-in for the listed
   // providers will silently fail otherwise. Acknowledged via the OK button;
-  // an optional "Don't show again" toggle persists the opt-out via the
+  // an optional "Don't show again" checkbox persists the opt-out via the
   // SetOAuthWarningDisabled setting in App.svelte.
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import { Button } from '$lib/components/ui/button'
-  import Switch from '$lib/components/ui/switch/Switch.svelte'
   import Icon from '@iconify/svelte'
   // @ts-ignore - wailsjs path
   import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
@@ -84,7 +83,11 @@
     </button>
 
     <label class="flex items-center gap-3 text-sm mt-2">
-      <Switch bind:checked={dontShowAgain} />
+      <input
+        type="checkbox"
+        bind:checked={dontShowAgain}
+        class="w-4 h-4 rounded border-border accent-primary cursor-pointer"
+      />
       <span>{$_('oauthMissing.dontShowAgain')}</span>
     </label>
 

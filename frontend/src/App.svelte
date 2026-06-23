@@ -11,7 +11,6 @@
   import ToastContainer from './lib/components/ui/toast/ToastContainer.svelte'
   import TermsDialog from './lib/components/TermsDialog.svelte'
   import OAuthMissingDialog from './lib/components/OAuthMissingDialog.svelte'
-  import WhatsNewDialog from './lib/components/WhatsNewDialog.svelte'
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
   import ExtensionSettingsDialog from './lib/components/settings/ExtensionSettingsDialog.svelte'
   import ExtensionRail from './lib/components/rail/ExtensionRail.svelte'
@@ -42,7 +41,7 @@
   import { dispatchExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
   import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive } from '$lib/stores/layout.svelte'
   // @ts-ignore - wailsjs path
-  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete, GetOAuthBuildStatus, GetOAuthWarningDisabled, SetOAuthWarningDisabled, GetLastSeenVersion, SetLastSeenVersion, GetAppInfo } from '../wailsjs/go/app/App.js'
+  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete, GetOAuthBuildStatus, GetOAuthWarningDisabled, SetOAuthWarningDisabled } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
@@ -153,10 +152,6 @@
   let oauthBuildStatus = $state({ google: true, microsoft: true, googleTesting: true })
   let pendingOAuthWarning = $state(false)
 
-  // What's New (per-version) dialog state
-  let showWhatsNewDialog = $state(false)
-  let whatsNewVersion = $state('')
-  let pendingWhatsNew = $state(false)
 
   // Certificate TOFU state (for background sync cert errors)
   let showCertDialog = $state(false)
@@ -200,32 +195,13 @@
     showOAuthMissingDialog = false
   }
 
-  // What's New acknowledgement — records the current version as seen.
-  // Called ONLY on explicit OK click; ESC/outside-click leaves the version
-  // unrecorded so the dialog fires again on next launch.
-  async function acknowledgeWhatsNew() {
-    try {
-      await SetLastSeenVersion(whatsNewVersion)
-    } catch (err) {
-      console.error('Failed to persist last-seen version:', err)
-    }
-    showWhatsNewDialog = false
-  }
-
-  // Reactive sequencing: Terms → OAuth warning → What's New.
+  // Reactive sequencing: Terms → OAuth warning.
   // Each gates on the previous being closed so users see them one at a
   // time, never stacked.
   $effect(() => {
     if (!showTermsDialog && pendingOAuthWarning && !showOAuthMissingDialog) {
       showOAuthMissingDialog = true
       pendingOAuthWarning = false
-    }
-  })
-
-  $effect(() => {
-    if (!showTermsDialog && !showOAuthMissingDialog && pendingWhatsNew && !showWhatsNewDialog) {
-      showWhatsNewDialog = true
-      pendingWhatsNew = false
     }
   })
 
@@ -420,24 +396,6 @@
       }
     } catch (err) {
       console.error('Failed to check OAuth build status:', err)
-    }
-
-    // What's New: fire whenever the stored last-seen version differs from
-    // the current build's version — including the empty-string case so
-    // existing users upgrading to v0.3.0 (or anyone whose DB predates the
-    // last_seen_version key) see the release announcement on first launch.
-    // The version isn't recorded until the user explicitly clicks OK in
-    // the dialog (see acknowledgeWhatsNew); ESC/outside-click leaves it
-    // unrecorded so the dialog fires again next launch.
-    try {
-      const appInfo = await GetAppInfo()
-      const lastSeen = await GetLastSeenVersion()
-      if (lastSeen !== appInfo.version) {
-        whatsNewVersion = appInfo.version
-        pendingWhatsNew = true
-      }
-    } catch (err) {
-      console.error('Failed to check What\'s New state:', err)
     }
 
     // Load persisted UI state
@@ -787,7 +745,7 @@
   }
 
   // Pane sizing state
-  let sidebarWidth = $state(240)
+  let sidebarWidth = $state(280)
   let listWidth = $state(420)
 
   // Resizing state
@@ -1672,13 +1630,6 @@
   onDismiss={dismissOAuthWarning}
 />
 
-<!-- Per-version release announcement. OK click records acknowledgement;
-     closing without OK leaves the version unrecorded so the dialog
-     fires again next launch. -->
-<WhatsNewDialog
-  bind:open={showWhatsNewDialog}
-  onAcknowledge={acknowledgeWhatsNew}
-/>
 
 <!-- Certificate TOFU Dialog (for background sync cert errors) -->
 <CertificateDialog
