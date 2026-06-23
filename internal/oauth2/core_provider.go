@@ -25,12 +25,12 @@ func (coreProvider) Lookup(configID string) (ClientCredentials, bool) {
 			return ClientCredentials{}, false
 		}
 		return ClientCredentials{ClientID: GoogleClientID, ClientSecret: GoogleClientSecret}, true
-	case "google-contacts", "google-calendar":
+	case "google-contacts":
 		if GoogleTestingClientID == "" {
 			return ClientCredentials{}, false
 		}
 		return ClientCredentials{ClientID: GoogleTestingClientID, ClientSecret: GoogleTestingClientSecret}, true
-	case "microsoft-mail", "microsoft-contacts", "microsoft-calendar":
+	case "microsoft-mail", "microsoft-contacts":
 		if MicrosoftClientID == "" {
 			return ClientCredentials{}, false
 		}

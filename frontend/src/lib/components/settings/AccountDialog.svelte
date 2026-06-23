@@ -9,8 +9,6 @@
   import AccountServerTab from './account/AccountServerTab.svelte'
   import AccountSecurityTab from './account/AccountSecurityTab.svelte'
   import AccountContactsHookPanel from '$extensions/contacts/frontend/hooks/AccountContactsHookPanel.svelte'
-  import AccountCalendarHookPanelGoogle from '$extensions/calendar/frontend/hooks/AccountCalendarHookPanelGoogle.svelte'
-  import AccountCalendarHookPanelMicrosoft from '$extensions/calendar/frontend/hooks/AccountCalendarHookPanelMicrosoft.svelte'
   import { loadAccountSetupHooks } from '$lib/stores/extensionRegistry.svelte'
   // @ts-ignore - wailsjs path
   import type { v1 } from '../../../../wailsjs/go/models'
@@ -539,24 +537,6 @@
                 {hook}
                 accountId={hookAccount.id}
                 accountName={hookAccount.name}
-                onResolved={() => resolveHook(hook.extensionId)}
-              />
-            {/if}
-            {#if hook.component === 'AccountCalendarHookPanelGoogle'}
-              <AccountCalendarHookPanelGoogle
-                {hook}
-                accountId={hookAccount.id}
-                accountName={hookAccount.name}
-                accountEmail={hookAccount.email ?? ''}
-                onResolved={() => resolveHook(hook.extensionId)}
-              />
-            {/if}
-            {#if hook.component === 'AccountCalendarHookPanelMicrosoft'}
-              <AccountCalendarHookPanelMicrosoft
-                {hook}
-                accountId={hookAccount.id}
-                accountName={hookAccount.name}
-                accountEmail={hookAccount.email ?? ''}
                 onResolved={() => resolveHook(hook.extensionId)}
               />
             {/if}

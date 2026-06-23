@@ -293,11 +293,11 @@ func providerFromConfigID(configID string) string {
 // "aulycmail - Google" (the aulycmail-mail choice — mail's verified client).
 func shippedLabelForSlot(configID string) string {
 	switch configID {
-	case "google-contacts", "google-calendar":
+	case "google-contacts":
 		return "aulycmail - Google (Testing)"
 	case "google-mail":
 		return "aulycmail - Google"
-	case "microsoft-mail", "microsoft-contacts", "microsoft-calendar":
+	case "microsoft-mail", "microsoft-contacts":
 		return "aulycmail - Microsoft"
 	}
 	return "aulycmail - Default"

@@ -42,10 +42,6 @@ export default defineConfig({
       // ── SHARED (kit primitives + most/all extensions) ───────────────────
       '@iconify/svelte': path.resolve(NODE_MODULES_DIR, '@iconify/svelte'),
       'svelte-i18n':     path.resolve(NODE_MODULES_DIR, 'svelte-i18n'),
-
-      // ── PER-EXTENSION (move to per-ext deps when the SDK supports it) ───
-      // extension: calendar — tz-aware date math (toZonedTime / fromZonedTime)
-      'date-fns-tz':     path.resolve(NODE_MODULES_DIR, 'date-fns-tz'),
     },
   },
   optimizeDeps: {

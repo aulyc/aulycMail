@@ -75,46 +75,6 @@ func GoogleContactsOnlyProvider() ProviderConfig {
 	}
 }
 
-// GoogleCalendarProvider returns OAuth2 config for the Calendar extension's
-// per-extension OAuth slot. Scope covers full Calendar API read+write.
-// Mirrors GoogleContactsOnlyProvider's shape — separate ClientConfigID so
-// extension and mail OAuth grants stay isolated.
-func GoogleCalendarProvider() ProviderConfig {
-	return ProviderConfig{
-		Name:        "google-calendar",
-		DisplayName: "Google Calendar",
-		AuthURL:     "https://accounts.google.com/o/oauth2/v2/auth",
-		TokenURL:    "https://oauth2.googleapis.com/token",
-		Scopes: []string{
-			"https://www.googleapis.com/auth/calendar",       // Full Calendar API access (read + write)
-			"https://www.googleapis.com/auth/userinfo.email", // Get user's email address
-			"openid",                                         // OpenID Connect
-		},
-		ClientID:     GoogleClientID,
-		ClientSecret: GoogleClientSecret,
-	}
-}
-
-// MicrosoftCalendarProvider returns OAuth2 config for the Calendar
-// extension's Microsoft Graph slot. Scope covers Calendars.ReadWrite on
-// the Graph audience (separate from mail's Outlook IMAP audience).
-func MicrosoftCalendarProvider() ProviderConfig {
-	return ProviderConfig{
-		Name:        "microsoft-calendar",
-		DisplayName: "Outlook Calendar",
-		AuthURL:     "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-		TokenURL:    "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-		Scopes: []string{
-			"https://graph.microsoft.com/Calendars.ReadWrite", // Calendar CRUD via Graph
-			"offline_access", // Refresh tokens
-			"openid",         // OpenID Connect
-			"email",          // Get user's email address
-		},
-		ClientID:     MicrosoftClientID,
-		ClientSecret: "", // Public client, no secret needed
-	}
-}
-
 // MicrosoftContactsOnlyProvider returns OAuth2 config for contacts-only access (standalone contact sources)
 func MicrosoftContactsOnlyProvider() ProviderConfig {
 	return ProviderConfig{
@@ -159,10 +119,6 @@ func GetProvider(name string) (ProviderConfig, error) {
 		return GoogleContactsOnlyProvider(), nil
 	case "microsoft-contacts":
 		return MicrosoftContactsOnlyProvider(), nil
-	case "google-calendar":
-		return GoogleCalendarProvider(), nil
-	case "microsoft-calendar":
-		return MicrosoftCalendarProvider(), nil
 	default:
 		return ProviderConfig{}, fmt.Errorf("unknown OAuth provider: %s", name)
 	}
