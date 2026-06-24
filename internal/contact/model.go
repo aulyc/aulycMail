@@ -124,6 +124,7 @@ type RecordIMPP struct {
 type RecordFilter struct {
 	Source    string // 'local' | 'carddav' | '' for both
 	Kind      string // for local: 'manual' | 'collected' | ''
+	Role      string // for collected: 'sender' | 'recipient' | 'ccbcc' | '' for any
 	SourceRef string // optional: addressbook_id for carddav scope
 	Query     string // optional case-insensitive fn/email substring
 	Limit     int

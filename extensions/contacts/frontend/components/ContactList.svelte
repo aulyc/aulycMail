@@ -169,11 +169,13 @@
   const headerLabel = $derived.by(() => {
     const sel = contactsView.selectedSourceId
     if (sel === '') return $_('contacts.sidebar.all')
+    if (sel === 'role:sender') return $_('contacts.sidebar.roleSender')
+    if (sel === 'role:recipient') return $_('contacts.sidebar.roleRecipient')
+    if (sel === 'role:ccbcc') return $_('contacts.sidebar.roleCcBcc')
     if (sel === 'local') return $_('contacts.sidebar.localAll')
     if (sel === 'local:manual') return $_('contacts.sidebar.localManual')
     if (sel === 'local:collected') return $_('contacts.sidebar.localCollected')
-    const src = contactSourcesStore.sources.find(s => s.id === sel)
-    return src?.name || $_('contacts.list.header')
+    return $_('contacts.list.header')
   })
 </script>
 

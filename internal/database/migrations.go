@@ -1301,4 +1301,24 @@ var migrations = []Migration{
 			ALTER TABLE messages ADD COLUMN body_failed INTEGER NOT NULL DEFAULT 0;
 		`,
 	},
+	{
+		Version: 40,
+		SQL: `
+			-- Role flags for auto-collected contacts. A collected contact can play
+			-- multiple roles across the user's mail, so each role is an independent
+			-- boolean rather than a single 'kind'. Drives the Contacts sidebar's
+			-- 全部 / 发件人 / 收件人 / 抄送密送 categories:
+			--   collected_sender    — appeared as the From of a received message
+			--   collected_recipient — was a To recipient of a message the user sent
+			--   collected_ccbcc     — was a Cc/Bcc recipient of a sent message
+			-- Manual contacts leave all three at 0. Existing collected rows were
+			-- collected from received mail's From, so backfill them as senders.
+
+			ALTER TABLE contact_records ADD COLUMN collected_sender INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE contact_records ADD COLUMN collected_recipient INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE contact_records ADD COLUMN collected_ccbcc INTEGER NOT NULL DEFAULT 0;
+
+			UPDATE contact_records SET collected_sender = 1 WHERE source = 'local' AND kind = 'collected';
+		`,
+	},
 }

@@ -12,6 +12,9 @@
     "sidebar": {
       "title": "联系人",
       "all": "全部",
+      "roleSender": "发件人",
+      "roleRecipient": "收件人",
+      "roleCcBcc": "抄送/密送",
       "localAll": "本地 - 全部",
       "localManual": "本地 - 联系人",
       "localCollected": "本地 - 已收集",

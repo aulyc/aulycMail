@@ -196,6 +196,12 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN body_failed`); err != nil {
 		t.Fatalf("drop messages.body_failed for re-migrate: %v", err)
 	}
+	// And v40's collected-role flags on contact_records.
+	for _, col := range []string{"collected_sender", "collected_recipient", "collected_ccbcc"} {
+		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
+			t.Fatalf("drop contact_records.%s for re-migrate: %v", col, err)
+		}
+	}
 
 	// Re-run migrations — migration 32 should rewrite the seeded local- id.
 	if err := db.Migrate(); err != nil {
@@ -347,6 +353,12 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 	// And v39's body_failed on messages.
 	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN body_failed`); err != nil {
 		t.Fatalf("drop messages.body_failed for re-migrate: %v", err)
+	}
+	// And v40's collected-role flags on contact_records.
+	for _, col := range []string{"collected_sender", "collected_recipient", "collected_ccbcc"} {
+		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
+			t.Fatalf("drop contact_records.%s for re-migrate: %v", col, err)
+		}
 	}
 
 	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,

@@ -127,8 +127,48 @@ func mapSourceForLegacy(source string) string {
 	return source
 }
 
-// AddOrUpdate inserts or updates a contact for the given email. Called by mail's
-// compose flow to record sent-mail recipients. Public signature preserved.
+// Role values for auto-collected contacts. A collected contact can carry
+// multiple roles; each maps to a boolean column on contact_records that drives
+// the Contacts sidebar's 全部 / 发件人 / 收件人 / 抄送密送 categories.
+const (
+	RoleSender    = "sender"    // appeared as the From of a received message
+	RoleRecipient = "recipient" // was a To recipient of a sent message
+	RoleCcBcc     = "ccbcc"     // was a Cc/Bcc recipient of a sent message
+)
+
+// roleColumn maps a role string to its contact_records column, or "" for an
+// unknown/empty role (no flag set). The returned value is one of a fixed set of
+// literals, so it's safe to interpolate into SQL.
+func roleColumn(role string) string {
+	switch role {
+	case RoleSender:
+		return "collected_sender"
+	case RoleRecipient:
+		return "collected_recipient"
+	case RoleCcBcc:
+		return "collected_ccbcc"
+	default:
+		return ""
+	}
+}
+
+// AddOrUpdate inserts or updates an auto-collected contact for the given email,
+// without tagging a role. Public signature preserved.
+func (s *Store) AddOrUpdate(email, displayName string) error {
+	return s.addOrUpdateCollected(email, displayName, "")
+}
+
+// AddOrUpdateWithRole inserts or updates an auto-collected contact and tags it
+// with the given role (RoleSender / RoleRecipient / RoleCcBcc). Roles OR
+// together across calls — a contact collected first as a sender and later as a
+// recipient carries both flags.
+func (s *Store) AddOrUpdateWithRole(email, displayName, role string) error {
+	return s.addOrUpdateCollected(email, displayName, roleColumn(role))
+}
+
+// addOrUpdateCollected is the shared insert/update path. roleCol, when non-empty,
+// is a whitelisted collected_* column name that gets set to 1 on both the insert
+// and update paths.
 //
 // Insert path: creates a new contact_records row (source='local', kind='collected')
 // + a contact_emails row pointing at it. send_count starts at 1.
@@ -137,7 +177,7 @@ func mapSourceForLegacy(source string) string {
 // fn is updated ONLY if no contact_emails row for that record has name_overridden=1
 // (preserves user-edited names) AND the new display name is non-empty. Kind is
 // NOT touched on conflict — a manual contact stays manual even after mail-send.
-func (s *Store) AddOrUpdate(email, displayName string) error {
+func (s *Store) addOrUpdateCollected(email, displayName, roleCol string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 	displayName = strings.TrimSpace(displayName)
 	if email == "" {
@@ -157,10 +197,9 @@ func (s *Store) AddOrUpdate(email, displayName string) error {
 
 	if errors.Is(err, sql.ErrNoRows) {
 		// Brand new email — create a local-collected record + email pair.
-		// Record id is a UUID (matches CardDAV — vCard UID semantics), NOT
-		// derived from email. The email lives in contact_emails as a fully-
-		// editable sub-row so future Edit UI can rename it without losing
-		// autocomplete metadata.
+		// Record id is a UUID, NOT derived from email. The email lives in
+		// contact_emails as a fully-editable sub-row so future Edit UI can
+		// rename it without losing autocomplete metadata.
 		recordID = uuid.New().String()
 		if _, err := s.db.Exec(`
 			INSERT INTO contact_records (id, source, kind, fn, created_at, updated_at)
@@ -174,6 +213,7 @@ func (s *Store) AddOrUpdate(email, displayName string) error {
 		`, recordID, email, now); err != nil {
 			return fmt.Errorf("failed to insert contact_emails: %w", err)
 		}
+		s.setRoleFlag(recordID, roleCol)
 		s.log.Debug().Str("email", email).Str("name", displayName).Msg("Contact created (collected)")
 		return nil
 	}
@@ -205,8 +245,22 @@ func (s *Store) AddOrUpdate(email, displayName string) error {
 		}
 	}
 
+	s.setRoleFlag(recordID, roleCol)
 	s.log.Debug().Str("email", email).Msg("Contact updated (auto-collected)")
 	return nil
+}
+
+// setRoleFlag sets the given whitelisted collected_* column to 1 on a record.
+// No-op when roleCol is empty. Best-effort: a flag failure is logged, not
+// propagated, so it never blocks the core add/update.
+func (s *Store) setRoleFlag(recordID, roleCol string) {
+	if roleCol == "" {
+		return
+	}
+	if _, err := s.db.Exec(
+		`UPDATE contact_records SET `+roleCol+` = 1 WHERE id = ?`, recordID); err != nil {
+		s.log.Warn().Err(err).Str("column", roleCol).Msg("Failed to set contact role flag")
+	}
 }
 
 // UpdateName sets a user-edited display name and marks the contact's email as
@@ -761,6 +815,10 @@ func (s *Store) ListRecords(filter RecordFilter) ([]*Record, error) {
 	if filter.Kind != "" {
 		conds = append(conds, `cr.kind = ?`)
 		args = append(args, filter.Kind)
+	}
+	if col := roleColumn(filter.Role); col != "" {
+		// col is a whitelisted literal from roleColumn — safe to interpolate.
+		conds = append(conds, `cr.`+col+` = 1`)
 	}
 	if filter.SourceRef != "" {
 		conds = append(conds, `cr.source_ref = ?`)

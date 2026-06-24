@@ -11,6 +11,7 @@ import (
 
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
+	"github.com/aulyc/aulycmail/internal/contact"
 	"github.com/aulyc/aulycmail/internal/folder"
 	imapPkg "github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/message"
@@ -722,11 +723,12 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 		savedMessages = append(savedMessages, m)
 		fetchedCount++
 
-		// Auto-collect the sender into local contacts (received mail only).
-		// Idempotent + best-effort — fetchMessageHeaders only runs for NEW
-		// UIDs, so this fires once when a message first arrives.
+		// Auto-collect the sender into local contacts (received mail only),
+		// tagged with the 发件人 (sender) role. Idempotent + best-effort —
+		// fetchMessageHeaders only runs for NEW UIDs, so this fires once when
+		// a message first arrives.
 		if collectSenders && m.FromEmail != "" {
-			_ = e.contactStore.AddOrUpdate(m.FromEmail, m.FromName)
+			_ = e.contactStore.AddOrUpdateWithRole(m.FromEmail, m.FromName, contact.RoleSender)
 		}
 	}
 

@@ -10,10 +10,11 @@
 
   const { onSelect }: Props = $props()
 
-  // Source IDs (single local address book):
+  // Source IDs (single local address book, classified by mail role):
   //   ''                  → all local contacts
-  //   'local:manual'      → user-added local contacts
-  //   'local:collected'   → auto-collected from mail
+  //   'role:sender'       → 发件人 (collected from received mail's From)
+  //   'role:recipient'    → 收件人 (collected from sent mail's To)
+  //   'role:ccbcc'        → 抄送密送 (collected from sent mail's Cc/Bcc)
   type SidebarItem = {
     id: string
     label: string
@@ -24,8 +25,9 @@
   const sections = $derived.by(() => {
     const builtins: SidebarItem[] = [
       { id: '', label: $_('contacts.sidebar.all'), icon: 'mdi:account-multiple' },
-      { id: 'local:manual', label: $_('contacts.sidebar.localManual'), icon: 'mdi:account-plus-outline' },
-      { id: 'local:collected', label: $_('contacts.sidebar.localCollected'), icon: 'mdi:email-outline' },
+      { id: 'role:sender', label: $_('contacts.sidebar.roleSender'), icon: 'mdi:email-arrow-left-outline' },
+      { id: 'role:recipient', label: $_('contacts.sidebar.roleRecipient'), icon: 'mdi:email-arrow-right-outline' },
+      { id: 'role:ccbcc', label: $_('contacts.sidebar.roleCcBcc'), icon: 'mdi:email-multiple-outline' },
     ]
     return [{ items: builtins }]
   })

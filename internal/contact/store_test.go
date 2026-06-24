@@ -22,6 +22,48 @@ func openTestDB(t *testing.T) *database.DB {
 	return db
 }
 
+func TestAddOrUpdateWithRole_FlagsAndFilter(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db.DB)
+
+	if err := store.AddOrUpdateWithRole("sender@example.com", "Sender", RoleSender); err != nil {
+		t.Fatalf("collect sender: %v", err)
+	}
+	if err := store.AddOrUpdateWithRole("rcpt@example.com", "Rcpt", RoleRecipient); err != nil {
+		t.Fatalf("collect recipient: %v", err)
+	}
+	if err := store.AddOrUpdateWithRole("cc@example.com", "Cc", RoleCcBcc); err != nil {
+		t.Fatalf("collect ccbcc: %v", err)
+	}
+	// A contact first seen as a sender and later as a recipient carries both
+	// roles — flags OR together rather than overwrite.
+	if err := store.AddOrUpdateWithRole("sender@example.com", "Sender", RoleRecipient); err != nil {
+		t.Fatalf("re-collect sender as recipient: %v", err)
+	}
+
+	count := func(role string) int {
+		t.Helper()
+		recs, err := store.ListRecords(RecordFilter{Source: "local", Role: role})
+		if err != nil {
+			t.Fatalf("ListRecords(role=%q): %v", role, err)
+		}
+		return len(recs)
+	}
+
+	if got := count(RoleSender); got != 1 {
+		t.Errorf("sender role count = %d, want 1", got)
+	}
+	if got := count(RoleRecipient); got != 2 {
+		t.Errorf("recipient role count = %d, want 2 (rcpt + dual-role sender)", got)
+	}
+	if got := count(RoleCcBcc); got != 1 {
+		t.Errorf("ccbcc role count = %d, want 1", got)
+	}
+	if got := count(""); got != 3 {
+		t.Errorf("all-roles (no filter) count = %d, want 3 distinct records", got)
+	}
+}
+
 func TestUpsert(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db.DB)

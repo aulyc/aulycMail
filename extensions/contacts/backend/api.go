@@ -25,6 +25,12 @@ const (
 	SourceIDLocal          = "local"
 	SourceIDLocalManual    = "local:manual"
 	SourceIDLocalCollected = "local:collected"
+
+	// Role categories for auto-collected contacts (Contacts sidebar
+	// 发件人 / 收件人 / 抄送密送). Each filters by the matching role flag.
+	SourceIDRoleSender    = "role:sender"
+	SourceIDRoleRecipient = "role:recipient"
+	SourceIDRoleCcBcc     = "role:ccbcc"
 )
 
 // localKindFromSourceID returns the `contacts.kind` filter value for a local
@@ -35,6 +41,21 @@ func localKindFromSourceID(id string) string {
 		return "manual"
 	case SourceIDLocalCollected:
 		return "collected"
+	default:
+		return ""
+	}
+}
+
+// roleFromSourceID returns the contact role for a "role:*" sidebar source ID,
+// or "" when the ID isn't a role category.
+func roleFromSourceID(id string) string {
+	switch id {
+	case SourceIDRoleSender:
+		return contact.RoleSender
+	case SourceIDRoleRecipient:
+		return contact.RoleRecipient
+	case SourceIDRoleCcBcc:
+		return contact.RoleCcBcc
 	default:
 		return ""
 	}
@@ -104,14 +125,16 @@ func (a *API) GetContact(emailOrID string) (*coreapi.Contact, error) {
 //   - "" / SourceIDLocal       → all local contacts (manual + collected)
 //   - SourceIDLocalManual      → user-added local contacts only
 //   - SourceIDLocalCollected   → auto-collected local contacts only
+//   - role:sender / recipient / ccbcc → collected contacts by mail role
+//     (发件人 / 收件人 / 抄送密送)
 func (a *API) ListContacts(filter coreapi.ContactFilter) ([]coreapi.Contact, error) {
 	if a.localStore == nil {
 		return nil, nil
 	}
-	kind := localKindFromSourceID(filter.SourceID)
 	records, err := a.localStore.ListRecords(contact.RecordFilter{
 		Source: "local",
-		Kind:   kind,
+		Kind:   localKindFromSourceID(filter.SourceID),
+		Role:   roleFromSourceID(filter.SourceID),
 		Query:  filter.Query,
 		Limit:  filter.Limit,
 		Offset: filter.Offset,

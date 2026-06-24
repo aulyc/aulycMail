@@ -12,6 +12,9 @@
     "sidebar": {
       "title": "Contacts",
       "all": "All",
+      "roleSender": "Senders",
+      "roleRecipient": "Recipients",
+      "roleCcBcc": "Cc / Bcc",
       "localAll": "Local - All",
       "localManual": "Local - Contacts",
       "localCollected": "Local - Collected",
