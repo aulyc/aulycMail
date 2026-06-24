@@ -64,7 +64,9 @@ build:
 		echo "Warning: No OAuth credentials configured. Gmail/Outlook OAuth will not work."; \
 		echo "See .env.example for required variables."; \
 	fi
-	wails build -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+	wails build -ldflags "$(LDFLAGS) -s -w" -tags $(BUILD_TAGS)
+	@echo "Injecting macOS asset-catalog icon (fills the Liquid Glass plate on macOS 26)..."
+	bash tools/inject_macos_icon.sh build/bin/aulycmail.app build/appicon.png
 	@echo "Ad-hoc signing aulycmail.app (required for macOS notifications)..."
 	codesign --force --deep --sign - build/bin/aulycmail.app
 
