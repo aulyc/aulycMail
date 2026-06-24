@@ -145,15 +145,6 @@ func (c *ComposerApp) Startup(ctx context.Context) {
 	c.messageStore = message.NewStore(db)
 	c.contactStore = contact.NewStore(db.DB)
 
-	// Initialize vCard scanner for contact autocomplete (shared .vcf files)
-	vcardScanner := contact.NewVCardScanner(contact.DefaultVCardPaths(), 20*time.Minute)
-	c.contactStore.SetVCardScanner(vcardScanner)
-	go func() {
-		if _, err := vcardScanner.Scan(); err != nil {
-			log.Debug().Err(err).Msg("vCard scan failed")
-		}
-	}()
-
 	// Removed in 2b.2.a: contactStore.Search now natively walks both local and
 	// carddav contacts via the unified contact_records schema. The carddav
 	// store and search-bridge wiring is no longer needed here.

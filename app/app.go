@@ -499,17 +499,6 @@ func (a *App) Startup(ctx context.Context) {
 	// Scale database connection pool based on number of accounts
 	a.updateDBConnectionPool()
 
-	// Initialize vCard scanner for contact autocomplete
-	// Scans known Linux paths for .vcf files with 20 minute cache TTL
-	vcardScanner := contact.NewVCardScanner(contact.DefaultVCardPaths(), 20*time.Minute)
-	a.contactStore.SetVCardScanner(vcardScanner)
-	// Trigger initial scan in background
-	go func() {
-		if _, err := vcardScanner.Scan(); err != nil {
-			log.Debug().Err(err).Msg("vCard scan failed")
-		}
-	}()
-
 	// Initialize certificate trust store (TOFU)
 	a.certStore = certificate.NewStore(db.DB)
 

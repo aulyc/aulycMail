@@ -6,7 +6,6 @@ require (
 	github.com/emersion/go-imap/v2 v2.0.0-beta.7
 	github.com/emersion/go-message v0.18.1
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
-	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
 	github.com/google/uuid v1.6.0
 	github.com/microcosm-cc/bluemonday v1.0.27
 	github.com/rs/zerolog v1.34.0

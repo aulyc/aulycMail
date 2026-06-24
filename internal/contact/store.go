@@ -26,12 +26,10 @@ import (
 var ErrContactExists = errors.New("contact already exists")
 
 // Store handles contact storage and retrieval against the unified
-// contact-record schema. The filesystem-based VCardScanner is held as an
-// optional secondary autocomplete source (unchanged by migration 31).
+// contact-record schema (a single local address book).
 type Store struct {
-	db           *sql.DB
-	vcardScanner *VCardScanner
-	log          zerolog.Logger
+	db  *sql.DB
+	log zerolog.Logger
 }
 
 // NewStore creates a new contact store.
@@ -42,19 +40,9 @@ func NewStore(db *sql.DB) *Store {
 	}
 }
 
-// SetVCardScanner attaches a filesystem-based vCard cache as a secondary
-// autocomplete source. Existing behavior preserved across migration 31.
-func (s *Store) SetVCardScanner(scanner *VCardScanner) {
-	s.vcardScanner = scanner
-}
-
-// Search returns contacts matching the query for autocomplete. The unified
-// tables already include both local AND CardDAV records, so a single SQL
-// query covers both — the legacy CardDAVSearchFunc bridge is no longer needed.
-// The optional VCardScanner is still consulted for filesystem-based .vcf
-// files (unchanged).
+// Search returns local contacts matching the query for autocomplete.
 //
-// Ranked by: send count > recency > source priority. Public signature preserved.
+// Ranked by: send count > recency. Public signature preserved.
 func (s *Store) Search(query string, limit int) ([]*Contact, error) {
 	if limit <= 0 {
 		limit = 10
@@ -62,27 +50,13 @@ func (s *Store) Search(query string, limit int) ([]*Contact, error) {
 
 	unified, err := s.searchUnified(query, limit)
 	if err != nil {
-		s.log.Warn().Err(err).Msg("Failed to search unified contacts")
+		s.log.Warn().Err(err).Msg("Failed to search contacts")
 		unified = []*Contact{}
 	}
-
-	var vcardContacts []*Contact
-	if s.vcardScanner != nil {
-		vcardContacts, err = s.vcardScanner.Search(query, limit)
-		if err != nil {
-			s.log.Warn().Err(err).Msg("Failed to search vCard contacts")
-			vcardContacts = []*Contact{}
-		}
-		if len(unified)+len(vcardContacts) < 3 {
-			s.vcardScanner.RefreshIfNeeded()
-		}
+	if len(unified) > limit {
+		unified = unified[:limit]
 	}
-
-	merged := MergeResults(unified, vcardContacts)
-	if len(merged) > limit {
-		merged = merged[:limit]
-	}
-	return merged, nil
+	return unified, nil
 }
 
 // searchUnified queries the unified contact_records + contact_emails tables.
