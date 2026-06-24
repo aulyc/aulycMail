@@ -9,7 +9,6 @@
   import SidebarFooter from '$lib/components/kit/SidebarFooter.svelte'
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
-  import { contactSourcesStore } from '$lib/stores/contactSources.svelte'
   import { isAccountExpanded, setAccountExpanded, isUnifiedInboxExpanded, setFolderCollapsed, getUIState, getUIStateVersion, saveUIState } from '$lib/stores/uiState.svelte'
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
   import { _ } from '$lib/i18n'
@@ -157,7 +156,6 @@
       }
     })
 
-    contactSourcesStore.load()
     loadUnifiedInboxCount()
 
     // Listen for folder count changes to update unified inbox count
@@ -658,9 +656,6 @@
         title={$_('sidebar.settings')}
       >
         <Icon icon="mdi:cog" class="w-4 h-4" />
-        {#if contactSourcesStore.hasErrors}
-          <span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-destructive rounded-full border border-background"></span>
-        {/if}
       </button>
     {/snippet}
   </SidebarFooter>

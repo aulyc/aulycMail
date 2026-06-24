@@ -3,7 +3,7 @@
   import Icon from '@iconify/svelte'
   import { Button } from '$lib/components/ui/button'
   import { addToast } from '$lib/stores/toast'
-  import { refreshExtensionRegistry, openExtensionSettings } from '$lib/stores/extensionRegistry.svelte'
+  import { refreshExtensionRegistry } from '$lib/stores/extensionRegistry.svelte'
   import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs bindings
   import { ListExtensions, SetExtensionEnabled } from '../../../../wailsjs/go/app/App'
@@ -91,17 +91,6 @@
               {/if}
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
-              {#if ext.enabled}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onclick={() => openExtensionSettings(ext.id)}
-                  title="Edit extension settings"
-                >
-                  <Icon icon="mdi:cog" class="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
-              {/if}
               <Button
                 variant={ext.enabled ? 'outline' : 'default'}
                 size="sm"

@@ -4,30 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aulyc/aulycmail/internal/carddav"
 	"github.com/aulyc/aulycmail/internal/oauth2"
 )
-
-// AuthContextInfo describes a single authenticated identity (email account or
-// standalone contacts source) that the Contacts extension's write-access
-// picker can attach a new write grant to. Enumerated by ListAuthContextsForProvider.
-//
-// Standalone contacts sources are first-class auth contexts even though they
-// don't have an entry in the `accounts` table — their OAuth tokens are stored
-// against the source id directly.
-type AuthContextInfo struct {
-	// Kind is "mail" or "standalone-contacts". Drives which backend method
-	// the picker's confirm calls (incremental consent on a mail account vs.
-	// incremental consent / fresh OAuth against a contacts source).
-	Kind string `json:"kind"`
-	// Identifier is the account_id (for "mail") or source_id (for
-	// "standalone-contacts") the picker passes back to the bridge.
-	Identifier string `json:"identifier"`
-	// Email is the user-facing identifier shown in the picker.
-	Email string `json:"email"`
-	// Label is a short tag rendered next to the email — "Mail" or "Contacts".
-	Label string `json:"label"`
-}
 
 // OAuthCredsStatus is the metadata returned by GetOAuthCredsStatus. Secret
 // values themselves NEVER leave the credentials store via this surface — only
@@ -325,93 +303,4 @@ func (a *App) ClearOAuthCreds(configID string) error {
 	return a.credStore.ClearUserClientCreds(configID)
 }
 
-// ListAuthContextsForProvider returns the existing authenticated identities
-// (mail accounts + standalone contacts sources) that match the given OAuth
-// provider. Used by the Contacts extension's write-access picker to let the
-// user attach a write grant to one of their EXISTING reads, rather than
-// adding a new account from inside the extension (which aulycmail's design
-// forbids — new accounts always come through core setup paths).
-//
-// Wails-bound. Returns an empty slice when nothing matches — the picker
-// renders an "Add a Google account in Mail or Contacts first" empty state.
-//
-// `provider` is "google" or "microsoft".
-func (a *App) ListAuthContextsForProvider(provider string) ([]AuthContextInfo, error) {
-	if provider != "google" && provider != "microsoft" {
-		return nil, fmt.Errorf("unsupported provider %q", provider)
-	}
-
-	var out []AuthContextInfo
-
-	// Mail accounts. We discover their provider via the existing OAuth
-	// tokens table; account IDs without OAuth tokens (basic-auth IMAP)
-	// don't match and are skipped.
-	if a.accountStore != nil && a.credStore != nil {
-		accounts, err := a.accountStore.List()
-		if err != nil {
-			return nil, fmt.Errorf("list accounts: %w", err)
-		}
-		for _, acc := range accounts {
-			if acc == nil {
-				continue
-			}
-			tokenProvider, err := a.credStore.GetOAuthProvider(acc.ID)
-			if err != nil || tokenProvider == "" {
-				continue
-			}
-			if tokenProvider != provider {
-				continue
-			}
-			out = append(out, AuthContextInfo{
-				Kind:       "mail",
-				Identifier: acc.ID,
-				Email:      acc.Email,
-				Label:      "Mail",
-			})
-		}
-	}
-
-	// Standalone contacts sources — carddav sources with AccountID == nil
-	// and Type matching the provider.
-	if a.carddavStore != nil {
-		sources, err := a.carddavStore.ListSources()
-		if err != nil {
-			return nil, fmt.Errorf("list contact sources: %w", err)
-		}
-		for _, s := range sources {
-			if s == nil {
-				continue
-			}
-			if s.AccountID != nil && *s.AccountID != "" {
-				continue // linked to a mail account — already covered above
-			}
-			if string(s.Type) != provider {
-				continue
-			}
-			email := contactSourceEmail(s)
-			if email == "" {
-				continue
-			}
-			out = append(out, AuthContextInfo{
-				Kind:       "standalone-contacts",
-				Identifier: s.ID,
-				Email:      email,
-				Label:      "Contacts",
-			})
-		}
-	}
-
-	return out, nil
-}
-
-// contactSourceEmail extracts the user-facing email for a standalone contacts
-// source. Standalone sources don't carry the email as a structured field —
-// it's stored against the source's username, which is set at
-// CompleteContactSourceOAuthSetup time to the email returned by Google/MS.
-func contactSourceEmail(s *carddav.Source) string {
-	if s == nil {
-		return ""
-	}
-	return s.Username
-}
 

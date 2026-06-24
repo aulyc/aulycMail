@@ -6,10 +6,8 @@
   import ContactDetail from './ContactDetail.svelte'
   import AddContactDialog from './AddContactDialog.svelte'
   import ContactEditDialog from './ContactEditDialog.svelte'
-  import ContactsSettingsDialog from './ContactsSettingsDialog.svelte'
   import PaneLayout from '$lib/components/kit/PaneLayout.svelte'
   import { contactsView, reloadContacts, selectSource, activateContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
-  import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
   import { toasts } from '$lib/stores/toast'
   import { registerExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
   import { KEY } from '$extensions/contacts/frontend/keyboard/shortcuts'
@@ -18,15 +16,10 @@
   // @ts-ignore - wailsjs bindings
   import type { v1 } from '$wailsjs/go/models'
 
-  // Conflict events fire when a CardDAV write loses the optimistic-concurrency
-  // race (server's ETag changed between read and PUT/DELETE). The Wails
-  // backend has already refreshed the local cache from the server before
-  // emitting — the UI just needs to toast + re-render.
+  // Conflict events are emitted by the bridge's write path. With a single
+  // local address book these never actually fire, but the listener stays so
+  // the UI degrades gracefully: toast + re-render.
   let unsubscribeConflict: (() => void) | null = null
-  // Fires after any source sync lands (background scheduler, post-add, or
-  // manual). reloadContacts() preserves the current selection + open detail,
-  // so a background refresh doesn't disrupt the user.
-  let unsubscribeChanged: (() => void) | null = null
 
   onMount(() => {
     reloadContacts()
@@ -37,21 +30,13 @@
         await activateContact(payload.contactId)
       }
     })
-    unsubscribeChanged = EventsOn('contacts:changed', () => {
-      void reloadContacts()
-    })
   })
 
   onDestroy(() => {
     if (unsubscribeConflict) unsubscribeConflict()
-    if (unsubscribeChanged) unsubscribeChanged()
   })
 
   let showAdd = $state(false)
-
-  // Settings dialog hoisted here so the sidebar's footer cog has a single
-  // owner to flip — same pattern CalendarPane uses for its settings dialog.
-  let showSettings = $state(false)
 
   // Edit-dialog state is hoisted to the pane so the 'e' keyboard shortcut and
   // ContactDetail's Edit button both route through one owner.
@@ -68,23 +53,15 @@
 
   function openEdit(contact: v1.Contact | null) {
     if (!contact) return
-    // Open for any writable source — local (always writable) or a CardDAV
-    // source that has its writable flag enabled. Google/Microsoft sources
-    // are gated to read-only until 2b.3 ships their write paths.
-    const writable =
-      contact.sourceId === 'aulycmail' || contactSourcesStore.isSourceWritable(contact.sourceId)
-    if (!writable) return
+    // Every contact lives in the local address book, which is always editable.
     editTarget = contact
     showEdit = true
   }
 
-  async function handleCreated(id: string, sourceId: string) {
-    // After a successful Add, switch the sidebar to the source the contact
-    // landed in so the user sees it in context. Local lands in 'local:manual';
-    // CardDAV lands at the source UUID.
-    const isLocal = sourceId === 'local' || sourceId.startsWith('local:')
-    const target = isLocal ? 'local:manual' : sourceId
-    selectSource(target)
+  async function handleCreated(id: string) {
+    // After a successful Add, switch to the manual sub-list so the user sees
+    // the new contact in context.
+    selectSource('local:manual')
     await reloadContacts()
     await activateContact(id)
   }
@@ -96,69 +73,20 @@
   const unregEdit = registerExtensionShortcut('contacts', KEY.CONTACT_EDIT, () => {
     openEdit(contactsView.detail)
   })
-  // Ctrl/Cmd+N opens the new-contact dialog. AddContactDialog's own
-  // autoFillFromSidebar reads contactsView.selectedSourceId, so the
-  // pre-selected addressbook tracks whatever the sidebar has focused
-  // — same path the "+" button takes today.
+  // Ctrl/Cmd+N opens the new-contact dialog.
   const unregNew = registerExtensionShortcut('contacts', KEY.CONTACT_NEW, () => {
     showAdd = true
   })
 
-  // Ctrl/Cmd+Shift+A: sync every configured contact source. Same chord
-  // as mail's "sync all accounts" — extension dispatch routes only when
-  // contacts is the active rail.
-  const unregSyncAll = registerExtensionShortcut('contacts', KEY.CONTACT_SYNC_ALL, () => {
-    void runSyncAll()
-  })
-
-  // Ctrl/Cmd+Shift+S: sync the focused source. selectedSourceId points
-  // at a CardDAV/OAuth source UUID for real entries; '' / 'local' /
-  // 'local:manual' / 'local:collected' are built-in slices with no
-  // remote to sync — the handler skips those and toasts.
-  const unregSyncFocused = registerExtensionShortcut('contacts', KEY.CONTACT_SYNC_FOCUSED, () => {
-    void runSyncFocused()
-  })
-
-  async function runSyncAll() {
-    try {
-      await contactSourcesStore.syncAll()
-      await reloadContacts()
-      toasts.success($_('contacts.toast.syncAllSucceeded'))
-    } catch (err) {
-      const msg = (err as Error)?.message ?? String(err)
-      toasts.error(msg)
-    }
-  }
-
-  async function runSyncFocused() {
-    const id = contactsView.selectedSourceId
-    const isBuiltin = id === '' || id === 'local' || id.startsWith('local:')
-    if (isBuiltin) {
-      toasts.warning($_('contacts.toast.syncNoSource'))
-      return
-    }
-    try {
-      await contactSourcesStore.syncSource(id)
-      await reloadContacts()
-      toasts.success($_('contacts.toast.syncSucceeded'))
-    } catch (err) {
-      const msg = (err as Error)?.message ?? String(err)
-      toasts.error(msg)
-    }
-  }
-
   onDestroy(unregEdit)
   onDestroy(unregNew)
-  onDestroy(unregSyncAll)
-  onDestroy(unregSyncFocused)
 </script>
 
 <PaneLayout>
-  <ContactsSidebar onSelect={handleSourceSelected} onOpenSettings={() => { showSettings = true }} />
+  <ContactsSidebar onSelect={handleSourceSelected} />
   <ContactList onAdd={openAdd} />
   <ContactDetail onEdit={openEdit} />
 </PaneLayout>
 
 <AddContactDialog bind:open={showAdd} onCreated={handleCreated} />
 <ContactEditDialog bind:open={showEdit} contact={editTarget} />
-<ContactsSettingsDialog bind:open={showSettings} />

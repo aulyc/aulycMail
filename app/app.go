@@ -13,7 +13,6 @@ import (
 
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/appstate"
-	"github.com/aulyc/aulycmail/internal/carddav"
 	"github.com/aulyc/aulycmail/internal/certificate"
 	"github.com/aulyc/aulycmail/internal/contact"
 	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
@@ -223,11 +222,6 @@ type App struct {
 	// Certificate trust store (TOFU)
 	certStore *certificate.Store
 
-	// CardDAV
-	carddavStore     *carddav.Store
-	carddavSyncer    *carddav.Syncer
-	carddavScheduler *carddav.Scheduler
-
 	// Extension system. Each extension's Wails-bound surface is embedded
 	// into App via its Bridge struct (declared at the top of this struct
 	// definition); the *Extension field below is the lightweight lifecycle
@@ -267,14 +261,6 @@ type App struct {
 	// Temporary OAuth token storage (for pending account creation)
 	pendingOAuthTokens *oauth2.TokenResponse
 	pendingOAuthEmail  string
-
-	// Temporary OAuth token storage (for pending contact source creation)
-	pendingContactSourceOAuthTokens   *oauth2.TokenResponse
-	pendingContactSourceOAuthEmail    string
-	pendingContactSourceOAuthProvider string
-
-	// Google Contacts API client (for OAuth accounts)
-	googleContactsClient *contact.GoogleContactsClient
 
 	// Pending mailto: URL data (from command line)
 	PendingMailto *MailtoData
@@ -524,9 +510,6 @@ func (a *App) Startup(ctx context.Context) {
 		}
 	}()
 
-	// Initialize CardDAV support (will be fully set up after credStore is initialized)
-	a.carddavStore = carddav.NewStore(db.DB)
-
 	// Initialize certificate trust store (TOFU)
 	a.certStore = certificate.NewStore(db.DB)
 
@@ -562,10 +545,6 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Start periodic WAL checkpoint routine to prevent WAL file from growing too large
 	go a.db.StartCheckpointRoutine(ctx)
-
-	// Initialize CardDAV syncer and scheduler
-	a.carddavSyncer = carddav.NewSyncer(a.carddavStore, a.credStore)
-	a.carddavScheduler = carddav.NewScheduler(a.carddavSyncer, a.carddavStore)
 
 	// Initialize the OAuth2 manager BEFORE constructing the Auth Broker — the
 	// broker captures a.oauth2Manager into bearerRefreshTransport at construction
@@ -613,34 +592,6 @@ func (a *App) Startup(ctx context.Context) {
 		a.extensionUnregs = append(a.extensionUnregs, unreg)
 	}
 
-	// Wire up network connectivity check so CardDAV scheduler skips ticks when offline
-	if a.networkMonitor != nil {
-		a.carddavScheduler.SetConnectivityCheck(a.networkMonitor.IsConnected)
-	}
-
-	// Set up access token getters for OAuth contact sources
-	a.carddavSyncer.SetAccessTokenGetters(
-		// Account token getter - for sources linked to email accounts
-		func(accountID string) (string, error) {
-			tokens, err := a.getValidOAuthToken(accountID)
-			if err != nil {
-				return "", err
-			}
-			return tokens.AccessToken, nil
-		},
-		// Source token getter - for standalone contact sources
-		func(sourceID string) (string, error) {
-			return a.getValidContactSourceOAuthToken(sourceID)
-		},
-	)
-
-	// Removed in 2b.2.a: contactStore.Search now natively walks both local and
-	// carddav contacts via the unified contact_records schema. The bridge
-	// function is no longer needed.
-
-	// Start CardDAV background sync scheduler
-	a.carddavScheduler.Start(ctx)
-
 	// Initialize undo stack (max 50 commands, 30 second timeout)
 	a.undoStack = undo.NewStack(50, 30*time.Second)
 
@@ -657,9 +608,6 @@ func (a *App) Startup(ctx context.Context) {
 		oauth2Manager:  a.oauth2Manager,
 		draftOps:       &a.draftOps,
 	}
-
-	// Initialize Google Contacts client for OAuth account contact search
-	a.googleContactsClient = contact.NewGoogleContactsClient()
 
 	// Initialize IPC for multi-window support
 	a.initIPC(ctx)
@@ -956,12 +904,6 @@ func (a *App) Shutdown(ctx context.Context) {
 		log.Info().Msg("Notification listener stopped")
 	}
 
-	// Stop CardDAV scheduler
-	if a.carddavScheduler != nil {
-		a.carddavScheduler.Stop()
-		log.Info().Msg("CardDAV scheduler stopped")
-	}
-
 	// Close all IMAP connections
 	if a.imapPool != nil {
 		a.imapPool.CloseAll()
@@ -1003,59 +945,6 @@ func (a *App) getValidOAuthToken(accountID string) (*credentials.OAuthTokens, er
 // GetContext returns the app context
 func (a *App) GetContext() context.Context {
 	return a.ctx
-}
-
-// getValidContactSourceOAuthToken returns a valid OAuth token for a standalone contact source
-func (a *App) getValidContactSourceOAuthToken(sourceID string) (string, error) {
-	log := logging.WithComponent("app")
-
-	tokens, err := a.credStore.GetContactSourceOAuthTokens(sourceID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get contact source OAuth tokens: %w", err)
-	}
-
-	// Check if token expires within 5 minutes
-	if tokens.IsExpiringSoon(5 * time.Minute) {
-		log.Debug().
-			Str("source_id", sourceID).
-			Time("expires_at", tokens.ExpiresAt).
-			Msg("Contact source OAuth token expiring soon, refreshing")
-
-		// Refresh the token
-		newTokenResp, err := a.oauth2Manager.RefreshToken(tokens.Provider, tokens.RefreshToken)
-		if err != nil {
-			log.Error().Err(err).
-				Str("source_id", sourceID).
-				Msg("Contact source OAuth token refresh failed")
-
-			// Error is persisted to the contact_sources table by the sync caller;
-			// sidebar red dot picks it up on next contactSourcesStore.load() (app start
-			// or Contacts settings open). Real-time notification deferred — not worth
-			// the listener wiring for a non-time-sensitive failure mode.
-			return "", fmt.Errorf("contact source OAuth token refresh failed: %w", err)
-		}
-
-		// Calculate new expiry time
-		expiresAt := time.Now().Add(time.Duration(newTokenResp.ExpiresIn) * time.Second)
-
-		// Update tokens in store
-		tokens.AccessToken = newTokenResp.AccessToken
-		tokens.ExpiresAt = expiresAt
-		if newTokenResp.RefreshToken != "" {
-			tokens.RefreshToken = newTokenResp.RefreshToken
-		}
-
-		if err := a.credStore.SetContactSourceOAuthTokens(sourceID, tokens); err != nil {
-			log.Warn().Err(err).Msg("Failed to save refreshed contact source OAuth tokens")
-		}
-
-		log.Info().
-			Str("source_id", sourceID).
-			Time("new_expires_at", expiresAt).
-			Msg("Contact source OAuth token refreshed successfully")
-	}
-
-	return tokens.AccessToken, nil
 }
 
 // OpenURL opens a URL in the system browser with proper shell escaping

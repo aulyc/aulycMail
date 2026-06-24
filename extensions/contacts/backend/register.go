@@ -52,20 +52,7 @@ func (e *Extension) Register(core coreapi.Core) (coreapi.Unregister, error) {
 		return nil, fmt.Errorf("contacts: register rail tab: %w", err)
 	}
 
-	unregHook, err := core.UI().RegisterAccountSetupHook(coreapi.AccountSetupHookRequest{
-		ExtensionID: e.manifest.ID,
-		Providers:   []string{"google", "microsoft"},
-		ButtonLabel: "Also set up your contacts",
-		Description: "Sync contacts from this account for autocomplete and browsing.",
-		Component:   "AccountContactsHookPanel",
-	})
-	if err != nil {
-		unregRail()
-		return nil, fmt.Errorf("contacts: register account-setup hook: %w", err)
-	}
-
 	return func() {
-		unregHook()
 		unregRail()
 	}, nil
 }

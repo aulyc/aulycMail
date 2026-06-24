@@ -298,9 +298,7 @@ func (a *App) getCoreOnlyFolders(accountID string) ([]*folder.Folder, error) {
 	return folders, nil
 }
 
-// SyncAllComplete syncs all accounts completely, then syncs CardDAV sources.
-// Email sync runs first (most important), then CardDAV sync runs after to avoid
-// database contention (SQLITE_BUSY errors).
+// SyncAllComplete syncs all enabled accounts completely.
 // This is the master sync function called from the sidebar sync button.
 func (a *App) SyncAllComplete() error {
 	log := logging.WithComponent("app.masterSync")
@@ -362,17 +360,6 @@ func (a *App) SyncAllComplete() error {
 		if err := a.SyncAccountComplete(acc.ID); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", acc.Email, err))
 			// Continue with other accounts
-		}
-	}
-
-	// Then: Sync CardDAV contacts (after email sync completes)
-	// This avoids SQLITE_BUSY errors from concurrent writes
-	a.syncMu.Lock()
-	cancelled := a.syncCancelled
-	a.syncMu.Unlock()
-	if !cancelled {
-		if err := a.SyncAllContactSources(); err != nil {
-			errors = append(errors, fmt.Sprintf("contacts: %v", err))
 		}
 	}
 

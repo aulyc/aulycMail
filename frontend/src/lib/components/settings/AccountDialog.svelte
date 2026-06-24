@@ -7,8 +7,6 @@
   import AccountGeneralTab from './account/AccountGeneralTab.svelte'
   import AccountIdentityTab from './account/AccountIdentityTab.svelte'
   import AccountServerTab from './account/AccountServerTab.svelte'
-  import AccountContactsHookPanel from '$extensions/contacts/frontend/hooks/AccountContactsHookPanel.svelte'
-  import { loadAccountSetupHooks } from '$lib/stores/extensionRegistry.svelte'
   // @ts-ignore - wailsjs path
   import type { v1 } from '../../../../wailsjs/go/models'
   import { accountStore } from '$lib/stores/accounts.svelte'
@@ -90,13 +88,6 @@
   let reauthorizeSuccess = $state(false)
   let errors = $state<Record<string, string>>({})
   let initialized = $state(false)
-
-  // Post-account-add hook step state. When an account is successfully created
-  // and at least one extension has registered a matching account-setup hook
-  // for the provider, the dialog switches from the wizard to a hooks step.
-  let hookAccount = $state<account.Account | null>(null)
-  let pendingHooks = $state<v1.AccountSetupHookRequest[]>([])
-  let resolvedHooks = $state<Set<string>>(new Set())
 
   // Initialize form when editing
   $effect(() => {
@@ -282,38 +273,6 @@
     }
 
     onSuccess?.(result)
-
-    // After successful account creation, check for matching account-setup hooks
-    // (e.g., Contacts extension's "Also set up contacts" offer). If any exist
-    // and the user has enabled the relevant extensions, switch the dialog to a
-    // hooks step. Otherwise close immediately.
-    const hooks = await loadAccountSetupHooks(provider)
-    if (hooks.length === 0) {
-      open = false
-      onClose?.()
-      return
-    }
-    hookAccount = result
-    pendingHooks = hooks
-    resolvedHooks = new Set()
-  }
-
-  function resolveHook(extensionId: string) {
-    resolvedHooks = new Set([...resolvedHooks, extensionId])
-    if (resolvedHooks.size >= pendingHooks.length) {
-      // All hooks settled — close.
-      hookAccount = null
-      pendingHooks = []
-      resolvedHooks = new Set()
-      open = false
-      onClose?.()
-    }
-  }
-
-  function skipRemainingHooks() {
-    hookAccount = null
-    pendingHooks = []
-    resolvedHooks = new Set()
     open = false
     onClose?.()
   }
@@ -515,28 +474,6 @@
           </div>
         {/if}
       </Tabs.Root>
-    {:else if hookAccount && pendingHooks.length > 0}
-      <!-- Post-Add Mode: Account-Setup Hooks -->
-      <div class="flex-1 overflow-y-auto pl-1 pr-3 pb-4" style="max-height: calc(90vh - 140px);">
-        <p class="text-sm text-muted-foreground mb-3">
-          Your account is added. Set up extras for this account, or skip.
-        </p>
-        {#each pendingHooks as hook (hook.extensionId)}
-          {#if !resolvedHooks.has(hook.extensionId)}
-            {#if hook.component === 'AccountContactsHookPanel'}
-              <AccountContactsHookPanel
-                {hook}
-                accountId={hookAccount.id}
-                accountName={hookAccount.name}
-                onResolved={() => resolveHook(hook.extensionId)}
-              />
-            {/if}
-          {/if}
-        {/each}
-        <div class="flex items-center justify-end gap-2 pt-2 border-t border-border mt-4">
-          <Button variant="ghost" onclick={skipRemainingHooks}>Skip all</Button>
-        </div>
-      </div>
     {:else}
       <!-- New Account Mode: Wizard -->
       <div class="flex-1 overflow-y-auto pl-1 pr-3 pb-4" style="max-height: calc(90vh - 140px);">

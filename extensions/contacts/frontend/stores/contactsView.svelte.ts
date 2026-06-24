@@ -9,7 +9,6 @@ import {
   Contacts_UpdateContact as UpdateContact,
   Contacts_DeleteLocalContact as DeleteLocalContact,
   Contacts_CreateContact as CreateContact,
-  Contacts_ListAddressbooks as ListAddressbooks,
 } from '$wailsjs/go/app/App'
 // @ts-ignore - wailsjs bindings
 import type { v1 } from '$wailsjs/go/models'
@@ -161,16 +160,3 @@ export async function createContact(input: v1.ContactCreateInput): Promise<strin
   return await CreateContact(input)
 }
 
-// Lists the enabled addressbooks for a CardDAV source. Used by the Add
-// Contact dialog's addressbook sub-picker. Returns [] for empty / unknown /
-// non-CardDAV source IDs (the backend returns nil which the bindings turn
-// into undefined; this helper normalizes to []).
-export async function listAddressbooks(sourceId: string): Promise<v1.Addressbook[]> {
-  if (!sourceId) return []
-  try {
-    return (await ListAddressbooks(sourceId)) || []
-  } catch (err) {
-    console.error('Failed to list addressbooks:', err)
-    return []
-  }
-}

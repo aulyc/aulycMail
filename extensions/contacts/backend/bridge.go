@@ -2,10 +2,8 @@ package backend
 
 import (
 	"errors"
-	"fmt"
 	"sync"
 
-	"github.com/aulyc/aulycmail/internal/carddav"
 	"github.com/aulyc/aulycmail/internal/contact"
 	"github.com/aulyc/aulycmail/internal/database"
 	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
@@ -65,24 +63,10 @@ type ContactsBridgeDeps struct {
 	// every time it needs to publish a conflict event.
 	Emitter EventEmitter
 
-	// Core is the coreapi.Core handle the bridge uses to call host-owned
-	// cross-extension surfaces:
-	//   - Source-management methods (ListSources, LinkAccountSource) that
-	//     back the extension's sidebar + account-setup hook.
-	//   - Storage().HostSecrets() — read-only access to core-managed
-	//     CardDAV passwords, since the contacts extension's writes need
-	//     the password but core owns the credential lifecycle (Pattern B
-	//     per docs/EXTENSIONS.md).
+	// Core is the coreapi.Core handle the bridge uses for host-owned
+	// cross-extension surfaces (events, logging). Source management is gone —
+	// there is a single local address book.
 	Core coreapi.Core
-
-	// GetStandaloneSourceToken returns a valid OAuth access token for a
-	// standalone contacts-only OAuth source (account_id IS NULL). Mirrors
-	// the host getter the carddav syncer uses for the read path; the
-	// contacts API uses it for the write path so create/update/delete work
-	// on standalone Google/Microsoft sources just like they do on
-	// account-linked ones. Nil-safe (writes to standalone sources then
-	// error with a clear message).
-	GetStandaloneSourceToken func(sourceID string) (string, error)
 }
 
 // SettingsStore is the narrow interface the bridge needs from the host's
@@ -138,19 +122,12 @@ func (b *ContactsBridge) gateEnabled() bool {
 // (and the disabled call still short-circuits before reaching here).
 func (b *ContactsBridge) ensureInit() error {
 	b.initOnce.Do(func() {
-		if b.deps.DB == nil || b.deps.Paths == nil {
-			b.initErr = errors.New("contacts.ContactsBridge: missing DB or Paths in deps")
+		if b.deps.DB == nil {
+			b.initErr = errors.New("contacts.ContactsBridge: missing DB in deps")
 			return
 		}
 		contactStore := contact.NewStore(b.deps.DB.DB)
-		carddavStore := carddav.NewStore(b.deps.DB.DB)
-		extStore, err := NewStore(b.deps.Paths.Data)
-		if err != nil {
-			b.initErr = err
-			return
-		}
-		b.api = NewAPI(contactStore, carddavStore, extStore, b.deps.Core, b.deps.DB.DB)
-		b.api.SetStandaloneSourceTokenGetter(b.deps.GetStandaloneSourceToken)
+		b.api = NewAPI(contactStore)
 	})
 	return b.initErr
 }
@@ -241,87 +218,6 @@ func (b *ContactsBridge) Contacts_CreateContact(input coreapi.ContactCreateInput
 	return b.api.CreateContact(input)
 }
 
-// Contacts_ListAddressbooks returns the enabled addressbooks for a CardDAV
-// source. Used by the Add Contact dialog to populate the addressbook picker
-// when the user chooses a multi-addressbook source.
-//
-// Returns nil for: extension disabled, empty sourceID, non-CardDAV source,
-// or any error during lookup (the caller treats nil as "no addressbooks to
-// pick" — falls back to letting the backend resolve the default).
-func (b *ContactsBridge) Contacts_ListAddressbooks(sourceID string) ([]coreapi.Addressbook, error) {
-	if !b.gateEnabled() {
-		return nil, nil
-	}
-	if err := b.ensureInit(); err != nil {
-		return nil, err
-	}
-	return b.api.ListAddressbooks(sourceID)
-}
-
-// Contacts_ListSources returns all configured contact sources via the
-// host's coreapi.Contacts surface. The extension's frontend store
-// (extensions/contacts/frontend/stores/contactSources.svelte.ts) caches
-// the result and derives isSourceWritable / source-by-id lookups locally
-// off the cached array.
-//
-// Returns nil when extension is disabled. No ensureInit required — this
-// proxies to host state via coreapi, never touches the extension's own
-// stores. Frontend can call this safely even before the extension's
-// SQLite has been opened.
-func (b *ContactsBridge) Contacts_ListSources() ([]coreapi.ContactSource, error) {
-	if !b.gateEnabled() {
-		return nil, nil
-	}
-	if b.deps.Core == nil {
-		return nil, nil
-	}
-	return b.deps.Core.Contacts().ListSources()
-}
-
-// Contacts_LinkAccountSource creates a new contact source backed by an
-// existing email account's OAuth tokens. Called by the AccountContactsHookPanel
-// after a user clicks "Set up contacts" during the post-account-add flow.
-// Returns the new source's id.
-//
-// Returns "" (no error) when extension is disabled. Otherwise proxies to
-// coreapi.Contacts.LinkAccountSource, which in turn delegates to the host's
-// existing source-management implementation.
-func (b *ContactsBridge) Contacts_LinkAccountSource(accountID, name string, syncInterval int) (string, error) {
-	if !b.gateEnabled() {
-		return "", nil
-	}
-	if b.deps.Core == nil {
-		return "", nil
-	}
-	return b.deps.Core.Contacts().LinkAccountSource(accountID, name, syncInterval)
-}
-
-// Contacts_SyncSource triggers an immediate sync against one source.
-// Used by the sidebar footer's Ctrl+Shift+S handler so the user can
-// refresh the focused address book without opening settings.
-func (b *ContactsBridge) Contacts_SyncSource(sourceID string) error {
-	if !b.gateEnabled() {
-		return errors.New("contacts: extension disabled")
-	}
-	if b.deps.Core == nil {
-		return errors.New("contacts: core not wired")
-	}
-	return b.deps.Core.Contacts().SyncSource(sourceID)
-}
-
-// Contacts_SyncAllSources triggers an immediate sync against every
-// configured contact source. Used by the sidebar footer's Ctrl+Shift+A
-// shortcut.
-func (b *ContactsBridge) Contacts_SyncAllSources() error {
-	if !b.gateEnabled() {
-		return errors.New("contacts: extension disabled")
-	}
-	if b.deps.Core == nil {
-		return errors.New("contacts: core not wired")
-	}
-	return b.deps.Core.Contacts().SyncAllSources()
-}
-
 // Contacts_UpdateContact applies a ContactPatch to a contact. Source
 // dispatch handled inside the API:
 //   - Local records → contact.Store.UpsertRecord (full-fidelity write)
@@ -374,95 +270,6 @@ func (b *ContactsBridge) Contacts_DeleteLocalContact(idOrEmail string) error {
 type ResizedContactPhoto struct {
 	Data      string `json:"data"`
 	MediaType string `json:"mediaType"`
-}
-
-// Contacts_EnableWriteAccess runs the interactive OAuth flow to grant write
-// access on a contact source, attaching the grant to a user-picked existing
-// auth context (either a mail account or a standalone contact source).
-//
-// Synchronous: blocks until OAuth completes (success / cancel / error). On
-// success: tokens are persisted under the picked identity, and the contact
-// source's Writable flag flips. The frontend's WriteAccessAccountPicker
-// dialog `await`s this.
-//
-// Inputs:
-//   sourceID              — the contact source being granted write access
-//   authContextKind       — "mail" or "standalone-contacts"
-//   authContextIdentifier — account_id (for "mail") or source_id (for
-//                           "standalone-contacts"); identifies the
-//                           OAuth identity the new tokens attach to
-//   expectedEmail         — the picked identity's email; enforced on
-//                           OAuth callback (mismatch = reject)
-//
-// aulycmail's design forbids creating new accounts from inside the contacts
-// extension; all auth contexts MUST be one the user already set up in core
-// (Mail account add OR standalone contacts source add).
-func (b *ContactsBridge) Contacts_EnableWriteAccess(sourceID, authContextKind, authContextIdentifier, expectedEmail string) error {
-	if !b.gateEnabled() {
-		return nil
-	}
-	if b.deps.Core == nil {
-		return errors.New("contacts: write-access flow unavailable (core not wired)")
-	}
-	if sourceID == "" {
-		return errors.New("contacts: sourceID is required")
-	}
-	if authContextIdentifier == "" {
-		return errors.New("contacts: authContextIdentifier is required")
-	}
-	if expectedEmail == "" {
-		return errors.New("contacts: expectedEmail is required")
-	}
-
-	// Resolve the source's provider → clientConfigID + write scope.
-	sources, err := b.deps.Core.Contacts().ListSources()
-	if err != nil {
-		return err
-	}
-	var providerType string
-	for _, s := range sources {
-		if s.ID == sourceID {
-			providerType = s.Type
-			break
-		}
-	}
-	if providerType == "" {
-		return fmt.Errorf("contacts: source %q not found", sourceID)
-	}
-
-	var clientConfigID coreapi.ClientConfigID
-	var writeScope string
-	switch providerType {
-	case "google":
-		clientConfigID = "google-contacts"
-		writeScope = "https://www.googleapis.com/auth/contacts"
-	case "microsoft":
-		clientConfigID = "microsoft-contacts"
-		writeScope = "https://graph.microsoft.com/Contacts.ReadWrite"
-	default:
-		return fmt.Errorf("contacts: source provider %q does not support write access", providerType)
-	}
-
-	req := coreapi.StartIncrementalConsentRequest{
-		ClientConfigID: clientConfigID,
-		Scopes:         []coreapi.AuthScope{{Resource: writeScope}},
-		ExpectedEmail:  expectedEmail,
-		LoginHint:      expectedEmail,
-	}
-	switch authContextKind {
-	case "mail":
-		req.AccountID = authContextIdentifier
-	case "standalone-contacts":
-		req.SourceID = authContextIdentifier
-	default:
-		return fmt.Errorf("contacts: unknown authContextKind %q", authContextKind)
-	}
-
-	if err := b.deps.Core.Auth().StartIncrementalConsent(req); err != nil {
-		return err
-	}
-
-	return b.deps.Core.Contacts().SetSourceWritable(sourceID, true)
 }
 
 // Contacts_ResizeContactPhoto takes a base64-encoded image, decodes it,

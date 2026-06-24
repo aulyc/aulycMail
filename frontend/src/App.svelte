@@ -12,7 +12,6 @@
   import TermsDialog from './lib/components/TermsDialog.svelte'
   import OAuthMissingDialog from './lib/components/OAuthMissingDialog.svelte'
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
-  import ExtensionSettingsDialog from './lib/components/settings/ExtensionSettingsDialog.svelte'
   import ExtensionRail from './lib/components/rail/ExtensionRail.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
   import { refreshExtensionRegistry, getRailTabs } from '$lib/stores/extensionRegistry.svelte'
@@ -1586,9 +1585,6 @@
 
 <!-- Toast notifications -->
 <ToastContainer />
-
-<!-- Per-extension settings dialog dispatcher (Settings → Extensions → Edit) -->
-<ExtensionSettingsDialog />
 
 <!-- Composer Modal -->
 {#if showComposer && composerAccountId}

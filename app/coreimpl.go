@@ -108,68 +108,31 @@ func (contactsCoreImpl) ListAddressbooks(string) ([]coreapi.Addressbook, error) 
 	return nil, coreapi.ErrUnimplemented
 }
 
-// ListSources wraps the host's existing contact-source store. Filters down
-// to the API-surface shape (ContactSource) so the extension only sees what
-// it consumes — id, name, type, writable.
+// ListSources returns no sources. Remote contact sources (CardDAV / Google /
+// Microsoft) were removed — aulycmail keeps a single local address book, so the
+// source list is always empty.
 func (c contactsCoreImpl) ListSources() ([]coreapi.ContactSource, error) {
-	sources, err := c.app.carddavStore.ListSources()
-	if err != nil {
-		return nil, err
-	}
-	out := make([]coreapi.ContactSource, 0, len(sources))
-	for _, s := range sources {
-		if s == nil {
-			continue
-		}
-		accountID := ""
-		if s.AccountID != nil {
-			accountID = *s.AccountID
-		}
-		out = append(out, coreapi.ContactSource{
-			ID:        s.ID,
-			Name:      s.Name,
-			Type:      string(s.Type),
-			Writable:  s.Writable,
-			AccountID: accountID,
-		})
-	}
-	return out, nil
+	return nil, nil
 }
 
-// SetSourceWritable flips the writable flag on a contact source. Pure delegation
-// to the host's existing carddav store — the contacts extension uses this from
-// its incremental-consent flow (Phase 2b.3) to flip Writable after the user
-// grants write scopes.
-func (c contactsCoreImpl) SetSourceWritable(sourceID string, writable bool) error {
-	return c.app.carddavStore.SetSourceWritable(sourceID, writable)
+// SetSourceWritable is a no-op — there are no remote sources to flip.
+func (c contactsCoreImpl) SetSourceWritable(string, bool) error {
+	return nil
 }
 
-// LinkAccountSource delegates to the host's existing LinkAccountContactSource
-// Wails method. Returns the new source's id (Wails method returned the full
-// source struct; we extract its ID since that's all the extension needs).
-func (c contactsCoreImpl) LinkAccountSource(accountID, name string, syncInterval int) (string, error) {
-	source, err := c.app.LinkAccountContactSource(accountID, name, syncInterval)
-	if err != nil {
-		return "", err
-	}
-	if source == nil {
-		return "", nil
-	}
-	return source.ID, nil
+// LinkAccountSource is unsupported — there are no remote sources to link.
+func (c contactsCoreImpl) LinkAccountSource(string, string, int) (string, error) {
+	return "", coreapi.ErrUnimplemented
 }
 
-// SyncSource delegates to the host's existing SyncContactSource. Used by
-// the contacts extension's Ctrl+Shift+S handler and per-source "Sync now"
-// affordances.
-func (c contactsCoreImpl) SyncSource(sourceID string) error {
-	return c.app.SyncContactSource(sourceID)
+// SyncSource is a no-op — the local address book has nothing to sync.
+func (c contactsCoreImpl) SyncSource(string) error {
+	return nil
 }
 
-// SyncAllSources delegates to the host's existing SyncAllContactSources.
-// Used by the contacts extension's Ctrl+Shift+A shortcut and bulk-sync
-// affordances.
+// SyncAllSources is a no-op — the local address book has nothing to sync.
 func (c contactsCoreImpl) SyncAllSources() error {
-	return c.app.SyncAllContactSources()
+	return nil
 }
 
 func (contactsCoreImpl) CreateContact(coreapi.ContactCreateInput) (string, error) {

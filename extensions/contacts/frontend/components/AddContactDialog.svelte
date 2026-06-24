@@ -1,27 +1,16 @@
 <script lang="ts">
-  // AddContactDialog — creates a new contact in the user-picked source.
-  //
-  // v0.3.0-dev expansion: previously email + name only; now hosts the
-  // shared ContactFieldsForm so users can add a contact with phones,
-  // addresses, URLs, IMPPs, photo, and the rest of the rich fields in
-  // a single step. Backend dispatch by SourceID:
-  //   - local sentinel       → CreateContact's local-manual path
-  //   - CardDAV source UUID  → CreateContact's CardDAV path
-  //   - Google/MS source ID  → CreateContact's Google/MS provider paths
-  // (local sentinel is ALWAYS 'local:manual' regardless of which local
-  // sub-view the sidebar is showing; the 'collected' kind is reserved for
-  // sent-mail collection).
+  // AddContactDialog — creates a new contact in the single local address book.
+  // Hosts the shared ContactFieldsForm so users can add a contact with phones,
+  // addresses, URLs, IMPPs, photo, and the rest of the rich fields in one step.
+  // The contact is always created as a local manual entry ('local:manual');
+  // the 'collected' kind is reserved for mail auto-collection.
 
   import { untrack } from 'svelte'
   import { _ } from 'svelte-i18n'
   import * as Dialog from '$lib/components/ui/dialog'
-  import * as Select from '$lib/components/ui/select'
   import { Button } from '$lib/components/ui/button'
-  import { Input } from '$lib/components/ui/input'
-  import { Label } from '$lib/components/ui/label'
   import Icon from '@iconify/svelte'
-  import { contactsView, createContact, listAddressbooks } from '$extensions/contacts/frontend/stores/contactsView.svelte'
-  import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
+  import { createContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import ContactFieldsForm, { slotConstraintsFor } from './fields/ContactFieldsForm.svelte'
@@ -32,7 +21,6 @@
     URLRow,
     IMPPRow,
     PhotoState,
-    SourceTypeID,
   } from './fields/types'
   // @ts-ignore - wailsjs bindings
   import { v1 } from '$wailsjs/go/models'
@@ -40,19 +28,15 @@
   interface Props {
     open: boolean
     onClose?: () => void
-    onCreated?: (id: string, sourceId: string) => void
+    onCreated?: (id: string) => void
   }
 
   let { open = $bindable(false), onClose, onCreated }: Props = $props()
 
-  // Local sentinel — single underlying value for the "Local" picker option.
-  // 'local:manual' is the only writable local kind; 'local' (parent) and
-  // 'local:collected' are filter values, not write targets.
+  // Local manual entry is the only write target. 'local:manual' is the only
+  // writable local kind; 'local:collected' is reserved for mail collection.
   const LOCAL_VALUE = 'local:manual'
 
-  // Form state.
-  let sourceValue = $state<string>(LOCAL_VALUE)
-  let addressbookValue = $state<string>('')
   let saving = $state(false)
   let errors = $state<Record<string, string>>({})
 
@@ -71,65 +55,10 @@
   let impps = $state<IMPPRow[]>([])
   let photo = $state<PhotoState>({ data: '', mediaType: '', url: '' })
 
-  // Addressbook cache for the currently-picked external source. Refreshed
-  // on source change; null until first fetch completes.
-  let addressbooks = $state<v1.Addressbook[]>([])
-  let loadingAddressbooks = $state<boolean>(false)
-
-  // Picker options. Any writable external source qualifies — CardDAV,
-  // Google, or Microsoft. The backend's CreateContact dispatches by
-  // source.Type to the matching provider create handler.
-  type PickerOption = { value: string; label: string }
-  const sourceOptions: PickerOption[] = $derived.by(() => {
-    const opts: PickerOption[] = [
-      { value: LOCAL_VALUE, label: $_('contacts.add.localOption') },
-    ]
-    for (const s of contactSourcesStore.sources) {
-      if (!s.writable) continue
-      if (s.type === 'carddav' || s.type === 'google' || s.type === 'microsoft') {
-        opts.push({ value: s.id, label: s.name })
-      }
-    }
-    return opts
-  })
-
-  function findOption(value: string): PickerOption | undefined {
-    return sourceOptions.find(o => o.value === value)
-  }
-
-  // Derive the SourceTypeID for ContactFieldsForm constraint gating. Local
-  // sentinel → 'local'; external source UUID → look up its type. Empty
-  // string when the source isn't (yet) in contactSourcesStore.
-  const sourceType: SourceTypeID = $derived.by(() => {
-    if (!sourceValue || sourceValue === LOCAL_VALUE || sourceValue.startsWith('local')) {
-      return 'local'
-    }
-    const s = contactSourcesStore.sources.find(s => s.id === sourceValue)
-    if (!s) return ''
-    if (s.type === 'carddav' || s.type === 'google' || s.type === 'microsoft') {
-      return s.type
-    }
-    return ''
-  })
-
-  // Auto-fill from the sidebar's current source when the dialog opens.
-  function autoFillFromSidebar(): string {
-    const sel = contactsView.selectedSourceId
-    if (!sel || sel === 'local' || sel.startsWith('local:')) return LOCAL_VALUE
-    const match = sourceOptions.find(o => o.value === sel)
-    return match ? sel : LOCAL_VALUE
-  }
-
-  // Reset state each time the dialog opens. Wrapped in untrack so it
-  // depends only on `open` — otherwise contactSourcesStore.load() (which
-  // reassigns sources) re-triggers the effect and resets all inputs
-  // mid-typing.
+  // Reset state each time the dialog opens.
   $effect(() => {
     if (!open) return
     untrack(() => {
-      contactSourcesStore.load()
-      sourceValue = autoFillFromSidebar()
-      addressbookValue = ''
       nameInput = ''
       nicknameInput = ''
       orgInput = ''
@@ -146,34 +75,6 @@
       errors = {}
       saving = false
     })
-  })
-
-  // Fetch addressbooks whenever the user picks an external source. Local
-  // doesn't need it. .catch is critical: an unhandled rejection on this
-  // effect's promise has been observed to break Svelte reactivity and
-  // freeze the dialog inputs.
-  $effect(() => {
-    if (!open) return
-    if (sourceValue === LOCAL_VALUE) {
-      addressbooks = []
-      addressbookValue = ''
-      return
-    }
-    loadingAddressbooks = true
-    listAddressbooks(sourceValue)
-      .then(abs => {
-        addressbooks = abs
-        addressbookValue = abs.length > 0 ? abs[0].id : ''
-      })
-      .catch(err => {
-        console.error('Failed to load addressbooks for source', sourceValue, err)
-        addressbooks = []
-        addressbookValue = ''
-        toasts.error($_('contacts.toast.failedAdd'))
-      })
-      .finally(() => {
-        loadingAddressbooks = false
-      })
   })
 
   $effect(() => {
@@ -205,10 +106,8 @@
       })
     }
 
-    // Per-source slot guards. The repeater UI gates Add buttons, but
-    // type-based caps (Microsoft: 1 mobile phone) can be triggered by
-    // changing an existing row's type after adding it — surface here.
-    const constraints = slotConstraintsFor(sourceType)
+    // Slot guards (e.g. phone type caps) surfaced from the shared constraints.
+    const constraints = slotConstraintsFor('local')
     if (constraints.phones.kind === 'maxByType') {
       const c = constraints.phones
       const target = c.type.toLowerCase()
@@ -256,8 +155,8 @@
       .filter(c => c.length > 0)
 
     return v1.ContactCreateInput.createFrom({
-      sourceId: sourceValue,
-      addressbookId: sourceValue === LOCAL_VALUE ? '' : addressbookValue,
+      sourceId: LOCAL_VALUE,
+      addressbookId: '',
       email: primaryEmail,
       name: nameInput.trim(),
       nickname: nicknameInput.trim(),
@@ -297,7 +196,7 @@
       const input = buildCreateInput()
       const id = await createContact(input)
       toasts.success($_('contacts.toast.added'))
-      onCreated?.(id, sourceValue)
+      onCreated?.(id)
       close()
     } catch (err) {
       handleSaveError(err)
@@ -305,10 +204,6 @@
       saving = false
     }
   }
-
-  let showAddressbookPicker = $derived(
-    sourceValue !== LOCAL_VALUE && addressbooks.length > 1,
-  )
 </script>
 
 <Dialog.Root bind:open onOpenChange={(v) => { if (!v) close() }}>
@@ -321,42 +216,6 @@
     </Dialog.Header>
 
     <div class="space-y-5 mt-2">
-      <!-- Source picker -->
-      <div>
-        <Label>{$_('contacts.add.sourceLabel')}</Label>
-        <Select.Root value={sourceValue} onValueChange={(v) => { sourceValue = v }} disabled={saving}>
-          <Select.Trigger>
-            <Select.Value placeholder={$_('contacts.add.sourcePlaceholder')}>
-              {findOption(sourceValue)?.label || $_('contacts.add.sourcePlaceholder')}
-            </Select.Value>
-          </Select.Trigger>
-          <Select.Content>
-            {#each sourceOptions as opt (opt.value)}
-              <Select.Item value={opt.value} label={opt.label} />
-            {/each}
-          </Select.Content>
-        </Select.Root>
-      </div>
-
-      <!-- Addressbook sub-picker -->
-      {#if showAddressbookPicker}
-        <div>
-          <Label>{$_('contacts.add.addressbookLabel')}</Label>
-          <Select.Root value={addressbookValue} onValueChange={(v) => { addressbookValue = v }} disabled={saving || loadingAddressbooks}>
-            <Select.Trigger>
-              <Select.Value placeholder={$_('contacts.add.addressbookPlaceholder')}>
-                {addressbooks.find(a => a.id === addressbookValue)?.name || $_('contacts.add.addressbookPlaceholder')}
-              </Select.Value>
-            </Select.Trigger>
-            <Select.Content>
-              {#each addressbooks as ab (ab.id)}
-                <Select.Item value={ab.id} label={ab.name} />
-              {/each}
-            </Select.Content>
-          </Select.Root>
-        </div>
-      {/if}
-
       {#if errors.email}
         <p class="text-xs text-destructive">{errors.email}</p>
       {/if}
@@ -378,7 +237,7 @@
         bind:photo
         errors={errors}
         saving={saving}
-        sourceType={sourceType}
+        sourceType={'local'}
       />
     </div>
 
