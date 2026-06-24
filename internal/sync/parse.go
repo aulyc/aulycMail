@@ -10,8 +10,6 @@ import (
 
 	gomessage "github.com/emersion/go-message"
 	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/pgp"
-	"github.com/aulyc/aulycmail/internal/smime"
 )
 
 // parseMessageBodyFull parses a raw email and extracts text, HTML, and attachment metadata.
@@ -71,71 +69,6 @@ func (e *Engine) parseMessageBodyInternal(raw []byte, messageID string) *ParsedB
 		Str("topLevelContentType", topLevelCT).
 		Int("rawLen", len(raw)).
 		Msg("Parsing message body")
-
-	// Check for S/MIME content (signed or encrypted)
-	isSigned := smime.IsSMIMESigned(topLevelCT)
-	isEncrypted := smime.IsSMIMEEncrypted(topLevelCT)
-
-	if isSigned || isEncrypted {
-		// Store raw body for on-view processing (verification/decryption happens fresh on each view)
-		result.SMIMERawBody = raw
-		result.SMIMEEncrypted = isEncrypted
-
-		if isEncrypted {
-			// Encrypted: don't store body text/html (decrypted only on view)
-			return result
-		}
-
-		// Signed-only: still parse body for FTS, but don't cache verification status
-		if e.smimeVerifier != nil {
-			_, innerBody := e.smimeVerifier.VerifyAndUnwrap(raw)
-			// Use the unwrapped inner body for parsing (not the S/MIME wrapper)
-			if innerBody != nil {
-				raw = innerBody
-				reader = bytes.NewReader(raw)
-				newEntity, parseErr := gomessage.Read(reader)
-				if parseErr != nil {
-					e.log.Debug().Err(parseErr).Msg("Failed to re-parse unwrapped S/MIME body")
-					result.BodyText = string(raw)
-					return result
-				}
-				entity = newEntity
-				topLevelCT = entity.Header.Get("Content-Type")
-			}
-		}
-	}
-
-	// Check for PGP/MIME content (signed or encrypted)
-	isPGPSigned := pgp.IsPGPSigned(topLevelCT)
-	isPGPEncrypted := pgp.IsPGPEncrypted(topLevelCT)
-
-	if isPGPSigned || isPGPEncrypted {
-		// Store raw body for on-view processing (verification/decryption happens fresh on each view)
-		result.PGPRawBody = raw
-		result.PGPEncrypted = isPGPEncrypted
-
-		if isPGPEncrypted {
-			// Encrypted: don't store body text/html (decrypted only on view)
-			return result
-		}
-
-		// Signed-only: still parse body for FTS, but don't cache verification status
-		if e.pgpVerifier != nil {
-			_, innerBody := e.pgpVerifier.VerifyAndUnwrap(raw)
-			// Use the unwrapped inner body for parsing (not the PGP wrapper)
-			if innerBody != nil {
-				raw = innerBody
-				reader = bytes.NewReader(raw)
-				newEntity, parseErr := gomessage.Read(reader)
-				if parseErr != nil {
-					e.log.Debug().Err(parseErr).Msg("Failed to re-parse unwrapped PGP body")
-					result.BodyText = string(raw)
-					return result
-				}
-				entity = newEntity
-			}
-		}
-	}
 
 	mr := entity.MultipartReader()
 	e.log.Debug().Bool("isMultipart", mr != nil).Msg("Multipart detection result")

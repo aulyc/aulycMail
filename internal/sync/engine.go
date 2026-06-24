@@ -13,8 +13,6 @@ import (
 	imapPkg "github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/pgp"
-	"github.com/aulyc/aulycmail/internal/smime"
 	"github.com/rs/zerolog"
 )
 
@@ -52,12 +50,7 @@ type ParsedBody struct {
 	BodyText       string
 	BodyHTML       string
 	HasAttachments bool
-	Attachments    []*message.Attachment  // Extracted attachment metadata (content only for inline)
-	SMIMEResult    *smime.SignatureResult // S/MIME verification result (nil if not S/MIME)
-	SMIMERawBody   []byte                // Raw S/MIME body for on-view processing
-	SMIMEEncrypted bool                  // Whether the message is encrypted
-	PGPRawBody     []byte                // Raw PGP body for on-view processing
-	PGPEncrypted   bool                  // Whether the message is PGP encrypted
+	Attachments    []*message.Attachment // Extracted attachment metadata (content only for inline)
 	UnsafeContent  bool                  // True if message has non-compliant encoding
 }
 
@@ -91,8 +84,6 @@ type Engine struct {
 	sanitizer        *email.Sanitizer
 	log              zerolog.Logger
 	progressCallback ProgressCallback
-	smimeVerifier    *smime.Verifier
-	pgpVerifier      *pgp.Verifier
 }
 
 // NewEngine creates a new sync engine
@@ -124,36 +115,6 @@ func (e *Engine) ReleasePoolConnection(conn *imapPkg.PooledConnection) {
 // SetProgressCallback sets the callback function for progress updates
 func (e *Engine) SetProgressCallback(callback ProgressCallback) {
 	e.progressCallback = callback
-}
-
-// SetSMIMEVerifier sets the S/MIME verifier for signature verification during body parsing
-func (e *Engine) SetSMIMEVerifier(verifier *smime.Verifier) {
-	e.smimeVerifier = verifier
-}
-
-// SetPGPVerifier sets the PGP verifier for signature verification during body parsing
-func (e *Engine) SetPGPVerifier(verifier *pgp.Verifier) {
-	e.pgpVerifier = verifier
-}
-
-// ParseRawBody parses raw message bytes into body text/HTML.
-// This is a convenience wrapper around ParseDecryptedBody for callers that only need text.
-func (e *Engine) ParseRawBody(raw []byte) (bodyHTML, bodyText string) {
-	parsed := e.ParseDecryptedBody(raw, "")
-	return parsed.BodyHTML, parsed.BodyText
-}
-
-// ParseDecryptedBody parses raw message bytes (e.g. from a decrypted S/MIME or PGP envelope)
-// and returns the full ParsedBody including attachments.
-// This is used by the app layer for on-view processing of encrypted messages.
-func (e *Engine) ParseDecryptedBody(raw []byte, messageID string) *ParsedBody {
-	parsed := e.parseMessageBodyInternal(raw, messageID)
-
-	if parsed.BodyHTML != "" && e.sanitizer != nil {
-		parsed.BodyHTML = e.sanitizer.Sanitize(parsed.BodyHTML)
-	}
-
-	return parsed
 }
 
 // emitProgress sends progress updates if a callback is set

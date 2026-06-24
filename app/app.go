@@ -34,8 +34,6 @@ import (
 	"github.com/aulyc/aulycmail/internal/oauth2"
 	"github.com/aulyc/aulycmail/internal/platform"
 	"github.com/aulyc/aulycmail/internal/settings"
-	"github.com/aulyc/aulycmail/internal/pgp"
-	"github.com/aulyc/aulycmail/internal/smime"
 	"github.com/aulyc/aulycmail/internal/sync"
 	"github.com/aulyc/aulycmail/internal/undo"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -249,20 +247,6 @@ type App struct {
 	// the bus is also lazy — first system:* Subscribe triggers it.
 	eventBus         *eventBusCoreImpl
 	eventBusInitOnce goSync.Once
-
-	// S/MIME
-	smimeStore     *smime.Store
-	smimeSigner    *smime.Signer
-	smimeVerifier  *smime.Verifier
-	smimeEncryptor *smime.Encryptor
-	smimeDecryptor *smime.Decryptor
-
-	// PGP
-	pgpStore     *pgp.Store
-	pgpSigner    *pgp.Signer
-	pgpVerifier  *pgp.Verifier
-	pgpEncryptor *pgp.Encryptor
-	pgpDecryptor *pgp.Decryptor
 
 	// Shared draft operations (used by both App and ComposerApp)
 	draftOps draftOps
@@ -546,20 +530,6 @@ func (a *App) Startup(ctx context.Context) {
 	// Initialize certificate trust store (TOFU)
 	a.certStore = certificate.NewStore(db.DB)
 
-	// Initialize S/MIME support
-	a.smimeStore = smime.NewStore(db.DB, log)
-	a.smimeSigner = smime.NewSigner(a.smimeStore, a.credStore, log)
-	a.smimeVerifier = smime.NewVerifier(a.smimeStore, log)
-	a.smimeEncryptor = smime.NewEncryptor(a.smimeStore, a.credStore, log)
-	a.smimeDecryptor = smime.NewDecryptor(a.smimeStore, a.credStore, log)
-
-	// Initialize PGP support
-	a.pgpStore = pgp.NewStore(db.DB, log)
-	a.pgpSigner = pgp.NewSigner(a.pgpStore, a.credStore, log)
-	a.pgpVerifier = pgp.NewVerifier(a.pgpStore, log)
-	a.pgpEncryptor = pgp.NewEncryptor(a.pgpStore, a.credStore, log)
-	a.pgpDecryptor = pgp.NewDecryptor(a.pgpStore, a.credStore, log)
-
 	// Initialize IMAP connection pool
 	poolConfig := imap.DefaultPoolConfig()
 	a.imapPool = imap.NewPool(poolConfig, a.getIMAPCredentials)
@@ -571,20 +541,10 @@ func (a *App) Startup(ctx context.Context) {
 		messageStore:   a.messageStore,
 		draftStore:     a.draftStore,
 		imapPool:       a.imapPool,
-		smimeSigner:    a.smimeSigner,
-		smimeEncryptor: a.smimeEncryptor,
-		smimeDecryptor: a.smimeDecryptor,
-		pgpSigner:      a.pgpSigner,
-		pgpEncryptor:   a.pgpEncryptor,
-		pgpDecryptor:   a.pgpDecryptor,
 	}
 
 	// Initialize sync engine
 	a.syncEngine = sync.NewEngine(a.imapPool, a.accountStore, a.folderStore, a.messageStore, a.attachmentStore, a.contactStore)
-
-	// Wire S/MIME and PGP verifiers into sync engine for signature verification during body parsing
-	a.syncEngine.SetSMIMEVerifier(a.smimeVerifier)
-	a.syncEngine.SetPGPVerifier(a.pgpVerifier)
 
 	// Set up sync progress callback to emit events to frontend
 	a.syncEngine.SetProgressCallback(func(progress sync.SyncProgress) {
@@ -695,12 +655,6 @@ func (a *App) Startup(ctx context.Context) {
 		certStore:      a.certStore,
 		contactStore:   a.contactStore,
 		oauth2Manager:  a.oauth2Manager,
-		smimeStore:     a.smimeStore,
-		smimeSigner:    a.smimeSigner,
-		smimeEncryptor: a.smimeEncryptor,
-		pgpStore:       a.pgpStore,
-		pgpSigner:      a.pgpSigner,
-		pgpEncryptor:   a.pgpEncryptor,
 		draftOps:       &a.draftOps,
 	}
 

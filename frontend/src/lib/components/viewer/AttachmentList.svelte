@@ -1,26 +1,16 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
-  import { GetAttachments, SaveAttachmentAs, SaveAllAttachments, OpenAttachment, SaveEncryptedAttachmentAs, OpenEncryptedAttachment, SaveAllEncryptedAttachments, OpenFile, OpenFolder } from '../../../../wailsjs/go/app/App'
+  import { GetAttachments, SaveAttachmentAs, SaveAllAttachments, OpenAttachment, OpenFile, OpenFolder } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
   import { message as messageModels } from '../../../../wailsjs/go/models'
   import { toasts } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
 
-  // Decrypted attachment metadata (from encrypted messages, not in DB)
-  interface DecryptedAttachment {
-    filename: string
-    contentType: string
-    size: number
-    isInline: boolean
-    contentId: string
-  }
-
   interface Props {
     messageId: string
-    encryptedAttachments?: DecryptedAttachment[]
   }
 
-  let { messageId, encryptedAttachments }: Props = $props()
+  let { messageId }: Props = $props()
 
   // State
   let attachments = $state<messageModels.Attachment[]>([])
@@ -28,15 +18,8 @@
   let downloadingIds = $state<Set<string>>(new Set())
   let savingAll = $state(false)
 
-  // Determine if we're in encrypted mode
-  let isEncrypted = $derived(encryptedAttachments != null && encryptedAttachments.length > 0)
-
-  // Load attachments when messageId changes (only for non-encrypted)
+  // Load attachments when messageId changes
   $effect(() => {
-    if (encryptedAttachments && encryptedAttachments.length > 0) {
-      attachments = []
-      return
-    }
     if (messageId) {
       loadAttachments(messageId)
     } else {
@@ -93,67 +76,17 @@
     }
   }
 
-  async function handleEncryptedDownload(att: DecryptedAttachment) {
-    const key = att.filename
-    downloadingIds = new Set([...downloadingIds, key])
-    try {
-      const path = await SaveEncryptedAttachmentAs(messageId, att.filename)
-      if (path) {
-        toasts.success($_('toast.attachmentSaved', { values: { filename: att.filename } }), [
-          {
-            label: $_('attachment.openFile'),
-            onClick: () => OpenFile(path)
-          },
-          {
-            label: $_('attachment.showInFolder'),
-            onClick: () => OpenFolder(path)
-          }
-        ])
-      }
-    } catch (err) {
-      console.error('Failed to save encrypted attachment:', err)
-      toasts.error($_('toast.failedToSaveAttachment', { values: { filename: att.filename } }))
-    } finally {
-      downloadingIds = new Set([...downloadingIds].filter(id => id !== key))
-    }
-  }
-
-  async function handleEncryptedOpen(att: DecryptedAttachment) {
-    const key = att.filename
-    downloadingIds = new Set([...downloadingIds, key])
-    try {
-      await OpenEncryptedAttachment(messageId, att.filename)
-    } catch (err) {
-      console.error('Failed to open encrypted attachment:', err)
-      toasts.error($_('toast.failedToOpenAttachment', { values: { filename: att.filename } }))
-    } finally {
-      downloadingIds = new Set([...downloadingIds].filter(id => id !== key))
-    }
-  }
-
   async function handleSaveAll() {
     savingAll = true
     try {
-      if (isEncrypted) {
-        const folder = await SaveAllEncryptedAttachments(messageId)
-        if (folder) {
-          toasts.success($_('toast.attachmentsSaved', { values: { count: encryptedAttachments!.length } }), [
-            {
-              label: $_('attachment.openFolder'),
-              onClick: () => OpenFolder(folder)
-            }
-          ])
-        }
-      } else {
-        const folder = await SaveAllAttachments(messageId)
-        if (folder) {
-          toasts.success($_('toast.attachmentsSaved', { values: { count: attachments.length } }), [
-            {
-              label: $_('attachment.openFolder'),
-              onClick: () => OpenFolder(folder)
-            }
-          ])
-        }
+      const folder = await SaveAllAttachments(messageId)
+      if (folder) {
+        toasts.success($_('toast.attachmentsSaved', { values: { count: attachments.length } }), [
+          {
+            label: $_('attachment.openFolder'),
+            onClick: () => OpenFolder(folder)
+          }
+        ])
       }
     } catch (err) {
       console.error('Failed to save all attachments:', err)
@@ -186,67 +119,10 @@
   }
 </script>
 
-{#if loading && !isEncrypted}
+{#if loading}
   <div class="flex items-center gap-2 text-sm text-muted-foreground">
     <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
     Loading attachments...
-  </div>
-{:else if isEncrypted && encryptedAttachments && encryptedAttachments.length > 0}
-  <div class="space-y-2">
-    {#each encryptedAttachments as att (att.filename)}
-      {@const isDownloading = downloadingIds.has(att.filename)}
-      <div class="flex items-center gap-3 p-2 rounded-md border border-border bg-muted/30 hover:bg-muted/50 transition-colors group">
-        <div class="flex-shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-          <Icon icon={getFileIcon(att.contentType)} class="w-5 h-5 text-primary" />
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="font-medium text-sm text-foreground truncate" title={att.filename}>
-            {att.filename}
-          </div>
-          <div class="text-xs text-muted-foreground">
-            {formatSize(att.size)}
-          </div>
-        </div>
-        <div class="flex items-center gap-1 flex-shrink-0">
-          {#if isDownloading}
-            <div class="p-2">
-              <Icon icon="mdi:loading" class="w-4 h-4 animate-spin text-muted-foreground" />
-            </div>
-          {:else}
-            <button
-              class="p-2 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
-              title={$_('attachment.open')}
-              onclick={() => handleEncryptedOpen(att)}
-            >
-              <Icon icon="mdi:open-in-new" class="w-4 h-4 text-muted-foreground" />
-            </button>
-            <button
-              class="p-2 rounded-md hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
-              title={$_('attachment.download')}
-              onclick={() => handleEncryptedDownload(att)}
-            >
-              <Icon icon="mdi:download" class="w-4 h-4 text-muted-foreground" />
-            </button>
-          {/if}
-        </div>
-      </div>
-    {/each}
-
-    {#if encryptedAttachments.length > 1}
-      <button
-        class="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors w-full justify-center border border-dashed border-border"
-        onclick={handleSaveAll}
-        disabled={savingAll}
-      >
-        {#if savingAll}
-          <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          {$_('attachment.saving')}
-        {:else}
-          <Icon icon="mdi:download-multiple" class="w-4 h-4" />
-          {$_('attachment.saveAll', { values: { count: encryptedAttachments.length } })}
-        {/if}
-      </button>
-    {/if}
   </div>
 {:else if attachments.length > 0}
   <div class="space-y-2">

@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   // @ts-ignore - wailsjs bindings
-  import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource, ProcessSMIMEMessage, ProcessPGPMessage, FetchMessageBody } from '../../../../wailsjs/go/app/App'
+  import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource, FetchMessageBody } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs bindings
   import { MarkAsRead, MarkAsUnread, Star, Unstar, Archive, Trash, MarkAsSpam, MarkAsNotSpam, DeletePermanently, Undo } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
@@ -64,53 +64,12 @@
   // Track which messages have had their remote images loaded by the user
   const messagesWithImagesLoaded = new Set<string>()
 
-  // Decrypted attachment metadata
-  interface DecryptedAttachment {
-    filename: string
-    contentType: string
-    size: number
-    isInline: boolean
-    contentId: string
-  }
-
-  // S/MIME on-view processing result type
-  interface SMIMEViewResult {
-    bodyHtml: string
-    bodyText: string
-    smimeStatus: string
-    smimeSignerEmail: string
-    smimeSignerSubject: string
-    smimeEncrypted: boolean
-    inlineAttachments?: Record<string, string>
-    attachments?: DecryptedAttachment[]
-  }
-
-  // PGP on-view processing result type
-  interface PGPViewResult {
-    bodyHtml: string
-    bodyText: string
-    pgpStatus: string
-    pgpSignerEmail: string
-    pgpSignerKeyId: string
-    pgpEncrypted: boolean
-    inlineAttachments?: Record<string, string>
-    attachments?: DecryptedAttachment[]
-  }
-
   // State
   let conversation = $state<messageModels.Conversation | null>(null)
   // Per-message EmailBody refs, used to pull each rendered body for printing.
   let emailBodyRefs: Record<string, { getPrintableHtml(): Promise<string> }> = {}
   let loading = $state(false)
   let error = $state<string | null>(null)
-
-  // S/MIME on-view processing results per message
-  let smimeResults = $state<Record<string, SMIMEViewResult>>({})
-  let smimeLoading = $state<Set<string>>(new Set())
-
-  // PGP on-view processing results per message
-  let pgpResults = $state<Record<string, PGPViewResult>>({})
-  let pgpLoading = $state<Set<string>>(new Set())
 
   // Track which messages are expanded (unread messages auto-expand)
   let expandedMessages = $state<Set<string>>(new Set())
@@ -448,8 +407,6 @@
         })
         expandedMessages = newExpanded
         scheduleMarkAsRead(tid, conversation.messages)
-        processSMIMEMessages(conversation.messages)
-        processPGPMessages(conversation.messages)
       }
 
       await tick()
@@ -492,12 +449,6 @@
 
         // Schedule auto-mark-as-read for unread messages
         scheduleMarkAsRead(tid, conversation.messages)
-
-        // Process S/MIME messages on-view
-        processSMIMEMessages(conversation.messages)
-
-        // Process PGP messages on-view
-        processPGPMessages(conversation.messages)
 
         // Fetch bodies for messages that don't have them yet (on-demand)
         fetchUnfetchedBodies(conversation.messages)
@@ -553,52 +504,6 @@
           }
         }
       }
-    }
-  }
-
-  function processSMIMEMessages(messages: messageModels.Message[]) {
-    // Clear previous results
-    smimeResults = {}
-    smimeLoading = new Set()
-
-    for (const msg of messages) {
-      if (!msg.hasSMIME) continue
-      smimeLoading = new Set([...smimeLoading, msg.id])
-
-      ProcessSMIMEMessage(msg.id).then(result => {
-        smimeResults = { ...smimeResults, [msg.id]: result }
-        const next = new Set(smimeLoading)
-        next.delete(msg.id)
-        smimeLoading = next
-      }).catch(err => {
-        console.error('Failed to process S/MIME message:', msg.id, err)
-        const next = new Set(smimeLoading)
-        next.delete(msg.id)
-        smimeLoading = next
-      })
-    }
-  }
-
-  // Process PGP messages on-view (verify/decrypt fresh each time)
-  function processPGPMessages(messages: messageModels.Message[]) {
-    pgpResults = {}
-    pgpLoading = new Set()
-
-    for (const msg of messages) {
-      if (!msg.hasPGP) continue
-      pgpLoading = new Set([...pgpLoading, msg.id])
-
-      ProcessPGPMessage(msg.id).then(result => {
-        pgpResults = { ...pgpResults, [msg.id]: result }
-        const next = new Set(pgpLoading)
-        next.delete(msg.id)
-        pgpLoading = next
-      }).catch(err => {
-        console.error('Failed to process PGP message:', msg.id, err)
-        const next = new Set(pgpLoading)
-        next.delete(msg.id)
-        pgpLoading = next
-      })
     }
   }
 
@@ -1658,105 +1563,7 @@
                         </div>
                       {/if}
 
-                      <!-- S/MIME Loading Spinner (on-view processing) -->
-                      {#if smimeLoading.has(msg.id)}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
-                          <Icon icon="mdi:loading" class="w-4 h-4 animate-spin flex-shrink-0" />
-                          <span>{$_('viewer.processingSMIME')}</span>
-                        </div>
-                      {/if}
-
-                      <!-- S/MIME Encryption Banner -->
-                      {#if smimeResults[msg.id]?.smimeEncrypted}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
-                          <Icon icon="mdi:lock-check" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.smimeEncryptedWith')}</span>
-                        </div>
-                      {/if}
-
-                      <!-- S/MIME Signature Banner (on-view result for S/MIME messages, cached for non-S/MIME) -->
-                      {#if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'signed'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
-                          <Icon icon="mdi:shield-check" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.smimeSignedBy', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
-                        </div>
-                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'unknown_signer'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
-                          <Icon icon="mdi:shield-alert" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.smimeUnknownSigner', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
-                        </div>
-                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'self_signed'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
-                          <Icon icon="mdi:shield-alert" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.smimeSelfSigned', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
-                        </div>
-                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'expired_cert'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
-                          <Icon icon="mdi:shield-off" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.smimeExpiredCert', { values: { email: (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerEmail : msg.smimeSignerEmail) || (msg.hasSMIME ? smimeResults[msg.id]?.smimeSignerSubject : msg.smimeSignerSubject) || $_('viewer.unknown').toLowerCase() } })}</span>
-                        </div>
-                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'invalid'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
-                          <Icon icon="mdi:shield-off" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.smimeInvalid')}</span>
-                        </div>
-                      {:else if (msg.hasSMIME ? smimeResults[msg.id]?.smimeStatus : msg.smimeStatus) === 'decrypt_failed'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
-                          <Icon icon="mdi:lock-off" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.smimeDecryptFailed')}</span>
-                        </div>
-                      {/if}
-
-                      <!-- PGP Loading Spinner (on-view processing) -->
-                      {#if pgpLoading.has(msg.id)}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-muted/50 border border-border rounded-md text-sm text-muted-foreground">
-                          <Icon icon="mdi:loading" class="w-4 h-4 animate-spin flex-shrink-0" />
-                          <span>{$_('viewer.processingPGP')}</span>
-                        </div>
-                      {/if}
-
-                      <!-- PGP Encryption Banner -->
-                      {#if pgpResults[msg.id]?.pgpEncrypted}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md text-sm text-blue-700 dark:text-blue-300">
-                          <Icon icon="mdi:lock-check" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.pgpEncryptedWith')}</span>
-                        </div>
-                      {/if}
-
-                      <!-- PGP Signature Banner -->
-                      {#if pgpResults[msg.id]?.pgpStatus === 'signed'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-md text-sm text-green-700 dark:text-green-300">
-                          <Icon icon="mdi:key-check" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.pgpSignedBy', { values: { email: pgpResults[msg.id]?.pgpSignerEmail || $_('viewer.unknown').toLowerCase() } })}</span>
-                        </div>
-                      {:else if pgpResults[msg.id]?.pgpStatus === 'unknown_key'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
-                          <Icon icon="mdi:key-alert" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.pgpUnknownKey', { values: { keyId: pgpResults[msg.id]?.pgpSignerKeyId || '' } })}</span>
-                        </div>
-                      {:else if pgpResults[msg.id]?.pgpStatus === 'expired_key'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md text-sm text-amber-700 dark:text-amber-300">
-                          <Icon icon="mdi:key-alert" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.pgpExpiredKey', { values: { email: pgpResults[msg.id]?.pgpSignerEmail || $_('viewer.unknown').toLowerCase() } })}</span>
-                        </div>
-                      {:else if pgpResults[msg.id]?.pgpStatus === 'revoked_key'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
-                          <Icon icon="mdi:key-remove" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.pgpRevokedKey', { values: { email: pgpResults[msg.id]?.pgpSignerEmail || $_('viewer.unknown').toLowerCase() } })}</span>
-                        </div>
-                      {:else if pgpResults[msg.id]?.pgpStatus === 'invalid'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
-                          <Icon icon="mdi:key-remove" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.pgpInvalid')}</span>
-                        </div>
-                      {:else if pgpResults[msg.id]?.pgpStatus === 'decrypt_failed'}
-                        <div class="flex items-center gap-2 px-3 py-2 mb-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-700 dark:text-red-300">
-                          <Icon icon="mdi:lock-off" class="w-4 h-4 flex-shrink-0" />
-                          <span>{$_('viewer.pgpDecryptFailed')}</span>
-                        </div>
-                      {/if}
-
-                      <!-- Body (use on-view result for S/MIME or PGP messages) -->
+                      <!-- Body -->
                       <div class="mb-4">
                         {#if (msg as any).bodyFetched === false && !msg.bodyHtml && !msg.bodyText}
                           <!-- Body not yet fetched (IDLE synced headers only) -->
@@ -1764,27 +1571,23 @@
                             <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
                             {$_('viewer.downloadingContent')}
                           </div>
-                        {:else if (msg.hasSMIME && !smimeResults[msg.id] && smimeLoading.has(msg.id)) || (msg.hasPGP && !pgpResults[msg.id] && pgpLoading.has(msg.id))}
-                          <!-- Show placeholder while processing -->
-                          <div class="text-muted-foreground text-sm italic py-4">{$_('viewer.decryptingMessage')}</div>
                         {:else}
                           <EmailBody
                             bind:this={emailBodyRefs[msg.id]}
                             messageId={msg.id}
                             accountId={msg.accountId}
-                            bodyHtml={msg.hasPGP && pgpResults[msg.id] ? pgpResults[msg.id].bodyHtml : msg.hasSMIME && smimeResults[msg.id] ? smimeResults[msg.id].bodyHtml : msg.bodyHtml}
-                            bodyText={msg.hasPGP && pgpResults[msg.id] ? pgpResults[msg.id].bodyText : msg.hasSMIME && smimeResults[msg.id] ? smimeResults[msg.id].bodyText : msg.bodyText}
+                            bodyHtml={msg.bodyHtml}
+                            bodyText={msg.bodyText}
                             fromEmail={msg.fromEmail}
                             onCompose={onComposeToAddress}
                             onImagesLoaded={() => messagesWithImagesLoaded.add(msg.id)}
-                            encryptedInlineAttachments={pgpResults[msg.id]?.inlineAttachments ?? smimeResults[msg.id]?.inlineAttachments}
                             darken={shouldDarkenMessage(msg.id)}
                           />
                         {/if}
                       </div>
 
                       <!-- Attachments -->
-                      {#if msg.hasAttachments || (pgpResults[msg.id]?.attachments?.length ?? 0) > 0 || (smimeResults[msg.id]?.attachments?.length ?? 0) > 0}
+                      {#if msg.hasAttachments}
                         <div class="border-t border-border pt-4 mt-4">
                           <h3 class="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                             <Icon icon="mdi:paperclip" class="w-4 h-4" />
@@ -1792,7 +1595,6 @@
                           </h3>
                           <AttachmentList
                             messageId={msg.id}
-                            encryptedAttachments={pgpResults[msg.id]?.attachments ?? smimeResults[msg.id]?.attachments}
                           />
                         </div>
                       {/if}

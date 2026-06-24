@@ -11,7 +11,6 @@ import (
 	"github.com/emersion/go-imap/v2/imapclient"
 	imapPkg "github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/smime"
 )
 
 // ProcessedBody holds the parsed body content and attachments for a message
@@ -21,13 +20,8 @@ type ProcessedBody struct {
 	BodyText       string
 	Snippet        string
 	HasAttachments bool
-	Attachments    []*message.Attachment  // Extracted during parsing (no re-parse needed)
-	RawBytes       []byte                 // For on-demand attachment content fetch
-	SMIMEResult    *smime.SignatureResult  // S/MIME verification result
-	SMIMERawBody   []byte                 // Raw S/MIME body for on-view processing
-	SMIMEEncrypted bool                   // Whether the message is encrypted
-	PGPRawBody     []byte                 // Raw PGP body for on-view processing
-	PGPEncrypted   bool                   // Whether the message is PGP encrypted
+	Attachments    []*message.Attachment // Extracted during parsing (no re-parse needed)
+	RawBytes       []byte                // For on-demand attachment content fetch
 
 	// Size signals used by shouldChargeFailure to distinguish "true empty
 	// body" from "server-side truncation". ReportedSize comes from the
@@ -275,11 +269,6 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			HasAttachments: parsed.HasAttachments,
 			Attachments:    parsed.Attachments,
 			RawBytes:       rawBytes,
-			SMIMEResult:    parsed.SMIMEResult,
-			SMIMERawBody:   parsed.SMIMERawBody,
-			SMIMEEncrypted: parsed.SMIMEEncrypted,
-			PGPRawBody:     parsed.PGPRawBody,
-			PGPEncrypted:   parsed.PGPEncrypted,
 			ReportedSize:   reportedSize,
 			ReceivedBytes:  int64(len(rawBytes)),
 		}
@@ -364,7 +353,7 @@ func (e *Engine) markUnresolvedAsFailed(requestedIDs []string, updates []message
 	}
 	resolved := make(map[string]bool, len(updates))
 	for _, u := range updates {
-		if u.BodyHTML != "" || u.BodyText != "" || u.SMIMEEncrypted || u.PGPEncrypted {
+		if u.BodyHTML != "" || u.BodyText != "" {
 			resolved[u.MessageID] = true
 		}
 	}
@@ -765,12 +754,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 					BodyText:       pb.BodyText,
 					Snippet:        pb.Snippet,
 					HasAttachments: pb.HasAttachments,
-					SMIMERawBody:   pb.SMIMERawBody,
-					SMIMEEncrypted: pb.SMIMEEncrypted,
-					PGPRawBody:     pb.PGPRawBody,
-					PGPEncrypted:   pb.PGPEncrypted,
 				}
-				// Don't cache S/MIME or PGP verification status — computed fresh on each view
 				bodyUpdates = append(bodyUpdates, bu)
 
 				sizes[pb.MessageID] = fetchedSize{received: pb.ReceivedBytes, reported: pb.ReportedSize}

@@ -7,7 +7,6 @@
   import AccountGeneralTab from './account/AccountGeneralTab.svelte'
   import AccountIdentityTab from './account/AccountIdentityTab.svelte'
   import AccountServerTab from './account/AccountServerTab.svelte'
-  import AccountSecurityTab from './account/AccountSecurityTab.svelte'
   import AccountContactsHookPanel from '$extensions/contacts/frontend/hooks/AccountContactsHookPanel.svelte'
   import { loadAccountSetupHooks } from '$lib/stores/extensionRegistry.svelte'
   // @ts-ignore - wailsjs path
@@ -394,7 +393,7 @@
     {#if editAccount}
       <!-- Edit Mode: Tabbed Interface -->
       <Tabs.Root bind:value={activeTab} class="flex-1 flex flex-col overflow-hidden">
-        <Tabs.List class="grid w-full grid-cols-4">
+        <Tabs.List class="grid w-full grid-cols-3">
           <Tabs.Trigger value="general" class="flex items-center gap-2">
             <Icon icon="mdi:cog" class="w-4 h-4" />
             {$_('account.general')}
@@ -406,10 +405,6 @@
           <Tabs.Trigger value="server" class="flex items-center gap-2">
             <Icon icon="mdi:server" class="w-4 h-4" />
             {$_('account.server')}
-          </Tabs.Trigger>
-          <Tabs.Trigger value="security" class="flex items-center gap-2">
-            <Icon icon="mdi:shield-lock-outline" class="w-4 h-4" />
-            {$_('account.security')}
           </Tabs.Trigger>
         </Tabs.List>
 
@@ -441,10 +436,6 @@
 
           <Tabs.Content value="identity" class="mt-0">
             <AccountIdentityTab accountId={editAccount.id} {editAccount} />
-          </Tabs.Content>
-
-          <Tabs.Content value="security" class="mt-0">
-            <AccountSecurityTab accountId={editAccount.id} />
           </Tabs.Content>
 
           <Tabs.Content value="server" class="mt-0">

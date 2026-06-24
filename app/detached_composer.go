@@ -24,8 +24,6 @@ import (
 	"github.com/aulyc/aulycmail/internal/oauth2"
 	"github.com/aulyc/aulycmail/internal/platform"
 	"github.com/aulyc/aulycmail/internal/settings"
-	"github.com/aulyc/aulycmail/internal/pgp"
-	"github.com/aulyc/aulycmail/internal/smime"
 	"github.com/aulyc/aulycmail/internal/smtp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -77,18 +75,6 @@ type ComposerApp struct {
 
 	// OAuth2 manager for token refresh
 	oauth2Manager *oauth2.Manager
-
-	// S/MIME signing, encryption, and decryption
-	smimeStore     *smime.Store
-	smimeSigner    *smime.Signer
-	smimeEncryptor *smime.Encryptor
-	smimeDecryptor *smime.Decryptor
-
-	// PGP signing, encryption, and decryption
-	pgpStore     *pgp.Store
-	pgpSigner    *pgp.Signer
-	pgpEncryptor *pgp.Encryptor
-	pgpDecryptor *pgp.Decryptor
 
 	// Shared draft operations
 	draftOps draftOps
@@ -185,18 +171,6 @@ func (c *ComposerApp) Startup(ctx context.Context) {
 	// Initialize certificate trust store (TOFU)
 	c.certStore = certificate.NewStore(db.DB)
 
-	// Initialize S/MIME store, signer, and encryptor
-	c.smimeStore = smime.NewStore(db.DB, log)
-	c.smimeSigner = smime.NewSigner(c.smimeStore, credStore, log)
-	c.smimeEncryptor = smime.NewEncryptor(c.smimeStore, credStore, log)
-	c.smimeDecryptor = smime.NewDecryptor(c.smimeStore, credStore, log)
-
-	// Initialize PGP store, signer, and encryptor
-	c.pgpStore = pgp.NewStore(db.DB, log)
-	c.pgpSigner = pgp.NewSigner(c.pgpStore, credStore, log)
-	c.pgpEncryptor = pgp.NewEncryptor(c.pgpStore, credStore, log)
-	c.pgpDecryptor = pgp.NewDecryptor(c.pgpStore, credStore, log)
-
 	// Initialize IMAP pool for send/draft operations
 	poolConfig := imap.DefaultPoolConfig()
 	poolConfig.MaxConnections = 1 // Composer only needs 1 connection
@@ -204,17 +178,11 @@ func (c *ComposerApp) Startup(ctx context.Context) {
 
 	// Initialize shared draft operations
 	c.draftOps = draftOps{
-		accountStore:   c.accountStore,
-		folderStore:    c.folderStore,
-		messageStore:   c.messageStore,
-		draftStore:     c.draftStore,
-		imapPool:       c.imapPool,
-		smimeSigner:    c.smimeSigner,
-		smimeEncryptor: c.smimeEncryptor,
-		smimeDecryptor: c.smimeDecryptor,
-		pgpSigner:      c.pgpSigner,
-		pgpEncryptor:   c.pgpEncryptor,
-		pgpDecryptor:   c.pgpDecryptor,
+		accountStore: c.accountStore,
+		folderStore:  c.folderStore,
+		messageStore: c.messageStore,
+		draftStore:   c.draftStore,
+		imapPool:     c.imapPool,
 	}
 
 	// Initialize OAuth2 manager for token refresh
@@ -222,19 +190,13 @@ func (c *ComposerApp) Startup(ctx context.Context) {
 
 	// Initialize shared compose operations
 	c.composeOps = composeOps{
-		accountStore:   c.accountStore,
-		folderStore:    c.folderStore,
-		credStore:      c.credStore,
-		certStore:      c.certStore,
-		contactStore:   c.contactStore,
-		oauth2Manager:  c.oauth2Manager,
-		smimeStore:     c.smimeStore,
-		smimeSigner:    c.smimeSigner,
-		smimeEncryptor: c.smimeEncryptor,
-		pgpStore:       c.pgpStore,
-		pgpSigner:      c.pgpSigner,
-		pgpEncryptor:   c.pgpEncryptor,
-		draftOps:       &c.draftOps,
+		accountStore:  c.accountStore,
+		folderStore:   c.folderStore,
+		credStore:     c.credStore,
+		certStore:     c.certStore,
+		contactStore:  c.contactStore,
+		oauth2Manager: c.oauth2Manager,
+		draftOps:      &c.draftOps,
 	}
 
 	// Connect to main window's IPC server
@@ -719,12 +681,12 @@ func (c *ComposerApp) SaveDraft(accountID string, msg smtp.ComposeMessage, exist
 		log.Debug().Str("draftID", localDraft.ID).Msg("Using c.currentDraft")
 	}
 
-	enc, err := c.draftOps.encryptDraftBody(accountID, msg.From.Address, msg)
+	body, err := c.draftOps.prepareDraftBody(msg)
 	if err != nil {
 		return nil, err
 	}
 
-	localDraft, err = c.draftOps.saveDraftToDB(accountID, localDraft, msg, enc)
+	localDraft, err = c.draftOps.saveDraftToDB(accountID, localDraft, msg, body)
 	if err != nil {
 		return nil, err
 	}
@@ -757,7 +719,7 @@ func (c *ComposerApp) SaveDraft(accountID string, msg smtp.ComposeMessage, exist
 		c.syncDraftToIMAP(ctx, localDraft, msg)
 	}()
 
-	log.Info().Str("draftID", localDraft.ID).Bool("encrypted", enc.encrypted).Bool("pgpEncrypted", enc.pgpEncrypted).Msg("Draft saved")
+	log.Info().Str("draftID", localDraft.ID).Msg("Draft saved")
 	return localDraft, nil
 }
 
@@ -862,7 +824,6 @@ func (c *ComposerApp) ReadFileAsAttachment(filePath string) (*ComposerAttachment
 // ============================================================================
 
 // draftToComposeMessage converts a draft to a ComposeMessage.
-// If the draft is encrypted (S/MIME or PGP), decrypts the body first.
 func (c *ComposerApp) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 	return c.draftOps.toComposeMessage(d)
 }
@@ -969,221 +930,6 @@ func (c *ComposerApp) buildReplyMessage(msg *message.Message, mode string) *smtp
 		TextBody:  textBody,
 		InReplyTo: msg.MessageID,
 	}
-}
-
-// HasSMIMECertificate returns whether the account has a valid default S/MIME certificate.
-func (c *ComposerApp) HasSMIMECertificate(accountID string) bool {
-	return c.composeOps.hasSMIMECertificate(accountID)
-}
-
-// GetSMIMECertificateForEmail returns the S/MIME certificate matching the given email.
-// Returns nil if no matching certificate is found.
-func (c *ComposerApp) GetSMIMECertificateForEmail(accountID string, email string) (*smime.Certificate, error) {
-	cert, _, err := c.smimeStore.GetCertificateByEmail(accountID, email)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get certificate for email: %w", err)
-	}
-	return cert, nil
-}
-
-// GetSMIMESignPolicy returns the signing policy for the account.
-func (c *ComposerApp) GetSMIMESignPolicy(accountID string) (string, error) {
-	return c.smimeStore.GetSignPolicy(accountID)
-}
-
-// GetSMIMEEncryptPolicy returns the encryption policy for the account.
-func (c *ComposerApp) GetSMIMEEncryptPolicy(accountID string) (string, error) {
-	return c.smimeStore.GetEncryptPolicy(accountID)
-}
-
-// CheckRecipientCerts checks which recipients have S/MIME certificates available.
-func (c *ComposerApp) CheckRecipientCerts(emails []string) (map[string]bool, error) {
-	certPEMs, err := c.smimeStore.GetSenderCertPEMs(emails)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check recipient certs: %w", err)
-	}
-
-	result := make(map[string]bool)
-	for _, email := range emails {
-		_, hasCert := certPEMs[email]
-		result[email] = hasCert
-	}
-	return result, nil
-}
-
-// PickRecipientCertFile opens a file picker for certificate files.
-func (c *ComposerApp) PickRecipientCertFile() (string, error) {
-	path, err := wailsRuntime.OpenFileDialog(c.ctx, wailsRuntime.OpenDialogOptions{
-		Title: "Select Recipient Certificate",
-		Filters: []wailsRuntime.FileFilter{
-			{
-				DisplayName: "Certificate Files (*.pem, *.cer, *.crt, *.der)",
-				Pattern:     "*.pem;*.cer;*.crt;*.der",
-			},
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to open file dialog: %w", err)
-	}
-	return path, nil
-}
-
-// ImportRecipientCert imports a recipient's public certificate from a file.
-func (c *ComposerApp) ImportRecipientCert(email, filePath string) error {
-	if filePath == "" {
-		return fmt.Errorf("no file selected")
-	}
-	if email == "" {
-		return fmt.Errorf("email address required")
-	}
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to read certificate file: %w", err)
-	}
-
-	return c.smimeStore.ImportSenderCertFromFile(email, data)
-}
-
-// HasPGPKey returns whether the account has a valid default PGP key.
-func (c *ComposerApp) HasPGPKey(accountID string) bool {
-	return c.composeOps.hasPGPKey(accountID)
-}
-
-// GetPGPKeyForEmail returns the PGP key matching the given email.
-// Returns nil if no matching key is found.
-func (c *ComposerApp) GetPGPKeyForEmail(accountID string, email string) (*pgp.Key, error) {
-	key, _, err := c.pgpStore.GetKeyByEmail(accountID, email)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get key for email: %w", err)
-	}
-	return key, nil
-}
-
-// GetPGPSignPolicy returns the PGP signing policy for the account.
-func (c *ComposerApp) GetPGPSignPolicy(accountID string) (string, error) {
-	return c.pgpStore.GetSignPolicy(accountID)
-}
-
-// GetPGPEncryptPolicy returns the PGP encryption policy for the account.
-func (c *ComposerApp) GetPGPEncryptPolicy(accountID string) (string, error) {
-	return c.pgpStore.GetEncryptPolicy(accountID)
-}
-
-// CheckRecipientPGPKeys checks which recipients have PGP public keys available.
-func (c *ComposerApp) CheckRecipientPGPKeys(emails []string) (map[string]bool, error) {
-	armoredKeys, err := c.pgpStore.GetSenderKeyArmoreds(emails)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check recipient PGP keys: %w", err)
-	}
-
-	result := make(map[string]bool)
-	for _, email := range emails {
-		_, hasKey := armoredKeys[email]
-		result[email] = hasKey
-	}
-	return result, nil
-}
-
-// PickRecipientPGPKeyFile opens a file picker for PGP public key files.
-func (c *ComposerApp) PickRecipientPGPKeyFile() (string, error) {
-	path, err := wailsRuntime.OpenFileDialog(c.ctx, wailsRuntime.OpenDialogOptions{
-		Title: "Select Recipient PGP Public Key",
-		Filters: []wailsRuntime.FileFilter{
-			{
-				DisplayName: "PGP Key Files (*.asc, *.gpg, *.key, *.pub)",
-				Pattern:     "*.asc;*.gpg;*.key;*.pub",
-			},
-		},
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to open file dialog: %w", err)
-	}
-	return path, nil
-}
-
-// ImportRecipientPGPKey imports a recipient's PGP public key from a file.
-func (c *ComposerApp) ImportRecipientPGPKey(email, filePath string) error {
-	if filePath == "" {
-		return fmt.Errorf("no file selected")
-	}
-	if email == "" {
-		return fmt.Errorf("email address required")
-	}
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("failed to read key file: %w", err)
-	}
-
-	return c.pgpStore.ImportSenderKeyFromFile(email, data)
-}
-
-// LookupWKD performs a Web Key Directory lookup for the given email address.
-func (c *ComposerApp) LookupWKD(email string) (string, error) {
-	armored, err := pgp.LookupWKD(email)
-	if err != nil {
-		return "", fmt.Errorf("WKD lookup failed: %w", err)
-	}
-	if armored == "" {
-		return "", nil
-	}
-
-	// Cache the discovered key
-	if err := c.pgpStore.CacheSenderKey(email, armored, "wkd"); err != nil {
-		return armored, nil
-	}
-
-	return armored, nil
-}
-
-// LookupHKP performs an HKP key server lookup for the given email address.
-func (c *ComposerApp) LookupHKP(email string) (string, error) {
-	armored, err := pgp.LookupHKP(email, c.getHKPServers())
-	if err != nil {
-		return "", fmt.Errorf("HKP lookup failed: %w", err)
-	}
-	if armored == "" {
-		return "", nil
-	}
-
-	if err := c.pgpStore.CacheSenderKey(email, armored, "hkp"); err != nil {
-		return armored, nil
-	}
-
-	return armored, nil
-}
-
-// LookupPGPKey performs a unified WKD+HKP lookup for the given email address.
-func (c *ComposerApp) LookupPGPKey(email string) (string, error) {
-	result, err := pgp.LookupKey(email, c.getHKPServers())
-	if err != nil {
-		return "", fmt.Errorf("PGP key lookup failed: %w", err)
-	}
-	if result == nil {
-		return "", nil
-	}
-
-	if err := c.pgpStore.CacheSenderKey(email, result.Armored, result.Source); err != nil {
-		return result.Armored, nil
-	}
-
-	return result.Armored, nil
-}
-
-// getHKPServers reads configured key servers from the database table.
-// Falls back to DefaultHKPServers if the table is empty.
-func (c *ComposerApp) getHKPServers() []string {
-	servers, err := c.pgpStore.ListKeyServers()
-	if err != nil || len(servers) == 0 {
-		return pgp.DefaultHKPServers
-	}
-
-	urls := make([]string, len(servers))
-	for i, s := range servers {
-		urls[i] = s.URL
-	}
-	return urls
 }
 
 // parseIntID parses a string ID to int64.

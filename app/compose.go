@@ -23,8 +23,6 @@ import (
 	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/rs/zerolog"
 	"github.com/aulyc/aulycmail/internal/oauth2"
-	"github.com/aulyc/aulycmail/internal/pgp"
-	"github.com/aulyc/aulycmail/internal/smime"
 	"github.com/aulyc/aulycmail/internal/smtp"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -46,12 +44,6 @@ type composeOps struct {
 	certStore      *certificate.Store
 	contactStore   *contact.Store
 	oauth2Manager  *oauth2.Manager
-	smimeStore     *smime.Store
-	smimeSigner    *smime.Signer
-	smimeEncryptor *smime.Encryptor
-	pgpStore       *pgp.Store
-	pgpSigner      *pgp.Signer
-	pgpEncryptor   *pgp.Encryptor
 	draftOps       *draftOps // for draft cleanup on send
 }
 
@@ -218,67 +210,7 @@ func (ops *composeOps) saveToSentFolder(ctx context.Context, accountID string, a
 	return nil
 }
 
-// hasSMIMECertificate returns whether the account has a valid default S/MIME certificate.
-func (ops *composeOps) hasSMIMECertificate(accountID string) bool {
-	cert, _, err := ops.smimeStore.GetDefaultCertificate(accountID)
-	return err == nil && cert != nil && !cert.IsExpired
-}
-
-// hasPGPKey returns whether the account has a valid default PGP key.
-func (ops *composeOps) hasPGPKey(accountID string) bool {
-	key, _, err := ops.pgpStore.GetDefaultKey(accountID)
-	return err == nil && key != nil && !key.IsExpired
-}
-
-// shouldSignMessage determines whether a message should be S/MIME signed.
-func (ops *composeOps) shouldSignMessage(accountID string, perMessageOverride bool) bool {
-	if perMessageOverride {
-		return ops.hasSMIMECertificate(accountID)
-	}
-	policy, err := ops.smimeStore.GetSignPolicy(accountID)
-	if err != nil || policy != "always" {
-		return false
-	}
-	return ops.hasSMIMECertificate(accountID)
-}
-
-// shouldEncryptMessage determines whether a message should be S/MIME encrypted.
-func (ops *composeOps) shouldEncryptMessage(accountID string, perMessageOverride bool) bool {
-	if perMessageOverride {
-		return ops.hasSMIMECertificate(accountID)
-	}
-	policy, err := ops.smimeStore.GetEncryptPolicy(accountID)
-	if err != nil || policy != "always" {
-		return false
-	}
-	return ops.hasSMIMECertificate(accountID)
-}
-
-// shouldPGPSignMessage determines whether a message should be PGP signed.
-func (ops *composeOps) shouldPGPSignMessage(accountID string, perMessageOverride bool) bool {
-	if perMessageOverride {
-		return ops.hasPGPKey(accountID)
-	}
-	policy, err := ops.pgpStore.GetSignPolicy(accountID)
-	if err != nil || policy != "always" {
-		return false
-	}
-	return ops.hasPGPKey(accountID)
-}
-
-// shouldPGPEncryptMessage determines whether a message should be PGP encrypted.
-func (ops *composeOps) shouldPGPEncryptMessage(accountID string, perMessageOverride bool) bool {
-	if perMessageOverride {
-		return ops.hasPGPKey(accountID)
-	}
-	policy, err := ops.pgpStore.GetEncryptPolicy(accountID)
-	if err != nil || policy != "always" {
-		return false
-	}
-	return ops.hasPGPKey(accountID)
-}
-
-// sendMessage performs the full send flow: build RFC822, sign, encrypt, SMTP send,
+// sendMessage performs the full send flow: build RFC822, SMTP send,
 // save to Sent folder, add recipients to contacts, and optionally delete a draft.
 // When d is non-nil, the draft is fully cleaned up (IMAP + message row + DB) after
 // a successful send. Returns the account for callers that need it post-send.
@@ -314,48 +246,6 @@ func (ops *composeOps) sendMessage(ctx context.Context, accountID string, msg sm
 	rawMsg, err := msg.ToRFC822()
 	if err != nil {
 		return nil, fmt.Errorf("failed to build message: %w", err)
-	}
-
-	fromEmail := msg.From.Address
-
-	// S/MIME signing (if configured for this account/message)
-	if ops.shouldSignMessage(accountID, msg.SignMessage) {
-		signedMsg, signErr := ops.smimeSigner.SignMessage(accountID, fromEmail, rawMsg)
-		if signErr != nil {
-			return nil, fmt.Errorf("failed to sign message: %w", signErr)
-		}
-		rawMsg = signedMsg
-		log.Info().Str("accountID", accountID).Msg("Message signed with S/MIME")
-	}
-
-	// S/MIME encryption (if configured) — sign-then-encrypt per RFC 5751
-	if ops.shouldEncryptMessage(accountID, msg.EncryptMessage) {
-		encryptedMsg, encErr := ops.smimeEncryptor.EncryptMessage(accountID, fromEmail, msg.AllRecipients(), rawMsg)
-		if encErr != nil {
-			return nil, fmt.Errorf("failed to encrypt message: %w", encErr)
-		}
-		rawMsg = encryptedMsg
-		log.Info().Str("accountID", accountID).Msg("Message encrypted with S/MIME")
-	}
-
-	// PGP signing (mutually exclusive with S/MIME — only if S/MIME sign was not applied)
-	if !msg.SignMessage && ops.shouldPGPSignMessage(accountID, msg.PGPSignMessage) {
-		signedMsg, signErr := ops.pgpSigner.SignMessage(accountID, fromEmail, rawMsg)
-		if signErr != nil {
-			return nil, fmt.Errorf("failed to PGP sign message: %w", signErr)
-		}
-		rawMsg = signedMsg
-		log.Info().Str("accountID", accountID).Msg("Message signed with PGP")
-	}
-
-	// PGP encryption (mutually exclusive with S/MIME — only if S/MIME encrypt was not applied)
-	if !msg.EncryptMessage && ops.shouldPGPEncryptMessage(accountID, msg.PGPEncryptMessage) {
-		encryptedMsg, encErr := ops.pgpEncryptor.EncryptMessage(accountID, fromEmail, msg.AllRecipients(), rawMsg)
-		if encErr != nil {
-			return nil, fmt.Errorf("failed to PGP encrypt message: %w", encErr)
-		}
-		rawMsg = encryptedMsg
-		log.Info().Str("accountID", accountID).Msg("Message encrypted with PGP")
 	}
 
 	// Create SMTP client config

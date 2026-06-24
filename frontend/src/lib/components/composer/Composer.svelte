@@ -134,45 +134,6 @@
   let requestReadReceipt = $state(false)
   let showReadReceiptOption = $state(false)  // Show checkbox when policy is 'ask'
 
-  // S/MIME signing
-  let signMessage = $state(false)
-  let showSignOption = $state(false)  // Only show if account has a cert
-
-  // S/MIME encryption
-  let encryptMessage = $state(false)
-  let showEncryptOption = $state(false)  // Only show if account has a cert
-  let recipientCertStatus = $state<Record<string, boolean>>({})
-  let missingCertRecipients = $derived.by(() => {
-    if (!encryptMessage) return []
-    const allRecipients = [...toRecipients, ...ccRecipients, ...bccRecipients]
-    return allRecipients
-      .map(r => r.address)
-      .filter(email => email && recipientCertStatus[email] === false)
-  })
-
-  // PGP signing
-  let pgpSignMessage = $state(false)
-  let showPGPSignOption = $state(false)  // Only show if account has a PGP key
-
-  // PGP encryption
-  let pgpEncryptMessage = $state(false)
-  let showPGPEncryptOption = $state(false)  // Only show if account has a PGP key
-  let recipientPGPKeyStatus = $state<Record<string, boolean>>({})
-  let missingPGPKeyRecipients = $derived.by(() => {
-    if (!pgpEncryptMessage) return []
-    const allRecipients = [...toRecipients, ...ccRecipients, ...bccRecipients]
-    return allRecipients
-      .map(r => r.address)
-      .filter(email => email && recipientPGPKeyStatus[email] === false)
-  })
-
-  // Identity-aware cert/key info (for display in security bars)
-  let smimeCertFingerprint = $state<string>('')  // First 8 hex chars of fingerprint
-  let pgpKeyId = $state<string>('')  // Last 8 hex chars of fingerprint (short key ID)
-
-  // Security mode for keyboard shortcuts (Alt+P / Alt+S activate, then s/e toggle sign/encrypt)
-  let securityMode = $state<'pgp' | 'smime' | null>(null)
-
   // Plain text mode toggle (default from user setting, can be toggled per-message)
   let isPlainTextMode = $state(getComposerFormat() === 'plain')
   let plainTextContent = $state('')  // Store plain text when in plain text mode
@@ -194,97 +155,6 @@
     }
   })
 
-  // Check recipient certs when encrypt is toggled on or recipients change
-  $effect(() => {
-    if (!encryptMessage) return
-    const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
-      .map(r => r.address)
-      .filter(Boolean)
-    if (allEmails.length === 0) return
-    checkRecipientCertsDebounced(allEmails)
-  })
-
-  let certCheckTimeout: ReturnType<typeof setTimeout> | null = null
-  function checkRecipientCertsDebounced(emails: string[]) {
-    if (certCheckTimeout) clearTimeout(certCheckTimeout)
-    certCheckTimeout = setTimeout(async () => {
-      try {
-        recipientCertStatus = await api.checkRecipientCerts(emails)
-      } catch (err) {
-        console.error('Failed to check recipient certs:', err)
-      }
-    }, 300)
-  }
-
-  // Check recipient PGP keys when encrypt is toggled on or recipients change
-  $effect(() => {
-    if (!pgpEncryptMessage) return
-    const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
-      .map(r => r.address)
-      .filter(Boolean)
-    if (allEmails.length === 0) return
-    checkRecipientPGPKeysDebounced(allEmails)
-  })
-
-  let pgpKeyCheckTimeout: ReturnType<typeof setTimeout> | null = null
-  function checkRecipientPGPKeysDebounced(emails: string[]) {
-    if (pgpKeyCheckTimeout) clearTimeout(pgpKeyCheckTimeout)
-    pgpKeyCheckTimeout = setTimeout(async () => {
-      try {
-        recipientPGPKeyStatus = await api.checkRecipientPGPKeys(emails)
-
-        // Auto-discover missing keys via unified WKD+HKP lookup
-        const missingEmails = emails.filter(e => !recipientPGPKeyStatus[e])
-        for (const email of missingEmails) {
-          try {
-            const armored = await api.lookupPGPKey(email)
-            if (armored) {
-              recipientPGPKeyStatus = { ...recipientPGPKeyStatus, [email]: true }
-            }
-          } catch { /* silent — lookup failure is not an error for the user */ }
-        }
-      } catch (err) {
-        console.error('Failed to check recipient PGP keys:', err)
-      }
-    }, 300)
-  }
-
-  async function handleImportRecipientCert() {
-    try {
-      const filePath = await api.pickRecipientCertFile()
-      if (!filePath) return
-      // Import for the first missing recipient
-      if (missingCertRecipients.length > 0) {
-        await api.importRecipientCert(missingCertRecipients[0], filePath)
-        addToast({ type: 'success', message: $_('composer.certImported', { values: { email: missingCertRecipients[0] } }) })
-        // Re-check certs
-        const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
-          .map(r => r.address).filter(Boolean)
-        recipientCertStatus = await api.checkRecipientCerts(allEmails)
-      }
-    } catch (err) {
-      console.error('Failed to import recipient cert:', err)
-      addToast({ type: 'error', message: $_('composer.failedToImportCert') })
-    }
-  }
-
-  async function handleImportRecipientPGPKey() {
-    try {
-      const filePath = await api.pickRecipientPGPKeyFile()
-      if (!filePath) return
-      if (missingPGPKeyRecipients.length > 0) {
-        await api.importRecipientPGPKey(missingPGPKeyRecipients[0], filePath)
-        addToast({ type: 'success', message: $_('composer.pgpKeyImported', { values: { email: missingPGPKeyRecipients[0] } }) })
-        const allEmails = [...toRecipients, ...ccRecipients, ...bccRecipients]
-          .map(r => r.address).filter(Boolean)
-        recipientPGPKeyStatus = await api.checkRecipientPGPKeys(allEmails)
-      }
-    } catch (err) {
-      console.error('Failed to import recipient PGP key:', err)
-      addToast({ type: 'error', message: $_('composer.failedToImportPGPKey') })
-    }
-  }
-
   let syncStatus = $state<'pending' | 'synced' | 'failed'>('pending') // IMAP sync status
   let lastSavedAt = $state<Date | null>(null)
   let saveTimeoutId: ReturnType<typeof setTimeout> | null = null
@@ -295,9 +165,6 @@
     if (saveStatus === 'saving') return 'mdi:loading'
     if (saveStatus === 'error') return 'mdi:alert-circle'
     if (saveStatus !== 'saved' || !lastSavedAt) return ''
-    if (encryptMessage || pgpEncryptMessage) {
-      return syncStatus === 'synced' ? 'mdi:lock-check' : 'mdi:lock'
-    }
     switch (syncStatus) {
       case 'synced': return 'mdi:cloud-check'
       case 'pending': return 'mdi:cloud-upload'
@@ -317,17 +184,9 @@
     }
   })
   let draftStatusLabel = $derived.by(() => {
-    if (saveStatus === 'saving') return (encryptMessage || pgpEncryptMessage) ? $_('composer.encrypting') : $_('composer.saving')
+    if (saveStatus === 'saving') return $_('composer.saving')
     if (saveStatus === 'error') return $_('composer.saveFailed')
     if (saveStatus !== 'saved' || !lastSavedAt) return ''
-    if (encryptMessage || pgpEncryptMessage) {
-      switch (syncStatus) {
-        case 'synced': return $_('composer.encryptedSynced')
-        case 'pending': return $_('composer.encryptedDraft')
-        case 'failed': return $_('composer.encryptedOffline')
-        default: return ''
-      }
-    }
     switch (syncStatus) {
       case 'synced': return $_('composer.synced')
       case 'pending': return $_('composer.savedLocally')
@@ -559,10 +418,6 @@
       in_reply_to: inReplyTo,
       references: references,
       request_read_receipt: requestReadReceipt,
-      sign_message: signMessage,
-      encrypt_message: encryptMessage,
-      pgp_sign_message: pgpSignMessage,
-      pgp_encrypt_message: pgpEncryptMessage,
     })
   }
 
@@ -673,7 +528,7 @@
   // Watch for content changes and trigger auto-save
   $effect(() => {
     // Dependencies to watch
-    const _ = [toRecipients, ccRecipients, bccRecipients, subject, signMessage, encryptMessage, pgpSignMessage, pgpEncryptMessage]
+    const _ = [toRecipients, ccRecipients, bccRecipients, subject]
     // untrack prevents $effect from creating a reactive dependency on saveStatus
     // (which scheduleDraftSave reads), avoiding a circular re-run that causes flash
     untrack(() => scheduleDraftSave())
@@ -766,12 +621,6 @@
     }
 
     // Load S/MIME and PGP availability for the selected identity's email
-    {
-      const selectedIdentity = identities.find(i => i.id === selectedIdentityId)
-      if (selectedIdentity) {
-        await updateSecurityForIdentity(selectedIdentity.email)
-      }
-    }
 
     // Initialize TipTap editor (no-op in plain text mode — its element isn't
     // mounted yet; created lazily when the user switches to rich text).
@@ -866,74 +715,6 @@
     editor.commands.setContent(newContent)
   }
 
-  // Update security bar visibility based on the selected identity's email
-  async function loadSMIMEForEmail(email: string) {
-    const acctId = activeAccountId
-    const cert = await api.getSMIMECertificateForEmail(acctId, email)
-    if (!cert || cert.isExpired) {
-      signMessage = false
-      encryptMessage = false
-      return
-    }
-
-    showSignOption = true
-    showEncryptOption = true
-    smimeCertFingerprint = cert.fingerprint ? cert.fingerprint.substring(0, 8).toUpperCase() : ''
-
-    const [signPolicy, encryptPolicy] = await Promise.all([
-      api.getSMIMESignPolicy(acctId),
-      api.getSMIMEEncryptPolicy(acctId),
-    ])
-    signMessage = signPolicy === 'always'
-    encryptMessage = encryptPolicy === 'always'
-  }
-
-  async function loadPGPForEmail(email: string) {
-    const acctId = activeAccountId
-    const key = await api.getPGPKeyForEmail(acctId, email)
-    if (!key || key.isExpired) {
-      pgpSignMessage = false
-      pgpEncryptMessage = false
-      return
-    }
-
-    showPGPSignOption = true
-    showPGPEncryptOption = true
-    pgpKeyId = key.fingerprint ? key.fingerprint.slice(-8).toUpperCase() : ''
-
-    const [pgpSignPolicy, pgpEncryptPolicy] = await Promise.all([
-      api.getPGPSignPolicy(acctId),
-      api.getPGPEncryptPolicy(acctId),
-    ])
-    // Only enable PGP defaults if S/MIME is not already active (mutual exclusivity)
-    pgpSignMessage = !signMessage && pgpSignPolicy === 'always'
-    pgpEncryptMessage = !encryptMessage && pgpEncryptPolicy === 'always'
-  }
-
-  async function updateSecurityForIdentity(email: string) {
-    // Reset all security state
-    showSignOption = false
-    showEncryptOption = false
-    showPGPSignOption = false
-    showPGPEncryptOption = false
-    signMessage = false
-    encryptMessage = false
-    pgpSignMessage = false
-    pgpEncryptMessage = false
-    smimeCertFingerprint = ''
-    pgpKeyId = ''
-
-    if (!email) return
-
-    try { await loadSMIMEForEmail(email) } catch (err) {
-      console.error('Failed to load S/MIME settings:', err)
-    }
-
-    try { await loadPGPForEmail(email) } catch (err) {
-      console.error('Failed to load PGP settings:', err)
-    }
-  }
-
   // Handle identity change from the From dropdown
   function handleIdentityChange(newIdentityId: string) {
     if (newIdentityId === selectedIdentityId) return
@@ -963,9 +744,6 @@
         })
       }
     }
-
-    // Update security bars for the new identity (uses activeAccountId which is now updated)
-    updateSecurityForIdentity(newIdentity.email)
 
     // Remove old signature and apply new one
     const content = removeSignatureFromContent(editor.getHTML())
@@ -1082,43 +860,10 @@
       }
     }
 
-    // Restore S/MIME toggles from draft
-    if (initialMessage.sign_message) {
-      signMessage = true
-    }
-    if (initialMessage.encrypt_message) {
-      encryptMessage = true
-    }
-
-    // Restore PGP toggles from draft
-    if ((initialMessage as any).pgp_sign_message) {
-      pgpSignMessage = true
-    }
-    if ((initialMessage as any).pgp_encrypt_message) {
-      pgpEncryptMessage = true
-    }
   }
 
   // Pre-send validation - returns true if we should proceed, false if waiting for confirmation
   function validateBeforeSend(): boolean {
-    // Block send if encrypt is on but recipients are missing certs
-    if (encryptMessage && missingCertRecipients.length > 0) {
-      addToast({
-        type: 'error',
-        message: $_('composer.cannotEncryptMissingCert', { values: { emails: missingCertRecipients.join(', ') } }),
-      })
-      return false
-    }
-
-    // Block send if PGP encrypt is on but recipients are missing keys
-    if (pgpEncryptMessage && missingPGPKeyRecipients.length > 0) {
-      addToast({
-        type: 'error',
-        message: $_('composer.cannotEncryptMissingPGPKey', { values: { emails: missingPGPKeyRecipients.join(', ') } }),
-      })
-      return false
-    }
-
     // Check for missing attachment
     if (attachments.length === 0 && bodyMentionsAttachment()) {
       showMissingAttachmentDialog = true
@@ -1378,39 +1123,6 @@
 
   // Keyboard shortcuts
   function handleKeyDown(e: KeyboardEvent) {
-    // Security mode key handling (must be early in handleKeyDown)
-    if (securityMode) {
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        securityMode = null
-        return
-      }
-      if (e.key === 's' || e.key === 'S') {
-        e.preventDefault()
-        if (securityMode === 'pgp' && showPGPSignOption) {
-          pgpSignMessage = !pgpSignMessage
-          if (pgpSignMessage) signMessage = false
-        } else if (securityMode === 'smime' && showSignOption) {
-          signMessage = !signMessage
-          if (signMessage) pgpSignMessage = false
-        }
-        return
-      }
-      if (e.key === 'e' || e.key === 'E') {
-        e.preventDefault()
-        if (securityMode === 'pgp' && showPGPEncryptOption) {
-          pgpEncryptMessage = !pgpEncryptMessage
-          if (pgpEncryptMessage) encryptMessage = false
-        } else if (securityMode === 'smime' && showEncryptOption) {
-          encryptMessage = !encryptMessage
-          if (encryptMessage) pgpEncryptMessage = false
-        }
-        return
-      }
-      // Any other key exits security mode
-      securityMode = null
-    }
-
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       handleSend()
@@ -1428,19 +1140,6 @@
     if (e.key === 'a' && e.altKey) {
       e.preventDefault()
       handleAttachFiles()
-    }
-    // Alt+P / Alt+S to toggle security mode
-    if (e.altKey && (e.key === 'p' || e.key === 's')) {
-      if (e.key === 'p' && (showPGPSignOption || showPGPEncryptOption)) {
-        e.preventDefault()
-        securityMode = securityMode === 'pgp' ? null : 'pgp'
-        return
-      }
-      if (e.key === 's' && (showSignOption || showEncryptOption)) {
-        e.preventDefault()
-        securityMode = securityMode === 'smime' ? null : 'smime'
-        return
-      }
     }
     if (e.key === 'Escape') {
       handleClose()
@@ -1941,66 +1640,6 @@
       />
     </div>
 
-    <!-- Security toggles -->
-    {#if showPGPSignOption || showPGPEncryptOption}
-      <div class="flex items-center px-4 py-3.5 border-b border-border text-xs {securityMode === 'pgp' ? 'bg-muted/50' : ''}">
-        <div class="flex items-center gap-1.5">
-          <Icon icon="mdi:lock-outline" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-          <span class="text-muted-foreground font-medium">PGP</span>
-          {#if pgpKeyId}
-            <span class="text-muted-foreground">|</span>
-            <span class="text-muted-foreground font-mono">{pgpKeyId}</span>
-          {/if}
-        </div>
-        <div class="flex items-center gap-3 ml-auto">
-          {#if securityMode === 'pgp'}
-            <span class="text-muted-foreground">{$_('composer.securityModeHint')}</span>
-          {/if}
-          {#if showPGPSignOption}
-            <div class="flex items-center gap-1.5" title={$_('composer.pgpSign')}>
-              <span>{$_('composer.sign')}</span>
-              <Switch bind:checked={pgpSignMessage} onCheckedChange={(v) => { if (v) { signMessage = false } }} class="scale-75 origin-left" />
-            </div>
-          {/if}
-          {#if showPGPEncryptOption}
-            <div class="flex items-center gap-1.5" title={$_('composer.pgpEncrypt')}>
-              <span>{$_('composer.encrypt')}</span>
-              <Switch bind:checked={pgpEncryptMessage} onCheckedChange={(v) => { if (v) { encryptMessage = false } }} class="scale-75 origin-left" />
-            </div>
-          {/if}
-        </div>
-      </div>
-    {/if}
-    {#if showSignOption || showEncryptOption}
-      <div class="flex items-center px-4 py-3.5 border-b border-border text-xs {securityMode === 'smime' ? 'bg-muted/50' : ''}">
-        <div class="flex items-center gap-1.5">
-          <Icon icon="mdi:shield-outline" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-          <span class="text-muted-foreground font-medium">S/MIME</span>
-          {#if smimeCertFingerprint}
-            <span class="text-muted-foreground">|</span>
-            <span class="text-muted-foreground font-mono">{smimeCertFingerprint}</span>
-          {/if}
-        </div>
-        <div class="flex items-center gap-3 ml-auto">
-          {#if securityMode === 'smime'}
-            <span class="text-muted-foreground">{$_('composer.securityModeHint')}</span>
-          {/if}
-          {#if showSignOption}
-            <div class="flex items-center gap-1.5" title={$_('composer.smimeSign')}>
-              <span>{$_('composer.sign')}</span>
-              <Switch bind:checked={signMessage} onCheckedChange={(v) => { if (v) { pgpSignMessage = false } }} class="scale-75 origin-left" />
-            </div>
-          {/if}
-          {#if showEncryptOption}
-            <div class="flex items-center gap-1.5" title={$_('composer.smimeEncrypt')}>
-              <span>{$_('composer.encrypt')}</span>
-              <Switch bind:checked={encryptMessage} onCheckedChange={(v) => { if (v) { pgpEncryptMessage = false } }} class="scale-75 origin-left" />
-            </div>
-          {/if}
-        </div>
-      </div>
-    {/if}
-
     <!-- Toolbar - extracted to separate component for performance -->
     <!-- Alt+T to focus toolbar, Tab skips it -->
     <EditorToolbar
@@ -2043,26 +1682,6 @@
 
     <!-- Attachments List -->
     <ComposerAttachmentList {attachments} onRemove={removeAttachment} />
-
-    <!-- Missing S/MIME cert warning -->
-    {#if encryptMessage && missingCertRecipients.length > 0}
-      <div class="flex items-center gap-2 text-xs px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
-        <Icon icon="mdi:alert" class="w-3.5 h-3.5 flex-shrink-0" />
-        <span class="flex-1">{$_('composer.noCertFor', { values: { emails: missingCertRecipients.join(', ') } })}</span>
-        <button onclick={handleImportRecipientCert} class="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors">{$_('composer.import')}</button>
-        <button onclick={() => encryptMessage = false} class="px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800 font-medium transition-colors">{$_('common.cancel')}</button>
-      </div>
-    {/if}
-
-    <!-- Missing PGP key warning -->
-    {#if pgpEncryptMessage && missingPGPKeyRecipients.length > 0}
-      <div class="flex items-center gap-2 text-xs px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border-t border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
-        <Icon icon="mdi:alert" class="w-3.5 h-3.5 flex-shrink-0" />
-        <span class="flex-1">{$_('composer.noPGPKeyFor', { values: { emails: missingPGPKeyRecipients.join(', ') } })}</span>
-        <button onclick={handleImportRecipientPGPKey} class="px-2 py-0.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 font-medium transition-colors">{$_('composer.import')}</button>
-        <button onclick={() => pgpEncryptMessage = false} class="px-2 py-0.5 rounded hover:bg-amber-200 dark:hover:bg-amber-800 font-medium transition-colors">{$_('common.cancel')}</button>
-      </div>
-    {/if}
 
     <!-- Footer -->
     <div class="flex items-center gap-2 px-4 py-2 border-t border-border text-sm text-muted-foreground">

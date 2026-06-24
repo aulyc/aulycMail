@@ -56,7 +56,7 @@
   }: Props = $props()
 
   // Form state
-  let step = $state<'provider' | 'details'>('provider')
+  let step = $state<'provider' | 'details'>('details')
   let selectedProvider = $state<EmailProvider | null>(null)
   let showAdvanced = $state(false)
 
@@ -193,6 +193,15 @@
       loadingFolders = false
     }
   }
+
+  // New account: skip the provider picker grid — open directly into the
+  // manual ("Other / Manual") form. Server fields start blank for manual entry.
+  $effect(() => {
+    if (!editAccount && !selectedProvider) {
+      const custom = providers.find((p) => p.id === 'custom')
+      if (custom) selectProvider(custom)
+    }
+  })
 
   // Initialize form when editing (only once)
   $effect(() => {
@@ -579,61 +588,12 @@
     }
   }
 
-  // Go back to provider selection
-  function goBackToProviders() {
-    step = 'provider'
-    testResult = null
-  }
 </script>
 
 <form onsubmit={handleSubmit} class="space-y-6">
-  {#if step === 'provider' && !editAccount}
-    <!-- Step 1: Provider Selection -->
+  {#if true}
+    <!-- Account Details (manual entry — provider grid removed) -->
     <div class="space-y-4">
-      <div class="text-center">
-        <h3 class="text-lg font-medium">{$_('account.chooseProvider')}</h3>
-        <p class="text-sm text-muted-foreground mt-1">
-          {$_('account.chooseProviderHelp')}
-        </p>
-      </div>
-
-      <div class="grid grid-cols-3 gap-3">
-        {#each providers as provider (provider.id)}
-          <button
-            type="button"
-            class="flex flex-col items-center gap-2 p-4 rounded-lg border border-input bg-background hover:bg-accent hover:text-accent-foreground transition-colors"
-            onclick={() => selectProvider(provider)}
-          >
-            {#if provider.iconSrc}
-              <img src={provider.iconSrc} alt={provider.name} class="w-8 h-8" />
-            {:else}
-              <Icon icon={provider.icon} class="w-8 h-8" />
-            {/if}
-            <span class="text-sm font-medium text-center">{provider.name}</span>
-          </button>
-        {/each}
-      </div>
-
-      <div class="flex justify-end pt-2">
-        <Button variant="ghost" onclick={() => onCancel?.()}>
-          {$_('common.cancel')}
-        </Button>
-      </div>
-    </div>
-  {:else}
-    <!-- Step 2: Account Details -->
-    <div class="space-y-4">
-      {#if !editAccount}
-        <button
-          type="button"
-          class="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          onclick={goBackToProviders}
-        >
-          <Icon icon="mdi:arrow-left" class="w-4 h-4" />
-          {$_('account.changeProvider')}
-        </button>
-      {/if}
-
       {#if selectedProvider?.notes}
         <div class="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <Icon icon="mdi:information-outline" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />

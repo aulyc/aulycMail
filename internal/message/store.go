@@ -347,10 +347,6 @@ func (s *Store) Get(id string) (*Message, error) {
 		       snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
 		       size, has_attachments, body_text, body_html, body_fetched,
 		       read_receipt_to, read_receipt_handled,
-		       smime_status, smime_signer_email, smime_signer_subject,
-		       smime_encrypted, (smime_raw_body IS NOT NULL) as has_smime,
-		       pgp_status, pgp_signer_email, pgp_signer_key_id,
-		       pgp_encrypted, (pgp_raw_body IS NOT NULL) as has_pgp,
 		       received_at
 		FROM messages
 		WHERE id = ?
@@ -358,8 +354,6 @@ func (s *Store) Get(id string) (*Message, error) {
 
 	m := &Message{}
 	var messageID, inReplyTo, threadID, toList, ccList, bccList, replyTo, snippet, bodyText, bodyHTML, readReceiptTo sql.NullString
-	var smimeStatus, smimeSignerEmail, smimeSignerSubject sql.NullString
-	var pgpStatus, pgpSignerEmail, pgpSignerKeyID sql.NullString
 	var dateStr, receivedAtStr sql.NullString
 	var uidI64 int64
 
@@ -369,10 +363,6 @@ func (s *Store) Get(id string) (*Message, error) {
 		&snippet, &m.IsRead, &m.IsStarred, &m.IsAnswered, &m.IsForwarded, &m.IsDraft, &m.IsDeleted,
 		&m.Size, &m.HasAttachments, &bodyText, &bodyHTML, &m.BodyFetched,
 		&readReceiptTo, &m.ReadReceiptHandled,
-		&smimeStatus, &smimeSignerEmail, &smimeSignerSubject,
-		&m.SMIMEEncrypted, &m.HasSMIME,
-		&pgpStatus, &pgpSignerEmail, &pgpSignerKeyID,
-		&m.PGPEncrypted, &m.HasPGP,
 		&receivedAtStr,
 	)
 	if err == sql.ErrNoRows {
@@ -419,24 +409,6 @@ func (s *Store) Get(id string) (*Message, error) {
 	if readReceiptTo.Valid {
 		m.ReadReceiptTo = readReceiptTo.String
 	}
-	if smimeStatus.Valid {
-		m.SMIMEStatus = smimeStatus.String
-	}
-	if smimeSignerEmail.Valid {
-		m.SMIMESignerEmail = smimeSignerEmail.String
-	}
-	if smimeSignerSubject.Valid {
-		m.SMIMESignerSubject = smimeSignerSubject.String
-	}
-	if pgpStatus.Valid {
-		m.PGPStatus = pgpStatus.String
-	}
-	if pgpSignerEmail.Valid {
-		m.PGPSignerEmail = pgpSignerEmail.String
-	}
-	if pgpSignerKeyID.Valid {
-		m.PGPSignerKeyID = pgpSignerKeyID.String
-	}
 	if receivedAtStr.Valid && receivedAtStr.String != "" {
 		m.ReceivedAt = parseTimeString(receivedAtStr.String)
 	}
@@ -452,10 +424,6 @@ func (s *Store) GetByUID(folderID string, uid uint32) (*Message, error) {
 		       snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
 		       size, has_attachments, body_text, body_html, body_fetched,
 		       read_receipt_to, read_receipt_handled,
-		       smime_status, smime_signer_email, smime_signer_subject,
-		       smime_encrypted, (smime_raw_body IS NOT NULL) as has_smime,
-		       pgp_status, pgp_signer_email, pgp_signer_key_id,
-		       pgp_encrypted, (pgp_raw_body IS NOT NULL) as has_pgp,
 		       received_at
 		FROM messages
 		WHERE folder_id = ? AND uid = ?
@@ -463,8 +431,6 @@ func (s *Store) GetByUID(folderID string, uid uint32) (*Message, error) {
 
 	m := &Message{}
 	var messageID, inReplyTo, threadID, toList, ccList, bccList, replyTo, snippet, bodyText, bodyHTML, readReceiptTo sql.NullString
-	var smimeStatus, smimeSignerEmail, smimeSignerSubject sql.NullString
-	var pgpStatus, pgpSignerEmail, pgpSignerKeyID sql.NullString
 	var dateStr, receivedAtStr sql.NullString
 	var uidI64 int64
 
@@ -474,10 +440,6 @@ func (s *Store) GetByUID(folderID string, uid uint32) (*Message, error) {
 		&snippet, &m.IsRead, &m.IsStarred, &m.IsAnswered, &m.IsForwarded, &m.IsDraft, &m.IsDeleted,
 		&m.Size, &m.HasAttachments, &bodyText, &bodyHTML, &m.BodyFetched,
 		&readReceiptTo, &m.ReadReceiptHandled,
-		&smimeStatus, &smimeSignerEmail, &smimeSignerSubject,
-		&m.SMIMEEncrypted, &m.HasSMIME,
-		&pgpStatus, &pgpSignerEmail, &pgpSignerKeyID,
-		&m.PGPEncrypted, &m.HasPGP,
 		&receivedAtStr,
 	)
 	if err == sql.ErrNoRows {
@@ -524,24 +486,6 @@ func (s *Store) GetByUID(folderID string, uid uint32) (*Message, error) {
 	}
 	if readReceiptTo.Valid {
 		m.ReadReceiptTo = readReceiptTo.String
-	}
-	if smimeStatus.Valid {
-		m.SMIMEStatus = smimeStatus.String
-	}
-	if smimeSignerEmail.Valid {
-		m.SMIMESignerEmail = smimeSignerEmail.String
-	}
-	if smimeSignerSubject.Valid {
-		m.SMIMESignerSubject = smimeSignerSubject.String
-	}
-	if pgpStatus.Valid {
-		m.PGPStatus = pgpStatus.String
-	}
-	if pgpSignerEmail.Valid {
-		m.PGPSignerEmail = pgpSignerEmail.String
-	}
-	if pgpSignerKeyID.Valid {
-		m.PGPSignerKeyID = pgpSignerKeyID.String
 	}
 	if receivedAtStr.Valid && receivedAtStr.String != "" {
 		m.ReceivedAt = parseTimeString(receivedAtStr.String)
@@ -1122,18 +1066,11 @@ func (s *Store) GetMessageUIDsAndFolder(messageIDs []string) (map[string]UIDInfo
 
 // BodyUpdate holds body content for batch updates
 type BodyUpdate struct {
-	MessageID          string
-	BodyHTML           string
-	BodyText           string
-	Snippet            string
-	HasAttachments     bool
-	SMIMEStatus        string
-	SMIMESignerEmail   string
-	SMIMESignerSubject string
-	SMIMERawBody       []byte
-	SMIMEEncrypted     bool
-	PGPRawBody         []byte
-	PGPEncrypted       bool
+	MessageID      string
+	BodyHTML       string
+	BodyText       string
+	Snippet        string
+	HasAttachments bool
 }
 
 // UpdateBodiesBatch updates body content for multiple messages in a single transaction
@@ -1151,10 +1088,7 @@ func (s *Store) UpdateBodiesBatch(updates []BodyUpdate) error {
 	stmt, err := tx.Prepare(`
 		UPDATE messages
 		SET body_html = ?, body_text = ?, snippet = ?, body_fetched = 1,
-		    has_attachments = ?,
-		    smime_status = ?, smime_signer_email = ?, smime_signer_subject = ?,
-		    smime_raw_body = ?, smime_encrypted = ?,
-		    pgp_raw_body = ?, pgp_encrypted = ?
+		    has_attachments = ?
 		WHERE id = ?
 	`)
 	if err != nil {
@@ -1163,20 +1097,9 @@ func (s *Store) UpdateBodiesBatch(updates []BodyUpdate) error {
 	defer stmt.Close()
 
 	for _, u := range updates {
-		var smimeRawBody interface{}
-		if len(u.SMIMERawBody) > 0 {
-			smimeRawBody = u.SMIMERawBody
-		}
-		var pgpRawBody interface{}
-		if len(u.PGPRawBody) > 0 {
-			pgpRawBody = u.PGPRawBody
-		}
 		_, err := stmt.Exec(
 			nullString(u.BodyHTML), nullString(u.BodyText), nullString(u.Snippet),
 			u.HasAttachments,
-			nullString(u.SMIMEStatus), nullString(u.SMIMESignerEmail), nullString(u.SMIMESignerSubject),
-			smimeRawBody, u.SMIMEEncrypted,
-			pgpRawBody, u.PGPEncrypted,
 			u.MessageID,
 		)
 		if err != nil {
@@ -1190,32 +1113,6 @@ func (s *Store) UpdateBodiesBatch(updates []BodyUpdate) error {
 	}
 
 	return nil
-}
-
-// GetSMIMERawBody returns the raw S/MIME body bytes for a message (for on-view decryption/verification)
-func (s *Store) GetSMIMERawBody(messageID string) ([]byte, error) {
-	var rawBody []byte
-	err := s.db.QueryRow("SELECT smime_raw_body FROM messages WHERE id = ?", messageID).Scan(&rawBody)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get S/MIME raw body: %w", err)
-	}
-	return rawBody, nil
-}
-
-// GetPGPRawBody returns the raw PGP body bytes for a message (for on-view decryption/verification)
-func (s *Store) GetPGPRawBody(messageID string) ([]byte, error) {
-	var rawBody []byte
-	err := s.db.QueryRow("SELECT pgp_raw_body FROM messages WHERE id = ?", messageID).Scan(&rawBody)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get PGP raw body: %w", err)
-	}
-	return rawBody, nil
 }
 
 // ClearBodiesForFolder clears body content for all messages in a folder.
@@ -1547,10 +1444,6 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		       m.snippet, m.is_read, m.is_starred, m.is_answered, m.is_forwarded, m.is_draft, m.is_deleted,
 		       m.size, m.has_attachments, m.body_text, m.body_html, m.body_fetched,
 		       m.read_receipt_to, m.read_receipt_handled,
-		       m.smime_status, m.smime_signer_email, m.smime_signer_subject,
-		       m.smime_encrypted, (m.smime_raw_body IS NOT NULL) as has_smime,
-		       m.pgp_status, m.pgp_signer_email, m.pgp_signer_key_id,
-		       m.pgp_encrypted, (m.pgp_raw_body IS NOT NULL) as has_pgp,
 		       m.received_at
 		FROM messages m
 		INNER JOIN folders f ON m.folder_id = f.id
@@ -1572,8 +1465,6 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 	for rows.Next() {
 		m := &Message{}
 		var messageID, inReplyTo, references, threadIDVal, toList, ccList, bccList, replyTo, snippetVal, bodyText, bodyHTML, readReceiptTo sql.NullString
-		var smimeStatus, smimeSignerEmail, smimeSignerSubject sql.NullString
-		var pgpStatus, pgpSignerEmail, pgpSignerKeyID sql.NullString
 		var dateStr, receivedAtStr sql.NullString
 		var uidI64 int64
 
@@ -1583,10 +1474,6 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 			&snippetVal, &m.IsRead, &m.IsStarred, &m.IsAnswered, &m.IsForwarded, &m.IsDraft, &m.IsDeleted,
 			&m.Size, &m.HasAttachments, &bodyText, &bodyHTML, &m.BodyFetched,
 			&readReceiptTo, &m.ReadReceiptHandled,
-			&smimeStatus, &smimeSignerEmail, &smimeSignerSubject,
-			&m.SMIMEEncrypted, &m.HasSMIME,
-			&pgpStatus, &pgpSignerEmail, &pgpSignerKeyID,
-			&m.PGPEncrypted, &m.HasPGP,
 			&receivedAtStr,
 		)
 		if err != nil {
@@ -1632,24 +1519,6 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		}
 		if readReceiptTo.Valid {
 			m.ReadReceiptTo = readReceiptTo.String
-		}
-		if smimeStatus.Valid {
-			m.SMIMEStatus = smimeStatus.String
-		}
-		if smimeSignerEmail.Valid {
-			m.SMIMESignerEmail = smimeSignerEmail.String
-		}
-		if smimeSignerSubject.Valid {
-			m.SMIMESignerSubject = smimeSignerSubject.String
-		}
-		if pgpStatus.Valid {
-			m.PGPStatus = pgpStatus.String
-		}
-		if pgpSignerEmail.Valid {
-			m.PGPSignerEmail = pgpSignerEmail.String
-		}
-		if pgpSignerKeyID.Valid {
-			m.PGPSignerKeyID = pgpSignerKeyID.String
 		}
 		if receivedAtStr.Valid && receivedAtStr.String != "" {
 			m.ReceivedAt = parseTimeString(receivedAtStr.String)
@@ -2110,10 +1979,6 @@ func (s *Store) GetByIDs(ids []string) ([]*Message, error) {
 		       snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
 		       size, has_attachments, body_text, body_html, body_fetched,
 		       read_receipt_to, read_receipt_handled,
-		       smime_status, smime_signer_email, smime_signer_subject,
-		       smime_encrypted, (smime_raw_body IS NOT NULL) as has_smime,
-		       pgp_status, pgp_signer_email, pgp_signer_key_id,
-		       pgp_encrypted, (pgp_raw_body IS NOT NULL) as has_pgp,
 		       received_at
 		FROM messages WHERE id IN (%s)
 	`, strings.Join(placeholders, ", "))
@@ -2128,8 +1993,6 @@ func (s *Store) GetByIDs(ids []string) ([]*Message, error) {
 	for rows.Next() {
 		m := &Message{}
 		var messageID, inReplyTo, references, threadID, toList, ccList, bccList, replyTo, snippet, bodyText, bodyHTML, readReceiptTo sql.NullString
-		var smimeStatus, smimeSignerEmail, smimeSignerSubject sql.NullString
-		var pgpStatus, pgpSignerEmail, pgpSignerKeyID sql.NullString
 		var dateStr, receivedAtStr sql.NullString
 		var uidI64 int64
 
@@ -2139,10 +2002,6 @@ func (s *Store) GetByIDs(ids []string) ([]*Message, error) {
 			&snippet, &m.IsRead, &m.IsStarred, &m.IsAnswered, &m.IsForwarded, &m.IsDraft, &m.IsDeleted,
 			&m.Size, &m.HasAttachments, &bodyText, &bodyHTML, &m.BodyFetched,
 			&readReceiptTo, &m.ReadReceiptHandled,
-			&smimeStatus, &smimeSignerEmail, &smimeSignerSubject,
-			&m.SMIMEEncrypted, &m.HasSMIME,
-			&pgpStatus, &pgpSignerEmail, &pgpSignerKeyID,
-			&m.PGPEncrypted, &m.HasPGP,
 			&receivedAtStr,
 		)
 		if err != nil {
@@ -2188,24 +2047,6 @@ func (s *Store) GetByIDs(ids []string) ([]*Message, error) {
 		}
 		if readReceiptTo.Valid {
 			m.ReadReceiptTo = readReceiptTo.String
-		}
-		if smimeStatus.Valid {
-			m.SMIMEStatus = smimeStatus.String
-		}
-		if smimeSignerEmail.Valid {
-			m.SMIMESignerEmail = smimeSignerEmail.String
-		}
-		if smimeSignerSubject.Valid {
-			m.SMIMESignerSubject = smimeSignerSubject.String
-		}
-		if pgpStatus.Valid {
-			m.PGPStatus = pgpStatus.String
-		}
-		if pgpSignerEmail.Valid {
-			m.PGPSignerEmail = pgpSignerEmail.String
-		}
-		if pgpSignerKeyID.Valid {
-			m.PGPSignerKeyID = pgpSignerKeyID.String
 		}
 		if receivedAtStr.Valid && receivedAtStr.String != "" {
 			m.ReceivedAt = parseTimeString(receivedAtStr.String)

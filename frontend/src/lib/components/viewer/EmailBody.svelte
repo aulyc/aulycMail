@@ -18,11 +18,10 @@
     fromEmail?: string
     onCompose?: (to: string) => void
     onImagesLoaded?: () => void
-    encryptedInlineAttachments?: Record<string, string>
     darken?: boolean
   }
 
-  let { messageId, accountId: _accountId, bodyHtml = '', bodyText = '', fromEmail = '', onCompose, onImagesLoaded, encryptedInlineAttachments, darken = false }: Props = $props()
+  let { messageId, accountId: _accountId, bodyHtml = '', bodyText = '', fromEmail = '', onCompose, onImagesLoaded, darken = false }: Props = $props()
 
   // State for remote image handling
   let imagesBlocked = $state(true)
@@ -605,15 +604,8 @@ ${processedHtml}
     const id = messageId
     const html = bodyHtml
     const hasCid = html ? /src=["']cid:([^"']+)["']/i.test(html) : false
-    const encInline = encryptedInlineAttachments
 
     if (!id || !hasCid) {
-      return
-    }
-
-    // For encrypted messages, use the in-memory inline attachments from decryption
-    if (encInline && Object.keys(encInline).length > 0) {
-      inlineAttachments = encInline
       return
     }
 
