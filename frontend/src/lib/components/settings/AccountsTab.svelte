@@ -4,7 +4,6 @@
   import { accountStore } from '$lib/stores/accounts.svelte'
   import AccountDialog from './AccountDialog.svelte'
   import DeleteAccountDialog from './DeleteAccountDialog.svelte'
-  import AulycmailCoreOAuthSection from './AulycmailCoreOAuthSection.svelte'
   // @ts-ignore - wailsjs path
   import type { account } from '../../../../wailsjs/go/models'
   import { _ } from '$lib/i18n'
@@ -159,9 +158,6 @@
       </Button>
     </div>
   {/if}
-
-  <!-- aulycmail core OAuth credentials (advanced, collapsed by default) -->
-  <AulycmailCoreOAuthSection />
 </div>
 
 <!-- Account Dialog -->

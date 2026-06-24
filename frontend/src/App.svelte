@@ -10,7 +10,6 @@
   import Composer from './lib/components/composer/Composer.svelte'
   import ToastContainer from './lib/components/ui/toast/ToastContainer.svelte'
   import TermsDialog from './lib/components/TermsDialog.svelte'
-  import OAuthMissingDialog from './lib/components/OAuthMissingDialog.svelte'
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
   import ExtensionRail from './lib/components/rail/ExtensionRail.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
@@ -39,7 +38,7 @@
   import { dispatchExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
   import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive } from '$lib/stores/layout.svelte'
   // @ts-ignore - wailsjs path
-  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete, GetOAuthBuildStatus, GetOAuthWarningDisabled, SetOAuthWarningDisabled } from '../wailsjs/go/app/App.js'
+  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, CloseWindow, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
@@ -145,12 +144,6 @@
   // Terms acceptance state
   let showTermsDialog = $state(false)
 
-  // Launch-time OAuth credentials warning state
-  let showOAuthMissingDialog = $state(false)
-  let oauthBuildStatus = $state({ google: true, microsoft: true, googleTesting: true })
-  let pendingOAuthWarning = $state(false)
-
-
   // Certificate TOFU state (for background sync cert errors)
   let showCertDialog = $state(false)
   let pendingCertificate = $state<certificate.CertificateInfo | null>(null)
@@ -180,28 +173,6 @@
     }
   }
 
-  // OAuth warning dismiss — optionally persists the opt-out so the warning
-  // stops firing on future launches even when credentials remain missing.
-  async function dismissOAuthWarning(dontShowAgain: boolean) {
-    if (dontShowAgain) {
-      try {
-        await SetOAuthWarningDisabled(true)
-      } catch (err) {
-        console.error('Failed to persist OAuth warning preference:', err)
-      }
-    }
-    showOAuthMissingDialog = false
-  }
-
-  // Reactive sequencing: Terms → OAuth warning.
-  // Each gates on the previous being closed so users see them one at a
-  // time, never stacked.
-  $effect(() => {
-    if (!showTermsDialog && pendingOAuthWarning && !showOAuthMissingDialog) {
-      showOAuthMissingDialog = true
-      pendingOAuthWarning = false
-    }
-  })
 
   // Certificate TOFU handlers for background sync
   async function handleBgCertAcceptOnce() {
@@ -375,25 +346,6 @@
       console.error('Failed to check terms acceptance:', err)
       // Show dialog on error to be safe
       showTermsDialog = true
-    }
-
-    // OAuth credentials warning: surface missing provider creds on every
-    // launch unless the user has explicitly opted out. The dialog shows
-    // all three providers with a missing/present indicator, so the
-    // trigger fires when ANY of them is missing. Actual opening is
-    // deferred via $effect so Terms can resolve first.
-    try {
-      const status = await GetOAuthBuildStatus()
-      const anyMissing = !status.google || !status.microsoft || !status.googleTesting
-      if (anyMissing) {
-        const disabled = await GetOAuthWarningDisabled()
-        if (!disabled) {
-          oauthBuildStatus = status
-          pendingOAuthWarning = true
-        }
-      }
-    } catch (err) {
-      console.error('Failed to check OAuth build status:', err)
     }
 
     // Load persisted UI state
@@ -1611,15 +1563,6 @@
 
 <!-- Terms Acceptance Dialog -->
 <TermsDialog bind:open={showTermsDialog} onAccept={handleTermsAccepted} />
-
-<!-- Launch-time OAuth credentials warning. Shows on every launch when one
-     or more provider credentials weren't compiled in, unless the user
-     opts out via "Don't show again". -->
-<OAuthMissingDialog
-  bind:open={showOAuthMissingDialog}
-  oauthStatus={oauthBuildStatus}
-  onDismiss={dismissOAuthWarning}
-/>
 
 
 <!-- Certificate TOFU Dialog (for background sync cert errors) -->

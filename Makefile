@@ -4,49 +4,16 @@
 #   make build    - Build production binary (aulycmail.app)
 #   make dev      - Run in development mode
 #   make help     - Show all available targets
-#
-# OAuth credentials are loaded from .env or .env.local files
-# See .env.example for required variables
 
 .PHONY: all build dev dev-race generate clean test lint lint-go lint-frontend \
         fmt frontend-deps frontend-update install uninstall \
         install-darwin uninstall-darwin help
 
-# Load environment variables from .env files.
-# .env.local overrides .env. All OAuth credentials live in the root .env —
-# extension packages no longer carry their own OAuth client vars.
--include .env
--include .env.local
-export
-
 # Go module path
 MODULE := github.com/aulyc/aulycmail
 
-# Build flags for injecting OAuth credentials at compile time.
-#
-#   GOOGLE_CLIENT_ID/SECRET   — mail's Google-verified client. Also backs
-#                               first-party extensions for any scopes their
-#                               manifest declares in
-#                               first_party_uses_core_for_scopes (today:
-#                               contacts.readonly). Surfaced as
-#                               "aulycmail - Google" in the picker.
-#   MICROSOFT_CLIENT_ID       — mail's Azure AD app registration. Also
-#                               backs microsoft-contacts and
-#                               microsoft-calendar (Microsoft Graph
-#                               doesn't gate scopes behind verification).
-#                               Surfaced as "aulycmail - Microsoft".
-#   GOOGLE_TESTING_CLIENT_ID/SECRET — shared un-Google-verified test
-#                               project for extensions that need broader
-#                               scopes than the mail project carries
-#                               (contacts.readwrite, full Calendar).
-#                               Single client backs google-contacts AND
-#                               google-calendar slots. Surfaced as
-#                               "aulycmail - Google (Testing)".
-LDFLAGS := -X '$(MODULE)/internal/oauth2.GoogleClientID=$(GOOGLE_CLIENT_ID)' \
-           -X '$(MODULE)/internal/oauth2.GoogleClientSecret=$(GOOGLE_CLIENT_SECRET)' \
-           -X '$(MODULE)/internal/oauth2.MicrosoftClientID=$(MICROSOFT_CLIENT_ID)' \
-           -X '$(MODULE)/internal/oauth2.GoogleTestingClientID=$(GOOGLE_TESTING_CLIENT_ID)' \
-           -X '$(MODULE)/internal/oauth2.GoogleTestingClientSecret=$(GOOGLE_TESTING_CLIENT_SECRET)'
+# No OAuth credentials are injected — aulycmail is a password-auth mail client.
+LDFLAGS :=
 
 # Wails build tags
 BUILD_TAGS := webkit2_41
@@ -60,10 +27,6 @@ all: build
 # (ad-hoc signature is required for macOS notifications to work).
 build:
 	@echo "Building aulycmail..."
-	@if [ -z "$(GOOGLE_CLIENT_ID)" ] && [ -z "$(MICROSOFT_CLIENT_ID)" ]; then \
-		echo "Warning: No OAuth credentials configured. Gmail/Outlook OAuth will not work."; \
-		echo "See .env.example for required variables."; \
-	fi
 	wails build -ldflags "$(LDFLAGS) -s -w" -tags $(BUILD_TAGS)
 	@echo "Injecting macOS asset-catalog icon (fills the Liquid Glass plate on macOS 26)..."
 	bash tools/inject_macos_icon.sh build/bin/aulycmail.app build/appicon.png
