@@ -226,9 +226,11 @@
     <!-- Content -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 mb-0.5">
-        <!-- Star (before the name; vertically centered with name + date) -->
+        <!-- Star (before the name; vertically centered with name + date).
+             -my-1 cancels the button's vertical padding so it doesn't inflate
+             the row height — keeps the click target, lifts the line up a touch. -->
         <button
-          class="flex-shrink-0 p-1 -ml-1 rounded hover:bg-muted transition-colors duration-200"
+          class="flex-shrink-0 p-1 -ml-1 -my-1 rounded hover:bg-muted transition-colors duration-200"
           onclick={handleStarClick}
         >
           <Icon
