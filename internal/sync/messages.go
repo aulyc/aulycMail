@@ -363,15 +363,15 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 	f.TotalCount = int(mailbox.Messages)
 	f.LastSync = &now
 
-	// Use IMAP server's authoritative unread count if available
-	if mailboxStatus != nil {
+	// Derive the unread badge from the LOCAL is_read state, not the IMAP
+	// server's UNSEEN, so the sidebar badge always matches what the message
+	// list shows (which is driven by local flags). Server UNSEEN can drift
+	// from local reality (e.g. 163 reports stale UNSEEN, or a flag change
+	// hasn't synced back yet), which otherwise leaves badge ≠ list header.
+	if unreadCount, err := e.messageStore.CountUnreadByFolder(folderID); err == nil {
+		f.UnreadCount = unreadCount
+	} else if mailboxStatus != nil {
 		f.UnreadCount = int(mailboxStatus.Unseen)
-	} else {
-		// Fall back to counting local messages if status call failed
-		unreadCount, err := e.messageStore.CountUnreadByFolder(folderID)
-		if err == nil {
-			f.UnreadCount = unreadCount
-		}
 	}
 
 	if err := e.folderStore.Update(f); err != nil {
