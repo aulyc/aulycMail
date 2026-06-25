@@ -80,10 +80,13 @@
 </script>
 
 <div class="space-y-6 p-1">
-  <div class="space-y-2">
-    <Label>{$_('settings.composerMode')}</Label>
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('settings.composerMode')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settings.composerModeDescription')}</p>
+    </div>
     <Select.Root value={composerMode} onValueChange={handleComposerModeChange}>
-      <Select.Trigger>
+      <Select.Trigger class="w-48 shrink-0">
         <Select.Value placeholder={$_('settings.composerMode')}>
           {getModeLabel(composerMode)}
         </Select.Value>
@@ -94,15 +97,15 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <p class="text-xs text-muted-foreground">
-      {$_('settings.composerModeDescription')}
-    </p>
   </div>
 
-  <div class="space-y-2">
-    <Label>{$_('settings.mailtoMode')}</Label>
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('settings.mailtoMode')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settings.mailtoModeDescription')}</p>
+    </div>
     <Select.Root value={mailtoMode} onValueChange={handleMailtoModeChange}>
-      <Select.Trigger>
+      <Select.Trigger class="w-48 shrink-0">
         <Select.Value placeholder={$_('settings.mailtoMode')}>
           {getModeLabel(mailtoMode)}
         </Select.Value>
@@ -113,15 +116,15 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <p class="text-xs text-muted-foreground">
-      {$_('settings.mailtoModeDescription')}
-    </p>
   </div>
 
-  <div class="space-y-2">
-    <Label>{$_('settings.composerFormat')}</Label>
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('settings.composerFormat')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settings.composerFormatDescription')}</p>
+    </div>
     <Select.Root value={composerFormat} onValueChange={handleFormatChange}>
-      <Select.Trigger>
+      <Select.Trigger class="w-48 shrink-0">
         <Select.Value placeholder={$_('settings.composerFormat')}>
           {getFormatLabel(composerFormat)}
         </Select.Value>
@@ -132,29 +135,24 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <p class="text-xs text-muted-foreground">
-      {$_('settings.composerFormatDescription')}
-    </p>
   </div>
 
-  <div class="space-y-4">
-    <div class="space-y-2">
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
       <Label>{$_('settingsGeneral.readReceiptPolicy')}</Label>
-      <Select.Root value={readReceiptResponsePolicy} onValueChange={handlePolicyChange}>
-        <Select.Trigger>
-          <Select.Value placeholder={$_('settingsGeneral.selectPolicy')}>
-            {getPolicyLabel(readReceiptResponsePolicy)}
-          </Select.Value>
-        </Select.Trigger>
-        <Select.Content>
-          {#each readReceiptResponseOptions as opt (opt.value)}
-            <Select.Item value={opt.value} label={opt.label} />
-          {/each}
-        </Select.Content>
-      </Select.Root>
-      <p class="text-xs text-muted-foreground">
-        {$_('settingsGeneral.readReceiptPolicyHelp')}
-      </p>
+      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.readReceiptPolicyHelp')}</p>
     </div>
+    <Select.Root value={readReceiptResponsePolicy} onValueChange={handlePolicyChange}>
+      <Select.Trigger class="w-48 shrink-0">
+        <Select.Value placeholder={$_('settingsGeneral.selectPolicy')}>
+          {getPolicyLabel(readReceiptResponsePolicy)}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        {#each readReceiptResponseOptions as opt (opt.value)}
+          <Select.Item value={opt.value} label={opt.label} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
   </div>
 </div>

@@ -132,13 +132,14 @@
 
 <div class="space-y-4">
   <!-- Title bar -->
-  <div class="space-y-2">
-    <Label>{$_('settingsGeneral.titleBar')}</Label>
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('settingsGeneral.titleBar')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.titleBarHelp')}</p>
+    </div>
     <Select.Root value={titleBarValue} onValueChange={handleTitleBarChange}>
-      <Select.Trigger>
-        <Select.Value>
-          {getTitleBarLabel(titleBarValue)}
-        </Select.Value>
+      <Select.Trigger class="w-48 shrink-0">
+        <Select.Value>{getTitleBarLabel(titleBarValue)}</Select.Value>
       </Select.Trigger>
       <Select.Content>
         {#each titleBarOptions as opt (opt.value)}
@@ -146,19 +147,14 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <p class="text-xs text-muted-foreground">
-      {$_('settingsGeneral.titleBarHelp')}
-    </p>
   </div>
 
   <!-- Language -->
-  <div class="space-y-2">
+  <div class="flex items-center justify-between gap-4">
     <Label>{$_('settingsGeneral.language')}</Label>
     <Select.Root value={language || 'en'} onValueChange={handleLanguageChange}>
-      <Select.Trigger>
-        <Select.Value>
-          {getLanguageLabel(language || 'en')}
-        </Select.Value>
+      <Select.Trigger class="w-48 shrink-0">
+        <Select.Value>{getLanguageLabel(language || 'en')}</Select.Value>
       </Select.Trigger>
       <Select.Content>
         {#each supportedLocales as loc (loc.code)}
@@ -169,10 +165,13 @@
   </div>
 
   <!-- Theme -->
-  <div class="space-y-2">
-    <Label>{$_('settingsGeneral.theme')}</Label>
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('settingsGeneral.theme')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.themeHelp')}</p>
+    </div>
     <Select.Root value={themeMode} onValueChange={handleThemeChange}>
-      <Select.Trigger>
+      <Select.Trigger class="w-48 shrink-0">
         <Select.Value placeholder={$_('settingsGeneral.selectTheme')}>
           {getThemeModeLabel(themeMode)}
         </Select.Value>
@@ -183,9 +182,6 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <p class="text-xs text-muted-foreground">
-      {$_('settingsGeneral.themeHelp')}
-    </p>
   </div>
 
   <!-- Dark mail content — only relevant when a dark theme is active -->
@@ -213,10 +209,13 @@
   </div>
 
   <!-- Message list density -->
-  <div class="space-y-2">
-    <Label>{$_('settingsGeneral.messageListDensity')}</Label>
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('settingsGeneral.messageListDensity')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.messageListDensityHelp')}</p>
+    </div>
     <Select.Root value={messageListDensity} onValueChange={handleDensityChange}>
-      <Select.Trigger>
+      <Select.Trigger class="w-48 shrink-0">
         <Select.Value placeholder={$_('settingsGeneral.selectDensity')}>
           {getDensityLabel(messageListDensity)}
         </Select.Value>
@@ -227,9 +226,6 @@
         {/each}
       </Select.Content>
     </Select.Root>
-    <p class="text-xs text-muted-foreground">
-      {$_('settingsGeneral.messageListDensityHelp')}
-    </p>
   </div>
 
   <!-- Run in background -->
