@@ -181,12 +181,10 @@ func (s *Store) Set(key, value string) error {
 // IsExtensionEnabled returns whether the given first-party extension is
 // enabled. Unknown / not-yet-set extensions return (false, nil) — the
 // app should treat "not present in settings" as disabled.
-func (s *Store) IsExtensionEnabled(name string) (bool, error) {
-	value, err := s.Get("extension_" + name + "_enabled")
-	if err != nil {
-		return false, err
-	}
-	return value == "true", nil
+func (s *Store) IsExtensionEnabled(_ string) (bool, error) {
+	// Contacts is the only built-in feature and is permanently enabled — there
+	// is no extension enable/disable concept anymore.
+	return true, nil
 }
 
 // SetExtensionEnabled writes the enable/disable flag for the given first-party
