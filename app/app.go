@@ -488,6 +488,9 @@ func (a *App) Startup(ctx context.Context) {
 		}
 	})
 	platform.StartActivationObserver()
+	// Let a genuine quit (Dock "Quit", menu Quit, Cmd+Q — all call
+	// terminate:) bypass background-mode hiding in BeforeClose.
+	platform.InstallTerminateHook()
 
 	// Logging, paths, db open, migrations, and credential store are all
 	// initialized in Preflight (called from main.go before wails.Run). By
@@ -724,9 +727,11 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 		return false
 	}
 
-	// Background mode: hide window instead of quitting
+	// Background mode: hide window instead of quitting — UNLESS this is a
+	// genuine quit (Dock "Quit" / menu Quit / Cmd+Q all call terminate:,
+	// which the macOS hook flags). A real quit must fall through to shutdown.
 	runBg, _ := a.settingsStore.GetRunBackground()
-	if runBg {
+	if runBg && !platform.RealQuitRequested() {
 		log := logging.WithComponent("app")
 		log.Info().Msg("Window close requested, hiding to background")
 		wailsRuntime.WindowHide(a.ctx)

@@ -7,9 +7,12 @@ package platform
 #cgo LDFLAGS: -framework Cocoa
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 // Implemented in activation_darwin.m
 void startActivationObserver(void);
+void installTerminateHook(void);
+bool aulycRealQuitRequested(void);
 */
 import "C"
 
@@ -39,4 +42,17 @@ func SetActivationHandler(fn func()) {
 // observer. Safe to call once after the Wails app has started.
 func StartActivationObserver() {
 	C.startActivationObserver()
+}
+
+// InstallTerminateHook swizzles -[NSApplication terminate:] so a genuine quit
+// (Dock "Quit", menu Quit, Cmd+Q) can be told apart from a window close in
+// background mode. Call once at startup.
+func InstallTerminateHook() {
+	C.installTerminateHook()
+}
+
+// RealQuitRequested reports whether terminate: has been invoked — i.e. the user
+// asked to actually quit, not just close the window.
+func RealQuitRequested() bool {
+	return bool(C.aulycRealQuitRequested())
 }
