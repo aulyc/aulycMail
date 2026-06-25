@@ -275,7 +275,7 @@ func (e *Engine) fetchEnvelopesForSearch(ctx context.Context, client *imapclient
 				r.Subject = envelope.Subject
 				r.Date = envelope.Date.UTC()
 				if len(envelope.From) > 0 {
-					r.FromName = envelope.From[0].Name
+					r.FromName = decodeAddressName(envelope.From[0].Name)
 					r.FromEmail = envelope.From[0].Addr()
 				}
 			}

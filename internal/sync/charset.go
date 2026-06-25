@@ -204,6 +204,34 @@ func extractCharsetFromHTML(html []byte) string {
 	return ""
 }
 
+// decodeAddressName decodes an address display name (a From/To/Cc phrase):
+// it MIME-decodes encoded words, then strips the surrounding RFC 5322
+// quoted-string quotes that some servers/senders leave in the IMAP ENVELOPE
+// (e.g. `"火山引擎"` → `火山引擎`). Use this for address names only — NOT for
+// subjects, where quote characters are meaningful content.
+func decodeAddressName(s string) string {
+	return unquotePhrase(decodeMIMEWord(s))
+}
+
+// unquotePhrase removes a single layer of RFC 5322 quoted-string quotes from a
+// display name and unescapes quoted-pairs (\" → ", \\ → \). Returns the input
+// unchanged when it isn't a "..."-wrapped string.
+func unquotePhrase(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
+		return s
+	}
+	inner := s[1 : len(s)-1]
+	var b strings.Builder
+	for i := 0; i < len(inner); i++ {
+		if inner[i] == '\\' && i+1 < len(inner) {
+			i++
+		}
+		b.WriteByte(inner[i])
+	}
+	return strings.TrimSpace(b.String())
+}
+
 // decodeMIMEWord decodes RFC 2047 encoded words (e.g., =?UTF-8?B?5Lit5paH?=)
 // used for non-ASCII filenames and headers
 func decodeMIMEWord(s string) string {
