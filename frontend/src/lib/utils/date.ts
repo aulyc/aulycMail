@@ -1,6 +1,7 @@
 import { format, isToday, isYesterday, isThisWeek, isThisYear } from 'date-fns'
 import { get } from 'svelte/store'
 import { _ } from '$lib/i18n'
+import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
 
 /**
  * Format a date relative to now for message list display
@@ -14,6 +15,7 @@ import { _ } from '$lib/i18n'
  */
 export function formatRelativeDate(date: Date): string {
   const t = get(_)
+  const locale = getCurrentDateFnsLocale()
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
@@ -36,14 +38,14 @@ export function formatRelativeDate(date: Date): string {
   }
 
   if (isThisWeek(date)) {
-    return format(date, 'EEEE')
+    return format(date, 'EEEE', { locale })
   }
 
   if (isThisYear(date)) {
-    return format(date, 'MMM d')
+    return format(date, 'MMM d', { locale })
   }
 
-  return format(date, 'MMM d, yyyy')
+  return format(date, 'MMM d, yyyy', { locale })
 }
 
 /**
@@ -52,25 +54,26 @@ export function formatRelativeDate(date: Date): string {
  */
 export function formatMessageDate(date: Date): string {
   const t = get(_)
+  const locale = getCurrentDateFnsLocale()
 
   if (isToday(date)) {
-    return t('date.todayAt', { values: { time: format(date, 'h:mm a') } })
+    return t('date.todayAt', { values: { time: format(date, 'h:mm a', { locale }) } })
   }
 
   if (isYesterday(date)) {
-    return t('date.yesterdayAt', { values: { time: format(date, 'h:mm a') } })
+    return t('date.yesterdayAt', { values: { time: format(date, 'h:mm a', { locale }) } })
   }
 
   if (isThisYear(date)) {
-    return format(date, 'MMM d \'at\' h:mm a')
+    return format(date, 'MMM d \'at\' h:mm a', { locale })
   }
 
-  return format(date, 'MMM d, yyyy \'at\' h:mm a')
+  return format(date, 'MMM d, yyyy \'at\' h:mm a', { locale })
 }
 
 /**
  * Format a date for full display (tooltips, etc.)
  */
 export function formatFullDate(date: Date): string {
-  return format(date, 'EEEE, MMMM d, yyyy \'at\' h:mm:ss a')
+  return format(date, 'EEEE, MMMM d, yyyy \'at\' h:mm:ss a', { locale: getCurrentDateFnsLocale() })
 }
