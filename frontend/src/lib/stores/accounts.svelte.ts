@@ -8,6 +8,8 @@ import {
   UpdateAccount,
   RemoveAccount,
   TestConnection,
+  TestAccountConnection,
+  GetAccountConnOK,
   CompleteOAuthAccountSetup,
   ReorderAccounts,
 } from '../../../wailsjs/go/app/App'
@@ -451,6 +453,20 @@ class AccountStore {
    */
   async testConnection(config: account.AccountConfig): Promise<app.ConnectionTestResult> {
     return await TestConnection(config)
+  }
+
+  /**
+   * Test connection for an existing account using its stored credentials.
+   */
+  async testAccountConnection(accountId: string): Promise<app.ConnectionTestResult> {
+    return await TestAccountConnection(accountId)
+  }
+
+  /**
+   * RFC3339 timestamp of the account's last successful connection, or "".
+   */
+  async getAccountConnOK(accountId: string): Promise<string> {
+    return await GetAccountConnOK(accountId)
   }
 
   /**

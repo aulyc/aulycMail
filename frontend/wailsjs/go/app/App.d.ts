@@ -408,6 +408,10 @@ export function SyncPendingDrafts(arg1:string):Promise<void>;
 
 export function TestConnection(arg1:account.AccountConfig):Promise<app.ConnectionTestResult>;
 
+export function TestAccountConnection(arg1:string):Promise<app.ConnectionTestResult>;
+
+export function GetAccountConnOK(arg1:string):Promise<string>;
+
 export function TestOAuthConnection(arg1:string):Promise<void>;
 
 export function TestSMTPConnection(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string):Promise<void>;

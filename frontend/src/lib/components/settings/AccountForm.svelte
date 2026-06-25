@@ -26,6 +26,7 @@
   // @ts-ignore - wailsjs path
   import { GetAccountFoldersForMapping, GetAutoDetectedFolders, GetIdentities, AcceptCertificate, GetAllAccountIdentities } from '../../../../wailsjs/go/app/App'
   import CertificateDialog from './CertificateDialog.svelte'
+  import ConnectionTestDialog from './ConnectionTestDialog.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { _ } from '$lib/i18n'
 
@@ -140,6 +141,7 @@
   // UI state
   let testing = $state(false)
   let testResult = $state<{ success: boolean; message: string } | null>(null)
+  let showTestConnDialog = $state(false)
   let submitting = $state(false)
   let errors = $state<Record<string, string>>({})
   let initialized = $state(false)
@@ -503,6 +505,7 @@
   async function handleTestConnection() {
     if (!validate()) return
 
+    showTestConnDialog = true
     testing = true
     testResult = null
 
@@ -511,6 +514,7 @@
       if (result.success) {
         testResult = { success: true, message: $_('account.connectionSuccessful') }
       } else if (result.certificateRequired && result.certificate) {
+        showTestConnDialog = false
         pendingCertificate = result.certificate
         showCertDialog = true
       } else {
@@ -1306,29 +1310,6 @@
         </div>
       {/if}
 
-      <!-- Test Result -->
-      {#if testResult}
-        <div
-          class="flex items-start gap-2 p-3 rounded-lg {testResult.success
-            ? 'bg-green-500/10 border border-green-500/20'
-            : 'bg-destructive/10 border border-destructive/20'}"
-        >
-          <Icon
-            icon={testResult.success ? 'mdi:check-circle' : 'mdi:alert-circle'}
-            class="w-5 h-5 flex-shrink-0 mt-0.5 {testResult.success
-              ? 'text-green-500'
-              : 'text-destructive'}"
-          />
-          <p
-            class="text-sm {testResult.success
-              ? 'text-green-600 dark:text-green-400'
-              : 'text-destructive'}"
-          >
-            {testResult.message}
-          </p>
-        </div>
-      {/if}
-
       <!-- Actions -->
       <div class="flex items-center justify-between pt-4 border-t border-border">
         <Button
@@ -1368,3 +1349,6 @@
   onAcceptPermanently={handleCertAcceptPermanently}
   onDecline={handleCertDecline}
 />
+
+<!-- Connection test result popup (same one Settings → Accounts uses) -->
+<ConnectionTestDialog bind:open={showTestConnDialog} {testing} result={testResult} />

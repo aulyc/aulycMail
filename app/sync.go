@@ -212,6 +212,8 @@ func (a *App) SyncAccountComplete(accountID string) error {
 	if err := a.SyncFolders(accountID); err != nil {
 		return fmt.Errorf("folder sync failed: %w", err)
 	}
+	// Reaching here means IMAP connected + authenticated — stamp last-OK.
+	a.recordAccountConnOK(accountID)
 
 	// 2. Determine which folders to sync based on account settings
 	foldersToSync, err := a.getSyncFolders(accountID)

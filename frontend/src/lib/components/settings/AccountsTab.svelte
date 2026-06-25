@@ -1,9 +1,13 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import Icon from '@iconify/svelte'
+  import { formatDistanceToNow } from 'date-fns'
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
+  import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
   import AccountDialog from './AccountDialog.svelte'
   import DeleteAccountDialog from './DeleteAccountDialog.svelte'
+  import ConnectionTestDialog from './ConnectionTestDialog.svelte'
   // @ts-ignore - wailsjs path
   import type { account } from '../../../../wailsjs/go/models'
   import { _ } from '$lib/i18n'
@@ -15,11 +19,56 @@
   let showAccountDialog = $state(false)
   let editingAccount = $state<account.Account | null>(null)
 
-  // Delete confirmation state. Reuses the same DeleteAccountDialog that
-  // the sidebar's 3-dot menu uses, so both entry points share the warning
-  // copy, destructive styling, and accountStore.removeAccount cleanup.
   let showDeleteDialog = $state(false)
   let deletingAccount = $state<account.Account | null>(null)
+
+  // Connection-test popup + per-account last-successful-connection timestamps.
+  let showTestDialog = $state(false)
+  let testing = $state(false)
+  let testResult = $state<{ success: boolean; message: string } | null>(null)
+  let connOk = $state<Record<string, string>>({})
+
+  // Lazily load each account's last-OK timestamp. Tracks the account list so
+  // new accounts get loaded; the connOk read/write is untracked to avoid a loop.
+  $effect(() => {
+    const ids = regularAccounts.map(a => a.account.id)
+    untrack(() => {
+      for (const id of ids) {
+        if (!(id in connOk)) {
+          accountStore.getAccountConnOK(id)
+            .then(v => { connOk = { ...connOk, [id]: v } })
+            .catch(() => {})
+        }
+      }
+    })
+  })
+
+  function relTime(iso: string): string {
+    try {
+      return formatDistanceToNow(new Date(iso), { addSuffix: true, locale: getCurrentDateFnsLocale() })
+    } catch {
+      return ''
+    }
+  }
+
+  async function runTest(accountId: string) {
+    showTestDialog = true
+    testing = true
+    testResult = null
+    try {
+      const r = await accountStore.testAccountConnection(accountId)
+      if (r.success) {
+        testResult = { success: true, message: $_('account.connectionSuccessful') }
+        connOk = { ...connOk, [accountId]: await accountStore.getAccountConnOK(accountId) }
+      } else {
+        testResult = { success: false, message: r.error || $_('account.connectionFailed') }
+      }
+    } catch (err) {
+      testResult = { success: false, message: (err as Error)?.message ?? String(err) }
+    } finally {
+      testing = false
+    }
+  }
 
   function openEdit(acc: account.Account) {
     editingAccount = acc
@@ -49,7 +98,6 @@
   async function moveUp(index: number) {
     if (index <= 0) return
     const ids = accountStore.accounts.map(a => a.account.id)
-    // Swap with previous
     ;[ids[index - 1], ids[index]] = [ids[index], ids[index - 1]]
     await accountStore.reorderAccounts(ids)
   }
@@ -57,7 +105,6 @@
   async function moveDown(index: number) {
     if (index >= accountStore.accounts.length - 1) return
     const ids = accountStore.accounts.map(a => a.account.id)
-    // Swap with next
     ;[ids[index], ids[index + 1]] = [ids[index + 1], ids[index]]
     await accountStore.reorderAccounts(ids)
   }
@@ -97,6 +144,22 @@
             <div class="font-medium text-sm truncate">{acc.name}</div>
             <div class="text-xs text-muted-foreground truncate">{acc.email}</div>
           </div>
+
+          <!-- Last-OK hint + test connection -->
+          <span class="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline">
+            {connOk[acc.id]
+              ? $_('account.lastConnected', { values: { time: relTime(connOk[acc.id]) } })
+              : $_('account.neverConnected')}
+          </span>
+          <Button
+            size="icon"
+            variant="ghost"
+            class="h-7 w-7"
+            onclick={() => runTest(acc.id)}
+            title={$_('account.testConnection')}
+          >
+            <Icon icon="mdi:lan-connect" class="w-4 h-4" />
+          </Button>
 
           <!-- Up/Down buttons -->
           <div class="flex items-center gap-1">
@@ -168,3 +231,6 @@
   account={deletingAccount}
   onClose={handleDeleteDialogClose}
 />
+
+<!-- Connection test result popup -->
+<ConnectionTestDialog bind:open={showTestDialog} {testing} result={testResult} />

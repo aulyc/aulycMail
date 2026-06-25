@@ -786,6 +786,14 @@ export function TestConnection(arg1) {
   return window['go']['app']['App']['TestConnection'](arg1);
 }
 
+export function TestAccountConnection(arg1) {
+  return window['go']['app']['App']['TestAccountConnection'](arg1);
+}
+
+export function GetAccountConnOK(arg1) {
+  return window['go']['app']['App']['GetAccountConnOK'](arg1);
+}
+
 export function TestOAuthConnection(arg1) {
   return window['go']['app']['App']['TestOAuthConnection'](arg1);
 }

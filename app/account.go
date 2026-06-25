@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/certificate"
@@ -461,4 +462,60 @@ func (a *App) TestConnection(config account.AccountConfig) ConnectionTestResult 
 
 	log.Info().Str("host", config.IMAPHost).Msg("Connection test successful")
 	return ConnectionTestResult{Success: true}
+}
+
+// TestAccountConnection tests connectivity for an EXISTING account by reusing
+// its stored credentials (the same config the sync pool uses). On success it
+// stamps the account's last-successful-connection time. Used by the per-account
+// "test connection" button in Settings → Accounts.
+func (a *App) TestAccountConnection(accountID string) ConnectionTestResult {
+	log := logging.WithComponent("app")
+
+	cfg, err := a.getIMAPCredentials(accountID)
+	if err != nil {
+		return ConnectionTestResult{Error: fmt.Sprintf("failed to load account credentials: %v", err)}
+	}
+
+	client := imap.NewClient(*cfg)
+	if err := client.Connect(); err != nil {
+		var certErr *certificate.Error
+		if errors.As(err, &certErr) {
+			return ConnectionTestResult{CertificateRequired: true, Certificate: certErr.Info}
+		}
+		log.Error().Err(err).Str("account", accountID).Msg("Account connection test failed")
+		return ConnectionTestResult{Error: fmt.Sprintf("failed to connect: %v", err)}
+	}
+	defer client.Close()
+
+	if err := client.Login(); err != nil {
+		log.Error().Err(err).Str("account", accountID).Msg("Account login test failed")
+		return ConnectionTestResult{Error: fmt.Sprintf("failed to login: %v", err)}
+	}
+
+	a.recordAccountConnOK(accountID)
+	log.Info().Str("account", accountID).Msg("Account connection test successful")
+	return ConnectionTestResult{Success: true}
+}
+
+// recordAccountConnOK stamps the account's most-recent successful connection
+// (test, send, or receive) as an RFC3339 timestamp in settings.
+func (a *App) recordAccountConnOK(accountID string) {
+	if a.settingsStore == nil || accountID == "" {
+		return
+	}
+	_ = a.settingsStore.Set("conn_ok_"+accountID, time.Now().UTC().Format(time.RFC3339))
+}
+
+// GetAccountConnOK returns the RFC3339 timestamp of the account's last
+// successful connection, or "" when there's none yet. The frontend renders it
+// as a relative "X ago" hint next to the test-connection button.
+func (a *App) GetAccountConnOK(accountID string) (string, error) {
+	if a.settingsStore == nil {
+		return "", nil
+	}
+	v, err := a.settingsStore.Get("conn_ok_" + accountID)
+	if err != nil {
+		return "", nil
+	}
+	return v, nil
 }

@@ -416,6 +416,8 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 	if err != nil {
 		return err
 	}
+	// A successful send is also a successful connection — refresh the stamp.
+	a.recordAccountConnOK(accountID)
 	go func() {
 		if err := a.syncSentFolder(accountID); err != nil {
 			log := logging.WithComponent("app")
