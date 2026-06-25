@@ -274,21 +274,17 @@
         <div class="mt-4 h-[350px] overflow-y-auto pl-1 pr-3">
           <Tabs.Content value="general" class="mt-0">
             <GeneralTab
-              bind:markAsReadDelaySeconds
               bind:messageListDensity
               bind:themeMode
               bind:nativeTitleBar
               bind:showTitleBar
               bind:runBackground
-              bind:startHidden
               bind:autostart
               bind:language
-              onDelayChange={(v) => markAsReadDelaySeconds = v}
               onDensityChange={(v) => messageListDensity = v}
               onThemeChange={(v) => themeMode = v}
               onTitleBarChange={(ntb, stb) => { nativeTitleBar = ntb; showTitleBar = stb }}
-              onRunBackgroundChange={(v) => { runBackground = v; if (!v) startHidden = false }}
-              onStartHiddenChange={(v) => { startHidden = v; if (v) runBackground = true }}
+              onRunBackgroundChange={(v) => { runBackground = v }}
               onAutostartChange={(v) => autostart = v}
               onLanguageChange={(v) => language = v}
               bind:accentBarUnread

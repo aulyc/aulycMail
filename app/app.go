@@ -820,15 +820,10 @@ func (a *App) QuitApp() {
 	}()
 }
 
-// GetStartHiddenActive returns true if the window should remain hidden on startup.
-// True when both start_hidden and run_background settings are enabled.
+// GetStartHiddenActive always returns false — the "start hidden" option was
+// removed; the window is always shown on startup.
 func (a *App) GetStartHiddenActive() bool {
-	startHidden, _ := a.settingsStore.GetStartHidden()
-	if !startHidden {
-		return false
-	}
-	runBg, _ := a.settingsStore.GetRunBackground()
-	return runBg
+	return false
 }
 
 // InitiateShutdown triggers the application quit (called from frontend)

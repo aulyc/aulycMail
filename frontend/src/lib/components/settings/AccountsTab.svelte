@@ -64,11 +64,6 @@
 </script>
 
 <div class="space-y-4">
-  <h3 class="text-sm font-medium flex items-center gap-2">
-    <Icon icon="mdi:email-multiple" class="w-4 h-4" />
-    {$_('settingsAccounts.emailAccounts')}
-  </h3>
-
   {#if accountStore.loading}
     <div class="flex items-center justify-center py-4">
       <Icon icon="mdi:loading" class="w-5 h-5 animate-spin text-muted-foreground" />

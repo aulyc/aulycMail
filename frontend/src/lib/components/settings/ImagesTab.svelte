@@ -3,7 +3,7 @@
   import Icon from '@iconify/svelte'
   import { Button } from '$lib/components/ui/button'
   import { Label } from '$lib/components/ui/label'
-  import Switch from '$lib/components/ui/switch/Switch.svelte'
+  import Checkbox from '$lib/components/ui/checkbox/Checkbox.svelte'
   import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
   import { addToast } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
@@ -90,7 +90,7 @@
             {$_('settingsGeneral.alwaysLoadImagesHelp')}
           </p>
         </div>
-        <Switch
+        <Checkbox
           id="always-load-images"
           bind:checked={alwaysLoadImages}
           onCheckedChange={handleAlwaysLoadImagesChange}

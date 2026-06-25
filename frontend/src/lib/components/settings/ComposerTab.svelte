@@ -137,16 +137,7 @@
     </p>
   </div>
 
-  <!-- Divider -->
-  <div class="border-t border-border"></div>
-
-  <!-- Read Receipts Section -->
   <div class="space-y-4">
-    <h3 class="text-sm font-medium flex items-center gap-2">
-      <Icon icon="mdi:email-check-outline" class="w-4 h-4" />
-      {$_('settingsGeneral.readReceipts')}
-    </h3>
-
     <div class="space-y-2">
       <Label>{$_('settingsGeneral.readReceiptPolicy')}</Label>
       <Select.Root value={readReceiptResponsePolicy} onValueChange={handlePolicyChange}>

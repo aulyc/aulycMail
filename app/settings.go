@@ -42,10 +42,11 @@ func (a *App) SetReadReceiptResponsePolicy(policy string) error {
 	return a.settingsStore.SetReadReceiptResponsePolicy(policy)
 }
 
-// GetMarkAsReadDelay returns the delay before marking messages as read (in milliseconds)
-// Returns: -1 = manual only, 0 = immediate, >0 = delay in ms
+// GetMarkAsReadDelay returns the delay before marking messages as read.
+// Hardcoded to 1 second — the customization was removed; a message is marked
+// read 1s after it's opened.
 func (a *App) GetMarkAsReadDelay() (int, error) {
-	return a.settingsStore.GetMarkAsReadDelay()
+	return 1000, nil
 }
 
 // SetMarkAsReadDelay sets the delay before marking messages as read (in milliseconds)
