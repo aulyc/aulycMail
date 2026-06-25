@@ -8,7 +8,7 @@
   import { Star, Unstar } from '../../../../wailsjs/go/app/App'
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { toasts } from '$lib/stores/toast'
-  import { getAccentBarUnread, getShowMessageListCircles } from '$lib/stores/settings.svelte'
+  import { getAccentBarUnread } from '$lib/stores/settings.svelte'
 
   interface Props {
     conversation: message.Conversation
@@ -155,30 +155,6 @@
     }
   }
 
-  function getInitials(conv: message.Conversation): string {
-    if (!conv.participants || conv.participants.length === 0) {
-      return '?'
-    }
-    const first = conv.participants[0]
-    const name = first.name || first.email
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
-  function getAvatarColor(conv: message.Conversation): string {
-    // Returns a theme-driven avatar class (.avatar-1 .. .avatar-14, defined in themes.css).
-    const email = conv.participants?.[0]?.email || conv.threadId
-    let hash = 0
-    for (let i = 0; i < email.length; i++) {
-      hash = email.charCodeAt(i) + ((hash << 5) - hash)
-    }
-    return `avatar-${(Math.abs(hash) % 14) + 1}`
-  }
-
   async function handleStarClick(e: MouseEvent) {
     e.stopPropagation()
     const starring = !conversation.isStarred
@@ -289,17 +265,6 @@
         {/if}
       </button>
     </div>
-
-    <!-- Sender circle (colored, with initials) -->
-    {#if getShowMessageListCircles()}
-      <div
-        class="{densityClasses.avatar[density]} rounded-full flex-shrink-0 flex items-center justify-center font-medium {getAvatarColor(
-          conversation
-        )}"
-      >
-        {getInitials(conversation)}
-      </div>
-    {/if}
 
     <!-- Content -->
     <div class="flex-1 min-w-0">

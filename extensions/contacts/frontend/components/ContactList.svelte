@@ -17,7 +17,6 @@
   import { _ } from 'svelte-i18n'
   import ListPane from '$lib/components/kit/ListPane.svelte'
   import ListRow from '$lib/components/kit/ListRow.svelte'
-  import Avatar from '$lib/components/kit/Avatar.svelte'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
   import { contactsView, reloadContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
@@ -256,7 +255,6 @@
   >
     {#snippet row(c: v1.Contact, { selected })}
       <ListRow {selected} onclick={() => activateContact(c.id)}>
-        <Avatar email={primaryEmail(c)} name={c.name} density="standard" />
         <span class="flex flex-col min-w-0 flex-1">
           <span class="font-medium truncate text-foreground">{c.name || primaryEmail(c) || $_('contacts.common.unnamed')}</span>
           {#if primaryEmail(c) && primaryEmail(c) !== c.name}

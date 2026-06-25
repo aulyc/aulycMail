@@ -1,7 +1,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
   import DetailPane from '$lib/components/kit/DetailPane.svelte'
-  import Avatar from '$lib/components/kit/Avatar.svelte'
   import { Button } from '$lib/components/ui/button'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
   import Icon from '@iconify/svelte'
@@ -86,13 +85,6 @@
 >
   {#snippet header()}
     {#if contact}
-      <Avatar
-        email={primaryEmail}
-        name={contact.name}
-        density="large"
-        photoData={contact.photoData}
-        photoMediaType={contact.photoMediaType}
-      />
       <h1 class="m-0 text-xl font-semibold text-foreground flex-1 min-w-0 truncate">
         {contact.name || $_('contacts.common.unnamed')}
       </h1>

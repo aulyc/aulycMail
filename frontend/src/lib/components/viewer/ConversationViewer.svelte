@@ -17,7 +17,7 @@
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { _ } from '$lib/i18n'
   import { isDialogGuardActive } from '$lib/stores/dialogGuard'
-  import { getShowViewerCircles, getDarkMailContent } from '$lib/stores/settings.svelte'
+  import { getDarkMailContent } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
 
   interface Props {
@@ -588,24 +588,6 @@
   function formatDate(dateStr: any): string {
     const date = new Date(dateStr)
     return `${date.toLocaleDateString()} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-  }
-
-  function getInitials(name: string): string {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
-  }
-
-  function getAvatarColor(email: string): string {
-    // Returns a theme-driven avatar class (.avatar-1 .. .avatar-14, defined in themes.css).
-    let hash = 0
-    for (let i = 0; i < email.length; i++) {
-      hash = email.charCodeAt(i) + ((hash << 5) - hash)
-    }
-    return `avatar-${(Math.abs(hash) % 14) + 1}`
   }
 
   // Parse recipient list (JSON array format from backend)
@@ -1381,15 +1363,6 @@
                   role="button"
                   tabindex="0"
                 >
-                  <!-- Sender circle (colored, with initials) -->
-                  {#if getShowViewerCircles()}
-                    <div
-                      class="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-medium {getAvatarColor(msg.fromEmail)}"
-                    >
-                      {getInitials(msg.fromName || msg.fromEmail)}
-                    </div>
-                  {/if}
-
                   <!-- Header Info -->
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">

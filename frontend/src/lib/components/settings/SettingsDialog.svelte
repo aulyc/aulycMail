@@ -297,8 +297,6 @@
               onAutostartChange={(v) => autostart = v}
               onLanguageChange={(v) => language = v}
               bind:accentBarUnread
-              bind:showMessageListCircles
-              bind:showViewerCircles
               bind:darkMailContent
             />
           </Tabs.Content>
