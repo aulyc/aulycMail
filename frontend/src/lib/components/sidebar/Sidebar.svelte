@@ -2,26 +2,22 @@
   import Icon from '@iconify/svelte'
   import { onMount } from 'svelte'
   import AccountSection from './AccountSection.svelte'
-  import UnifiedInboxSection from './UnifiedInboxSection.svelte'
   import AccountDialog from '$lib/components/settings/AccountDialog.svelte'
   import DeleteAccountDialog from '$lib/components/settings/DeleteAccountDialog.svelte'
   import SidebarFooter from '$lib/components/kit/SidebarFooter.svelte'
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
-  import { isAccountExpanded, setAccountExpanded, isUnifiedInboxExpanded, setFolderCollapsed, getUIState, getUIStateVersion, saveUIState } from '$lib/stores/uiState.svelte'
+  import { isAccountExpanded, setAccountExpanded, setFolderCollapsed, getUIState, getUIStateVersion, saveUIState } from '$lib/stores/uiState.svelte'
   import { setFocusedPane } from '$lib/stores/keyboard.svelte'
   import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { account, folder } from '../../../../wailsjs/go/models'
-  // @ts-ignore - wailsjs path
-  import { GetUnifiedInboxUnreadCount } from '../../../../wailsjs/go/app/App'
   import { formatDistanceToNow } from 'date-fns'
   import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
-  import { EventsOn } from '../../../../wailsjs/runtime/runtime'
 
   // Folder item type for flat navigation list
   interface FolderNavItem {
-    type: 'unified' | 'unified-account' | 'account-header' | 'folder'
+    type: 'account-header' | 'folder'
     accountId?: string
     folderId?: string
     folderPath?: string
@@ -106,13 +102,10 @@
 
   interface Props {
     onFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
-    onUnifiedFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
-    onUnifiedInboxSelect?: () => void
     onCompose?: () => void
     onMessagesMoved?: () => void
-    selectedAccountId?: string | null
     selectedFolderId?: string | null
-    selectionSource?: 'unified' | 'account' | null
+    selectionSource?: 'account' | null
     isFocused?: boolean
     isFlashing?: boolean
     showBackButton?: boolean
@@ -121,11 +114,8 @@
 
   let {
     onFolderSelect,
-    onUnifiedFolderSelect,
-    onUnifiedInboxSelect,
     onCompose,
     onMessagesMoved,
-    selectedAccountId = null,
     selectedFolderId = null,
     selectionSource = null,
     isFocused: _isFocused = false,
@@ -133,9 +123,6 @@
     showBackButton = false,
     onBack,
   }: Props = $props()
-
-  // Unified inbox state
-  let unifiedUnreadCount = $state(0)
 
   // Dialog state
   let showAccountDialog = $state(false)
@@ -153,61 +140,7 @@
         console.error('Failed to sync on launch:', err)
       }
     })
-
-    loadUnifiedInboxCount()
-
-    // Listen for folder count changes to update unified inbox count
-    const unsubscribe = EventsOn('folders:countsChanged', (_data: Record<string, number>) => {
-      loadUnifiedInboxCount()
-    })
-
-    return () => {
-      unsubscribe()
-    }
   })
-
-  // Load unified inbox unread count
-  async function loadUnifiedInboxCount() {
-    try {
-      const count = await GetUnifiedInboxUnreadCount()
-      unifiedUnreadCount = count
-    } catch (err) {
-      console.error('Failed to load unified inbox count:', err)
-    }
-  }
-
-  // Get accounts with their inbox folders for unified inbox section
-  function getAccountsWithInbox() {
-    return accountStore.accounts.map(acc => {
-      // Find the inbox folder in the folder tree
-      const findInbox = (folders: folder.FolderTree[]): folder.Folder | null => {
-        for (const f of folders) {
-          if (f.folder?.type === 'inbox') {
-            return f.folder
-          }
-          if (f.children) {
-            const found = findInbox(f.children)
-            if (found) return found
-          }
-        }
-        return null
-      }
-      return {
-        account: acc.account,
-        inbox: findInbox(acc.folders || [])
-      }
-    })
-  }
-
-  // Handle unified inbox selection (All Inboxes)
-  function handleUnifiedInboxSelect() {
-    onUnifiedInboxSelect?.()
-  }
-
-  // Handle individual account inbox selection from unified section
-  function handleAccountInboxSelect(accountId: string, folderId: string, folderPath: string) {
-    onUnifiedFolderSelect?.(accountId, folderId, folderPath, 'Inbox', 'inbox')
-  }
 
   // Sync status: { accountName, label, percentage } — accountName + percentage are populated only when a sync is active
   let syncStatus = $derived.by<{ accountName: string | null; label: string; percentage: number | null }>(() => {
@@ -288,47 +221,7 @@
   function buildFolderNavList(): FolderNavItem[] {
     const items: FolderNavItem[] = []
 
-    // Add Unified Inbox section items if more than 1 account
-    if (accountStore.accounts.length > 1) {
-      // 1. Add "All Inboxes"
-      items.push({
-        type: 'unified',
-        folderName: 'Unified Inbox',
-        folderType: 'unified',
-      })
-
-      // 2. Add each account's inbox (under unified section) - only if unified section is expanded
-      if (isUnifiedInboxExpanded()) {
-        for (const accWithFolders of accountStore.accounts) {
-          // Skip if account is not fully loaded yet (can happen during reauth)
-          if (!accWithFolders.account) continue
-
-          const findInbox = (trees: folder.FolderTree[]): folder.Folder | null => {
-            for (const tree of trees) {
-              if (tree.folder?.type === 'inbox') return tree.folder
-              if (tree.children) {
-                const found = findInbox(tree.children)
-                if (found) return found
-              }
-            }
-            return null
-          }
-          const inbox = findInbox(accWithFolders.folders || [])
-          if (inbox) {
-            items.push({
-              type: 'unified-account',
-              accountId: accWithFolders.account.id,
-              folderId: inbox.id,
-              folderPath: inbox.path,
-              folderName: inbox.name,
-              folderType: 'inbox',
-            })
-          }
-        }
-      }
-    }
-
-    // 3. Add account headers and their folders
+    // Add account headers and their folders
     for (const accWithFolders of accountStore.accounts) {
       // Skip if account is not fully loaded yet (can happen during reauth)
       if (!accWithFolders.account) continue
@@ -378,23 +271,10 @@
       )
     }
 
-    // Check if Unified Inbox is selected (All Inboxes)
-    if (selectedAccountId === 'unified') {
-      return navList.findIndex(item => item.type === 'unified')
-    }
-
-    // Check selectionSource to find the correct item
-    if (selectionSource === 'unified') {
-      // Looking for unified-account item
-      return navList.findIndex(item =>
-        item.type === 'unified-account' && item.folderId === selectedFolderId
-      )
-    } else {
-      // Looking for regular folder item
-      return navList.findIndex(item =>
-        item.type === 'folder' && item.folderId === selectedFolderId
-      )
-    }
+    // Find the selected folder item
+    return navList.findIndex(item =>
+      item.type === 'folder' && item.folderId === selectedFolderId
+    )
   }
 
   // Navigate to previous folder (exposed for keyboard navigation)
@@ -425,11 +305,7 @@
 
     // Build selector based on item type
     let selector: string | null = null
-    if (item.type === 'unified') {
-      selector = '[data-sidebar-item="unified"]'
-    } else if (item.type === 'unified-account' && item.folderId) {
-      selector = `[data-sidebar-item="unified-account"][data-folder-id="${item.folderId}"]`
-    } else if (item.type === 'account-header' && item.accountId) {
+    if (item.type === 'account-header' && item.accountId) {
       selector = `[data-sidebar-item="account-header"][data-account-id="${item.accountId}"]`
     } else if (item.type === 'folder' && item.folderId) {
       selector = `[data-sidebar-item="folder"][data-folder-id="${item.folderId}"]`
@@ -451,12 +327,7 @@
       focusedAccountId = null
     }
 
-    if (item.type === 'unified') {
-      onUnifiedInboxSelect?.()
-    } else if (item.type === 'unified-account' && item.accountId && item.folderId && item.folderPath) {
-      // Select from unified section - uses onUnifiedFolderSelect
-      onUnifiedFolderSelect?.(item.accountId, item.folderId, item.folderPath, item.folderName, item.folderType || 'inbox')
-    } else if (item.type === 'account-header' && item.accountId) {
+    if (item.type === 'account-header' && item.accountId) {
       // Focus on account header (Enter/Space will toggle expand)
       focusedAccountId = item.accountId
     } else if (item.type === 'folder' && item.accountId && item.folderId && item.folderPath) {
@@ -559,20 +430,6 @@
         </Button>
       </div>
     {:else}
-      <!-- Unified Inbox Section (only show if more than 1 account) -->
-      {#if accountStore.accounts.length > 1}
-        <UnifiedInboxSection
-          accounts={getAccountsWithInbox()}
-          {unifiedUnreadCount}
-          {selectedAccountId}
-          {selectedFolderId}
-          {selectionSource}
-          onSelectUnified={handleUnifiedInboxSelect}
-          onSelectAccountInbox={handleAccountInboxSelect}
-        />
-        <div class="border-b border-border mx-3 my-1"></div>
-      {/if}
-
       {#each accountStore.accounts as accWithFolders (accWithFolders.account.id)}
         <AccountSection
           account={accWithFolders.account}

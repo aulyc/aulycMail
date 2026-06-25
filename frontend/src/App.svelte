@@ -66,8 +66,8 @@
   let selectedFolderId = $state<string | null>(null)
   let selectedFolderName = $state('Inbox')
   let selectedFolderType = $state<string | null>(null)
-  // Track where the selection came from: 'unified' for unified section, 'account' for account tree
-  let selectionSource = $state<'unified' | 'account' | null>(null)
+  // Track where the selection came from: 'account' for account tree
+  let selectionSource = $state<'account' | null>(null)
 
   // Selected conversation state
   let selectedThreadId = $state<string | null>(null)
@@ -244,12 +244,12 @@
       // state below would update but stay hidden behind the extension pane.
       setActiveExtension('mail')
 
-      // Navigate to the folder (use 'unified' source to highlight under Unified Inbox)
+      // Navigate to the folder in the account tree
       selectedAccountId = data.accountId
       selectedFolderId = data.folderId
       selectedFolderName = folderInfo?.name || 'Inbox'
       selectedFolderType = folderInfo?.type || 'inbox'
-      selectionSource = 'unified'
+      selectionSource = 'account'
 
       // Select the conversation
       selectedThreadId = data.threadId
@@ -359,11 +359,10 @@
     sidebarWidth = uiState.sidebarWidth
     listWidth = uiState.listWidth
 
-    // Restore folder selection if valid
+    // Restore folder selection if valid. A legacy 'unified' selection no longer
+    // resolves to any account, so it falls through and nothing is restored.
     if (uiState.selectedAccountId && uiState.selectedFolderId) {
-      // Validate account still exists (unless unified inbox)
-      const isUnified = uiState.selectedAccountId === 'unified'
-      const accountExists = isUnified || accountStore.accounts.some(
+      const accountExists = accountStore.accounts.some(
         a => a.account.id === uiState.selectedAccountId
       )
 
@@ -464,60 +463,6 @@
       selectedFolderId: folderId,
       selectedFolderName: folderName,
       selectedFolderType: folderType,
-      selectedThreadId: null,
-      selectedConversationAccountId: null,
-      selectedConversationFolderId: null,
-    })
-  }
-
-  // Handle folder selection from unified inbox section
-  function handleUnifiedFolderSelect(
-    accountId: string,
-    folderId: string,
-    folderPath: string,
-    folderName: string,
-    folderType: string
-  ) {
-    selectedAccountId = accountId
-    selectedFolderId = folderId
-    selectedFolderName = folderName
-    selectedFolderType = folderType
-    selectionSource = 'unified'
-    selectedThreadId = null
-    selectedConversationFolderId = null
-    selectedConversationAccountId = null
-    hideSidebar()
-
-    // Persist state
-    saveUIState({
-      selectedAccountId: accountId,
-      selectedFolderId: folderId,
-      selectedFolderName: folderName,
-      selectedFolderType: folderType,
-      selectedThreadId: null,
-      selectedConversationAccountId: null,
-      selectedConversationFolderId: null,
-    })
-  }
-
-  // Handle unified inbox selection from sidebar (All Inboxes)
-  function handleUnifiedInboxSelect() {
-    selectedAccountId = 'unified'
-    selectedFolderId = 'inbox'
-    selectedFolderName = 'All Inboxes'
-    selectedFolderType = 'inbox'
-    selectionSource = 'unified'
-    selectedThreadId = null
-    selectedConversationFolderId = null
-    selectedConversationAccountId = null
-    hideSidebar()
-
-    // Persist state
-    saveUIState({
-      selectedAccountId: 'unified',
-      selectedFolderId: 'inbox',
-      selectedFolderName: 'All Inboxes',
-      selectedFolderType: 'inbox',
       selectedThreadId: null,
       selectedConversationAccountId: null,
       selectedConversationFolderId: null,
@@ -985,8 +930,7 @@
       if (leftAltHeld || focusedPane === 'sidebar') {
         if (!selectedFolderId) return
         const folderEl = document.querySelector(
-          `[data-sidebar-item="folder"][data-folder-id="${selectedFolderId}"], ` +
-          `[data-sidebar-item="unified-account"][data-folder-id="${selectedFolderId}"]`
+          `[data-sidebar-item="folder"][data-folder-id="${selectedFolderId}"]`
         ) as HTMLElement | null
         if (!folderEl) return
         const rect = folderEl.getBoundingClientRect()
@@ -1417,11 +1361,8 @@
       <Sidebar
         bind:this={sidebarRef}
         onFolderSelect={handleFolderSelect}
-        onUnifiedFolderSelect={handleUnifiedFolderSelect}
         onCompose={handleCompose}
-        onUnifiedInboxSelect={handleUnifiedInboxSelect}
         onMessagesMoved={() => messageListRef?.handleActionComplete(false)}
-        selectedAccountId={selectedAccountId}
         selectedFolderId={selectedFolderId}
         selectionSource={selectionSource}
         isFocused={getFocusedPane() === 'sidebar'}
