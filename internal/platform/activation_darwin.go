@@ -22,13 +22,23 @@ var activationHandler func()
 
 //export goAppActivated
 func goAppActivated() {
+	dispatchActivation()
+}
+
+//export goAppReopen
+func goAppReopen() {
+	dispatchActivation()
+}
+
+// dispatchActivation invokes the activation handler off the main thread. The C
+// callbacks run on the macOS main thread, and the handler calls Wails runtime
+// functions that dispatch_sync to the main thread, which would deadlock if
+// invoked directly. Hand off to a goroutine (same pattern as the notification
+// click callback).
+func dispatchActivation() {
 	if activationHandler == nil {
 		return
 	}
-	// The C callback runs on the macOS main thread; the handler calls Wails
-	// runtime functions that dispatch_sync to the main thread, which would
-	// deadlock if invoked directly. Hand off to a goroutine (same pattern as
-	// the notification click callback).
 	go activationHandler()
 }
 

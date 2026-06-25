@@ -4,6 +4,41 @@
 
 // Implemented in Go (activation_darwin.go), exported via cgo.
 extern void goAppActivated(void);
+extern void goAppReopen(void);
+
+// --- Dock-icon reopen ------------------------------------------------------
+//
+// didBecomeActive only fires on an inactive→active transition, so it misses
+// the case where the app is ALREADY frontmost but its window is hidden
+// (close-to-background can leave the app active). The canonical "Dock icon
+// clicked" hook is the delegate's
+// -applicationShouldHandleReopen:hasVisibleWindows:, which fires on every
+// Dock click regardless of active state. We install it on Wails' delegate
+// (replacing or adding) so a Dock click always brings the window back.
+
+static BOOL (*gOrigHandleReopen)(id, SEL, NSApplication *, BOOL) = NULL;
+
+static BOOL aulycHandleReopen(id self, SEL _cmd, NSApplication *app, BOOL hasVisibleWindows) {
+    goAppReopen();
+    if (gOrigHandleReopen) {
+        return gOrigHandleReopen(self, _cmd, app, hasVisibleWindows);
+    }
+    return YES;
+}
+
+static void aulycInstallReopenHook(id delegate) {
+    if (delegate == nil || gOrigHandleReopen != NULL) {
+        return;
+    }
+    Class cls = [delegate class];
+    SEL sel = @selector(applicationShouldHandleReopen:hasVisibleWindows:);
+    // Type encoding: BOOL return, self(id), _cmd(SEL), NSApplication*, BOOL.
+    char types[8];
+    snprintf(types, sizeof(types), "%s%s%s%s%s",
+             @encode(BOOL), @encode(id), @encode(SEL), @encode(NSApplication *), @encode(BOOL));
+    IMP prev = class_replaceMethod(cls, sel, (IMP)aulycHandleReopen, types);
+    gOrigHandleReopen = (BOOL (*)(id, SEL, NSApplication *, BOOL))prev;
+}
 
 // --- Real-quit detection ---------------------------------------------------
 //
@@ -55,19 +90,20 @@ void installTerminateHook(void) {
     // including the Dock "Quit" Apple Event). Done on the main queue so Wails'
     // delegate is guaranteed to be installed by the time we read it.
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (gOrigShouldTerminate != NULL) {
-            return;
-        }
         id delegate = [NSApp delegate];
         if (delegate == nil) {
             return;
         }
-        Method sm = class_getInstanceMethod([delegate class], @selector(applicationShouldTerminate:));
-        if (sm == NULL) {
-            return;
+        // Dock-icon reopen → always re-show the window.
+        aulycInstallReopenHook(delegate);
+        // Real-quit detection via applicationShouldTerminate:.
+        if (gOrigShouldTerminate == NULL) {
+            Method sm = class_getInstanceMethod([delegate class], @selector(applicationShouldTerminate:));
+            if (sm != NULL) {
+                gOrigShouldTerminate = (NSApplicationTerminateReply (*)(id, SEL, NSApplication *))method_getImplementation(sm);
+                method_setImplementation(sm, (IMP)aulycSwizzledShouldTerminate);
+            }
         }
-        gOrigShouldTerminate = (NSApplicationTerminateReply (*)(id, SEL, NSApplication *))method_getImplementation(sm);
-        method_setImplementation(sm, (IMP)aulycSwizzledShouldTerminate);
     });
 }
 
