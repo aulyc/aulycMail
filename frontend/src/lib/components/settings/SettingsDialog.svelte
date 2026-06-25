@@ -273,14 +273,11 @@
             <GeneralTab
               bind:messageListDensity
               bind:themeMode
-              bind:nativeTitleBar
-              bind:showTitleBar
               bind:runBackground
               bind:autostart
               bind:language
               onDensityChange={(v) => messageListDensity = v}
               onThemeChange={(v) => themeMode = v}
-              onTitleBarChange={(ntb, stb) => { nativeTitleBar = ntb; showTitleBar = stb }}
               onRunBackgroundChange={(v) => { runBackground = v }}
               onAutostartChange={(v) => autostart = v}
               onLanguageChange={(v) => language = v}

@@ -55,7 +55,8 @@ export function getThemeMode(): ThemeMode {
 }
 
 export function getShowTitleBar(): boolean {
-  return showTitleBar
+  // Title bar is hardcoded to OS-native — the custom title bar is never shown.
+  return false
 }
 
 export function getRunBackground(): boolean {
@@ -87,7 +88,8 @@ export function getComposerFormat(): ComposerFormat {
 }
 
 export function getNativeTitleBar(): boolean {
-  return nativeTitleBar
+  // Title bar is hardcoded to OS-native.
+  return true
 }
 
 export function getAlwaysLoadImages(): boolean {

@@ -12,7 +12,6 @@ import (
 
 	"github.com/aulyc/aulycmail/app"
 	"github.com/aulyc/aulycmail/internal/platform"
-	"github.com/aulyc/aulycmail/internal/settings"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -95,11 +94,8 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 	}
 	defer lock.Unlock()
 
-	// Read native title bar setting before Wails init (Frameless is init-time only)
-	nativeTitleBar := false
-	if paths, err := platform.GetPaths(); err == nil {
-		nativeTitleBar = settings.ReadNativeTitleBar(paths.DatabasePath())
-	}
+	// Title bar is hardcoded to the OS-native chrome — Frameless off.
+	nativeTitleBar := true
 
 	// Create an instance of the app structure
 	application := app.NewApp(DebugMode, *dbusNotify)
@@ -203,11 +199,8 @@ func runComposerMode() {
 		title = "Edit Draft"
 	}
 
-	// Read native title bar setting before Wails init (Frameless is init-time only)
-	composerNativeTitleBar := false
-	if paths, err := platform.GetPaths(); err == nil {
-		composerNativeTitleBar = settings.ReadNativeTitleBar(paths.DatabasePath())
-	}
+	// Title bar is hardcoded to the OS-native chrome — Frameless off.
+	composerNativeTitleBar := true
 
 	// Create a custom asset handler that serves composer.html instead of index.html
 	composerAssetHandler := &composerAssetHandler{assets: assets}

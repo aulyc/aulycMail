@@ -9,14 +9,11 @@
   interface Props {
     messageListDensity: string
     themeMode: string
-    nativeTitleBar: boolean
-    showTitleBar: boolean
     runBackground: boolean
     autostart: boolean
     language: string
     onDensityChange: (value: string) => void
     onThemeChange: (value: string) => void
-    onTitleBarChange: (nativeTitleBar: boolean, showTitleBar: boolean) => void
     onRunBackgroundChange: (value: boolean) => void
     onAutostartChange: (value: boolean) => void
     onLanguageChange: (value: string) => void
@@ -27,14 +24,11 @@
   let {
     messageListDensity = $bindable(),
     themeMode = $bindable(),
-    nativeTitleBar = $bindable(),
-    showTitleBar = $bindable(),
     runBackground = $bindable(),
     autostart = $bindable(),
     language = $bindable(),
     onDensityChange,
     onThemeChange,
-    onTitleBarChange,
     onRunBackgroundChange,
     onAutostartChange,
     onLanguageChange,
@@ -49,17 +43,6 @@
     { value: 'standard', label: $_('settingsGeneral.densityStandard') },
     { value: 'large', label: $_('settingsGeneral.densityLarge') },
   ])
-
-  // Title bar options
-  const titleBarOptions = $derived([
-    { value: 'aulycmail', label: $_('settingsGeneral.titleBaraulycmail'), description: $_('settingsGeneral.titleBaraulycmailDesc') },
-    { value: 'native', label: $_('settingsGeneral.titleBarNative'), description: $_('settingsGeneral.titleBarNativeDesc') },
-    { value: 'disable', label: $_('settingsGeneral.titleBarDisable'), description: $_('settingsGeneral.titleBarDisableDesc') },
-  ])
-
-  const titleBarValue = $derived(
-    nativeTitleBar ? 'native' : showTitleBar ? 'aulycmail' : 'disable'
-  )
 
   // Theme mode options
   const themeModeOptions = $derived([
@@ -91,27 +74,6 @@
     onThemeChange?.(value)
   }
 
-  function handleTitleBarChange(value: string) {
-    switch (value) {
-      case 'aulycmail':
-        nativeTitleBar = false
-        showTitleBar = true
-        break
-      case 'native':
-        nativeTitleBar = true
-        showTitleBar = false
-        break
-      case 'disable':
-        nativeTitleBar = false
-        showTitleBar = false
-        break
-    }
-    onTitleBarChange?.(nativeTitleBar, showTitleBar)
-  }
-
-  function getTitleBarLabel(value: string): string {
-    return titleBarOptions.find(opt => opt.value === value)?.label || value
-  }
 
   function handleRunBackgroundChange(value: boolean) {
     runBackground = value
@@ -131,24 +93,6 @@
 </script>
 
 <div class="space-y-4">
-  <!-- Title bar -->
-  <div class="flex items-center justify-between gap-4">
-    <div class="min-w-0">
-      <Label>{$_('settingsGeneral.titleBar')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.titleBarHelp')}</p>
-    </div>
-    <Select.Root value={titleBarValue} onValueChange={handleTitleBarChange}>
-      <Select.Trigger class="w-48 shrink-0">
-        <Select.Value>{getTitleBarLabel(titleBarValue)}</Select.Value>
-      </Select.Trigger>
-      <Select.Content>
-        {#each titleBarOptions as opt (opt.value)}
-          <Select.Item value={opt.value} label={opt.label} />
-        {/each}
-      </Select.Content>
-    </Select.Root>
-  </div>
-
   <!-- Language -->
   <div class="flex items-center justify-between gap-4">
     <Label>{$_('settingsGeneral.language')}</Label>
