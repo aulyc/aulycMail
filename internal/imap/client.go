@@ -247,6 +247,24 @@ func (c *Client) Login() error {
 	// Update capabilities after login (may change)
 	c.caps = c.client.Caps()
 
+	// Some servers — notably NetEase (163/126/yeah.net) — require an RFC 2971
+	// ID command identifying the client after login, otherwise they reject
+	// SELECT/FETCH with "Unsafe Login. Please contact kefu@188.com". Sending
+	// ID is harmless on other servers, so issue it whenever the server
+	// advertises the capability. Best-effort: a failure here shouldn't block
+	// an otherwise-successful login (the later SELECT surfaces real problems).
+	if c.caps.Has(imap.CapID) {
+		if _, err := c.client.ID(&imap.IDData{
+			Name:    "aulycmail",
+			Version: "0.3.0",
+			Vendor:  "aulyc",
+		}).Wait(); err != nil {
+			c.log.Warn().Err(err).Msg("IMAP ID command failed (continuing)")
+		} else {
+			c.log.Debug().Msg("Sent IMAP ID command")
+		}
+	}
+
 	c.log.Info().
 		Str("username", c.config.Username).
 		Msg("Logged in successfully")
