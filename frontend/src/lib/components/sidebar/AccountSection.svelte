@@ -99,7 +99,6 @@
         icon={isExpanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
         class="w-4 h-4 text-muted-foreground"
       />
-      <Icon icon="mdi:email-outline" class="w-4 h-4" />
       <span class="truncate flex-1 text-left">{acc.name}</span>
 
       {#if syncing}

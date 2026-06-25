@@ -1,4 +1,5 @@
 import { register, init, waitLocale, locale, _ } from 'svelte-i18n'
+import { loadDateFnsLocale } from './dateFnsLocale'
 
 // Register CORE locale files with lazy loading. Extensions register their own
 // locales via Vite glob auto-discovery in initI18n() — see below.
@@ -61,7 +62,10 @@ export async function initI18n(savedLocale?: string): Promise<void> {
     initialLocale,
   })
 
-  await waitLocale()
+  // Preload the matching date-fns locale so relative times (e.g. the sidebar
+  // "X 前同步" status) render in the active language even when the user never
+  // explicitly saved a language setting (auto-detected case).
+  await Promise.all([waitLocale(), loadDateFnsLocale(initialLocale)])
 }
 
 /**
