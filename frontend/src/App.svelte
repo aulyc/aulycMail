@@ -12,6 +12,7 @@
   import TermsDialog from './lib/components/TermsDialog.svelte'
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
   import ExtensionRail from './lib/components/rail/ExtensionRail.svelte'
+  import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
   import { refreshExtensionRegistry, getRailTabs } from '$lib/stores/extensionRegistry.svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
@@ -143,6 +144,10 @@
 
   // Terms acceptance state
   let showTermsDialog = $state(false)
+
+  // Settings dialog — hosted at app level so the rail's gear opens it from
+  // any view (mail or an extension pane), not just the mail sidebar.
+  let showSettings = $state(false)
 
   // Certificate TOFU state (for background sync cert errors)
   let showCertDialog = $state(false)
@@ -1400,7 +1405,7 @@
 
   <!-- Main Content -->
   <div class="flex flex-1 min-h-0 overflow-hidden relative">
-    <ExtensionRail />
+    <ExtensionRail onOpenSettings={() => showSettings = true} />
 
     {#if getActiveExtension() === 'contacts'}
       <ContactsPane />
@@ -1563,6 +1568,9 @@
 
 <!-- Terms Acceptance Dialog -->
 <TermsDialog bind:open={showTermsDialog} onAccept={handleTermsAccepted} />
+
+<!-- App Settings dialog — opened from the rail's gear (works in every view) -->
+<SettingsDialog bind:open={showSettings} onClose={() => { showSettings = false }} />
 
 
 <!-- Certificate TOFU Dialog (for background sync cert errors) -->

@@ -5,7 +5,6 @@
   import UnifiedInboxSection from './UnifiedInboxSection.svelte'
   import AccountDialog from '$lib/components/settings/AccountDialog.svelte'
   import DeleteAccountDialog from '$lib/components/settings/DeleteAccountDialog.svelte'
-  import SettingsDialog from '$lib/components/settings/SettingsDialog.svelte'
   import SidebarFooter from '$lib/components/kit/SidebarFooter.svelte'
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
@@ -141,7 +140,6 @@
   // Dialog state
   let showAccountDialog = $state(false)
   let showDeleteDialog = $state(false)
-  let showSettingsDialog = $state(false)
   let editingAccount = $state<account.Account | null>(null)
   let deletingAccount = $state<account.Account | null>(null)
 
@@ -649,15 +647,6 @@
         </div>
       </button>
     {/snippet}
-    {#snippet trailing()}
-      <button
-        class="p-1 hover:text-foreground hover:bg-muted rounded transition-colors relative"
-        onclick={() => showSettingsDialog = true}
-        title={$_('sidebar.settings')}
-      >
-        <Icon icon="mdi:cog" class="w-4 h-4" />
-      </button>
-    {/snippet}
   </SidebarFooter>
 </div>
 
@@ -679,15 +668,6 @@
   onClose={() => {
     showDeleteDialog = false
     deletingAccount = null
-    setFocusedPane('messageList')
-  }}
-/>
-
-<!-- Settings Dialog -->
-<SettingsDialog
-  bind:open={showSettingsDialog}
-  onClose={() => {
-    showSettingsDialog = false
     setFocusedPane('messageList')
   }}
 />

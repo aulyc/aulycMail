@@ -21,9 +21,10 @@
     /** Left-side content: status icon + label, or any consumer-defined
      *  affordance. 1 or 2 lines — the wrapper's min-h handles either. */
     leading: Snippet
-    /** Right-side content: cog button, sync action, etc. Wrapped in a
-     *  shrink-0 row so it never gets crowded out by long leading labels. */
-    trailing: Snippet
+    /** Optional right-side content: cog button, sync action, etc. Wrapped in
+     *  a shrink-0 row so it never gets crowded out by long leading labels.
+     *  Omitted by the mail sidebar now that Settings lives on the rail. */
+    trailing?: Snippet
     /** Optional absolutely-positioned overlay (top-0, h-1 progress bar
      *  for mail's sync indicator). Renders before the row content so it
      *  sits visually behind. */
@@ -43,7 +44,9 @@
   <div class="flex items-center gap-2 min-w-0 flex-1">
     {@render leading()}
   </div>
-  <div class="flex items-center gap-1 shrink-0">
-    {@render trailing()}
-  </div>
+  {#if trailing}
+    <div class="flex items-center gap-1 shrink-0">
+      {@render trailing()}
+    </div>
+  {/if}
 </div>
