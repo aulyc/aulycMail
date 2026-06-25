@@ -313,24 +313,6 @@ export namespace app {
 	        this.license = source["license"];
 	    }
 	}
-	export class AuthContextInfo {
-	    kind: string;
-	    identifier: string;
-	    email: string;
-	    label: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new AuthContextInfo(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.kind = source["kind"];
-	        this.identifier = source["identifier"];
-	        this.email = source["email"];
-	        this.label = source["label"];
-	    }
-	}
 	export class ComposeMode {
 	    accountId: string;
 	    mode: string;
@@ -403,26 +385,6 @@ export namespace app {
 		    return a;
 		}
 	}
-	export class DecryptedAttachment {
-	    filename: string;
-	    contentType: string;
-	    size: number;
-	    isInline: boolean;
-	    contentId: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new DecryptedAttachment(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.filename = source["filename"];
-	        this.contentType = source["contentType"];
-	        this.size = source["size"];
-	        this.isInline = source["isInline"];
-	        this.contentId = source["contentId"];
-	    }
-	}
 	export class DraftResult {
 	    draft?: draft.Draft;
 	
@@ -477,28 +439,6 @@ export namespace app {
 	        this.minaulycmailVersion = source["minaulycmailVersion"];
 	        this.capabilities = source["capabilities"];
 	        this.enabled = source["enabled"];
-	    }
-	}
-	export class LinkedAccountInfo {
-	    accountId: string;
-	    email: string;
-	    name: string;
-	    provider: string;
-	    isLinked: boolean;
-	    hasContactScope: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new LinkedAccountInfo(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.accountId = source["accountId"];
-	        this.email = source["email"];
-	        this.name = source["name"];
-	        this.provider = source["provider"];
-	        this.isLinked = source["isLinked"];
-	        this.hasContactScope = source["hasContactScope"];
 	    }
 	}
 	export class MailtoData {
@@ -648,94 +588,6 @@ export namespace app {
 		    return a;
 		}
 	}
-	export class PGPViewResult {
-	    bodyHtml: string;
-	    bodyText: string;
-	    pgpStatus: string;
-	    pgpSignerEmail: string;
-	    pgpSignerKeyId: string;
-	    pgpEncrypted: boolean;
-	    inlineAttachments?: Record<string, string>;
-	    attachments?: DecryptedAttachment[];
-	
-	    static createFrom(source: any = {}) {
-	        return new PGPViewResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.bodyHtml = source["bodyHtml"];
-	        this.bodyText = source["bodyText"];
-	        this.pgpStatus = source["pgpStatus"];
-	        this.pgpSignerEmail = source["pgpSignerEmail"];
-	        this.pgpSignerKeyId = source["pgpSignerKeyId"];
-	        this.pgpEncrypted = source["pgpEncrypted"];
-	        this.inlineAttachments = source["inlineAttachments"];
-	        this.attachments = this.convertValues(source["attachments"], DecryptedAttachment);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SMIMEViewResult {
-	    bodyHtml: string;
-	    bodyText: string;
-	    smimeStatus: string;
-	    smimeSignerEmail: string;
-	    smimeSignerSubject: string;
-	    smimeEncrypted: boolean;
-	    inlineAttachments?: Record<string, string>;
-	    attachments?: DecryptedAttachment[];
-	
-	    static createFrom(source: any = {}) {
-	        return new SMIMEViewResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.bodyHtml = source["bodyHtml"];
-	        this.bodyText = source["bodyText"];
-	        this.smimeStatus = source["smimeStatus"];
-	        this.smimeSignerEmail = source["smimeSignerEmail"];
-	        this.smimeSignerSubject = source["smimeSignerSubject"];
-	        this.smimeEncrypted = source["smimeEncrypted"];
-	        this.inlineAttachments = source["inlineAttachments"];
-	        this.attachments = this.convertValues(source["attachments"], DecryptedAttachment);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 
 }
 
@@ -795,196 +647,6 @@ export namespace backend {
 	        this.data = source["data"];
 	        this.mediaType = source["mediaType"];
 	    }
-	}
-
-}
-
-export namespace carddav {
-	
-	export class Addressbook {
-	    id: string;
-	    source_id: string;
-	    path: string;
-	    name: string;
-	    enabled: boolean;
-	    sync_token?: string;
-	    // Go type: time
-	    last_synced_at?: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Addressbook(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.source_id = source["source_id"];
-	        this.path = source["path"];
-	        this.name = source["name"];
-	        this.enabled = source["enabled"];
-	        this.sync_token = source["sync_token"];
-	        this.last_synced_at = this.convertValues(source["last_synced_at"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class AddressbookInfo {
-	    path: string;
-	    name: string;
-	    description?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new AddressbookInfo(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.path = source["path"];
-	        this.name = source["name"];
-	        this.description = source["description"];
-	    }
-	}
-	export class Source {
-	    id: string;
-	    name: string;
-	    type: string;
-	    url: string;
-	    username: string;
-	    account_id?: string;
-	    enabled: boolean;
-	    writable: boolean;
-	    sync_interval: number;
-	    // Go type: time
-	    last_synced_at?: any;
-	    last_error?: string;
-	    // Go type: time
-	    last_error_at?: any;
-	    // Go type: time
-	    created_at: any;
-	    addressbooks?: Addressbook[];
-	
-	    static createFrom(source: any = {}) {
-	        return new Source(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.type = source["type"];
-	        this.url = source["url"];
-	        this.username = source["username"];
-	        this.account_id = source["account_id"];
-	        this.enabled = source["enabled"];
-	        this.writable = source["writable"];
-	        this.sync_interval = source["sync_interval"];
-	        this.last_synced_at = this.convertValues(source["last_synced_at"], null);
-	        this.last_error = source["last_error"];
-	        this.last_error_at = this.convertValues(source["last_error_at"], null);
-	        this.created_at = this.convertValues(source["created_at"], null);
-	        this.addressbooks = this.convertValues(source["addressbooks"], Addressbook);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SourceConfig {
-	    name: string;
-	    type: string;
-	    url: string;
-	    username: string;
-	    password: string;
-	    account_id?: string;
-	    enabled: boolean;
-	    writable: boolean;
-	    sync_interval: number;
-	    enabled_addressbooks?: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new SourceConfig(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.type = source["type"];
-	        this.url = source["url"];
-	        this.username = source["username"];
-	        this.password = source["password"];
-	        this.account_id = source["account_id"];
-	        this.enabled = source["enabled"];
-	        this.writable = source["writable"];
-	        this.sync_interval = source["sync_interval"];
-	        this.enabled_addressbooks = source["enabled_addressbooks"];
-	    }
-	}
-	export class SourceError {
-	    source_id: string;
-	    source_name: string;
-	    error: string;
-	    // Go type: time
-	    error_at: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new SourceError(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.source_id = source["source_id"];
-	        this.source_name = source["source_name"];
-	        this.error = source["error"];
-	        this.error_at = this.convertValues(source["error_at"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 
 }
@@ -1086,10 +748,6 @@ export namespace draft {
 	    replyType?: string;
 	    referencesList?: string;
 	    identityId?: string;
-	    signMessage?: boolean;
-	    encrypted?: boolean;
-	    pgpSignMessage?: boolean;
-	    pgpEncrypted?: boolean;
 	    syncStatus: string;
 	    imapUid?: number;
 	    folderId?: string;
@@ -1119,10 +777,6 @@ export namespace draft {
 	        this.replyType = source["replyType"];
 	        this.referencesList = source["referencesList"];
 	        this.identityId = source["identityId"];
-	        this.signMessage = source["signMessage"];
-	        this.encrypted = source["encrypted"];
-	        this.pgpSignMessage = source["pgpSignMessage"];
-	        this.pgpEncrypted = source["pgpEncrypted"];
 	        this.syncStatus = source["syncStatus"];
 	        this.imapUid = source["imapUid"];
 	        this.folderId = source["folderId"];
@@ -1336,16 +990,6 @@ export namespace message {
 	    bodyFetched: boolean;
 	    readReceiptTo?: string;
 	    readReceiptHandled: boolean;
-	    smimeStatus?: string;
-	    smimeSignerEmail?: string;
-	    smimeSignerSubject?: string;
-	    smimeEncrypted?: boolean;
-	    hasSMIME?: boolean;
-	    pgpStatus?: string;
-	    pgpSignerEmail?: string;
-	    pgpSignerKeyId?: string;
-	    pgpEncrypted?: boolean;
-	    hasPGP?: boolean;
 	    // Go type: time
 	    receivedAt: any;
 	
@@ -1385,16 +1029,6 @@ export namespace message {
 	        this.bodyFetched = source["bodyFetched"];
 	        this.readReceiptTo = source["readReceiptTo"];
 	        this.readReceiptHandled = source["readReceiptHandled"];
-	        this.smimeStatus = source["smimeStatus"];
-	        this.smimeSignerEmail = source["smimeSignerEmail"];
-	        this.smimeSignerSubject = source["smimeSignerSubject"];
-	        this.smimeEncrypted = source["smimeEncrypted"];
-	        this.hasSMIME = source["hasSMIME"];
-	        this.pgpStatus = source["pgpStatus"];
-	        this.pgpSignerEmail = source["pgpSignerEmail"];
-	        this.pgpSignerKeyId = source["pgpSignerKeyId"];
-	        this.pgpEncrypted = source["pgpEncrypted"];
-	        this.hasPGP = source["hasPGP"];
 	        this.receivedAt = this.convertValues(source["receivedAt"], null);
 	    }
 	
@@ -1625,177 +1259,6 @@ export namespace message {
 
 }
 
-export namespace pgp {
-	
-	export class Key {
-	    id: string;
-	    accountId: string;
-	    email: string;
-	    keyId: string;
-	    fingerprint: string;
-	    userId: string;
-	    algorithm: string;
-	    keySize: number;
-	    // Go type: time
-	    createdAtKey?: any;
-	    // Go type: time
-	    expiresAtKey?: any;
-	    isDefault: boolean;
-	    isExpired: boolean;
-	    hasPrivate: boolean;
-	    // Go type: time
-	    createdAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Key(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.accountId = source["accountId"];
-	        this.email = source["email"];
-	        this.keyId = source["keyId"];
-	        this.fingerprint = source["fingerprint"];
-	        this.userId = source["userId"];
-	        this.algorithm = source["algorithm"];
-	        this.keySize = source["keySize"];
-	        this.createdAtKey = this.convertValues(source["createdAtKey"], null);
-	        this.expiresAtKey = this.convertValues(source["expiresAtKey"], null);
-	        this.isDefault = source["isDefault"];
-	        this.isExpired = source["isExpired"];
-	        this.hasPrivate = source["hasPrivate"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ImportResult {
-	    key?: Key;
-	    hasPrivate: boolean;
-	    subkeyCount: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new ImportResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.key = this.convertValues(source["key"], Key);
-	        this.hasPrivate = source["hasPrivate"];
-	        this.subkeyCount = source["subkeyCount"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class KeyServer {
-	    id: number;
-	    url: string;
-	    orderIndex: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new KeyServer(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.url = source["url"];
-	        this.orderIndex = source["orderIndex"];
-	    }
-	}
-	export class SenderKey {
-	    id: string;
-	    email: string;
-	    keyId: string;
-	    fingerprint: string;
-	    userId: string;
-	    algorithm: string;
-	    keySize: number;
-	    // Go type: time
-	    createdAtKey?: any;
-	    // Go type: time
-	    expiresAtKey?: any;
-	    source: string;
-	    // Go type: time
-	    collectedAt: any;
-	    // Go type: time
-	    lastSeenAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new SenderKey(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.email = source["email"];
-	        this.keyId = source["keyId"];
-	        this.fingerprint = source["fingerprint"];
-	        this.userId = source["userId"];
-	        this.algorithm = source["algorithm"];
-	        this.keySize = source["keySize"];
-	        this.createdAtKey = this.convertValues(source["createdAtKey"], null);
-	        this.expiresAtKey = this.convertValues(source["expiresAtKey"], null);
-	        this.source = source["source"];
-	        this.collectedAt = this.convertValues(source["collectedAt"], null);
-	        this.lastSeenAt = this.convertValues(source["lastSeenAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
 export namespace settings {
 	
 	export class AllowlistEntry {
@@ -1815,152 +1278,6 @@ export namespace settings {
 	        this.value = source["value"];
 	        this.createdAt = source["createdAt"];
 	    }
-	}
-
-}
-
-export namespace smime {
-	
-	export class Certificate {
-	    id: string;
-	    accountId: string;
-	    email: string;
-	    subject: string;
-	    issuer: string;
-	    serialNumber: string;
-	    fingerprint: string;
-	    // Go type: time
-	    notBefore: any;
-	    // Go type: time
-	    notAfter: any;
-	    isDefault: boolean;
-	    isExpired: boolean;
-	    isSelfSigned: boolean;
-	    // Go type: time
-	    createdAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Certificate(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.accountId = source["accountId"];
-	        this.email = source["email"];
-	        this.subject = source["subject"];
-	        this.issuer = source["issuer"];
-	        this.serialNumber = source["serialNumber"];
-	        this.fingerprint = source["fingerprint"];
-	        this.notBefore = this.convertValues(source["notBefore"], null);
-	        this.notAfter = this.convertValues(source["notAfter"], null);
-	        this.isDefault = source["isDefault"];
-	        this.isExpired = source["isExpired"];
-	        this.isSelfSigned = source["isSelfSigned"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ImportResult {
-	    certificate?: Certificate;
-	    chainLength: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new ImportResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.certificate = this.convertValues(source["certificate"], Certificate);
-	        this.chainLength = source["chainLength"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class SenderCert {
-	    id: string;
-	    email: string;
-	    subject: string;
-	    issuer: string;
-	    serialNumber: string;
-	    fingerprint: string;
-	    // Go type: time
-	    notBefore: any;
-	    // Go type: time
-	    notAfter: any;
-	    // Go type: time
-	    collectedAt: any;
-	    // Go type: time
-	    lastSeenAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new SenderCert(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.email = source["email"];
-	        this.subject = source["subject"];
-	        this.issuer = source["issuer"];
-	        this.serialNumber = source["serialNumber"];
-	        this.fingerprint = source["fingerprint"];
-	        this.notBefore = this.convertValues(source["notBefore"], null);
-	        this.notAfter = this.convertValues(source["notAfter"], null);
-	        this.collectedAt = this.convertValues(source["collectedAt"], null);
-	        this.lastSeenAt = this.convertValues(source["lastSeenAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 
 }
@@ -2016,10 +1333,6 @@ export namespace smtp {
 	    in_reply_to?: string;
 	    references?: string[];
 	    request_read_receipt: boolean;
-	    sign_message: boolean;
-	    encrypt_message: boolean;
-	    pgp_sign_message: boolean;
-	    pgp_encrypt_message: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ComposeMessage(source);
@@ -2039,10 +1352,6 @@ export namespace smtp {
 	        this.in_reply_to = source["in_reply_to"];
 	        this.references = source["references"];
 	        this.request_read_receipt = source["request_read_receipt"];
-	        this.sign_message = source["sign_message"];
-	        this.encrypt_message = source["encrypt_message"];
-	        this.pgp_sign_message = source["pgp_sign_message"];
-	        this.pgp_encrypt_message = source["pgp_encrypt_message"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2180,24 +1489,6 @@ export namespace v1 {
 	        this.buttonLabel = source["buttonLabel"];
 	        this.description = source["description"];
 	        this.component = source["component"];
-	    }
-	}
-	export class Addressbook {
-	    id: string;
-	    sourceId: string;
-	    name: string;
-	    path?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Addressbook(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.sourceId = source["sourceId"];
-	        this.name = source["name"];
-	        this.path = source["path"];
 	    }
 	}
 	export class ContactIMPP {
@@ -2484,26 +1775,6 @@ export namespace v1 {
 	}
 	
 	
-	export class ContactSource {
-	    id: string;
-	    name: string;
-	    type: string;
-	    writable: boolean;
-	    accountId?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ContactSource(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.name = source["name"];
-	        this.type = source["type"];
-	        this.writable = source["writable"];
-	        this.accountId = source["accountId"];
-	    }
-	}
 	
 	export class RailTabRequest {
 	    extensionId: string;

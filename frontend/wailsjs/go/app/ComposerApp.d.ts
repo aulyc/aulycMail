@@ -4,15 +4,9 @@ import {account} from '../models';
 import {app} from '../models';
 import {smtp} from '../models';
 import {message} from '../models';
-import {pgp} from '../models';
-import {smime} from '../models';
 import {draft} from '../models';
 import {contact} from '../models';
 import {context} from '../models';
-
-export function CheckRecipientCerts(arg1:Array<string>):Promise<Record<string, boolean>>;
-
-export function CheckRecipientPGPKeys(arg1:Array<string>):Promise<Record<string, boolean>>;
 
 export function CloseWindow():Promise<void>;
 
@@ -32,49 +26,19 @@ export function GetNativeTitleBar():Promise<boolean>;
 
 export function GetOriginalMessage():Promise<message.Message>;
 
-export function GetPGPEncryptPolicy(arg1:string):Promise<string>;
-
-export function GetPGPKeyForEmail(arg1:string,arg2:string):Promise<pgp.Key>;
-
-export function GetPGPSignPolicy(arg1:string):Promise<string>;
-
-export function GetSMIMECertificateForEmail(arg1:string,arg2:string):Promise<smime.Certificate>;
-
-export function GetSMIMEEncryptPolicy(arg1:string):Promise<string>;
-
-export function GetSMIMESignPolicy(arg1:string):Promise<string>;
-
 export function GetShowTitleBar():Promise<boolean>;
 
 export function GetSystemTheme():Promise<string>;
 
 export function GetThemeMode():Promise<string>;
 
-export function HasPGPKey(arg1:string):Promise<boolean>;
-
-export function HasSMIMECertificate(arg1:string):Promise<boolean>;
-
-export function ImportRecipientCert(arg1:string,arg2:string):Promise<void>;
-
-export function ImportRecipientPGPKey(arg1:string,arg2:string):Promise<void>;
-
 export function IsFlatpak():Promise<boolean>;
 
 export function LogFrontend(arg1:string,arg2:string):Promise<void>;
 
-export function LookupHKP(arg1:string):Promise<string>;
-
-export function LookupPGPKey(arg1:string):Promise<string>;
-
-export function LookupWKD(arg1:string):Promise<string>;
-
 export function NotifyStartupComplete():Promise<void>;
 
 export function PickAttachmentFiles():Promise<Array<app.ComposerAttachment>>;
-
-export function PickRecipientCertFile():Promise<string>;
-
-export function PickRecipientPGPKeyFile():Promise<string>;
 
 export function PrepareReply():Promise<smtp.ComposeMessage>;
 

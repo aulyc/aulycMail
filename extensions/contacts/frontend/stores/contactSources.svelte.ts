@@ -6,11 +6,13 @@
 // isSourceWritable, load) so they compile unchanged, while reporting an empty
 // source list and treating every local contact as writable.
 
-// @ts-ignore - wailsjs bindings
-import type { v1 } from '$wailsjs/go/models'
+// Minimal source shape the contacts components still reference (.id / .name /
+// .type / .writable). There are no remote sources anymore, so this list is
+// always empty — the type just keeps the consumers' field access type-checking.
+type ContactSourceLite = { id: string; name: string; type: string; writable: boolean; accountId: string }
 
 function createContactSourcesStore() {
-  const sources: v1.ContactSource[] = []
+  const sources: ContactSourceLite[] = []
 
   async function load(): Promise<void> {
     // No remote sources to load.
@@ -22,7 +24,7 @@ function createContactSourcesStore() {
   }
 
   return {
-    get sources(): v1.ContactSource[] {
+    get sources(): ContactSourceLite[] {
       return sources
     },
     get loading(): boolean {

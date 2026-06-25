@@ -14,20 +14,12 @@ export function AddContact(arg1, arg2) {
   return window['go']['app']['App']['AddContact'](arg1, arg2);
 }
 
-export function AddContactSource(arg1) {
-  return window['go']['app']['App']['AddContactSource'](arg1);
-}
-
 export function AddImageAllowlist(arg1, arg2) {
   return window['go']['app']['App']['AddImageAllowlist'](arg1, arg2);
 }
 
 export function AddMicrosoftSharedMailbox(arg1, arg2, arg3) {
   return window['go']['app']['App']['AddMicrosoftSharedMailbox'](arg1, arg2, arg3);
-}
-
-export function AddPGPKeyServer(arg1) {
-  return window['go']['app']['App']['AddPGPKeyServer'](arg1);
 }
 
 export function Archive(arg1) {
@@ -50,10 +42,6 @@ export function CancelAllSyncs() {
   return window['go']['app']['App']['CancelAllSyncs']();
 }
 
-export function CancelContactSourceOAuthFlow() {
-  return window['go']['app']['App']['CancelContactSourceOAuthFlow']();
-}
-
 export function CancelFolderSync(arg1, arg2) {
   return window['go']['app']['App']['CancelFolderSync'](arg1, arg2);
 }
@@ -62,24 +50,12 @@ export function CancelOAuthFlow() {
   return window['go']['app']['App']['CancelOAuthFlow']();
 }
 
-export function CheckRecipientCerts(arg1) {
-  return window['go']['app']['App']['CheckRecipientCerts'](arg1);
-}
-
-export function CheckRecipientPGPKeys(arg1) {
-  return window['go']['app']['App']['CheckRecipientPGPKeys'](arg1);
-}
-
 export function ClearOAuthCreds(arg1) {
   return window['go']['app']['App']['ClearOAuthCreds'](arg1);
 }
 
 export function CloseWindow() {
   return window['go']['app']['App']['CloseWindow']();
-}
-
-export function CompleteContactSourceOAuthSetup(arg1, arg2) {
-  return window['go']['app']['App']['CompleteContactSourceOAuthSetup'](arg1, arg2);
 }
 
 export function CompleteOAuthAccountSetup(arg1, arg2, arg3, arg4, arg5) {
@@ -94,40 +70,16 @@ export function Contacts_DeleteLocalContact(arg1) {
   return window['go']['app']['App']['Contacts_DeleteLocalContact'](arg1);
 }
 
-export function Contacts_EnableWriteAccess(arg1, arg2, arg3, arg4) {
-  return window['go']['app']['App']['Contacts_EnableWriteAccess'](arg1, arg2, arg3, arg4);
-}
-
 export function Contacts_GetContactDetail(arg1) {
   return window['go']['app']['App']['Contacts_GetContactDetail'](arg1);
-}
-
-export function Contacts_LinkAccountSource(arg1, arg2, arg3) {
-  return window['go']['app']['App']['Contacts_LinkAccountSource'](arg1, arg2, arg3);
-}
-
-export function Contacts_ListAddressbooks(arg1) {
-  return window['go']['app']['App']['Contacts_ListAddressbooks'](arg1);
 }
 
 export function Contacts_ListContactsForBrowse(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['Contacts_ListContactsForBrowse'](arg1, arg2, arg3, arg4);
 }
 
-export function Contacts_ListSources() {
-  return window['go']['app']['App']['Contacts_ListSources']();
-}
-
 export function Contacts_ResizeContactPhoto(arg1) {
   return window['go']['app']['App']['Contacts_ResizeContactPhoto'](arg1);
-}
-
-export function Contacts_SyncAllSources() {
-  return window['go']['app']['App']['Contacts_SyncAllSources']();
-}
-
-export function Contacts_SyncSource(arg1) {
-  return window['go']['app']['App']['Contacts_SyncSource'](arg1);
 }
 
 export function Contacts_UpdateContact(arg1, arg2) {
@@ -146,10 +98,6 @@ export function DeleteContact(arg1) {
   return window['go']['app']['App']['DeleteContact'](arg1);
 }
 
-export function DeleteContactSource(arg1) {
-  return window['go']['app']['App']['DeleteContactSource'](arg1);
-}
-
 export function DeleteDraft(arg1) {
   return window['go']['app']['App']['DeleteDraft'](arg1);
 }
@@ -162,36 +110,12 @@ export function DeleteLocalMessages(arg1) {
   return window['go']['app']['App']['DeleteLocalMessages'](arg1);
 }
 
-export function DeletePGPKey(arg1) {
-  return window['go']['app']['App']['DeletePGPKey'](arg1);
-}
-
-export function DeletePGPSenderKey(arg1) {
-  return window['go']['app']['App']['DeletePGPSenderKey'](arg1);
-}
-
 export function DeletePermanently(arg1) {
   return window['go']['app']['App']['DeletePermanently'](arg1);
 }
 
-export function DeleteSMIMECertificate(arg1) {
-  return window['go']['app']['App']['DeleteSMIMECertificate'](arg1);
-}
-
-export function DeleteSenderCert(arg1) {
-  return window['go']['app']['App']['DeleteSenderCert'](arg1);
-}
-
-export function DiscoverCardDAVAddressbooks(arg1, arg2, arg3) {
-  return window['go']['app']['App']['DiscoverCardDAVAddressbooks'](arg1, arg2, arg3);
-}
-
 export function DownloadAttachment(arg1, arg2) {
   return window['go']['app']['App']['DownloadAttachment'](arg1, arg2);
-}
-
-export function DownloadEncryptedAttachment(arg1, arg2, arg3) {
-  return window['go']['app']['App']['DownloadEncryptedAttachment'](arg1, arg2, arg3);
 }
 
 export function EmptyTrash(arg1, arg2) {
@@ -208,10 +132,6 @@ export function FetchServerMessage(arg1, arg2, arg3) {
 
 export function FindLocalMessageIDs(arg1, arg2, arg3) {
   return window['go']['app']['App']['FindLocalMessageIDs'](arg1, arg2, arg3);
-}
-
-export function ForceSyncContactSource(arg1) {
-  return window['go']['app']['App']['ForceSyncContactSource'](arg1);
 }
 
 export function ForceSyncFolder(arg1, arg2) {
@@ -280,22 +200,6 @@ export function GetConnectedComposers() {
 
 export function GetContact(arg1) {
   return window['go']['app']['App']['GetContact'](arg1);
-}
-
-export function GetContactSource(arg1) {
-  return window['go']['app']['App']['GetContactSource'](arg1);
-}
-
-export function GetContactSourceErrors() {
-  return window['go']['app']['App']['GetContactSourceErrors']();
-}
-
-export function GetContactSourceStats() {
-  return window['go']['app']['App']['GetContactSourceStats']();
-}
-
-export function GetContactSources() {
-  return window['go']['app']['App']['GetContactSources']();
 }
 
 export function GetContext() {
@@ -370,10 +274,6 @@ export function GetLastSeenVersion() {
   return window['go']['app']['App']['GetLastSeenVersion']();
 }
 
-export function GetLinkedAccountsForContactSync() {
-  return window['go']['app']['App']['GetLinkedAccountsForContactSync']();
-}
-
 export function GetMailtoMode() {
   return window['go']['app']['App']['GetMailtoMode']();
 }
@@ -434,22 +334,6 @@ export function GetOAuthWarningDisabled() {
   return window['go']['app']['App']['GetOAuthWarningDisabled']();
 }
 
-export function GetPGPEncryptPolicy(arg1) {
-  return window['go']['app']['App']['GetPGPEncryptPolicy'](arg1);
-}
-
-export function GetPGPKeyForEmail(arg1, arg2) {
-  return window['go']['app']['App']['GetPGPKeyForEmail'](arg1, arg2);
-}
-
-export function GetPGPKeyServers() {
-  return window['go']['app']['App']['GetPGPKeyServers']();
-}
-
-export function GetPGPSignPolicy(arg1) {
-  return window['go']['app']['App']['GetPGPSignPolicy'](arg1);
-}
-
 export function GetPendingMailto() {
   return window['go']['app']['App']['GetPendingMailto']();
 }
@@ -460,18 +344,6 @@ export function GetReadReceiptResponsePolicy() {
 
 export function GetRunBackground() {
   return window['go']['app']['App']['GetRunBackground']();
-}
-
-export function GetSMIMECertificateForEmail(arg1, arg2) {
-  return window['go']['app']['App']['GetSMIMECertificateForEmail'](arg1, arg2);
-}
-
-export function GetSMIMEEncryptPolicy(arg1) {
-  return window['go']['app']['App']['GetSMIMEEncryptPolicy'](arg1);
-}
-
-export function GetSMIMESignPolicy(arg1) {
-  return window['go']['app']['App']['GetSMIMESignPolicy'](arg1);
 }
 
 export function GetSearchCount(arg1, arg2, arg3, arg4) {
@@ -492,10 +364,6 @@ export function GetShowTitleBar() {
 
 export function GetShowViewerCircles() {
   return window['go']['app']['App']['GetShowViewerCircles']();
-}
-
-export function GetSourceAddressbooks(arg1) {
-  return window['go']['app']['App']['GetSourceAddressbooks'](arg1);
 }
 
 export function GetSpecialFolder(arg1, arg2) {
@@ -546,40 +414,12 @@ export function GetUnifiedInboxUnreadCount() {
   return window['go']['app']['App']['GetUnifiedInboxUnreadCount']();
 }
 
-export function HasPGPKey(arg1) {
-  return window['go']['app']['App']['HasPGPKey'](arg1);
-}
-
-export function HasSMIMECertificate(arg1) {
-  return window['go']['app']['App']['HasSMIMECertificate'](arg1);
-}
-
 export function IMAPSearchFolder(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['IMAPSearchFolder'](arg1, arg2, arg3, arg4);
 }
 
 export function IgnoreReadReceipt(arg1, arg2) {
   return window['go']['app']['App']['IgnoreReadReceipt'](arg1, arg2);
-}
-
-export function ImportPGPKeyFromPath(arg1, arg2, arg3) {
-  return window['go']['app']['App']['ImportPGPKeyFromPath'](arg1, arg2, arg3);
-}
-
-export function ImportRecipientCert(arg1, arg2) {
-  return window['go']['app']['App']['ImportRecipientCert'](arg1, arg2);
-}
-
-export function ImportRecipientPGPKey(arg1, arg2) {
-  return window['go']['app']['App']['ImportRecipientPGPKey'](arg1, arg2);
-}
-
-export function ImportSMIMECertificateFromPath(arg1, arg2, arg3) {
-  return window['go']['app']['App']['ImportSMIMECertificateFromPath'](arg1, arg2, arg3);
-}
-
-export function ImportSMIMECertificateFromPathBER(arg1, arg2, arg3) {
-  return window['go']['app']['App']['ImportSMIMECertificateFromPathBER'](arg1, arg2, arg3);
 }
 
 export function InitiateShutdown() {
@@ -614,16 +454,8 @@ export function IsReady() {
   return window['go']['app']['App']['IsReady']();
 }
 
-export function LinkAccountContactSource(arg1, arg2, arg3) {
-  return window['go']['app']['App']['LinkAccountContactSource'](arg1, arg2, arg3);
-}
-
 export function ListAccountSetupHooksForProvider(arg1) {
   return window['go']['app']['App']['ListAccountSetupHooksForProvider'](arg1);
-}
-
-export function ListAuthContextsForProvider(arg1) {
-  return window['go']['app']['App']['ListAuthContextsForProvider'](arg1);
 }
 
 export function ListContacts(arg1) {
@@ -646,36 +478,8 @@ export function ListExtensions() {
   return window['go']['app']['App']['ListExtensions']();
 }
 
-export function ListPGPKeys(arg1) {
-  return window['go']['app']['App']['ListPGPKeys'](arg1);
-}
-
-export function ListPGPSenderKeys() {
-  return window['go']['app']['App']['ListPGPSenderKeys']();
-}
-
-export function ListSMIMECertificates(arg1) {
-  return window['go']['app']['App']['ListSMIMECertificates'](arg1);
-}
-
-export function ListSenderCerts() {
-  return window['go']['app']['App']['ListSenderCerts']();
-}
-
 export function LogFrontend(arg1, arg2) {
   return window['go']['app']['App']['LogFrontend'](arg1, arg2);
-}
-
-export function LookupHKP(arg1) {
-  return window['go']['app']['App']['LookupHKP'](arg1);
-}
-
-export function LookupPGPKey(arg1) {
-  return window['go']['app']['App']['LookupPGPKey'](arg1);
-}
-
-export function LookupWKD(arg1) {
-  return window['go']['app']['App']['LookupWKD'](arg1);
 }
 
 export function MarkAllFolderMessagesAsRead(arg1) {
@@ -726,10 +530,6 @@ export function OpenComposerWindow(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['app']['App']['OpenComposerWindow'](arg1, arg2, arg3, arg4, arg5);
 }
 
-export function OpenEncryptedAttachment(arg1, arg2) {
-  return window['go']['app']['App']['OpenEncryptedAttachment'](arg1, arg2);
-}
-
 export function OpenFile(arg1) {
   return window['go']['app']['App']['OpenFile'](arg1);
 }
@@ -746,36 +546,12 @@ export function PickAttachmentFiles() {
   return window['go']['app']['App']['PickAttachmentFiles']();
 }
 
-export function PickPGPKeyFile() {
-  return window['go']['app']['App']['PickPGPKeyFile']();
-}
-
-export function PickRecipientCertFile() {
-  return window['go']['app']['App']['PickRecipientCertFile']();
-}
-
-export function PickRecipientPGPKeyFile() {
-  return window['go']['app']['App']['PickRecipientPGPKeyFile']();
-}
-
-export function PickSMIMECertificateFile() {
-  return window['go']['app']['App']['PickSMIMECertificateFile']();
-}
-
 export function Preflight() {
   return window['go']['app']['App']['Preflight']();
 }
 
 export function PrepareReply(arg1, arg2) {
   return window['go']['app']['App']['PrepareReply'](arg1, arg2);
-}
-
-export function ProcessPGPMessage(arg1) {
-  return window['go']['app']['App']['ProcessPGPMessage'](arg1);
-}
-
-export function ProcessSMIMEMessage(arg1) {
-  return window['go']['app']['App']['ProcessSMIMEMessage'](arg1);
 }
 
 export function QuitApp() {
@@ -806,10 +582,6 @@ export function RemoveImageAllowlist(arg1) {
   return window['go']['app']['App']['RemoveImageAllowlist'](arg1);
 }
 
-export function RemovePGPKeyServer(arg1) {
-  return window['go']['app']['App']['RemovePGPKeyServer'](arg1);
-}
-
 export function RemoveTrustedCertificate(arg1) {
   return window['go']['app']['App']['RemoveTrustedCertificate'](arg1);
 }
@@ -822,20 +594,12 @@ export function SaveAllAttachments(arg1) {
   return window['go']['app']['App']['SaveAllAttachments'](arg1);
 }
 
-export function SaveAllEncryptedAttachments(arg1) {
-  return window['go']['app']['App']['SaveAllEncryptedAttachments'](arg1);
-}
-
 export function SaveAttachmentAs(arg1) {
   return window['go']['app']['App']['SaveAttachmentAs'](arg1);
 }
 
 export function SaveDraft(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveDraft'](arg1, arg2, arg3);
-}
-
-export function SaveEncryptedAttachmentAs(arg1, arg2) {
-  return window['go']['app']['App']['SaveEncryptedAttachmentAs'](arg1, arg2);
 }
 
 export function SaveOAuthTokens(arg1, arg2, arg3, arg4, arg5) {
@@ -878,10 +642,6 @@ export function SetAccountEnabled(arg1, arg2) {
   return window['go']['app']['App']['SetAccountEnabled'](arg1, arg2);
 }
 
-export function SetAddressbookEnabled(arg1, arg2) {
-  return window['go']['app']['App']['SetAddressbookEnabled'](arg1, arg2);
-}
-
 export function SetAlwaysLoadImages(arg1) {
   return window['go']['app']['App']['SetAlwaysLoadImages'](arg1);
 }
@@ -898,24 +658,12 @@ export function SetComposerMode(arg1) {
   return window['go']['app']['App']['SetComposerMode'](arg1);
 }
 
-export function SetContactSourceWritable(arg1, arg2) {
-  return window['go']['app']['App']['SetContactSourceWritable'](arg1, arg2);
-}
-
 export function SetDarkMailContent(arg1) {
   return window['go']['app']['App']['SetDarkMailContent'](arg1);
 }
 
 export function SetDefaultIdentity(arg1, arg2) {
   return window['go']['app']['App']['SetDefaultIdentity'](arg1, arg2);
-}
-
-export function SetDefaultPGPKey(arg1, arg2) {
-  return window['go']['app']['App']['SetDefaultPGPKey'](arg1, arg2);
-}
-
-export function SetDefaultSMIMECertificate(arg1, arg2) {
-  return window['go']['app']['App']['SetDefaultSMIMECertificate'](arg1, arg2);
 }
 
 export function SetExtensionEnabled(arg1, arg2) {
@@ -962,28 +710,12 @@ export function SetOAuthWarningDisabled(arg1) {
   return window['go']['app']['App']['SetOAuthWarningDisabled'](arg1);
 }
 
-export function SetPGPEncryptPolicy(arg1, arg2) {
-  return window['go']['app']['App']['SetPGPEncryptPolicy'](arg1, arg2);
-}
-
-export function SetPGPSignPolicy(arg1, arg2) {
-  return window['go']['app']['App']['SetPGPSignPolicy'](arg1, arg2);
-}
-
 export function SetReadReceiptResponsePolicy(arg1) {
   return window['go']['app']['App']['SetReadReceiptResponsePolicy'](arg1);
 }
 
 export function SetRunBackground(arg1) {
   return window['go']['app']['App']['SetRunBackground'](arg1);
-}
-
-export function SetSMIMEEncryptPolicy(arg1, arg2) {
-  return window['go']['app']['App']['SetSMIMEEncryptPolicy'](arg1, arg2);
-}
-
-export function SetSMIMESignPolicy(arg1, arg2) {
-  return window['go']['app']['App']['SetSMIMESignPolicy'](arg1, arg2);
 }
 
 export function SetShowMessageListCircles(arg1) {
@@ -1018,10 +750,6 @@ export function Star(arg1) {
   return window['go']['app']['App']['Star'](arg1);
 }
 
-export function StartContactsOnlyOAuthFlow(arg1) {
-  return window['go']['app']['App']['StartContactsOnlyOAuthFlow'](arg1);
-}
-
 export function StartOAuthFlow(arg1) {
   return window['go']['app']['App']['StartOAuthFlow'](arg1);
 }
@@ -1042,14 +770,6 @@ export function SyncAllComplete() {
   return window['go']['app']['App']['SyncAllComplete']();
 }
 
-export function SyncAllContactSources() {
-  return window['go']['app']['App']['SyncAllContactSources']();
-}
-
-export function SyncContactSource(arg1) {
-  return window['go']['app']['App']['SyncContactSource'](arg1);
-}
-
 export function SyncFolder(arg1, arg2) {
   return window['go']['app']['App']['SyncFolder'](arg1, arg2);
 }
@@ -1060,10 +780,6 @@ export function SyncFolders(arg1) {
 
 export function SyncPendingDrafts(arg1) {
   return window['go']['app']['App']['SyncPendingDrafts'](arg1);
-}
-
-export function TestCardDAVConnection(arg1, arg2, arg3) {
-  return window['go']['app']['App']['TestCardDAVConnection'](arg1, arg2, arg3);
 }
 
 export function TestConnection(arg1) {
@@ -1096,10 +812,6 @@ export function UnsubscribeFolder(arg1, arg2) {
 
 export function UpdateAccount(arg1, arg2) {
   return window['go']['app']['App']['UpdateAccount'](arg1, arg2);
-}
-
-export function UpdateContactSource(arg1, arg2) {
-  return window['go']['app']['App']['UpdateContactSource'](arg1, arg2);
 }
 
 export function UpdateIdentity(arg1, arg2) {
