@@ -479,6 +479,16 @@ func (a *App) Startup(ctx context.Context) {
 		})
 	}
 
+	// macOS background mode: re-show the window when the app is reactivated
+	// (Dock-icon click or Cmd+Tab) while it's hidden. Hiding uses orderOut,
+	// which AppKit won't restore on a Dock click by itself.
+	platform.SetActivationHandler(func() {
+		if a.windowHidden {
+			a.ShowWindow()
+		}
+	})
+	platform.StartActivationObserver()
+
 	// Logging, paths, db open, migrations, and credential store are all
 	// initialized in Preflight (called from main.go before wails.Run). By
 	// the time Startup runs, a.paths, a.db, and a.credStore are non-nil.
