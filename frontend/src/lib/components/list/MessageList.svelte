@@ -930,9 +930,15 @@
     loadConversations()
   }
 
-  // Calculate total unread count
+  // Total unread for the header. Use the folder's authoritative unread count
+  // (the same live value the sidebar badge shows) so the header always agrees
+  // with the badge — summing only loaded conversations under-counts once the
+  // list is paginated (unread threads past the first page aren't loaded). The
+  // unified view has no single folder, so it keeps the loaded-sum fallback.
   const unreadCount = $derived(
-    conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
+    isUnifiedView
+      ? conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0)
+      : accountStore.getFolderUnreadCount(folderId)
   )
 
   // Reference to the list container for scrolling

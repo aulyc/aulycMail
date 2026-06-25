@@ -199,6 +199,31 @@ class AccountStore {
   }
 
   /**
+   * Return a folder's live unread count (same value the sidebar badge shows),
+   * searching every account's folder tree. Returns 0 when not found. Reactive:
+   * reads tree.folder.unreadCount, which is kept current via folders:countsChanged
+   * and post-sync reloads.
+   */
+  getFolderUnreadCount(folderId: string | null | undefined): number {
+    if (!folderId) return 0
+    const search = (trees: folder.FolderTree[]): number | null => {
+      for (const tree of trees) {
+        if (tree.folder?.id === folderId) return tree.folder.unreadCount ?? 0
+        if (tree.children) {
+          const found = search(tree.children)
+          if (found !== null) return found
+        }
+      }
+      return null
+    }
+    for (const acc of this.accounts) {
+      const found = search(acc.folders || [])
+      if (found !== null) return found
+    }
+    return 0
+  }
+
+  /**
    * Check if any folder in the tree matches the given folder IDs
    */
   private findFolderInTree(trees: folder.FolderTree[], folderIds: string[]): boolean {
