@@ -23,6 +23,9 @@
 
   interface Props {
     title?: string
+    /** Optional action(s) pinned to the right of the title — forwarded to
+     *  SidebarFrame's titleAction slot (e.g. a refresh button). */
+    titleAction?: Snippet
     sections: SourceSection<T>[]
     selectedId: string | null
     focusSlot?: FocusablePane
@@ -39,6 +42,7 @@
 
   const {
     title,
+    titleAction,
     sections,
     selectedId,
     focusSlot = 'sidebar',
@@ -120,6 +124,7 @@
 
 <SidebarFrame
   {title}
+  {titleAction}
   {label}
   bind:containerRef
   focusable

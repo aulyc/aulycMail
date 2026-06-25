@@ -1,14 +1,36 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n'
+  import Icon from '@iconify/svelte'
   import SourceSidebar from '$lib/components/kit/SourceSidebar.svelte'
   import SourceItem from '$lib/components/kit/SourceItem.svelte'
-  import { contactsView, selectSource } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, selectSource, reloadContacts } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { toasts } from '$lib/stores/toast'
+  // @ts-ignore - wailsjs bindings
+  import { RefreshContactsFromMail } from '$wailsjs/go/app/App'
 
   interface Props {
     onSelect: () => void
   }
 
   const { onSelect }: Props = $props()
+
+  let refreshing = $state(false)
+
+  // Re-scan every account's mail and re-collect participants into the local
+  // address book (senders / recipients / cc-bcc), then reload the list.
+  async function runRefresh() {
+    if (refreshing) return
+    refreshing = true
+    try {
+      const count = await RefreshContactsFromMail()
+      await reloadContacts()
+      toasts.success($_('contacts.toast.refreshed', { values: { count } }))
+    } catch (err) {
+      toasts.error((err as Error)?.message ?? String(err))
+    } finally {
+      refreshing = false
+    }
+  }
 
   // Source IDs (single local address book, classified by mail role):
   //   ''                  → all local contacts
@@ -44,6 +66,19 @@
   selectedId={contactsView.selectedSourceId}
   onSelect={pick}
 >
+  {#snippet titleAction()}
+    <button
+      class="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+      title={$_('contacts.sidebar.refresh')}
+      aria-label={$_('contacts.sidebar.refresh')}
+      onclick={runRefresh}
+      disabled={refreshing}
+      type="button"
+    >
+      <Icon icon="mdi:refresh" class="w-5 h-5 {refreshing ? 'animate-spin' : ''}" />
+    </button>
+  {/snippet}
+
   {#snippet item(it: SidebarItem, { active })}
     <SourceItem icon={it.icon} label={it.label} {active} onclick={() => pick(it.id)} />
   {/snippet}

@@ -412,6 +412,8 @@ export function TestAccountConnection(arg1:string):Promise<app.ConnectionTestRes
 
 export function GetAccountConnOK(arg1:string):Promise<string>;
 
+export function RefreshContactsFromMail():Promise<number>;
+
 export function TestOAuthConnection(arg1:string):Promise<void>;
 
 export function TestSMTPConnection(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string):Promise<void>;

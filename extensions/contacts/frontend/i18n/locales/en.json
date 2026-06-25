@@ -11,6 +11,7 @@
     },
     "sidebar": {
       "title": "Contacts",
+      "refresh": "Refresh contacts from mail",
       "all": "All",
       "roleSender": "Senders",
       "roleRecipient": "Recipients",
@@ -151,6 +152,7 @@
       "completeMessage": "Contacts sync is set up."
     },
     "toast": {
+      "refreshed": "Refreshed contacts from {count} messages",
       "conflict": "This contact was changed elsewhere. Your edit was discarded — refreshed with the latest version.",
       "deleted": "Contact deleted",
       "failedDelete": "Failed to delete contact.",

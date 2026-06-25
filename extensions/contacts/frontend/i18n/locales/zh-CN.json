@@ -11,6 +11,7 @@
     },
     "sidebar": {
       "title": "联系人",
+      "refresh": "从邮件刷新通讯录",
       "all": "全部",
       "roleSender": "发件人",
       "roleRecipient": "收件人",
@@ -151,6 +152,7 @@
       "completeMessage": "联系人同步已设置。"
     },
     "toast": {
+      "refreshed": "已从 {count} 封邮件刷新联系人",
       "conflict": "此联系人已在别处被更改。您的编辑已被放弃 — 已刷新为最新版本。",
       "deleted": "联系人已删除",
       "failedDelete": "删除联系人失败。",

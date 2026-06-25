@@ -794,6 +794,10 @@ export function GetAccountConnOK(arg1) {
   return window['go']['app']['App']['GetAccountConnOK'](arg1);
 }
 
+export function RefreshContactsFromMail() {
+  return window['go']['app']['App']['RefreshContactsFromMail']();
+}
+
 export function TestOAuthConnection(arg1) {
   return window['go']['app']['App']['TestOAuthConnection'](arg1);
 }

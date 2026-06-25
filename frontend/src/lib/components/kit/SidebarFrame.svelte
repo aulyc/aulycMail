@@ -25,6 +25,9 @@
   interface Props {
     /** Optional title rendered as <h2>. Omit for sidebars with no title. */
     title?: string
+    /** Optional action(s) pinned to the right of the title row (e.g. a
+     *  refresh button). Only rendered when `title` is set. */
+    titleAction?: Snippet
     /** ARIA label for the <aside>. Defaults to `title`. */
     label?: string
     /** The scrollable body content. Required. */
@@ -49,6 +52,7 @@
 
   let {
     title,
+    titleAction,
     label,
     body,
     footer,
@@ -89,7 +93,12 @@
   {/if}
 
   {#if title}
-    <h2 class="px-4 mb-3 text-lg font-semibold text-foreground">{title}</h2>
+    <div class="px-4 mb-3 flex items-center justify-between gap-2">
+      <h2 class="text-lg font-semibold text-foreground">{title}</h2>
+      {#if titleAction}
+        {@render titleAction()}
+      {/if}
+    </div>
   {/if}
 
   <div class="flex-1 min-h-0 overflow-y-auto">
