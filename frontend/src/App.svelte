@@ -162,10 +162,11 @@
     CloseWindow()
   }
 
-  // Handle forced quit (Ctrl+Q) — always quits regardless of background mode
+  // Handle forced quit (Ctrl+Q) — always quits regardless of background mode.
+  // Quit immediately so it feels as snappy as any other macOS app.
   function handleQuit() {
     isShuttingDown = true
-    setTimeout(() => QuitApp(), 100)
+    QuitApp()
   }
 
   // Handle terms acceptance

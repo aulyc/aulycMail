@@ -741,17 +741,14 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 
 	// Normal shutdown flow
 	log := logging.WithComponent("app")
-	log.Info().Msg("Window close requested, showing shutdown overlay")
+	log.Info().Msg("Window close requested, shutting down")
 
 	shuttingDown = true
 
-	// Emit event to show shutdown overlay
-	wailsRuntime.EventsEmit(a.ctx, "app:shutting-down")
-
-	// Schedule actual quit after UI has time to render
+	// Quit immediately (deferred to a goroutine so this close callback can
+	// return first; no artificial delay, so it's as snappy as any other app).
 	go func() {
 		defer recoverPanic("app", "shutdown")
-		time.Sleep(150 * time.Millisecond)
 		wailsRuntime.Quit(a.ctx)
 	}()
 
@@ -801,10 +798,8 @@ func (a *App) CloseWindow() {
 
 	log := logging.WithComponent("app")
 	log.Info().Msg("Window close requested, shutting down")
-	wailsRuntime.EventsEmit(a.ctx, "app:shutting-down")
 	go func() {
 		defer recoverPanic("app", "shutdown")
-		time.Sleep(150 * time.Millisecond)
 		wailsRuntime.Quit(a.ctx)
 	}()
 }
@@ -819,10 +814,8 @@ func (a *App) QuitApp() {
 
 	log := logging.WithComponent("app")
 	log.Info().Msg("Quit requested")
-	wailsRuntime.EventsEmit(a.ctx, "app:shutting-down")
 	go func() {
 		defer recoverPanic("app", "shutdown")
-		time.Sleep(150 * time.Millisecond)
 		wailsRuntime.Quit(a.ctx)
 	}()
 }
