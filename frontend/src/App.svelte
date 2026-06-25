@@ -646,24 +646,37 @@
   // Resizing state
   let isResizingSidebar = $state(false)
   let isResizingList = $state(false)
+  // Drag anchors captured at mousedown so resizing tracks the pointer delta
+  // rather than the absolute clientX. The panes sit to the right of the icon
+  // rail, so an absolute clientX would jump the divider by the rail's width on
+  // the first move; a delta from the grab point has no such offset.
+  let resizeStartX = 0
+  let resizeStartSidebarWidth = 0
+  let resizeStartListWidth = 0
 
   function startResizeSidebar(e: MouseEvent) {
     if (isResponsive()) return
     isResizingSidebar = true
+    resizeStartX = e.clientX
+    resizeStartSidebarWidth = sidebarWidth
     e.preventDefault()
   }
 
   function startResizeList(e: MouseEvent) {
     if (isResponsive()) return
     isResizingList = true
+    resizeStartX = e.clientX
+    resizeStartListWidth = listWidth
     e.preventDefault()
   }
 
   function handleMouseMove(e: MouseEvent) {
     if (isResizingSidebar) {
-      sidebarWidth = Math.max(paneConstraints.sidebar.min, Math.min(paneConstraints.sidebar.max, e.clientX))
+      const next = resizeStartSidebarWidth + (e.clientX - resizeStartX)
+      sidebarWidth = Math.max(paneConstraints.sidebar.min, Math.min(paneConstraints.sidebar.max, next))
     } else if (isResizingList) {
-      listWidth = Math.max(paneConstraints.list.min, Math.min(paneConstraints.list.max, e.clientX - sidebarWidth))
+      const next = resizeStartListWidth + (e.clientX - resizeStartX)
+      listWidth = Math.max(paneConstraints.list.min, Math.min(paneConstraints.list.max, next))
     }
   }
 
