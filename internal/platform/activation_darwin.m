@@ -8,14 +8,23 @@ extern void goAppActivated(void);
 // --- Real-quit detection ---------------------------------------------------
 //
 // In background mode the window-close hook hides the window instead of
-// quitting. But Dock "Quit", the menu Quit item, and Cmd+Q all funnel through
-// the same close hook, so they'd also just hide. They differ from a window
-// close in one way: they call -[NSApplication terminate:]. Swizzling that lets
-// us set a flag the Go close handler reads to allow a genuine quit. The window
-// close button never calls terminate:, so it still hides.
+// quitting. But Dock "Quit", the menu Quit item, and Cmd+Q all want to really
+// quit, yet they funnel through the same close hook and would just hide.
+//
+// What sets a genuine quit apart from a window close is that it goes through
+// the delegate's -applicationShouldTerminate:. The window close button uses
+// -windowShouldClose: instead and never hits applicationShouldTerminate:, so
+// swizzling that delegate method lets us flag a real quit without affecting
+// the red-X hide.
+//
+// We ALSO swizzle -[NSApplication terminate:] as a fallback: the menu Quit /
+// Cmd+Q call it directly, whereas the Dock "Quit" sends a kAEQuitApplication
+// Apple Event that reaches applicationShouldTerminate: without terminate:.
+// Covering both selectors catches every quit path.
 
 static bool gRealQuitRequested = false;
 static void (*gOrigTerminate)(id, SEL, id) = NULL;
+static NSApplicationTerminateReply (*gOrigShouldTerminate)(id, SEL, NSApplication *) = NULL;
 
 bool aulycRealQuitRequested(void) { return gRealQuitRequested; }
 
@@ -26,13 +35,40 @@ static void aulycSwizzledTerminate(id self, SEL _cmd, id sender) {
     }
 }
 
-void installTerminateHook(void) {
-    Method m = class_getInstanceMethod([NSApplication class], @selector(terminate:));
-    if (m == NULL) {
-        return;
+static NSApplicationTerminateReply aulycSwizzledShouldTerminate(id self, SEL _cmd, NSApplication *sender) {
+    gRealQuitRequested = true;
+    if (gOrigShouldTerminate) {
+        return gOrigShouldTerminate(self, _cmd, sender);
     }
-    gOrigTerminate = (void (*)(id, SEL, id))method_getImplementation(m);
-    method_setImplementation(m, (IMP)aulycSwizzledTerminate);
+    return NSTerminateNow;
+}
+
+void installTerminateHook(void) {
+    // Fallback: -[NSApplication terminate:] (menu Quit / Cmd+Q).
+    Method tm = class_getInstanceMethod([NSApplication class], @selector(terminate:));
+    if (tm != NULL && gOrigTerminate == NULL) {
+        gOrigTerminate = (void (*)(id, SEL, id))method_getImplementation(tm);
+        method_setImplementation(tm, (IMP)aulycSwizzledTerminate);
+    }
+
+    // Primary: the delegate's -applicationShouldTerminate: (every quit path,
+    // including the Dock "Quit" Apple Event). Done on the main queue so Wails'
+    // delegate is guaranteed to be installed by the time we read it.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (gOrigShouldTerminate != NULL) {
+            return;
+        }
+        id delegate = [NSApp delegate];
+        if (delegate == nil) {
+            return;
+        }
+        Method sm = class_getInstanceMethod([delegate class], @selector(applicationShouldTerminate:));
+        if (sm == NULL) {
+            return;
+        }
+        gOrigShouldTerminate = (NSApplicationTerminateReply (*)(id, SEL, NSApplication *))method_getImplementation(sm);
+        method_setImplementation(sm, (IMP)aulycSwizzledShouldTerminate);
+    });
 }
 
 // Observer that forwards NSApplicationDidBecomeActiveNotification into Go.
