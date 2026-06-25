@@ -237,9 +237,6 @@
   <Dialog.Content class="max-w-3xl" preventCloseAutoFocus onInteractOutside={(e) => e.preventDefault()}>
     <Dialog.Header>
       <Dialog.Title>{$_('settings.title')}</Dialog.Title>
-      <Dialog.Description>
-        {$_('settings.description')}
-      </Dialog.Description>
     </Dialog.Header>
 
     {#if loading}
