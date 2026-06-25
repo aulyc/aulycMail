@@ -741,12 +741,21 @@
     set.add(key)
   }
 
+  // A row is shown selected (highlighted) if it's in the multi-selection set;
+  // when nothing is multi-selected, the single open conversation is highlighted.
+  function isRowSelected(threadId: string): boolean {
+    return checkedThreadIds.size > 0 ? checkedThreadIds.has(threadId) : selectedThreadId === threadId
+  }
+
   function selectConversation(threadId: string, index: number, event?: MouseEvent) {
-    // Shift+click: range select (preserve anchor)
+    // Shift+click: range-select from the anchor to here, seeding with the
+    // currently-open conversation so the first click is included in the range.
     if (event?.shiftKey) {
-      const start = lastClickedIndex !== null ? Math.min(lastClickedIndex, index) : index
-      const end = lastClickedIndex !== null ? Math.max(lastClickedIndex, index) : index
       const newChecked = new Set(checkedThreadIds)
+      if (newChecked.size === 0 && selectedThreadId) newChecked.add(selectedThreadId)
+      const anchor = lastClickedIndex !== null ? lastClickedIndex : index
+      const start = Math.min(anchor, index)
+      const end = Math.max(anchor, index)
       for (let i = start; i <= end; i++) {
         newChecked.add(activeList[i].threadId)
       }
@@ -757,15 +766,17 @@
     // Update anchor for non-shift clicks
     lastClickedIndex = index
 
-    // Ctrl/Cmd+click: toggle single checkbox without changing selection
+    // Cmd/Ctrl+click: toggle this row in the multi-selection, seeding with the
+    // currently-open conversation so it joins the set on the first Cmd+click.
     if (event?.ctrlKey || event?.metaKey) {
       const newChecked = new Set(checkedThreadIds)
+      if (newChecked.size === 0 && selectedThreadId) newChecked.add(selectedThreadId)
       toggleSetEntry(newChecked, threadId)
       checkedThreadIds = newChecked
       return
     }
 
-    // Normal click - select for viewing, clear checks
+    // Normal click - select for viewing, clear multi-selection
     checkedThreadIds = new Set()
     selectedThreadId = threadId
 
@@ -807,25 +818,6 @@
       console.error('Failed to fetch server message:', err)
       error = $_('viewer.failedToLoadMessages')
     }
-  }
-
-  function handleCheck(threadId: string, isChecked: boolean, index: number, event?: MouseEvent) {
-    if (event?.shiftKey && lastClickedIndex !== null) {
-      const start = Math.min(lastClickedIndex, index)
-      const end = Math.max(lastClickedIndex, index)
-      const newChecked = new Set(checkedThreadIds)
-      for (let i = start; i <= end; i++) {
-        newChecked.add(activeList[i].threadId)
-      }
-      checkedThreadIds = newChecked
-      return
-    }
-
-    lastClickedIndex = index
-    const newChecked = new Set(checkedThreadIds)
-    if (isChecked) newChecked.add(threadId)
-    if (!isChecked) newChecked.delete(threadId)
-    checkedThreadIds = newChecked
   }
 
   export function handleActionComplete(autoSelectNext: boolean = false) {
@@ -954,7 +946,7 @@
   }
 
   // Select previous message (exposed for keyboard navigation)
-  // Just moves focus, doesn't clear checkboxes or open in viewer
+  // Moves the single selection; collapses any multi-selection back to single.
   export function selectPrevious() {
     if (activeList.length === 0) return
 
@@ -963,7 +955,9 @@
 
     const conv = activeList[newIndex]
     if (conv) {
+      if (checkedThreadIds.size > 0) checkedThreadIds = new Set()
       selectedThreadId = conv.threadId
+      lastClickedIndex = newIndex
       scrollToIndex(newIndex)
       // Blur any focused element so Enter key triggers openSelected() instead of the button
       ;(document.activeElement as HTMLElement)?.blur?.()
@@ -971,7 +965,7 @@
   }
 
   // Select next message (exposed for keyboard navigation)
-  // Just moves focus, doesn't clear checkboxes or open in viewer
+  // Moves the single selection; collapses any multi-selection back to single.
   export function selectNext() {
     if (activeList.length === 0) return
 
@@ -987,7 +981,9 @@
 
     const conv = activeList[newIndex]
     if (conv) {
+      if (checkedThreadIds.size > 0) checkedThreadIds = new Set()
       selectedThreadId = conv.threadId
+      lastClickedIndex = newIndex
       scrollToIndex(newIndex)
       // Blur any focused element so Enter key triggers openSelected() instead of the button
       ;(document.activeElement as HTMLElement)?.blur?.()
@@ -1534,7 +1530,7 @@
             <ConversationRow
               conversation={result}
               density={getMessageListDensity()}
-              selected={selectedThreadId === result.threadId}
+              selected={isRowSelected(result.threadId)}
               checked={checkedThreadIds.has(result.threadId)}
               accountId={resultAccountId}
               folderId={resultFolderId}
@@ -1544,7 +1540,6 @@
               selectedIsRead={!selectedHasUnread}
               isNonLocal={result._isLocal === false}
               onSelect={(e) => selectConversation(result.threadId, index, e)}
-              onCheck={(checked, e) => handleCheck(result.threadId, checked, index, e)}
               onClearSelection={clearSelection}
               onActionComplete={handleActionComplete}
               {onReply}
@@ -1602,7 +1597,7 @@
           <ConversationRow
             conversation={result}
             density={getMessageListDensity()}
-            selected={selectedThreadId === result.threadId}
+            selected={isRowSelected(result.threadId)}
             checked={checkedThreadIds.has(result.threadId)}
             accountId={isUnifiedView ? resultAccountId : accountId!}
             folderId={isUnifiedView ? resultFolderId : folderId!}
@@ -1619,7 +1614,6 @@
             searchFolderName={result.folderName}
             searchFolderType={result.folderType}
             onSelect={(e) => selectConversation(result.threadId, index, e)}
-            onCheck={(checked, e) => handleCheck(result.threadId, checked, index, e)}
             onClearSelection={clearSelection}
             onActionComplete={handleActionComplete}
             {onReply}
@@ -1672,7 +1666,7 @@
         <ConversationRow
           conversation={conv}
           density={getMessageListDensity()}
-          selected={selectedThreadId === conv.threadId}
+          selected={isRowSelected(conv.threadId)}
           checked={checkedThreadIds.has(conv.threadId)}
           accountId={isUnifiedView ? convAccountId : accountId!}
           folderId={isUnifiedView ? convFolderId : folderId!}
@@ -1684,7 +1678,6 @@
           accountColor={convAccountColor}
           accountName={convAccountName}
           onSelect={(e) => selectConversation(conv.threadId, index, e)}
-          onCheck={(checked, e) => handleCheck(conv.threadId, checked, index, e)}
           onClearSelection={clearSelection}
           onActionComplete={handleActionComplete}
           {onReply}

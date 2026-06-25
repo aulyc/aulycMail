@@ -31,7 +31,6 @@
     searchFolderType?: string       // Folder type for icon in search results
     isNonLocal?: boolean            // Show cloud icon for non-local server search results
     onSelect: (e?: MouseEvent) => void
-    onCheck: (checked: boolean, event?: MouseEvent) => void
     onClearSelection: () => void  // Clear multi-select when right-clicking unchecked row
     onActionComplete?: (autoSelectNext?: boolean) => void
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
@@ -58,7 +57,6 @@
     searchFolderType: _searchFolderType = '',
     isNonLocal = false,
     onSelect,
-    onCheck,
     onClearSelection,
     onActionComplete,
     onReply,
@@ -118,24 +116,6 @@
       standard: 'px-2 py-1 text-xs',
       large: 'px-2.5 py-1 text-sm',
     },
-    checkbox: {
-      micro: 'w-4 h-4',
-      compact: 'w-5 h-5',
-      standard: 'w-6 h-6',
-      large: 'w-7 h-7',
-    },
-    checkboxInner: {
-      micro: 'w-3 h-3',
-      compact: 'w-4 h-4',
-      standard: 'w-5 h-5',
-      large: 'w-6 h-6',
-    },
-    checkIcon: {
-      micro: 'w-2 h-2',
-      compact: 'w-3 h-3',
-      standard: 'w-4 h-4',
-      large: 'w-5 h-5',
-    },
   }
 
   // Get display name for participants
@@ -172,11 +152,6 @@
       console.error('Star toggle failed:', err)
       toasts.error($_('toast.failedToUpdateStar'))
     }
-  }
-
-  function handleCheckboxClick(e: MouseEvent) {
-    e.stopPropagation()
-    onCheck(!checked, e)
   }
 
   const hasUnread = $derived((conversation.unreadCount || 0) > 0)
@@ -248,24 +223,6 @@
     role="button"
     tabindex="0"
   >
-    <!-- Checkbox (visible on hover or when checked) -->
-    <div
-      class="{densityClasses.checkbox[density]} flex-shrink-0 flex items-center justify-center self-center {checked
-        ? 'opacity-100'
-        : 'opacity-0 group-hover:opacity-40 hover:!opacity-100 max-[767px]:opacity-40 max-[767px]:active:opacity-100'} transition-opacity duration-200"
-    >
-      <button
-        class="{densityClasses.checkboxInner[density]} rounded border {checked
-          ? 'bg-primary border-primary'
-          : 'border-muted-foreground hover:border-primary'} flex items-center justify-center transition-colors duration-200"
-        onclick={handleCheckboxClick}
-      >
-        {#if checked}
-          <Icon icon="mdi:check" class="{densityClasses.checkIcon[density]} text-primary-foreground" />
-        {/if}
-      </button>
-    </div>
-
     <!-- Content -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 mb-0.5">
