@@ -912,6 +912,8 @@ func (a *App) Shutdown(ctx context.Context) {
 
 // updateDBConnectionPool scales the database connection pool based on account count.
 // This should be called at startup and whenever accounts are added or removed.
+// It also refreshes the contact store's own-address set so auto-collection never
+// harvests the user's own mail accounts into their address book.
 func (a *App) updateDBConnectionPool() {
 	accounts, err := a.accountStore.List()
 	if err != nil {
@@ -920,6 +922,16 @@ func (a *App) updateDBConnectionPool() {
 		return
 	}
 	a.db.UpdateIdleConns(len(accounts))
+
+	if a.contactStore != nil {
+		emails := make([]string, 0, len(accounts))
+		for _, acc := range accounts {
+			if acc != nil && acc.Email != "" {
+				emails = append(emails, acc.Email)
+			}
+		}
+		a.contactStore.SetOwnEmails(emails)
+	}
 }
 
 // getIMAPCredentials returns IMAP credentials for an account.

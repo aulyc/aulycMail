@@ -23,6 +23,18 @@ func (a *App) RefreshContactsFromMail() (int, error) {
 		return 0, fmt.Errorf("contacts not ready")
 	}
 
+	// Keep the contact store's own-address set current, then purge any of the
+	// user's own accounts that were collected before this exclusion existed.
+	// New collection below already skips them via the store.
+	a.updateDBConnectionPool()
+	if accounts, err := a.accountStore.List(); err == nil {
+		for _, acc := range accounts {
+			if acc != nil && acc.Email != "" {
+				_ = a.contactStore.Delete(acc.Email)
+			}
+		}
+	}
+
 	rows, err := a.db.DB.Query(`
 		SELECT m.from_email, m.from_name,
 		       COALESCE(m.to_list, ''), COALESCE(m.cc_list, ''), COALESCE(m.bcc_list, ''),

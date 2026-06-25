@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,14 +31,71 @@ var ErrContactExists = errors.New("contact already exists")
 type Store struct {
 	db  *sql.DB
 	log zerolog.Logger
+
+	// ownEmails holds the lowercased addresses of the user's own mail accounts.
+	// Auto-collection (sender/recipient/ccbcc) skips these so the user never
+	// shows up in their own address book. Updated at startup and on account
+	// add/remove via SetOwnEmails; guarded by mu for concurrent sync goroutines.
+	mu        sync.RWMutex
+	ownEmails map[string]struct{}
 }
 
 // NewStore creates a new contact store.
 func NewStore(db *sql.DB) *Store {
 	return &Store{
-		db:  db,
-		log: logging.WithComponent("contact"),
+		db:        db,
+		log:       logging.WithComponent("contact"),
+		ownEmails: map[string]struct{}{},
 	}
+}
+
+// SetOwnEmails replaces the set of the user's own account addresses. Collection
+// paths skip any address in this set. Safe for concurrent use.
+func (s *Store) SetOwnEmails(emails []string) {
+	set := make(map[string]struct{}, len(emails))
+	for _, e := range emails {
+		e = strings.ToLower(strings.TrimSpace(e))
+		if e != "" {
+			set[e] = struct{}{}
+		}
+	}
+	s.mu.Lock()
+	s.ownEmails = set
+	s.mu.Unlock()
+}
+
+// IsOwnEmail reports whether the (case-insensitive) address belongs to one of
+// the user's own mail accounts.
+func (s *Store) IsOwnEmail(email string) bool {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return false
+	}
+	s.mu.RLock()
+	_, ok := s.ownEmails[email]
+	s.mu.RUnlock()
+	return ok
+}
+
+// unquoteDisplayName strips a single layer of surrounding RFC 5322 quoted-string
+// quotes from an auto-collected display name and unescapes quoted-pairs
+// (\" → ", \\ → \). Some servers leave the whole phrase quoted (e.g. the literal
+// `"70497@bjtu.edu.cn"`); this normalizes it to `70497@bjtu.edu.cn`. Returns the
+// input unchanged when it isn't a "..."-wrapped string.
+func unquoteDisplayName(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
+		return s
+	}
+	inner := s[1 : len(s)-1]
+	var b strings.Builder
+	for i := 0; i < len(inner); i++ {
+		if inner[i] == '\\' && i+1 < len(inner) {
+			i++
+		}
+		b.WriteByte(inner[i])
+	}
+	return strings.TrimSpace(b.String())
 }
 
 // Search returns local contacts matching the query for autocomplete.
@@ -179,9 +237,13 @@ func (s *Store) AddOrUpdateWithRole(email, displayName, role string) error {
 // NOT touched on conflict — a manual contact stays manual even after mail-send.
 func (s *Store) addOrUpdateCollected(email, displayName, roleCol string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
-	displayName = strings.TrimSpace(displayName)
+	displayName = unquoteDisplayName(displayName)
 	if email == "" {
 		return fmt.Errorf("email cannot be empty")
+	}
+	// Never collect the user's own account addresses into their address book.
+	if s.IsOwnEmail(email) {
+		return nil
 	}
 
 	now := time.Now()
