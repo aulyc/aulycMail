@@ -226,6 +226,17 @@
     <!-- Content -->
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-2 mb-0.5">
+        <!-- Star (before the name; vertically centered with name + date) -->
+        <button
+          class="flex-shrink-0 p-1 -ml-1 rounded hover:bg-muted transition-colors duration-200"
+          onclick={handleStarClick}
+        >
+          <Icon
+            icon={conversation.isStarred ? 'mdi:star' : 'mdi:star-outline'}
+            class="{densityClasses.starIcon[density]} {conversation.isStarred ? 'text-yellow-500' : 'text-muted-foreground'}"
+          />
+        </button>
+
         <!-- Account Indicator (for unified inbox) -->
         {#if showAccountIndicator && accountColor}
           <span
@@ -321,16 +332,5 @@
         </p>
       {/if}
     </div>
-
-    <!-- Star -->
-    <button
-      class="flex-shrink-0 p-1 -mr-1 rounded hover:bg-muted transition-colors duration-200"
-      onclick={handleStarClick}
-    >
-      <Icon
-        icon={conversation.isStarred ? 'mdi:star' : 'mdi:star-outline'}
-        class="{densityClasses.starIcon[density]} {conversation.isStarred ? 'text-yellow-500' : 'text-muted-foreground'}"
-      />
-    </button>
   </div>
 </MessageContextMenu>
