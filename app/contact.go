@@ -26,7 +26,7 @@ func (a *App) RefreshContactsFromMail() (int, error) {
 	rows, err := a.db.DB.Query(`
 		SELECT m.from_email, m.from_name,
 		       COALESCE(m.to_list, ''), COALESCE(m.cc_list, ''), COALESCE(m.bcc_list, ''),
-		       f.type
+		       f.folder_type
 		FROM messages m
 		JOIN folders f ON m.folder_id = f.id
 	`)
