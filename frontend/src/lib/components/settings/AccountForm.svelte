@@ -5,7 +5,7 @@
   import { Label } from '$lib/components/ui/label'
   import * as Select from '$lib/components/ui/select'
   import { ColorPicker } from '$lib/components/ui/color-picker'
-  import Checkbox from '$lib/components/ui/checkbox/Checkbox.svelte'
+  import BoolSelect from '$lib/components/ui/bool-select/BoolSelect.svelte'
   import {
     providers,
     detectProvider,
@@ -936,7 +936,7 @@
                excludes this account. -->
           <div class="space-y-2">
             <label class="flex items-center gap-3 text-sm">
-              <Checkbox bind:checked={noOutgoingServer} />
+              <BoolSelect bind:checked={noOutgoingServer} />
               <span class="font-medium">{$_('account.noOutgoingServer')}</span>
             </label>
             <p class="text-xs text-muted-foreground">{$_('account.noOutgoingServerHelp')}</p>
@@ -1040,7 +1040,7 @@
               <div class="space-y-3 pt-3 border-t border-border">
                 <h4 class="text-sm font-medium">{$_('account.smtpAuthentication')}</h4>
                 <label class="flex items-center gap-3 text-sm">
-                  <Checkbox
+                  <BoolSelect
                     checked={smtpUseSameAsIncoming}
                     onCheckedChange={handleSmtpUseSameAsIncomingChange}
                   />

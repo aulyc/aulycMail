@@ -1,7 +1,7 @@
 <script lang="ts">
   import * as Select from '$lib/components/ui/select'
   import { Label } from '$lib/components/ui/label'
-  import Checkbox from '$lib/components/ui/checkbox/Checkbox.svelte'
+  import BoolSelect from '$lib/components/ui/bool-select/BoolSelect.svelte'
   import { _, setLocale } from '$lib/i18n'
   import { supportedLocales } from '$lib/i18n'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
@@ -193,7 +193,7 @@
           {$_('settingsGeneral.darkMailContentHelp')}
         </p>
       </div>
-      <Checkbox id="dark-mail-content" bind:checked={darkMailContent} />
+      <BoolSelect id="dark-mail-content" bind:checked={darkMailContent} />
     </div>
   {/if}
 
@@ -205,7 +205,7 @@
         {$_('settingsGeneral.accentBarUnreadHelp')}
       </p>
     </div>
-    <Checkbox id="accent-bar-unread" bind:checked={accentBarUnread} />
+    <BoolSelect id="accent-bar-unread" bind:checked={accentBarUnread} />
   </div>
 
   <!-- Message list density -->
@@ -236,7 +236,7 @@
         {$_('settingsGeneral.runInBackgroundHelp')}
       </p>
     </div>
-    <Checkbox id="run-background" bind:checked={runBackground} onCheckedChange={handleRunBackgroundChange} />
+    <BoolSelect id="run-background" bind:checked={runBackground} onCheckedChange={handleRunBackgroundChange} />
   </div>
 
   <!-- Autostart on login -->
@@ -247,6 +247,6 @@
         {$_('settingsGeneral.autostartHelp')}
       </p>
     </div>
-    <Checkbox id="autostart" bind:checked={autostart} onCheckedChange={handleAutostartChange} />
+    <BoolSelect id="autostart" bind:checked={autostart} onCheckedChange={handleAutostartChange} />
   </div>
 </div>
