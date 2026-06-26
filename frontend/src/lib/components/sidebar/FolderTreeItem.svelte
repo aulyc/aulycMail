@@ -52,6 +52,23 @@
   }
 
   let hasChildren = $derived(tree.children && tree.children.length > 0)
+
+  // Recursively sum unread across a subtree (folder + all descendants).
+  function sumTreeUnread(trees: folder.FolderTree[]): number {
+    let total = 0
+    for (const t of trees) {
+      total += t.folder?.unreadCount || 0
+      if (t.children) total += sumTreeUnread(t.children)
+    }
+    return total
+  }
+
+  // Badge count: own unread plus every descendant's, so a parent like
+  // "其他文件夹" shows the combined total in both collapsed and expanded states.
+  let aggregateUnread = $derived(
+    (tree.folder?.unreadCount || 0) + (tree.children ? sumTreeUnread(tree.children) : 0)
+  )
+
   let isCollapsed = $derived(
     hasChildren
       ? collapsedFolders[tree.folder!.id] !== false  // collapsed unless explicitly set to false
@@ -161,11 +178,11 @@
         </span>
       {/if}
       <span class="flex-1"></span>
-      {#if tree.folder.unreadCount > 0}
+      {#if aggregateUnread > 0}
         <span
           class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground"
         >
-          {tree.folder.unreadCount}
+          {aggregateUnread}
         </span>
       {/if}
     </button>
