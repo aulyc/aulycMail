@@ -12,6 +12,7 @@
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
   import ExtensionRail from './lib/components/rail/ExtensionRail.svelte'
   import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
+  import AboutDialog from './lib/components/settings/AboutDialog.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
   import { refreshExtensionRegistry, getRailTabs } from '$lib/stores/extensionRegistry.svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
@@ -147,6 +148,7 @@
   // Settings dialog — hosted at app level so the rail's gear opens it from
   // any view (mail or an extension pane), not just the mail sidebar.
   let showSettings = $state(false)
+  let showAbout = $state(false)
 
   // Certificate TOFU state (for background sync cert errors)
   let showCertDialog = $state(false)
@@ -234,6 +236,10 @@
   }
 
   onMount(async () => {
+    // Native macOS App-menu items route here.
+    EventsOn('menu:openSettings', () => { showSettings = true })
+    EventsOn('menu:openAbout', () => { showAbout = true })
+
     // Listen for notification click events from backend
     EventsOn('notification:clicked', (data: { accountId: string; folderId: string; threadId: string }) => {
       // Find folder info for display
@@ -1515,6 +1521,7 @@
 
 <!-- App Settings dialog — opened from the rail's gear (works in every view) -->
 <SettingsDialog bind:open={showSettings} onClose={() => { showSettings = false }} />
+<AboutDialog bind:open={showAbout} onClose={() => { showAbout = false }} />
 
 
 <!-- Certificate TOFU Dialog (for background sync cert errors) -->

@@ -492,6 +492,18 @@ func (a *App) Startup(ctx context.Context) {
 	// terminate:) bypass background-mode hiding in BeforeClose.
 	platform.InstallTerminateHook()
 
+	// Replace the default macOS menu with a minimal App + Edit menu. The custom
+	// App-menu items (Settings / About) emit events the frontend handles.
+	platform.SetMenuHandler(func(action string) {
+		switch action {
+		case "settings":
+			wailsRuntime.EventsEmit(a.ctx, "menu:openSettings")
+		case "about":
+			wailsRuntime.EventsEmit(a.ctx, "menu:openAbout")
+		}
+	})
+	platform.InstallAppMenu(a.menuLabels())
+
 	// Logging, paths, db open, migrations, and credential store are all
 	// initialized in Preflight (called from main.go before wails.Run). By
 	// the time Startup runs, a.paths, a.db, and a.credStore are non-nil.
@@ -949,6 +961,28 @@ func (a *App) getValidOAuthToken(accountID string) (*credentials.OAuthTokens, er
 // GetContext returns the app context
 func (a *App) GetContext() context.Context {
 	return a.ctx
+}
+
+// menuLabels returns the localized strings for the native macOS menu. The menu
+// is built once at startup; changing the language takes effect after a restart.
+// Defaults to Chinese (this build's primary language) when no language is set.
+func (a *App) menuLabels() platform.MenuLabels {
+	zh := true
+	if lang, err := a.GetLanguage(); err == nil && lang != "" && !strings.HasPrefix(lang, "zh") {
+		zh = false
+	}
+	if zh {
+		return platform.MenuLabels{
+			Settings: "设置", About: "关于 aulycmail", Quit: "退出 aulycmail",
+			Edit: "编辑", Undo: "撤销", Redo: "重做",
+			Cut: "剪切", Copy: "复制", Paste: "粘贴", Delete: "删除",
+		}
+	}
+	return platform.MenuLabels{
+		Settings: "Settings", About: "About aulycmail", Quit: "Quit aulycmail",
+		Edit: "Edit", Undo: "Undo", Redo: "Redo",
+		Cut: "Cut", Copy: "Copy", Paste: "Paste", Delete: "Delete",
+	}
 }
 
 // OpenURL opens a URL in the system browser with proper shell escaping
