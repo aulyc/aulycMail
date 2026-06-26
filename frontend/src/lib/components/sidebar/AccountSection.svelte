@@ -86,7 +86,7 @@
 
 <svelte:window onclick={handleClickOutside} />
 
-<div class="mb-2">
+<div class="mb-1">
   <!-- Account Header -->
   <div class="relative group">
     <button
