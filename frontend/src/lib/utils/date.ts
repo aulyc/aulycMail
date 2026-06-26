@@ -16,6 +16,9 @@ import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
 export function formatRelativeDate(date: Date): string {
   const t = get(_)
   const locale = getCurrentDateFnsLocale()
+  // Chinese uses 年/月/日 patterns ("6月25日", "2024年6月25日"); date-fns treats
+  // the CJK characters as literals since only a–z are format tokens.
+  const isZh = locale?.code === 'zh-CN'
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffMinutes = Math.floor(diffMs / (1000 * 60))
@@ -42,10 +45,10 @@ export function formatRelativeDate(date: Date): string {
   }
 
   if (isThisYear(date)) {
-    return format(date, 'MMM d', { locale })
+    return format(date, isZh ? 'M月d日' : 'MMM d', { locale })
   }
 
-  return format(date, 'MMM d, yyyy', { locale })
+  return format(date, isZh ? 'yyyy年M月d日' : 'MMM d, yyyy', { locale })
 }
 
 /**
