@@ -24,6 +24,10 @@ typedef struct {
 @implementation AulycMenuTarget
 - (void)onSettings:(id)sender { (void)sender; goMenuAction("settings"); }
 - (void)onAbout:(id)sender    { (void)sender; goMenuAction("about"); }
+// Routed through a custom selector (not the standard terminate:) so AppKit
+// doesn't decorate the item with the app icon. Still terminates for real, which
+// the terminate hook flags as a genuine quit.
+- (void)onQuit:(id)sender     { (void)sender; [NSApp terminate:nil]; }
 @end
 
 static AulycMenuTarget *gMenuTarget = nil;
@@ -82,9 +86,11 @@ void installAppMenu(AulycMenuLabels labels) {
         [appMenu addItem:aulycItem(settings, @selector(onSettings:), gMenuTarget, @",", NSEventModifierFlagCommand)];
         [appMenu addItem:aulycItem(about, @selector(onAbout:), gMenuTarget, @"", 0)];
         [appMenu addItem:[NSMenuItem separatorItem]];
-        // Quit routes through -[NSApplication terminate:] (target nil → responder
-        // chain → NSApp), which the terminate hook flags as a genuine quit.
-        [appMenu addItem:aulycItem(quit, @selector(terminate:), nil, @"q", NSEventModifierFlagCommand)];
+        // Quit via a custom selector (onQuit: → [NSApp terminate:]) so AppKit
+        // doesn't add the app-icon glyph it attaches to a standard terminate:
+        // item. terminate: is still what ultimately runs, so the real-quit hook
+        // fires.
+        [appMenu addItem:aulycItem(quit, @selector(onQuit:), gMenuTarget, @"q", NSEventModifierFlagCommand)];
 
         // --- Edit menu (native selectors so copy/paste/undo work in the webview) ---
         NSMenuItem* editItem = [[[NSMenuItem alloc] init] autorelease];
