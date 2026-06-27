@@ -286,6 +286,8 @@ export function OpenFolder(arg1:string):Promise<void>;
 
 export function OpenURL(arg1:string):Promise<void>;
 
+export function PrintHTML(arg1:string,arg2:string):Promise<void>;
+
 export function PickAttachmentFiles():Promise<Array<app.ComposerAttachment>>;
 
 export function Preflight():Promise<void>;

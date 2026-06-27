@@ -2,7 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   // @ts-ignore - wailsjs bindings
-  import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource, FetchMessageBody } from '../../../../wailsjs/go/app/App'
+  import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource, FetchMessageBody, PrintHTML } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs bindings
   import { MarkAsRead, MarkAsUnread, Star, Unstar, Archive, Trash, MarkAsSpam, MarkAsNotSpam, DeletePermanently, Undo } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
@@ -77,16 +77,21 @@
   // Per-message override for the dark-mail-content filter. Runtime-only,
   // resets when the conversation changes. Truthy value = user explicitly
   // disabled the filter for this message.
-  let darkMailOverrides = $state<Record<string, boolean>>({})
+  // Whole-conversation dark-filter toggle (driven by the toolbar button). When
+  // true the dark filter is lifted for every message. Resets per conversation.
+  let conversationLightened = $state(false)
 
-  function shouldDarkenMessage(msgId: string): boolean {
-    if (!getDarkMailContent()) return false
-    if (!getIsDarkActive()) return false
-    return !darkMailOverrides[msgId]
+  // The dark filter only applies when dark mode + dark-mail content are on.
+  function darkFilterAvailable(): boolean {
+    return getDarkMailContent() && getIsDarkActive()
   }
 
-  function toggleDarkMailOverride(msgId: string) {
-    darkMailOverrides = { ...darkMailOverrides, [msgId]: !darkMailOverrides[msgId] }
+  function shouldDarkenMessage(_msgId: string): boolean {
+    return darkFilterAvailable() && !conversationLightened
+  }
+
+  function toggleDarkFilter() {
+    conversationLightened = !conversationLightened
   }
 
   // Track focused message for keyboard deletion
@@ -334,7 +339,7 @@
       refreshTimer = null
     }
     messagesWithImagesLoaded.clear()
-    darkMailOverrides = {}
+    conversationLightened = false
     // Reset focused message on thread change so opening a thread starts fresh.
     // Same-thread refreshes (handled via scheduleRefresh) preserve focus.
     focusedMessageId = null
@@ -886,23 +891,10 @@
       </style></head>
       <body><h1>${escapeHtmlText(subject)}</h1>${blocks.join('')}</body></html>`
 
-    const frame = document.createElement('iframe')
-    frame.setAttribute('aria-hidden', 'true')
-    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;'
-    frame.srcdoc = doc
-    frame.onload = () => {
-      const win = frame.contentWindow
-      if (!win) {
-        frame.remove()
-        return
-      }
-      win.addEventListener('afterprint', () => setTimeout(() => frame.remove(), 500))
-      win.focus()
-      win.print()
-      // Fallback cleanup if afterprint never fires (some webviews)
-      setTimeout(() => frame.remove(), 60000)
-    }
-    document.body.appendChild(frame)
+    // window.print() is a no-op in WKWebView, so hand the document to the Go
+    // side, which renders it in an offscreen WKWebView and opens the native
+    // macOS print panel.
+    PrintHTML(doc, subject || 'aulycmail')
   }
 
   async function handlePrint() {
@@ -1270,6 +1262,15 @@
         >
           <Icon icon={allRead ? 'mdi:email-open-outline' : 'mdi:email-outline'} class="w-5 h-5 text-muted-foreground" />
         </button>
+        {#if darkFilterAvailable()}
+          <button
+            class="p-2 rounded-md hover:bg-muted transition-colors"
+            title={conversationLightened ? $_('viewer.darkMailToDark') : $_('viewer.darkMailToLight')}
+            onclick={toggleDarkFilter}
+          >
+            <Icon icon={conversationLightened ? 'mdi:weather-night' : 'mdi:white-balance-sunny'} class="w-5 h-5 text-muted-foreground" />
+          </button>
+        {/if}
       </div>
 
       <div class="flex items-center gap-2">
@@ -1326,7 +1327,6 @@
           <div class="space-y-4">
             {#each visibleMessages as msg, _index (msg.id)}
               {@const isExpanded = expandedMessages.has(msg.id)}
-              {@const isFocusedMsg = inFocusMode && focusModeKind === 'message' && focusedMessageIdInFocus === msg.id}
 
               <!-- Wrap each message in its own context menu -->
               <MessageContextMenu
@@ -1474,27 +1474,11 @@
                           <Icon icon="mdi:pencil" class="w-4 h-4 text-muted-foreground" />
                         </button>
                       {/if}
-                      <button
-                        class="p-1 rounded hover:bg-muted transition-colors"
-                        title={isFocusedMsg ? $_('viewer.exitFocus') : $_('viewer.focusMessage')}
-                        onclick={(e) => { e.stopPropagation(); onToggleMessageFocus?.(msg.id) }}
-                      >
-                        <Icon icon={isFocusedMsg ? 'mdi:fullscreen-exit' : 'mdi:fullscreen'} class="w-4 h-4 text-muted-foreground" />
-                      </button>
                       <Icon
                         icon={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
                         class="w-5 h-5 text-muted-foreground"
                       />
                     </div>
-                    {#if getDarkMailContent() && getIsDarkActive()}
-                      <button
-                        class="text-xs leading-none px-1.5 py-0.5 rounded hover:bg-muted transition-colors"
-                        title={shouldDarkenMessage(msg.id) ? $_('viewer.darkMailToLight') : $_('viewer.darkMailToDark')}
-                        onclick={(e) => { e.stopPropagation(); toggleDarkMailOverride(msg.id) }}
-                      >
-                        {shouldDarkenMessage(msg.id) ? '☀️' : '🌛'}
-                      </button>
-                    {/if}
                   </div>
                 </div>
 
