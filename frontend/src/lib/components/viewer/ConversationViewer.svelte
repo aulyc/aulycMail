@@ -584,10 +584,8 @@
   }
 
   function collapseAll() {
-    // Keep only the last message expanded
-    if (conversation?.messages && conversation.messages.length > 0) {
-      expandedMessages = new Set([conversation.messages[conversation.messages.length - 1].id])
-    }
+    // Collapse every message, including the latest one.
+    expandedMessages = new Set()
   }
 
   function formatDate(dateStr: any): string {
