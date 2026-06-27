@@ -974,13 +974,13 @@ func (a *App) menuLabels() platform.MenuLabels {
 	}
 	if zh {
 		return platform.MenuLabels{
-			Settings: "设置", About: "关于 aulycmail", Quit: "退出 aulycmail",
+			Settings: "设置", About: "关于", Quit: "退出",
 			Edit: "编辑", Undo: "撤销", Redo: "重做",
 			Cut: "剪切", Copy: "复制", Paste: "粘贴", Delete: "删除",
 		}
 	}
 	return platform.MenuLabels{
-		Settings: "Settings", About: "About aulycmail", Quit: "Quit aulycmail",
+		Settings: "Settings", About: "About", Quit: "Quit",
 		Edit: "Edit", Undo: "Undo", Redo: "Redo",
 		Cut: "Cut", Copy: "Copy", Paste: "Paste", Delete: "Delete",
 	}

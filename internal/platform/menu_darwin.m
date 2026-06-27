@@ -40,6 +40,12 @@ static NSMenuItem* aulycItem(NSString* title, SEL action, id target, NSString* k
     if (mods != 0) {
         it.keyEquivalentModifierMask = mods;
     }
+    // Never show a glyph in the state-image column (macOS otherwise puts the app
+    // icon next to the Quit item).
+    [it setImage:nil];
+    [it setOnStateImage:nil];
+    [it setOffStateImage:nil];
+    [it setMixedStateImage:nil];
     return it;
 }
 
