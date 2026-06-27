@@ -27,7 +27,9 @@ export interface UIState {
 // Pane width constraints
 const SIDEBAR_MIN = 180
 const SIDEBAR_MAX = 400
-const LIST_MIN = 280
+// Min wide enough that the list header ("INBOX (1234 封未读)") plus the toolbar
+// icons fit on one line with a 4-digit unread count and no wrapping.
+const LIST_MIN = 360
 const LIST_MAX = 600
 
 // Default state

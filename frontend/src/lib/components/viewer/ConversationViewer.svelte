@@ -1120,118 +1120,106 @@
     </div>
   {:else if conversation}
     <div class="conversation-viewer-content flex flex-col h-full">
-    <!-- Header with Actions -->
-    <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-      <div class="flex items-center gap-2">
-        {#if showBackButton}
-          <button
-            class="p-2 rounded-md hover:bg-muted transition-colors mr-1"
-            title={$_('responsive.back')}
-            aria-label={$_('aria.backToList')}
-            onclick={onBack}
-          >
-            <Icon icon="mdi:arrow-left" class="w-5 h-5 text-muted-foreground" />
-          </button>
-          <div class="w-px h-5 bg-border mx-1"></div>
-        {/if}
+    <!-- Header with Actions — all icons in one continuous row, no grouping -->
+    <div class="flex items-center gap-1 px-4 py-3 border-b border-border">
+      {#if showBackButton}
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.reply')}
-          onclick={handleReply}
+          title={$_('responsive.back')}
+          aria-label={$_('aria.backToList')}
+          onclick={onBack}
         >
-          <Icon icon="mdi:reply" class="w-5 h-5 text-muted-foreground" />
+          <Icon icon="mdi:arrow-left" class="w-5 h-5 text-muted-foreground" />
+        </button>
+      {/if}
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_('viewer.reply')}
+        onclick={handleReply}
+      >
+        <Icon icon="mdi:reply" class="w-5 h-5 text-muted-foreground" />
+      </button>
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_('viewer.replyAll')}
+        onclick={handleReplyAll}
+      >
+        <Icon icon="mdi:reply-all" class="w-5 h-5 text-muted-foreground" />
+      </button>
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_('viewer.forward')}
+        onclick={handleForward}
+      >
+        <Icon icon="mdi:share" class="w-5 h-5 text-muted-foreground" />
+      </button>
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_('viewer.archive')}
+        onclick={handleArchive}
+      >
+        <Icon icon="mdi:archive-outline" class="w-5 h-5 text-muted-foreground" />
+      </button>
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_(isTrashFolder ? 'viewer.deletePermanently' : 'viewer.delete')}
+        onclick={handleDelete}
+      >
+        <Icon icon={isTrashFolder ? 'mdi:delete-forever' : 'mdi:delete-outline'} class="w-5 h-5 text-muted-foreground" />
+      </button>
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_(isSpamFolder ? 'viewer.markAsNotSpam' : 'viewer.markAsSpam')}
+        onclick={handleSpam}
+      >
+        <Icon icon={isSpamFolder ? 'mdi:email-check-outline' : 'mdi:alert-octagon-outline'} class="w-5 h-5 text-muted-foreground" />
+      </button>
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_(allStarred ? 'viewer.removeStar' : 'viewer.star')}
+        onclick={handleStar}
+      >
+        <Icon icon={allStarred ? 'mdi:star' : 'mdi:star-outline'} class="w-5 h-5 {allStarred ? 'text-yellow-500' : 'text-muted-foreground'}" />
+      </button>
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_(allRead ? 'viewer.markAsUnread' : 'viewer.markAsRead')}
+        onclick={handleMarkRead}
+      >
+        <Icon icon={allRead ? 'mdi:email-open-outline' : 'mdi:email-outline'} class="w-5 h-5 text-muted-foreground" />
+      </button>
+      {#if darkFilterAvailable()}
+        <button
+          class="p-2 rounded-md hover:bg-muted transition-colors"
+          title={conversationLightened ? $_('viewer.darkMailToDark') : $_('viewer.darkMailToLight')}
+          onclick={toggleDarkFilter}
+        >
+          <Icon icon={conversationLightened ? 'mdi:weather-night' : 'mdi:white-balance-sunny'} class="w-5 h-5 text-muted-foreground" />
+        </button>
+      {/if}
+      {#if conversation.messages && conversation.messages.length > 1}
+        <button
+          class="p-2 rounded-md hover:bg-muted transition-colors"
+          title={$_('viewer.expandAll')}
+          onclick={expandAll}
+        >
+          <Icon icon="mdi:unfold-more-horizontal" class="w-5 h-5 text-muted-foreground" />
         </button>
         <button
           class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.replyAll')}
-          onclick={handleReplyAll}
+          title={$_('viewer.collapseAll')}
+          onclick={collapseAll}
         >
-          <Icon icon="mdi:reply-all" class="w-5 h-5 text-muted-foreground" />
+          <Icon icon="mdi:unfold-less-horizontal" class="w-5 h-5 text-muted-foreground" />
         </button>
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.forward')}
-          onclick={handleForward}
-        >
-          <Icon icon="mdi:share" class="w-5 h-5 text-muted-foreground" />
-        </button>
-
-        <div class="w-px h-5 bg-border mx-1"></div>
-
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_('viewer.archive')}
-          onclick={handleArchive}
-        >
-          <Icon icon="mdi:archive-outline" class="w-5 h-5 text-muted-foreground" />
-        </button>
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_(isTrashFolder ? 'viewer.deletePermanently' : 'viewer.delete')}
-          onclick={handleDelete}
-        >
-          <Icon icon={isTrashFolder ? 'mdi:delete-forever' : 'mdi:delete-outline'} class="w-5 h-5 text-muted-foreground" />
-        </button>
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_(isSpamFolder ? 'viewer.markAsNotSpam' : 'viewer.markAsSpam')}
-          onclick={handleSpam}
-        >
-          <Icon icon={isSpamFolder ? 'mdi:email-check-outline' : 'mdi:alert-octagon-outline'} class="w-5 h-5 text-muted-foreground" />
-        </button>
-
-        <div class="w-px h-5 bg-border mx-1"></div>
-
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_(allStarred ? 'viewer.removeStar' : 'viewer.star')}
-          onclick={handleStar}
-        >
-          <Icon icon={allStarred ? 'mdi:star' : 'mdi:star-outline'} class="w-5 h-5 {allStarred ? 'text-yellow-500' : 'text-muted-foreground'}" />
-        </button>
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={$_(allRead ? 'viewer.markAsUnread' : 'viewer.markAsRead')}
-          onclick={handleMarkRead}
-        >
-          <Icon icon={allRead ? 'mdi:email-open-outline' : 'mdi:email-outline'} class="w-5 h-5 text-muted-foreground" />
-        </button>
-        {#if darkFilterAvailable()}
-          <button
-            class="p-2 rounded-md hover:bg-muted transition-colors"
-            title={conversationLightened ? $_('viewer.darkMailToDark') : $_('viewer.darkMailToLight')}
-            onclick={toggleDarkFilter}
-          >
-            <Icon icon={conversationLightened ? 'mdi:weather-night' : 'mdi:white-balance-sunny'} class="w-5 h-5 text-muted-foreground" />
-          </button>
-        {/if}
-      </div>
-
-      <div class="flex items-center gap-2">
-        {#if conversation.messages && conversation.messages.length > 1}
-          <button
-            class="p-2 rounded-md hover:bg-muted transition-colors"
-            title={$_('viewer.expandAll')}
-            onclick={expandAll}
-          >
-            <Icon icon="mdi:unfold-more-horizontal" class="w-5 h-5 text-muted-foreground" />
-          </button>
-          <button
-            class="p-2 rounded-md hover:bg-muted transition-colors"
-            title={$_('viewer.collapseAll')}
-            onclick={collapseAll}
-          >
-            <Icon icon="mdi:unfold-less-horizontal" class="w-5 h-5 text-muted-foreground" />
-          </button>
-        {/if}
-        <button
-          class="p-2 rounded-md hover:bg-muted transition-colors"
-          title={inFocusMode && focusModeKind === 'thread' ? $_('viewer.exitFocus') : $_('viewer.focusThread')}
-          onclick={onToggleThreadFocus}
-        >
-          <Icon icon={inFocusMode && focusModeKind === 'thread' ? 'mdi:fullscreen-exit' : 'mdi:fullscreen'} class="w-5 h-5 text-muted-foreground" />
-        </button>
-      </div>
+      {/if}
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={inFocusMode && focusModeKind === 'thread' ? $_('viewer.exitFocus') : $_('viewer.focusThread')}
+        onclick={onToggleThreadFocus}
+      >
+        <Icon icon={inFocusMode && focusModeKind === 'thread' ? 'mdi:fullscreen-exit' : 'mdi:fullscreen'} class="w-5 h-5 text-muted-foreground" />
+      </button>
     </div>
 
     <!-- Conversation Content -->

@@ -1255,7 +1255,7 @@
 <div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
   <!-- Header -->
   <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       {#if showFolderToggle}
         <button
           class="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors"
@@ -1303,13 +1303,13 @@
           {/if}
         </div>
       {:else}
-        <h2 class="font-semibold text-foreground">{folderName}</h2>
-        <span class="text-sm text-muted-foreground">
+        <h2 class="font-semibold text-foreground truncate">{folderName}</h2>
+        <span class="text-sm text-muted-foreground whitespace-nowrap flex-shrink-0">
           {$_('messageList.unread', { values: { count: unreadCount } })}
         </span>
       {/if}
     </div>
-    <div class="flex items-center gap-1">
+    <div class="flex items-center gap-1 flex-shrink-0">
       {#if syncing}
         <!-- While syncing, show spinning icon that cancels on click -->
         <button

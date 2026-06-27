@@ -11,20 +11,11 @@ let narrowMql: MediaQueryList | null = null
 let mediumMql: MediaQueryList | null = null
 
 function updateMode() {
-  if (!narrowMql || !mediumMql) return
-
-  if (narrowMql.matches) {
-    layoutMode = 'narrow'
-  } else if (mediumMql.matches) {
-    layoutMode = 'medium'
-  } else {
-    layoutMode = 'full'
-  }
-
-  // Reset overlays when entering full mode
-  if (layoutMode === 'full') {
-    responsiveView = 'default'
-  }
+  // Always use the full three-column layout — the responsive medium/narrow
+  // collapse modes are disabled by request. All three panes stay visible at
+  // every window width.
+  layoutMode = 'full'
+  responsiveView = 'default'
 }
 
 export function initLayout() {
