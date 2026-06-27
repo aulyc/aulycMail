@@ -122,9 +122,12 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 	// Create application with options
 	err = wails.Run(&options.App{
 		Title:                    "aulycmail",
-		Width:                    1280,
+		Width:                    1300,
 		Height:                   800,
-		MinWidth:                 360,
+		// Floor for the narrowest pane layout (rail + sidebar-min + list-min +
+		// viewer toolbar). The frontend raises this dynamically when the panes
+		// are widened so the viewer's action toolbar always fits.
+		MinWidth:                 1138,
 		MinHeight:                400,
 		Frameless:                !nativeTitleBar,
 		StartHidden:              true, // Hide until frontend is ready to prevent white flash

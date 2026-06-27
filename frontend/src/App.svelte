@@ -43,7 +43,7 @@
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
-  import { WindowShow, WindowHide, EventsOn } from '../wailsjs/runtime/runtime'
+  import { WindowShow, WindowHide, EventsOn, WindowSetMinSize } from '../wailsjs/runtime/runtime'
   import { _ } from '$lib/i18n'
 
   // Component refs for keyboard navigation. Plain `let` (not $state) is
@@ -364,6 +364,8 @@
     // Restore pane widths (already validated/clamped by loadUIState)
     sidebarWidth = uiState.sidebarWidth
     listWidth = uiState.listWidth
+    // Apply the window minimum width for the restored pane layout.
+    updateWindowMinWidth()
 
     // Restore folder selection if valid. A legacy 'unified' selection no longer
     // resolves to any account, so it falls through and nothing is restored.
@@ -690,9 +692,23 @@
     // Save pane widths if we were resizing
     if (isResizingSidebar || isResizingList) {
       saveUIState({ sidebarWidth, listWidth })
+      updateWindowMinWidth()
     }
     isResizingSidebar = false
     isResizingList = false
+  }
+
+  // Keep a window minimum width so the viewer's toolbar always fits. The viewer
+  // gets (window − rail − sidebar − list), so the floor must leave VIEWER_MIN
+  // for it. Recomputed whenever the panes are resized; with narrow panes the
+  // window can be narrower, with wide panes the floor grows.
+  const RAIL_WIDTH = 48        // w-12 icon rail
+  const VIEWER_MIN = 520       // fits the full viewer action toolbar (~12 icons)
+  const LAYOUT_BUFFER = 30     // resize handles + pane borders
+  const WINDOW_MIN_HEIGHT = 400
+  function updateWindowMinWidth() {
+    const minW = Math.round(RAIL_WIDTH + sidebarWidth + listWidth + VIEWER_MIN + LAYOUT_BUFFER)
+    WindowSetMinSize(minW, WINDOW_MIN_HEIGHT)
   }
 
   // After a synthetic contextmenu event, bits-ui mounts the portal asynchronously.
