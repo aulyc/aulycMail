@@ -492,18 +492,6 @@ func (a *App) Startup(ctx context.Context) {
 	// terminate:) bypass background-mode hiding in BeforeClose.
 	platform.InstallTerminateHook()
 
-	// Replace the default macOS menu with a minimal App + Edit menu. The custom
-	// App-menu items (Settings / About) emit events the frontend handles.
-	platform.SetMenuHandler(func(action string) {
-		switch action {
-		case "settings":
-			wailsRuntime.EventsEmit(a.ctx, "menu:openSettings")
-		case "about":
-			wailsRuntime.EventsEmit(a.ctx, "menu:openAbout")
-		}
-	})
-	platform.InstallAppMenu(a.menuLabels())
-
 	// Logging, paths, db open, migrations, and credential store are all
 	// initialized in Preflight (called from main.go before wails.Run). By
 	// the time Startup runs, a.paths, a.db, and a.credStore are non-nil.
@@ -520,6 +508,19 @@ func (a *App) Startup(ctx context.Context) {
 	a.settingsStore = settings.NewStore(db)
 	a.appStateStore = appstate.NewStore(db.DB)
 	a.imageAllowlistStore = settings.NewImageAllowlistStore(db)
+
+	// Replace the default macOS menu with a minimal App + Edit menu. Done after
+	// the settings store exists, since menuLabels() reads the language setting.
+	// The custom App-menu items (Settings / About) emit events the frontend handles.
+	platform.SetMenuHandler(func(action string) {
+		switch action {
+		case "settings":
+			wailsRuntime.EventsEmit(a.ctx, "menu:openSettings")
+		case "about":
+			wailsRuntime.EventsEmit(a.ctx, "menu:openAbout")
+		}
+	})
+	platform.InstallAppMenu(a.menuLabels())
 
 	// Scale database connection pool based on number of accounts
 	a.updateDBConnectionPool()
