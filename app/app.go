@@ -964,12 +964,6 @@ func (a *App) GetContext() context.Context {
 	return a.ctx
 }
 
-// PrintHTML opens the native print panel for the given HTML document. Exposed to
-// the frontend because window.print() is a no-op inside WKWebView.
-func (a *App) PrintHTML(html, title string) {
-	platform.PrintHTML(html, title)
-}
-
 // menuLabels returns the localized strings for the native macOS menu. The menu
 // is built once at startup; changing the language takes effect after a restart.
 // Defaults to Chinese (this build's primary language) when no language is set.

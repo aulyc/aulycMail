@@ -542,10 +542,6 @@ export function OpenURL(arg1) {
   return window['go']['app']['App']['OpenURL'](arg1);
 }
 
-export function PrintHTML(arg1, arg2) {
-  return window['go']['app']['App']['PrintHTML'](arg1, arg2);
-}
-
 export function PickAttachmentFiles() {
   return window['go']['app']['App']['PickAttachmentFiles']();
 }
