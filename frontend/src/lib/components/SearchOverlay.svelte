@@ -112,6 +112,9 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
+    // While an IME is composing (e.g. typing pinyin), let Enter/arrows commit or
+    // navigate the candidate window — don't hijack them for the results list.
+    if (e.isComposing || e.keyCode === 229) return
     if (e.key === 'Escape') {
       e.preventDefault()
       e.stopPropagation()
