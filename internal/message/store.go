@@ -2392,6 +2392,7 @@ type ContactMessage struct {
 	Date      time.Time `json:"date"`
 	IsRead    bool      `json:"isRead"`
 	Incoming  bool      `json:"incoming"` // true when the contact is the sender
+	Snippet   string    `json:"snippet"`  // short body preview (search overlay)
 }
 
 // ListByParticipant returns recent messages where the given email address is a
@@ -2462,9 +2463,11 @@ func (s *Store) SearchMessagesInFolder(folderID, query string, limit int) ([]*Co
 
 	rows, err := s.db.Query(`
 		SELECT m.id, COALESCE(m.thread_id, m.id), m.subject, m.from_name, m.from_email,
-		       m.date, m.folder_id, f.account_id, m.is_read
+		       m.date, m.folder_id, f.account_id, m.is_read,
+		       COALESCE(m.snippet, ''), COALESCE(a.email, '')
 		FROM messages m
 		JOIN folders f ON m.folder_id = f.id
+		JOIN accounts a ON f.account_id = a.id
 		WHERE m.folder_id = ?
 		  AND (
 		    LOWER(COALESCE(m.subject, '')) LIKE ?
@@ -2486,13 +2489,17 @@ func (s *Store) SearchMessagesInFolder(folderID, query string, limit int) ([]*Co
 	for rows.Next() {
 		m := &ContactMessage{}
 		var dateStr sql.NullString
+		var accountEmail string
 		if err := rows.Scan(&m.ID, &m.ThreadID, &m.Subject, &m.FromName, &m.FromEmail,
-			&dateStr, &m.FolderID, &m.AccountID, &m.IsRead); err != nil {
+			&dateStr, &m.FolderID, &m.AccountID, &m.IsRead, &m.Snippet, &accountEmail); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
 		}
 		if dateStr.Valid {
 			m.Date = parseTimeString(dateStr.String)
 		}
+		// Direction: received unless the sender is this account's own address
+		// (mirrors the Contacts "related mail" arrow icons).
+		m.Incoming = !strings.EqualFold(strings.TrimSpace(m.FromEmail), strings.TrimSpace(accountEmail))
 		out = append(out, m)
 	}
 	return out, nil

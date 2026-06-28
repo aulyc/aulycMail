@@ -5,7 +5,7 @@
   // active rail. Selecting a result navigates to it via the parent's callbacks.
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
-  import { formatRelativeDate } from '$lib/utils/date'
+  import { formatRelativeDateTime } from '$lib/utils/date'
   // @ts-ignore - wailsjs path
   import { SearchMailInFolder, Contacts_ListContactsForBrowse } from '../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
@@ -22,6 +22,8 @@
     fromEmail: string
     date: string
     isRead: boolean
+    incoming: boolean
+    snippet: string
   }
 
   interface Props {
@@ -46,6 +48,8 @@
   let inputEl = $state<HTMLInputElement | null>(null)
   let debounce: ReturnType<typeof setTimeout> | null = null
   let searchSeq = 0
+  // True while an IME is composing (e.g. typing pinyin before picking a hanzi).
+  let composing = false
 
   const resultCount = $derived(mode === 'mail' ? mailResults.length : contactResults.length)
 
@@ -96,6 +100,21 @@
   }
 
   function onInput() {
+    // While an IME is composing pinyin, the in-progress romaji ("liao") sits in
+    // the input but isn't a real query yet — don't search on it. We search on
+    // compositionend instead, once the hanzi is committed.
+    if (composing) return
+    if (debounce) clearTimeout(debounce)
+    debounce = setTimeout(runSearch, 200)
+  }
+
+  function onCompositionStart() {
+    composing = true
+  }
+
+  function onCompositionEnd() {
+    composing = false
+    // The committed text is now in the input — search it.
     if (debounce) clearTimeout(debounce)
     debounce = setTimeout(runSearch, 200)
   }
@@ -161,6 +180,8 @@
           bind:this={inputEl}
           bind:value={query}
           oninput={onInput}
+          oncompositionstart={onCompositionStart}
+          oncompositionend={onCompositionEnd}
           onkeydown={onKeydown}
           placeholder={mode === 'mail' ? $_('search.overlayMail') : $_('search.overlayContacts')}
           class="flex-1 min-w-0 bg-transparent border-none outline-none text-base text-foreground"
@@ -181,17 +202,25 @@
           {#if mode === 'mail'}
             {#each mailResults as r, i (r.threadId + '-' + i)}
               <button
-                class="w-full flex items-center gap-3 px-4 py-2 text-left {i === activeIndex ? 'bg-muted' : 'hover:bg-muted/50'}"
+                class="w-full flex items-start gap-3 px-4 py-2 text-left {i === activeIndex ? 'bg-muted' : 'hover:bg-muted/50'}"
                 onclick={() => selectIndex(i)}
                 onmousemove={() => activeIndex = i}
               >
-                <Icon icon="mdi:email-outline" class="w-4 h-4 flex-shrink-0 text-muted-foreground" />
+                <Icon
+                  icon={r.incoming ? 'mdi:email-arrow-left-outline' : 'mdi:email-arrow-right-outline'}
+                  class="w-4 h-4 flex-shrink-0 text-muted-foreground mt-0.5"
+                />
                 <span class="flex flex-col min-w-0 flex-1">
-                  <span class="truncate text-sm text-foreground">{r.subject || $_('viewer.noSubject')}</span>
+                  <span class="flex items-baseline gap-2 min-w-0">
+                    <span class="truncate text-sm text-foreground flex-1 min-w-0">{r.subject || $_('viewer.noSubject')}</span>
+                    <span class="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
+                      {r.date ? formatRelativeDateTime(new Date(r.date)) : ''}
+                    </span>
+                  </span>
                   <span class="truncate text-xs text-muted-foreground">{r.fromName || r.fromEmail}</span>
-                </span>
-                <span class="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
-                  {r.date ? formatRelativeDate(new Date(r.date)) : ''}
+                  {#if r.snippet}
+                    <span class="truncate text-xs text-muted-foreground/80">{r.snippet}</span>
+                  {/if}
                 </span>
               </button>
             {/each}

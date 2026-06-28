@@ -65,6 +65,7 @@
     "loadMore": "Load more ({remaining} remaining)",
     "showingNewest": "Showing newest first",
     "showingOldest": "Showing oldest first",
+    "scrollToTop": "Scroll to top",
     "foundIn": "Found in {folder}",
     "encryptedContent": "(Encrypted content)",
     "noContent": "(No content)",

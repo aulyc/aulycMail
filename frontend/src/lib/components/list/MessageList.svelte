@@ -1256,6 +1256,11 @@
       })
   }
 
+  // Scroll the list back to the very top (one-click "to top" button).
+  function scrollToTop() {
+    listContainerRef?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   // Scroll to a specific index in the list
   function scrollToIndex(index: number, block: ScrollLogicalPosition = 'nearest') {
     if (!listContainerRef) return
@@ -1328,6 +1333,15 @@
       <div class="flex-1"></div>
     {/if}
     <div class="flex items-center gap-1 flex-shrink-0">
+      <!-- Scroll list to top -->
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_('messageList.scrollToTop')}
+        aria-label={$_('messageList.scrollToTop')}
+        onclick={scrollToTop}
+      >
+        <Icon icon="mdi:arrow-up" class="w-5 h-5 text-muted-foreground" />
+      </button>
       {#if syncing}
         <!-- While syncing, show spinning icon that cancels on click -->
         <button

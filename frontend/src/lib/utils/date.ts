@@ -52,6 +52,20 @@ export function formatRelativeDate(date: Date): string {
 }
 
 /**
+ * Relative date plus 24-hour wall-clock time — used by the search overlay
+ * results, where the exact time helps distinguish same-day messages.
+ * - Today: just the time ("13:18") — the relative label would itself be a
+ *   duration ("5m", "3h"), so the wall-clock time alone reads cleaner.
+ * - Otherwise: relative date + time ("4月7日 13:18", "2025年3月9日 13:18").
+ */
+export function formatRelativeDateTime(date: Date): string {
+  const locale = getCurrentDateFnsLocale()
+  const time = format(date, 'HH:mm', { locale })
+  if (isToday(date)) return time
+  return `${formatRelativeDate(date)} ${time}`
+}
+
+/**
  * Format a date for message header display
  * Shows full date and time
  */

@@ -14,6 +14,7 @@
   import { toasts } from '$lib/stores/toast'
   import { setFocusedPane, isInputElement, isComposerOpen } from '$lib/stores/keyboard.svelte'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
+  import * as Dialog from '$lib/components/ui/dialog'
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { _ } from '$lib/i18n'
   import { isDialogGuardActive } from '$lib/stores/dialogGuard'
@@ -1062,30 +1063,34 @@
     return email
   }
 
-  // View source state
-  let viewingSourceMessageId = $state<string | null>(null)
+  // View source state — shown in a modal dialog, opened from the toolbar icon.
+  let showSourceDialog = $state(false)
   let messageSource = $state<string | null>(null)
   let loadingSource = $state(false)
 
-  // Toggle view source for a message
-  async function toggleViewSource(msgId: string) {
-    if (viewingSourceMessageId === msgId) {
-      // Close source view
-      viewingSourceMessageId = null
-      messageSource = null
-      return
-    }
+  // Pick which message's source to show: the one the user is focused on, else
+  // the last expanded (currently-reading) message, else the latest message.
+  function currentSourceMessageId(): string | null {
+    const msgs = conversation?.messages
+    if (!msgs || msgs.length === 0) return null
+    if (focusedMessageId && msgs.some(m => m.id === focusedMessageId)) return focusedMessageId
+    const expanded = msgs.filter(m => expandedMessages.has(m.id))
+    if (expanded.length > 0) return expanded[expanded.length - 1].id
+    return msgs[msgs.length - 1].id
+  }
 
-    viewingSourceMessageId = msgId
+  // Open the view-source dialog for the current message and load its source.
+  async function openViewSource() {
+    const msgId = currentSourceMessageId()
+    if (!msgId) return
+    showSourceDialog = true
     loadingSource = true
     messageSource = null
-
     try {
-      const source = await GetMessageSource(msgId)
-      messageSource = source
+      messageSource = await GetMessageSource(msgId)
     } catch {
       toasts.error($_('viewer.failedToLoadSource'))
-      viewingSourceMessageId = null
+      showSourceDialog = false
     } finally {
       loadingSource = false
     }
@@ -1215,6 +1220,13 @@
       {/if}
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_('viewer.viewSource')}
+        onclick={openViewSource}
+      >
+        <Icon icon="mdi:code-tags" class="w-5 h-5 text-muted-foreground" />
+      </button>
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
         title={inFocusMode && focusModeKind === 'thread' ? $_('viewer.exitFocus') : $_('viewer.focusThread')}
         onclick={onToggleThreadFocus}
       >
@@ -1297,6 +1309,9 @@
                       {/if}
                     </div>
 
+                    <!-- Date on its own line, directly under the sender -->
+                    <div class="text-sm text-muted-foreground">{formatDate(msg.date)}</div>
+
                     {#if msg.replyTo && msg.replyTo.toLowerCase() !== msg.fromEmail.toLowerCase()}
                       <div class="text-sm text-muted-foreground flex flex-wrap items-center gap-1">
                         <span class="opacity-60">{$_('viewer.replyTo')}</span>
@@ -1374,12 +1389,10 @@
                     {/if}
                   </div>
 
-                  <!-- Date, edit button (drafts), and expand icon -->
+                  <!-- Edit button (drafts) and expand icon. The date now lives on
+                       the "To" line, so it no longer takes a column here. -->
                   <div class="flex flex-col items-end gap-1 flex-shrink-0">
                     <div class="flex items-center gap-2">
-                      <span class="text-sm text-muted-foreground">
-                        {formatDate(msg.date)}
-                      </span>
                       {#if isDraftsFolder}
                         <button
                           class="p-1 rounded hover:bg-muted transition-colors"
@@ -1400,7 +1413,7 @@
                 <!-- Message Body (visible when expanded) -->
                 {#if isExpanded}
                   <div class="px-4 pb-4 pt-0">
-                    <div class="ml-13 pl-3 border-l-2 border-border">
+                    <div>
                       <!-- Read Receipt Banner -->
                       {#if shouldShowReadReceiptBanner(msg) && readReceiptPolicy === 'ask'}
                         <div class="flex items-center justify-between gap-3 px-3 py-2 mb-4 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md">
@@ -1470,38 +1483,6 @@
                         </div>
                       {/if}
 
-                      <!-- View Source Button -->
-                      <div class="border-t border-border pt-4 mt-4">
-                        <button
-                          onclick={() => toggleViewSource(msg.id)}
-                          class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <Icon icon={viewingSourceMessageId === msg.id ? 'mdi:code-tags' : 'mdi:code-tags'} class="w-4 h-4" />
-                          {viewingSourceMessageId === msg.id ? $_('viewer.hideSource') : $_('viewer.viewSource')}
-                        </button>
-
-                        {#if viewingSourceMessageId === msg.id}
-                          <div class="mt-3">
-                            {#if loadingSource}
-                              <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-                                {$_('viewer.loadingSource')}
-                              </div>
-                            {:else if messageSource}
-                              <div class="relative">
-                                <button
-                                  onclick={() => copyToClipboard(messageSource || '', $_('viewer.viewSource'))}
-                                  class="absolute top-2 right-2 p-1.5 rounded bg-muted hover:bg-muted/80 transition-colors"
-                                  title={$_('viewer.copySource')}
-                                >
-                                  <Icon icon="mdi:content-copy" class="w-4 h-4" />
-                                </button>
-                                <pre class="text-xs bg-muted/50 p-4 rounded-md overflow-x-auto max-h-96 overflow-y-auto whitespace-pre-wrap break-all font-mono">{messageSource}</pre>
-                              </div>
-                            {/if}
-                          </div>
-                        {/if}
-                      </div>
                     </div>
                   </div>
                 {/if}
@@ -1526,3 +1507,41 @@
   onConfirm={handleConfirmPermanentDelete}
   onCancel={() => showDeleteConfirm = false}
 />
+
+<!-- View Source Dialog. Hide the built-in (absolutely-positioned) close button
+     so the title, copy, and close all sit on one vertically-aligned flex row. -->
+<Dialog.Root bind:open={showSourceDialog}>
+  <Dialog.Content class="max-w-3xl w-[min(90vw,900px)] [&>button]:hidden">
+    <div class="flex items-center gap-2">
+      <Icon icon="mdi:code-tags" class="w-4 h-4 text-foreground flex-shrink-0" />
+      <Dialog.Title class="text-sm font-semibold text-foreground">{$_('viewer.viewSource')}</Dialog.Title>
+      <div class="ml-auto flex items-center gap-1">
+        {#if messageSource}
+          <button
+            onclick={() => copyToClipboard(messageSource || '', $_('viewer.viewSource'))}
+            class="p-1.5 rounded hover:bg-muted transition-colors"
+            title={$_('viewer.copySource')}
+            aria-label={$_('viewer.copySource')}
+          >
+            <Icon icon="mdi:content-copy" class="w-4 h-4 text-muted-foreground" />
+          </button>
+        {/if}
+        <button
+          onclick={() => showSourceDialog = false}
+          class="p-1.5 rounded hover:bg-muted transition-colors"
+          aria-label={$_('common.close')}
+        >
+          <Icon icon="mdi:close" class="w-4 h-4 text-muted-foreground" />
+        </button>
+      </div>
+    </div>
+    {#if loadingSource}
+      <div class="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
+        <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
+        {$_('viewer.loadingSource')}
+      </div>
+    {:else if messageSource}
+      <pre class="text-xs bg-muted/50 p-4 rounded-md overflow-auto max-h-[70vh] whitespace-pre-wrap break-all font-mono text-foreground">{messageSource}</pre>
+    {/if}
+  </Dialog.Content>
+</Dialog.Root>
