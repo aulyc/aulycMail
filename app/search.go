@@ -19,6 +19,17 @@ func (a *App) SearchConversations(accountID, folderID, query string, offset, lim
 	return results, err
 }
 
+// SearchMailInFolder does a substring (case-insensitive) match over a folder's
+// messages — subject, sender, recipients, snippet. Powers the `/` search
+// overlay, where partial/mid-word matches (CJK + pinyin) must work, which the
+// FTS-backed SearchConversations can't do.
+func (a *App) SearchMailInFolder(folderID, query string, limit int) ([]*message.ContactMessage, error) {
+	if a.messageStore == nil {
+		return []*message.ContactMessage{}, nil
+	}
+	return a.messageStore.SearchMessagesInFolder(folderID, query, limit)
+}
+
 // GetSearchCount returns the total count of search results in a folder
 func (a *App) GetSearchCount(accountID, folderID, query, filter string) (int, error) {
 	_, count, err := a.messageStore.SearchConversations(folderID, query, 0, 0, filter)

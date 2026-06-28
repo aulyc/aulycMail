@@ -2444,3 +2444,56 @@ func (s *Store) ListByParticipant(email string, limit int) ([]*ContactMessage, e
 	}
 	return out, nil
 }
+
+// SearchMessagesInFolder returns messages in a folder whose subject, sender, or
+// recipients contain the query as a SUBSTRING (case-insensitive), newest first.
+// Unlike the FTS-backed conversation search, this matches mid-word and suffix
+// fragments (e.g. "亚军" inside "廖亚军", "yajun" inside "liaoyajun"), which is
+// what the `/` search overlay needs. Powers the overlay's mail results.
+func (s *Store) SearchMessagesInFolder(folderID, query string, limit int) ([]*ContactMessage, error) {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if folderID == "" || q == "" {
+		return []*ContactMessage{}, nil
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	like := "%" + q + "%"
+
+	rows, err := s.db.Query(`
+		SELECT m.id, COALESCE(m.thread_id, m.id), m.subject, m.from_name, m.from_email,
+		       m.date, m.folder_id, f.account_id, m.is_read
+		FROM messages m
+		JOIN folders f ON m.folder_id = f.id
+		WHERE m.folder_id = ?
+		  AND (
+		    LOWER(COALESCE(m.subject, '')) LIKE ?
+		    OR LOWER(COALESCE(m.from_name, '')) LIKE ?
+		    OR LOWER(COALESCE(m.from_email, '')) LIKE ?
+		    OR LOWER(COALESCE(m.to_list, '')) LIKE ?
+		    OR LOWER(COALESCE(m.cc_list, '')) LIKE ?
+		    OR LOWER(COALESCE(m.snippet, '')) LIKE ?
+		  )
+		ORDER BY m.date DESC
+		LIMIT ?
+	`, folderID, like, like, like, like, like, like, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search messages in folder: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*ContactMessage
+	for rows.Next() {
+		m := &ContactMessage{}
+		var dateStr sql.NullString
+		if err := rows.Scan(&m.ID, &m.ThreadID, &m.Subject, &m.FromName, &m.FromEmail,
+			&dateStr, &m.FolderID, &m.AccountID, &m.IsRead); err != nil {
+			return nil, fmt.Errorf("scan message: %w", err)
+		}
+		if dateStr.Valid {
+			m.Date = parseTimeString(dateStr.String)
+		}
+		out = append(out, m)
+	}
+	return out, nil
+}

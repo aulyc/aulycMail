@@ -7,9 +7,22 @@
   import { _ } from '$lib/i18n'
   import { formatRelativeDate } from '$lib/utils/date'
   // @ts-ignore - wailsjs path
-  import { SearchConversations, Contacts_ListContactsForBrowse } from '../../../wailsjs/go/app/App'
+  import { SearchMailInFolder, Contacts_ListContactsForBrowse } from '../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
-  import type { message, v1 } from '../../../wailsjs/go/models'
+  import type { v1 } from '../../../wailsjs/go/models'
+
+  // Substring mail-search result (mirrors Go message.ContactMessage).
+  interface MailResult {
+    id: string
+    threadId: string
+    accountId: string
+    folderId: string
+    subject: string
+    fromName: string
+    fromEmail: string
+    date: string
+    isRead: boolean
+  }
 
   interface Props {
     open?: boolean
@@ -19,14 +32,14 @@
     accountId?: string | null
     folderId?: string | null
     onClose: () => void
-    onSelectMail?: (r: message.ConversationSearchResult) => void
+    onSelectMail?: (r: MailResult) => void
     onSelectContact?: (c: v1.Contact) => void
   }
 
   let { open = $bindable(false), mode, accountId = null, folderId = null, onClose, onSelectMail, onSelectContact }: Props = $props()
 
   let query = $state('')
-  let mailResults = $state<message.ConversationSearchResult[]>([])
+  let mailResults = $state<MailResult[]>([])
   let contactResults = $state<v1.Contact[]>([])
   let loading = $state(false)
   let activeIndex = $state(0)
@@ -65,7 +78,7 @@
     loading = true
     const seq = ++searchSeq
     const p: Promise<any> = mode === 'mail'
-      ? SearchConversations(accountId!, folderId!, q, 0, 50, '')
+      ? SearchMailInFolder(folderId!, q, 50)
       : Contacts_ListContactsForBrowse(q, '', 50, 0)
     p.then((r: any) => {
       if (seq !== searchSeq) return // stale
@@ -118,10 +131,6 @@
     }
   }
 
-  function mailSender(r: message.ConversationSearchResult): string {
-    const p = r.participants && r.participants.length > 0 ? r.participants[0] : null
-    return (p?.name || p?.email || '') as string
-  }
   function contactEmail(c: v1.Contact): string {
     return c.emails && c.emails.length > 0 ? c.emails[0] : ''
   }
@@ -130,9 +139,9 @@
 {#if open}
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 z-[100] bg-black/50" onclick={onClose}>
+  <div class="fixed inset-0 z-[100] bg-black/70" onclick={onClose}>
     <div
-      class="mx-auto mt-[12vh] w-[min(90vw,640px)] bg-popover border border-border rounded-xl shadow-2xl overflow-hidden"
+      class="mx-auto mt-[calc(12vh+52px)] w-[min(90vw,640px)] bg-popover border border-border rounded-xl shadow-2xl overflow-hidden"
       onclick={(e) => e.stopPropagation()}
     >
       <!-- Search input -->
@@ -169,10 +178,10 @@
                 <Icon icon="mdi:email-outline" class="w-4 h-4 flex-shrink-0 text-muted-foreground" />
                 <span class="flex flex-col min-w-0 flex-1">
                   <span class="truncate text-sm text-foreground">{r.subject || $_('viewer.noSubject')}</span>
-                  <span class="truncate text-xs text-muted-foreground">{mailSender(r)}</span>
+                  <span class="truncate text-xs text-muted-foreground">{r.fromName || r.fromEmail}</span>
                 </span>
                 <span class="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
-                  {r.latestDate ? formatRelativeDate(new Date(r.latestDate)) : ''}
+                  {r.date ? formatRelativeDate(new Date(r.date)) : ''}
                 </span>
               </button>
             {/each}
