@@ -704,6 +704,11 @@
     const focusedPane = getFocusedPane()
     const hasConversation = selectedThreadId !== null
 
+    // When the search overlay is open, it (and its input) owns the keyboard.
+    // Bail so app shortcuts don't fire — e.g. Cmd+A must select the input's
+    // text, not all messages in the list behind the overlay.
+    if (showSearchOverlay) return
+
     // Don't intercept keyboard events when a context menu or dropdown is open
     // (bits-ui portals mount [role="menu"] only while open)
     if (document.querySelector('[role="menu"]')) return
