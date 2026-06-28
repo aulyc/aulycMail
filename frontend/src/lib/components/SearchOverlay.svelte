@@ -131,6 +131,13 @@
       e.preventDefault()
       e.stopPropagation()
       if (resultCount > 0) selectIndex(activeIndex)
+    } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+      // Select all of the input's text. The native Edit menu has no Select All
+      // item (so macOS won't do this), and the global Cmd+A would otherwise be
+      // suppressed while the overlay is open — handle it here.
+      e.preventDefault()
+      e.stopPropagation()
+      inputEl?.select()
     }
   }
 
