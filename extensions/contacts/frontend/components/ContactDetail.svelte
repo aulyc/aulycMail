@@ -315,44 +315,42 @@
         <dd class="m-0 text-foreground">
           {contact.updatedAt ? new Date(contact.updatedAt).toLocaleString() : '—'}
         </dd>
-      </dl>
 
-      <!-- Related mail — click a row to open it in the mail view -->
-      <div class="mt-6">
-        <h2 class="text-sm font-semibold text-muted-foreground mb-2">
-          {$_('contacts.detail.relatedMail')}
-        </h2>
-        {#if loadingMessages}
-          <div class="flex items-center gap-2 text-sm text-muted-foreground py-4">
-            <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-            <span>{$_('contacts.detail.relatedMailLoading')}</span>
-          </div>
-        {:else if relatedMessages.length === 0}
-          <p class="text-sm text-muted-foreground py-4">{$_('contacts.detail.relatedMailEmpty')}</p>
-        {:else}
-          <div class="border border-border rounded-md divide-y divide-border overflow-hidden">
-            {#each relatedMessages as m (m.id)}
-              <button
-                type="button"
-                class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
-                onclick={() => openConversation(m)}
-                title={$_('contacts.detail.openInMail')}
-              >
-                <Icon
-                  icon={m.incoming ? 'mdi:email-arrow-left-outline' : 'mdi:email-arrow-right-outline'}
-                  class="w-4 h-4 flex-shrink-0 text-muted-foreground"
-                />
-                <span class="flex-1 min-w-0 truncate {m.isRead ? 'text-foreground' : 'font-semibold text-foreground'}">
-                  {m.subject || $_('contacts.common.unnamed')}
-                </span>
-                <span class="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
-                  {formatRelativeDate(new Date(m.date))}
-                </span>
-              </button>
-            {/each}
-          </div>
-        {/if}
-      </div>
+        <!-- Related mail — click a row to open it in the mail view -->
+        <dt class="text-sm text-muted-foreground">{$_('contacts.detail.relatedMail')}</dt>
+        <dd class="m-0">
+          {#if loadingMessages}
+            <div class="flex items-center gap-2 text-sm text-muted-foreground">
+              <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
+              <span>{$_('contacts.detail.relatedMailLoading')}</span>
+            </div>
+          {:else if relatedMessages.length === 0}
+            <p class="text-sm text-muted-foreground">{$_('contacts.detail.relatedMailEmpty')}</p>
+          {:else}
+            <div class="border border-border rounded-md divide-y divide-border overflow-hidden">
+              {#each relatedMessages as m (m.id)}
+                <button
+                  type="button"
+                  class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+                  onclick={() => openConversation(m)}
+                  title={$_('contacts.detail.openInMail')}
+                >
+                  <Icon
+                    icon={m.incoming ? 'mdi:email-arrow-left-outline' : 'mdi:email-arrow-right-outline'}
+                    class="w-4 h-4 flex-shrink-0 text-muted-foreground"
+                  />
+                  <span class="flex-1 min-w-0 truncate {m.isRead ? 'text-foreground' : 'font-semibold text-foreground'}">
+                    {m.subject || $_('contacts.common.unnamed')}
+                  </span>
+                  <span class="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
+                    {formatRelativeDate(new Date(m.date))}
+                  </span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </dd>
+      </dl>
     {/if}
   {/snippet}
 </DetailPane>
