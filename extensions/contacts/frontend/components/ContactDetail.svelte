@@ -332,9 +332,8 @@
             {#each relatedMessages as m (m.id)}
               <button
                 type="button"
-                class="w-full flex items-center gap-2 py-2 text-left hover:bg-muted/50 transition-colors"
+                class="w-full flex items-center gap-2 py-2 text-left cursor-pointer"
                 onclick={() => openConversation(m)}
-                title={$_('contacts.detail.openInMail')}
               >
                 <Icon
                   icon={m.incoming ? 'mdi:email-arrow-left-outline' : 'mdi:email-arrow-right-outline'}
