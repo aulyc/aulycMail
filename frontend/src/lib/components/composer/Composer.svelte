@@ -62,25 +62,15 @@
     initialMessage?: smtp.ComposeMessage | null
     /** Existing draft ID if editing a draft */
     draftId?: string | null
-    /** Original message ID for reply/forward (needed for pop-out) */
-    messageId?: string | null
     onClose?: () => void
     onSent?: () => void
     /** Optional API override - if not provided, uses context or creates main window API */
     api?: ComposerApi
-    /** Whether this composer is in a detached window (hides pop-out button) */
-    isDetached?: boolean
-    /** Signal from parent (detached window) to trigger close flow */
-    closeRequested?: boolean
-    /** Callback when close request has been handled */
-    onCloseHandled?: () => void
-    /** Callback when recipient or subject changes (for dynamic window title) */
-    onTitleChange?: (to: string, subject: string) => void
     /** Whether remote images were loaded in the viewer before reply/forward */
     imagesLoaded?: boolean
   }
 
-  let { accountId, initialMessage = null, draftId = null, messageId = null, onClose, onSent, api: propApi, isDetached = false, closeRequested = false, onCloseHandled, onTitleChange, imagesLoaded = false }: Props = $props()
+  let { accountId, initialMessage = null, draftId = null, onClose, onSent, api: propApi, imagesLoaded = false }: Props = $props()
 
   // Get API from context, props, or create default main window API
   const contextApi = getContext<ComposerApi | undefined>(COMPOSER_API_KEY)
@@ -114,7 +104,6 @@
   let showCc = $state(false)
   let showBcc = $state(false)
   let sending = $state(false)
-  let poppingOut = $state(false)  // Pop-out in progress
   let editorElement = $state<HTMLElement | null>(null)
   let editor = $state<Editor | null>(null)
 
@@ -532,21 +521,6 @@
     // untrack prevents $effect from creating a reactive dependency on saveStatus
     // (which scheduleDraftSave reads), avoiding a circular re-run that causes flash
     untrack(() => scheduleDraftSave())
-  })
-
-  // Watch for close request from parent (detached window)
-  $effect(() => {
-    if (closeRequested) {
-      handleClose()
-    }
-  })
-
-  // Emit title info when recipients or subject change (for dynamic window title)
-  $effect(() => {
-    if (!onTitleChange) return
-    const firstTo = toRecipients[0]
-    const displayTo = firstTo?.name || firstTo?.address || ''
-    onTitleChange(displayTo, subject)
   })
 
   // Track current signature for swapping when identity changes
@@ -992,7 +966,6 @@
     }
     showCloseConfirm = false
     closeLoading = null
-    onCloseHandled?.()
     onClose?.()
   }
 
@@ -1009,49 +982,12 @@
     }
     showCloseConfirm = false
     closeLoading = null
-    onCloseHandled?.()
     onClose?.()
   }
 
   // Keep Editing: Just close the dialog
   function handleKeepEditing() {
     showCloseConfirm = false
-    onCloseHandled?.()
-  }
-
-  // Pop out to detached window
-  async function handlePopOut() {
-    if (!api.openComposerWindow) {
-      // Not available in detached windows
-      return
-    }
-
-    poppingOut = true
-
-    try {
-      // Save draft first to get a draft ID
-      const message = buildMessage()
-      const result = await api.saveDraft(activeAccountId, message, currentDraftId || '')
-      const savedDraftId = result.id
-
-      // Open detached composer window with the active account
-      await api.openComposerWindow(
-        activeAccountId,
-        getDisplayMode(),
-        messageId || '',
-        savedDraftId
-      )
-
-      // Close this modal/inline composer
-      onClose?.()
-    } catch (err) {
-      console.error('Failed to pop out composer:', err)
-      addToast({
-        type: 'error',
-        message: $_('composer.failedToOpenComposer'),
-      })
-      poppingOut = false
-    }
   }
 
   // Insert image via file picker
@@ -1126,10 +1062,6 @@
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       handleSend()
-    }
-    if (e.key === 'd' && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault()
-      handlePopOut()
     }
     // Alt+T to focus toolbar (hint mode)
     if (e.key === 't' && e.altKey) {
@@ -1484,39 +1416,20 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
-      <!-- Pop-out button (only shown in main window, not detached) -->
-      {#if !isDetached && api.openComposerWindow}
-        <button
-          onclick={handlePopOut}
-          disabled={poppingOut || sending}
-          class="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={$_('composer.openInNewWindow')}
-        >
-          {#if poppingOut}
-            <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          {:else}
-            <Icon icon="mdi:open-in-new" class="w-4 h-4" />
-          {/if}
-        </button>
-      {/if}
       <button
         onclick={handleClose}
-        disabled={poppingOut}
         class="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors disabled:opacity-50"
       >
         {$_('composer.close')}
       </button>
       <button
         onclick={handleSend}
-        disabled={sending || poppingOut || toRecipients.length === 0}
+        disabled={sending || toRecipients.length === 0}
         class="px-4 py-1.5 text-sm font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {#if sending}
           <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
           {$_('composer.sending')}
-        {:else if poppingOut}
-          <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
-          {$_('composer.opening')}
         {:else}
           <Icon icon="mdi:send" class="w-4 h-4" />
           {$_('composer.send')}

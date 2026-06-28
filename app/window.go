@@ -13,9 +13,3 @@ import (
 func (a *App) RefreshWindowConstraints() {
 	wailsRuntime.WindowSetMaxSize(a.ctx, 100000, 100000)
 }
-
-// RefreshWindowConstraints removes window max size constraints for the
-// composer window. See App.RefreshWindowConstraints for details.
-func (c *ComposerApp) RefreshWindowConstraints() {
-	wailsRuntime.WindowSetMaxSize(c.ctx, 100000, 100000)
-}

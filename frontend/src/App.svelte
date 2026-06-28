@@ -21,7 +21,7 @@
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { addToast } from '$lib/stores/toast'
-  import { loadSettings, getThemeMode, getComposerMode, getMailtoMode } from '$lib/stores/settings.svelte'
+  import { loadSettings, getThemeMode } from '$lib/stores/settings.svelte'
   import { loadImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
   import { initTheme, applyThemeFromMode, handleSystemThemeEvent, handleMediaQueryChange } from '$lib/stores/theme.svelte'
   import { loadUIState, saveUIState, getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
@@ -41,7 +41,7 @@
   import { dispatchExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
   import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive } from '$lib/stores/layout.svelte'
   // @ts-ignore - wailsjs path
-  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, QuitApp, OpenComposerWindow, GetSystemTheme, NotifyStartupComplete } from '../wailsjs/go/app/App.js'
+  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, QuitApp, GetSystemTheme, NotifyStartupComplete } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
@@ -509,12 +509,6 @@
     const accountId = resolveAccountId(selectedAccountId)
     if (!accountId) return
 
-    // Check if detached mode is preferred
-    if (getComposerMode() === 'detached') {
-      OpenComposerWindow(accountId, 'new', '', '', '')
-      return
-    }
-
     composerAccountId = accountId
     composerInitialMessage = null
     composerDraftId = null
@@ -576,7 +570,7 @@
     body?: string
   }
 
-  function handleMailtoData(data: MailtoData, rawMailtoURL?: string) {
+  function handleMailtoData(data: MailtoData) {
     // Use selected account or first account (resolve 'unified' to real account)
     const accountId = resolveAccountId(selectedAccountId)
     if (!accountId) {
@@ -585,12 +579,6 @@
         type: 'error',
         message: $_('toast.noAccountConfigured'),
       })
-      return
-    }
-
-    // Check if detached mode is preferred for mailto
-    if (getMailtoMode() === 'detached' && rawMailtoURL) {
-      OpenComposerWindow(accountId, 'new', '', '', rawMailtoURL)
       return
     }
 
@@ -615,12 +603,6 @@
     // Use conversation's account ID (important for unified inbox), fall back to selected account or first account
     const accountId = resolveAccountId(selectedConversationAccountId) || resolveAccountId(selectedAccountId)
     if (!accountId) return
-
-    // Force detached composer when in focus mode — preserves the focused view
-    if (focusMode !== 'off') {
-      OpenComposerWindow(accountId, mode, messageId, '', '')
-      return
-    }
 
     try {
       // Call backend to prepare the reply message (backend gets account from message)
@@ -1430,8 +1412,8 @@
 
 <!-- Composer Modal -->
 {#if showComposer && composerAccountId}
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-    <div class="{getLayoutMode() === 'narrow' ? 'w-full h-full bg-background overflow-hidden' : 'w-full max-w-3xl h-[80vh] bg-background rounded-lg shadow-xl overflow-hidden'}">
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+    <div class="{getLayoutMode() === 'narrow' ? 'w-full h-full bg-background overflow-hidden' : 'w-full max-w-3xl h-[80vh] bg-background border rounded-lg shadow-xl overflow-hidden'}">
       <Composer
         accountId={composerAccountId}
         initialMessage={composerInitialMessage}

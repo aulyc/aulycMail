@@ -54,7 +54,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
-        composer: path.resolve(__dirname, 'composer.html'),
       },
     },
   },

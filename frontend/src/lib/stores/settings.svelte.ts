@@ -2,12 +2,11 @@
 // Provides reactive state for application settings
 
 // @ts-ignore - wailsjs path
-import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetShowTitleBar, GetRunBackground, GetStartHidden, GetAutostart, GetLanguage, GetComposerMode, GetMailtoMode, GetComposerFormat, GetNativeTitleBar, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread, GetShowMessageListCircles, GetShowViewerCircles } from '../../../wailsjs/go/app/App'
+import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetShowTitleBar, GetRunBackground, GetStartHidden, GetAutostart, GetLanguage, GetComposerFormat, GetNativeTitleBar, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread, GetShowMessageListCircles, GetShowViewerCircles } from '../../../wailsjs/go/app/App'
 import { setLocale as setI18nLocale, detectSystemLocale } from '$lib/i18n'
 import { loadDateFnsLocale, getDateFnsLocale } from '$lib/i18n/dateFnsLocale'
 import type { Locale } from 'date-fns'
 
-export type ComposerMode = 'inline' | 'detached'
 export type ComposerFormat = 'rich' | 'plain'
 export type MessageListDensity = 'micro' | 'compact' | 'standard' | 'large'
 export type MessageListSortOrder = 'newest' | 'oldest'
@@ -31,8 +30,6 @@ let runBackground = $state<boolean>(false)
 let startHidden = $state<boolean>(false)
 let autostart = $state<boolean>(false)
 let language = $state<string>('')
-let composerMode = $state<ComposerMode>('inline')
-let mailtoMode = $state<ComposerMode>('inline')
 let composerFormat = $state<ComposerFormat>('rich')
 let nativeTitleBar = $state<boolean>(false)
 let alwaysLoadImages = $state<boolean>(false)
@@ -75,13 +72,6 @@ export function getLanguage(): string {
   return language
 }
 
-export function getComposerMode(): ComposerMode {
-  return composerMode
-}
-
-export function getMailtoMode(): ComposerMode {
-  return mailtoMode
-}
 
 export function getComposerFormat(): ComposerFormat {
   return composerFormat
@@ -155,14 +145,6 @@ export function setLanguage(lang: string) {
   }
 }
 
-export function setComposerMode(mode: ComposerMode) {
-  composerMode = mode
-}
-
-export function setMailtoMode(mode: ComposerMode) {
-  mailtoMode = mode
-}
-
 export function setComposerFormat(format: ComposerFormat) {
   composerFormat = format
 }
@@ -194,7 +176,7 @@ export function setShowViewerCircles(v: boolean) {
 // Load settings from backend (call on app startup)
 export async function loadSettings(): Promise<ThemeMode> {
   try {
-    const [density, sortOrder, theme, titleBar, runBg, startHid, autoSt, lang, compMode, mailMode, compFormat, nativeTB, alwaysImages, darkMail, accentBar, listCircles, viewerCircles] = await Promise.all([
+    const [density, sortOrder, theme, titleBar, runBg, startHid, autoSt, lang, compFormat, nativeTB, alwaysImages, darkMail, accentBar, listCircles, viewerCircles] = await Promise.all([
       GetMessageListDensity(),
       GetMessageListSortOrder(),
       GetThemeMode(),
@@ -203,8 +185,6 @@ export async function loadSettings(): Promise<ThemeMode> {
       GetStartHidden(),
       GetAutostart(),
       GetLanguage(),
-      GetComposerMode(),
-      GetMailtoMode(),
       GetComposerFormat(),
       GetNativeTitleBar(),
       GetAlwaysLoadImages(),
@@ -220,8 +200,6 @@ export async function loadSettings(): Promise<ThemeMode> {
     runBackground = runBg ?? false
     startHidden = startHid ?? false
     autostart = autoSt ?? false
-    composerMode = (compMode as ComposerMode) || 'inline'
-    mailtoMode = (mailMode as ComposerMode) || 'inline'
     composerFormat = (compFormat as ComposerFormat) || 'rich'
     nativeTitleBar = nativeTB ?? false
     alwaysLoadImages = alwaysImages ?? false

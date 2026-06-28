@@ -28,7 +28,6 @@ export function AddMicrosoftSharedMailbox(arg1:string,arg2:string,arg3:string):P
 
 export function Archive(arg1:Array<string>):Promise<void>;
 
-export function BroadcastThemeChange(arg1:string):Promise<void>;
 
 export function CanUndo():Promise<boolean>;
 
@@ -108,11 +107,9 @@ export function GetAutostart():Promise<boolean>;
 
 export function GetComposerFormat():Promise<string>;
 
-export function GetComposerMode():Promise<string>;
 
 export function GetConfiguredOAuthProviders():Promise<Array<string>>;
 
-export function GetConnectedComposers():Promise<number>;
 
 export function GetContact(arg1:string):Promise<contact.Contact>;
 
@@ -138,7 +135,6 @@ export function GetFolders(arg1:string):Promise<Array<folder.Folder>>;
 
 export function GetIMAPConnectionForUndo(arg1:context.Context,arg2:string):Promise<imap.Client>;
 
-export function GetIPCAddress():Promise<string>;
 
 export function GetIdentities(arg1:string):Promise<Array<account.Identity>>;
 
@@ -152,7 +148,6 @@ export function GetLanguage():Promise<string>;
 
 export function GetLastSeenVersion():Promise<string>;
 
-export function GetMailtoMode():Promise<string>;
 
 export function GetMarkAsReadDelay():Promise<number>;
 
@@ -280,7 +275,6 @@ export function NotifyStartupComplete():Promise<void>;
 
 export function OpenAttachment(arg1:string):Promise<void>;
 
-export function OpenComposerWindow(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function OpenFile(arg1:string):Promise<void>;
 
@@ -346,7 +340,6 @@ export function SetAutostart(arg1:boolean):Promise<void>;
 
 export function SetComposerFormat(arg1:string):Promise<void>;
 
-export function SetComposerMode(arg1:string):Promise<void>;
 
 export function SetDarkMailContent(arg1:boolean):Promise<void>;
 
@@ -358,7 +351,6 @@ export function SetLanguage(arg1:string):Promise<void>;
 
 export function SetLastSeenVersion(arg1:string):Promise<void>;
 
-export function SetMailtoMode(arg1:string):Promise<void>;
 
 export function SetMarkAsReadDelay(arg1:number):Promise<void>;
 

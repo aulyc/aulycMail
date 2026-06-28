@@ -1,9 +1,5 @@
-// Theme store - centralizes all theme application and system theme detection logic
-//
-// Used by both App.svelte (main window) and ComposerApp.svelte (detached composer).
-// The OS theme probe is injected by the caller because each Wails process binds a
-// different Go struct (App vs ComposerApp), and importing the wrong binding at the
-// module level silently fails at runtime.
+// Theme store - centralizes all theme application and system theme detection logic.
+// The OS theme probe is injected by the caller.
 
 import { getThemeMode, type ThemeMode } from './settings.svelte'
 
@@ -88,13 +84,4 @@ export function handleSystemThemeEvent(newTheme: string) {
 export function handleMediaQueryChange(matches: boolean) {
   if (getThemeMode() !== 'system' || portalThemeAvailable) return
   applyTheme(matches ? 'dark' : 'light')
-}
-
-/** Handle 'theme:changed' IPC events for composer windows. */
-export function handleThemeChanged(newTheme: string) {
-  if (newTheme === 'system') {
-    applyThemeFromMode('system')
-    return
-  }
-  applyTheme(newTheme as ThemeMode)
 }

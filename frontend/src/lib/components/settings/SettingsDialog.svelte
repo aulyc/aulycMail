@@ -5,9 +5,9 @@
   import * as Tabs from '$lib/components/ui/tabs'
   import { Button } from '$lib/components/ui/button'
   // @ts-ignore - wailsjs path
-  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage, GetComposerMode, SetComposerMode, GetMailtoMode, SetMailtoMode, GetComposerFormat, SetComposerFormat, GetNativeTitleBar, SetNativeTitleBar, GetAlwaysLoadImages, SetAlwaysLoadImages, GetDarkMailContent, SetDarkMailContent, GetAccentBarUnread, SetAccentBarUnread, GetShowMessageListCircles, SetShowMessageListCircles, GetShowViewerCircles, SetShowViewerCircles, QuitApp } from '../../../../wailsjs/go/app/App.js'
+  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage, GetComposerFormat, SetComposerFormat, GetNativeTitleBar, SetNativeTitleBar, GetAlwaysLoadImages, SetAlwaysLoadImages, GetDarkMailContent, SetDarkMailContent, GetAccentBarUnread, SetAccentBarUnread, GetShowMessageListCircles, SetShowMessageListCircles, GetShowViewerCircles, SetShowViewerCircles, QuitApp } from '../../../../wailsjs/go/app/App.js'
   import { addToast } from '$lib/stores/toast'
-  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, setRunBackground as updateRunBackgroundStore, setStartHidden as updateStartHiddenStore, setAutostart as updateAutostartStore, setLanguage as updateLanguageStore, setComposerMode as updateComposerModeStore, setMailtoMode as updateMailtoModeStore, setComposerFormat as updateComposerFormatStore, setNativeTitleBar as updateNativeTitleBarStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setAccentBarUnread as updateAccentBarUnreadStore, setShowMessageListCircles as updateShowMessageListCirclesStore, setShowViewerCircles as updateShowViewerCirclesStore, type MessageListDensity, type ThemeMode, type ComposerMode, type ComposerFormat } from '$lib/stores/settings.svelte'
+  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, setRunBackground as updateRunBackgroundStore, setStartHidden as updateStartHiddenStore, setAutostart as updateAutostartStore, setLanguage as updateLanguageStore, setComposerFormat as updateComposerFormatStore, setNativeTitleBar as updateNativeTitleBarStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setAccentBarUnread as updateAccentBarUnreadStore, setShowMessageListCircles as updateShowMessageListCirclesStore, setShowViewerCircles as updateShowViewerCirclesStore, type MessageListDensity, type ThemeMode, type ComposerFormat } from '$lib/stores/settings.svelte'
   import { applyThemeFromMode } from '$lib/stores/theme.svelte'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
@@ -16,7 +16,6 @@
   import ComposerTab from './ComposerTab.svelte'
   import ImagesTab from './ImagesTab.svelte'
   import AccountsTab from './AccountsTab.svelte'
-  import AboutTab from './AboutTab.svelte'
 
   interface Props {
     /** Whether the dialog is open */
@@ -40,8 +39,6 @@
   let startHidden = $state<boolean>(false)
   let autostart = $state<boolean>(false)
   let language = $state<string>('')
-  let composerMode = $state<string>('inline')
-  let mailtoMode = $state<string>('inline')
   let composerFormat = $state<string>('rich')
   let nativeTitleBar = $state<boolean>(false)
   let alwaysLoadImages = $state<boolean>(false)
@@ -93,7 +90,7 @@
     loading = true
     hasSaved = false
     try {
-      const [policy, delayMs, density, theme, titleBar, runBg, startHid, autoSt, lang, comp, mail, compFmt, nativeTB, alwaysImages, darkMail, accentBar, listCircles, viewerCircles] = await Promise.all([
+      const [policy, delayMs, density, theme, titleBar, runBg, startHid, autoSt, lang, compFmt, nativeTB, alwaysImages, darkMail, accentBar, listCircles, viewerCircles] = await Promise.all([
         GetReadReceiptResponsePolicy(),
         GetMarkAsReadDelay(),
         GetMessageListDensity(),
@@ -103,8 +100,6 @@
         GetStartHidden(),
         GetAutostart(),
         GetLanguage(),
-        GetComposerMode(),
-        GetMailtoMode(),
         GetComposerFormat(),
         GetNativeTitleBar(),
         GetAlwaysLoadImages(),
@@ -124,8 +119,6 @@
       startHidden = startHid
       autostart = autoSt
       language = lang
-      composerMode = comp || 'inline'
-      mailtoMode = mail || 'inline'
       composerFormat = compFmt || 'rich'
       nativeTitleBar = nativeTB ?? false
       alwaysLoadImages = alwaysImages ?? false
@@ -159,8 +152,6 @@
       if (language) {
         await SetLanguage(language)
       }
-      await SetComposerMode(composerMode)
-      await SetMailtoMode(mailtoMode)
       await SetComposerFormat(composerFormat)
       await SetNativeTitleBar(nativeTitleBar)
       await SetAlwaysLoadImages(alwaysLoadImages)
@@ -178,8 +169,6 @@
       if (language) {
         updateLanguageStore(language)
       }
-      updateComposerModeStore(composerMode as ComposerMode)
-      updateMailtoModeStore(mailtoMode as ComposerMode)
       updateComposerFormatStore(composerFormat as ComposerFormat)
       updateNativeTitleBarStore(nativeTitleBar)
       updateAlwaysLoadImagesStore(alwaysLoadImages)
@@ -245,7 +234,7 @@
       </div>
     {:else}
       <Tabs.Root bind:value={activeTab} class="w-full">
-        <Tabs.List class="grid w-full grid-cols-5">
+        <Tabs.List class="grid w-full grid-cols-4">
           <Tabs.Trigger value="general" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:settings-2" width="16" height="16" /></span>
             {$_('settings.general')}
@@ -261,10 +250,6 @@
           <Tabs.Trigger value="accounts" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:mails" width="16" height="16" /></span>
             {$_('settings.accounts')}
-          </Tabs.Trigger>
-          <Tabs.Trigger value="about" class="flex items-center gap-2">
-            <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:info" width="16" height="16" /></span>
-            {$_('settings.about')}
           </Tabs.Trigger>
         </Tabs.List>
 
@@ -288,12 +273,8 @@
 
           <Tabs.Content value="composer" class="mt-0">
             <ComposerTab
-              bind:composerMode
-              bind:mailtoMode
               bind:composerFormat
               bind:readReceiptResponsePolicy
-              onComposerModeChange={(v) => { composerMode = v; if (v === 'detached') mailtoMode = 'detached' }}
-              onMailtoModeChange={(v) => mailtoMode = v}
               onFormatChange={(v) => composerFormat = v}
               onPolicyChange={(v) => readReceiptResponsePolicy = v}
             />
@@ -308,11 +289,6 @@
 
           <Tabs.Content value="accounts" class="mt-0">
             <AccountsTab />
-          </Tabs.Content>
-
-
-          <Tabs.Content value="about" class="mt-0">
-            <AboutTab />
           </Tabs.Content>
         </div>
       </Tabs.Root>

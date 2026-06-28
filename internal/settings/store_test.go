@@ -220,43 +220,6 @@ func TestSetGetMessageListSortOrder(t *testing.T) {
 	}
 }
 
-func TestSetGetComposerMode(t *testing.T) {
-	tests := []struct {
-		name    string
-		mode    string
-		wantErr bool
-	}{
-		{name: "inline", mode: "inline"},
-		{name: "detached", mode: "detached"},
-		{name: "invalid", mode: "invalid", wantErr: true},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			store := NewStore(openTestDB(t))
-
-			err := store.SetComposerMode(tt.mode)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			got, err := store.GetComposerMode()
-			if err != nil {
-				t.Fatalf("unexpected error on get: %v", err)
-			}
-			if got != tt.mode {
-				t.Errorf("got %q, want %q", got, tt.mode)
-			}
-		})
-	}
-}
-
 func TestSetGetComposerFormat(t *testing.T) {
 	tests := []struct {
 		name    string

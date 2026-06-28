@@ -114,14 +114,7 @@ func (a *App) GetThemeMode() (string, error) {
 // SetThemeMode sets the theme mode
 // Valid values: "system", "light", "light-blue", "light-orange", "dark", "dark-gray", "dark-balanced"
 func (a *App) SetThemeMode(mode string) error {
-	if err := a.settingsStore.SetThemeMode(mode); err != nil {
-		return err
-	}
-
-	// Broadcast theme change to all detached composer windows
-	a.BroadcastThemeChange(mode)
-
-	return nil
+	return a.settingsStore.SetThemeMode(mode)
 }
 
 // GetShowTitleBar returns whether the title bar should be shown
@@ -237,33 +230,6 @@ func (a *App) GetLanguage() (string, error) {
 // Valid values: "en", "zh-TW", "zh-HK", "zh-CN"
 func (a *App) SetLanguage(language string) error {
 	return a.settingsStore.SetLanguage(language)
-}
-
-// GetComposerMode returns the default compose mode ("inline" or "detached")
-func (a *App) GetComposerMode() (string, error) {
-	return a.settingsStore.GetComposerMode()
-}
-
-// SetComposerMode sets the default compose mode.
-// Setting to "detached" also auto-sets mailto mode to "detached".
-func (a *App) SetComposerMode(mode string) error {
-	if err := a.settingsStore.SetComposerMode(mode); err != nil {
-		return err
-	}
-	if mode == "detached" {
-		return a.settingsStore.SetMailtoMode("detached")
-	}
-	return nil
-}
-
-// GetMailtoMode returns the external mailto link handling mode ("inline" or "detached")
-func (a *App) GetMailtoMode() (string, error) {
-	return a.settingsStore.GetMailtoMode()
-}
-
-// SetMailtoMode sets the external mailto link handling mode
-func (a *App) SetMailtoMode(mode string) error {
-	return a.settingsStore.SetMailtoMode(mode)
 }
 
 // GetComposerFormat returns the default composer format ("rich" or "plain")

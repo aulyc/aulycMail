@@ -26,9 +26,6 @@ export function Archive(arg1) {
   return window['go']['app']['App']['Archive'](arg1);
 }
 
-export function BroadcastThemeChange(arg1) {
-  return window['go']['app']['App']['BroadcastThemeChange'](arg1);
-}
 
 export function CanUndo() {
   return window['go']['app']['App']['CanUndo']();
@@ -186,17 +183,11 @@ export function GetComposerFormat() {
   return window['go']['app']['App']['GetComposerFormat']();
 }
 
-export function GetComposerMode() {
-  return window['go']['app']['App']['GetComposerMode']();
-}
 
 export function GetConfiguredOAuthProviders() {
   return window['go']['app']['App']['GetConfiguredOAuthProviders']();
 }
 
-export function GetConnectedComposers() {
-  return window['go']['app']['App']['GetConnectedComposers']();
-}
 
 export function GetContact(arg1) {
   return window['go']['app']['App']['GetContact'](arg1);
@@ -246,9 +237,6 @@ export function GetIMAPConnectionForUndo(arg1, arg2) {
   return window['go']['app']['App']['GetIMAPConnectionForUndo'](arg1, arg2);
 }
 
-export function GetIPCAddress() {
-  return window['go']['app']['App']['GetIPCAddress']();
-}
 
 export function GetIdentities(arg1) {
   return window['go']['app']['App']['GetIdentities'](arg1);
@@ -274,9 +262,6 @@ export function GetLastSeenVersion() {
   return window['go']['app']['App']['GetLastSeenVersion']();
 }
 
-export function GetMailtoMode() {
-  return window['go']['app']['App']['GetMailtoMode']();
-}
 
 export function GetMarkAsReadDelay() {
   return window['go']['app']['App']['GetMarkAsReadDelay']();
@@ -530,9 +515,6 @@ export function OpenAttachment(arg1) {
   return window['go']['app']['App']['OpenAttachment'](arg1);
 }
 
-export function OpenComposerWindow(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['app']['App']['OpenComposerWindow'](arg1, arg2, arg3, arg4, arg5);
-}
 
 export function OpenFile(arg1) {
   return window['go']['app']['App']['OpenFile'](arg1);
@@ -662,9 +644,6 @@ export function SetComposerFormat(arg1) {
   return window['go']['app']['App']['SetComposerFormat'](arg1);
 }
 
-export function SetComposerMode(arg1) {
-  return window['go']['app']['App']['SetComposerMode'](arg1);
-}
 
 export function SetDarkMailContent(arg1) {
   return window['go']['app']['App']['SetDarkMailContent'](arg1);
@@ -686,9 +665,6 @@ export function SetLastSeenVersion(arg1) {
   return window['go']['app']['App']['SetLastSeenVersion'](arg1);
 }
 
-export function SetMailtoMode(arg1) {
-  return window['go']['app']['App']['SetMailtoMode'](arg1);
-}
 
 export function SetMarkAsReadDelay(arg1) {
   return window['go']['app']['App']['SetMarkAsReadDelay'](arg1);

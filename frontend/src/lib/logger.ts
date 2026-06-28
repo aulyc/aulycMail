@@ -15,10 +15,7 @@
  *   logger.debug('user clicked send')
  *   logger.error(`failed to load: ${err}`)
  *
- * Note: currently routes through App.LogFrontend (main-window binding).
- * The detached composer process has its own ComposerApp.LogFrontend with
- * component=composer-frontend; composer-only code can call that directly
- * if needed.
+ * Routes through App.LogFrontend so frontend logs land in the Go log stream.
  */
 
 // @ts-ignore - Wails generated bindings

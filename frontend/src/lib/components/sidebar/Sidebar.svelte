@@ -456,17 +456,6 @@
           }}
         />
       {/each}
-
-      <!-- Add Account Button -->
-      <div class="px-3 py-2">
-        <button
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-          onclick={openAddAccount}
-        >
-          <Icon icon="mdi:plus" class="w-4 h-4" />
-          <span>{$_('sidebar.addAccount')}</span>
-        </button>
-      </div>
     {/if}
   </div>
 

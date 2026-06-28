@@ -428,7 +428,8 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 }
 
 // handleExternalMailto handles a mailto URL received from a second instance.
-// Routes to inline or detached composer based on the mailto_mode setting.
+// Shows the main window and emits an event for the frontend to open the
+// in-app composer prefilled with the mailto fields.
 func (a *App) handleExternalMailto(rawURL string) {
 	log := logging.WithComponent("app")
 
@@ -438,23 +439,6 @@ func (a *App) handleExternalMailto(rawURL string) {
 		return
 	}
 
-	mailtoMode, _ := a.settingsStore.GetMailtoMode()
-	log.Info().Str("mode", mailtoMode).Msg("Handling external mailto")
-
-	if mailtoMode == "detached" {
-		// Pick first account for detached composer
-		accounts, err := a.accountStore.List()
-		if err != nil || len(accounts) == 0 {
-			log.Warn().Msg("No accounts available for mailto")
-			return
-		}
-		if err := a.OpenComposerWindow(accounts[0].ID, "new", "", "", rawURL); err != nil {
-			log.Warn().Err(err).Msg("Failed to open detached composer for mailto")
-		}
-		return
-	}
-
-	// Inline mode: show window and emit event for frontend
 	a.ShowWindow()
 	wailsRuntime.EventsEmit(a.ctx, "mailto:external", mailtoData)
 }

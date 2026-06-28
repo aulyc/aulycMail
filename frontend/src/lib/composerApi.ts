@@ -1,12 +1,9 @@
 /**
  * Composer API Abstraction Layer
  *
- * Provides a unified interface for composer operations that works in both:
- * - Main window (modal/inline composer) - uses App bindings
- * - Detached composer window - uses ComposerApp bindings
- *
- * The API is injected via Svelte context to allow different implementations
- * depending on the window type.
+ * Provides a unified interface for the in-app (modal/inline) composer's
+ * operations, backed by the main window's App bindings. The API is injected
+ * via Svelte context.
  */
 
 // @ts-ignore - Wails generated imports
@@ -14,7 +11,6 @@ import { smtp, account, contact, app } from '../../wailsjs/go/models'
 
 /**
  * Interface for composer API operations.
- * Both App and ComposerApp implement these methods with the same signatures.
  */
 export interface ComposerApi {
   /** Send a composed email */
@@ -44,17 +40,8 @@ export interface ComposerApi {
   /** Check if running inside a Flatpak sandbox */
   isFlatpak: () => Promise<boolean>
 
-  /**
-   * Get all accounts with their identities (only available in main window).
-   * Returns undefined in detached composer windows.
-   */
+  /** Get all accounts with their identities (for the cross-account From dropdown) */
   getAllAccountIdentities?: () => Promise<app.AccountIdentityGroup[]>
-
-  /**
-   * Open a detached composer window (only available in main window).
-   * Returns undefined in detached composer windows.
-   */
-  openComposerWindow?: (accountId: string, mode: string, messageId: string, draftId: string, mailtoURL?: string) => Promise<void>
 }
 
 /**
@@ -119,70 +106,6 @@ export function createMainWindowApi(): ComposerApi {
 
     getAllAccountIdentities: async () => {
       const { GetAllAccountIdentities } = await import('../../wailsjs/go/app/App.js')
-      return GetAllAccountIdentities()
-    },
-
-    openComposerWindow: async (accountId: string, mode: string, messageId: string, draftId: string, mailtoURL?: string) => {
-      const { OpenComposerWindow } = await import('../../wailsjs/go/app/App.js')
-      return OpenComposerWindow(accountId, mode, messageId, draftId, mailtoURL || '')
-    },
-  }
-}
-
-/**
- * Creates the composer API implementation for the detached composer window.
- * Uses ComposerApp bindings.
- */
-export function createComposerWindowApi(_accountId: string): ComposerApi {
-  return {
-    sendMessage: async (accountId: string, message: smtp.ComposeMessage) => {
-      const { SendMessage } = await import('../../wailsjs/go/app/ComposerApp.js')
-      return SendMessage(accountId, message)
-    },
-
-    searchContacts: async (query: string, limit: number) => {
-      const { SearchContacts } = await import('../../wailsjs/go/app/ComposerApp.js')
-      return SearchContacts(query, limit) || []
-    },
-
-    getIdentities: async (accountId: string) => {
-      const { GetIdentities } = await import('../../wailsjs/go/app/ComposerApp.js')
-      return GetIdentities(accountId)
-    },
-
-    saveDraft: async (accountId: string, message: smtp.ComposeMessage, draftId: string) => {
-      const { SaveDraft } = await import('../../wailsjs/go/app/ComposerApp.js')
-      const result = await SaveDraft(accountId, message, draftId || '')
-      return { id: result?.id || '', syncStatus: result?.syncStatus || 'pending' }
-    },
-
-    deleteDraft: async (draftId: string) => {
-      const { DeleteDraft } = await import('../../wailsjs/go/app/ComposerApp.js')
-      return DeleteDraft(draftId)
-    },
-
-    pickAttachmentFiles: async () => {
-      const { PickAttachmentFiles } = await import('../../wailsjs/go/app/ComposerApp.js')
-      return PickAttachmentFiles()
-    },
-
-    getAccount: async (accountId: string) => {
-      const { GetAccount } = await import('../../wailsjs/go/app/ComposerApp.js')
-      return GetAccount(accountId)
-    },
-
-    readFileAsAttachment: async (filePath: string) => {
-      const { ReadFileAsAttachment } = await import('../../wailsjs/go/app/ComposerApp.js')
-      return ReadFileAsAttachment(filePath)
-    },
-
-    isFlatpak: async () => {
-      const { IsFlatpak } = await import('../../wailsjs/go/app/ComposerApp.js')
-      return IsFlatpak()
-    },
-
-    getAllAccountIdentities: async () => {
-      const { GetAllAccountIdentities } = await import('../../wailsjs/go/app/ComposerApp.js')
       return GetAllAccountIdentities()
     },
   }

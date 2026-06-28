@@ -26,7 +26,6 @@ import (
 	extui "github.com/aulyc/aulycmail/internal/extensions/ui"
 	"github.com/aulyc/aulycmail/internal/folder"
 	"github.com/aulyc/aulycmail/internal/imap"
-	"github.com/aulyc/aulycmail/internal/ipc"
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/aulyc/aulycmail/internal/notification"
@@ -228,7 +227,7 @@ type App struct {
 	// handle the host's knownExtensions Register loop iterates.
 	authBroker       *extauth.Broker      // coreapi.Auth impl for extensions
 	mailAPI          *extmail.API         // coreapi.Mail impl wrapping core stores
-	composerAPI      *extcompose.API      // coreapi.Composer impl wrapping OpenComposerWindow
+	composerAPI      *extcompose.API      // coreapi.Composer impl (currently unimplemented)
 	uiRegistry       *extui.Registry      // coreapi.UI impl: rail tabs, account-setup hooks, ...
 	contactsExt      *extcontactsbe.Extension // Contacts lifecycle handle (manifest + Register only)
 	knownExtensions  []coreapi.Extension      // all first-party extensions, iterated by ListExtensions
@@ -250,10 +249,6 @@ type App struct {
 
 	// Undo system
 	undoStack *undo.Stack
-
-	// IPC for multi-window support (composer windows)
-	ipcServer   ipc.Server
-	ipcTokenMgr *ipc.TokenManager
 
 	// OAuth2 manager
 	oauth2Manager *oauth2.Manager
@@ -575,7 +570,7 @@ func (a *App) Startup(ctx context.Context) {
 	// enabled method call. See extensions/<name>/backend/bridge.go.
 	a.authBroker = extauth.NewBroker(a.credStore, a.oauth2Manager)
 	a.mailAPI = extmail.NewAPI(a.messageStore, a.folderStore)
-	a.composerAPI = extcompose.NewAPI(a)
+	a.composerAPI = extcompose.NewAPI()
 	a.uiRegistry = extui.NewRegistry()
 
 	// Construct first-party extensions and call their lifecycle Register().
@@ -623,9 +618,6 @@ func (a *App) Startup(ctx context.Context) {
 		oauth2Manager:  a.oauth2Manager,
 		draftOps:       &a.draftOps,
 	}
-
-	// Initialize IPC for multi-window support
-	a.initIPC(ctx)
 
 	// Initialize network connectivity monitor (event-driven, zero polling).
 	// Must be initialized before background sync so scheduler and IDLE
@@ -854,24 +846,6 @@ func (a *App) InitiateShutdown() {
 // Shutdown is called when the app is closing
 func (a *App) Shutdown(ctx context.Context) {
 	log := logging.WithComponent("app")
-
-	// Broadcast shutdown to all composer windows
-	if a.ipcServer != nil {
-		clients := a.ipcServer.Clients()
-		if len(clients) > 0 {
-			log.Info().Int("count", len(clients)).Msg("Notifying composer windows of shutdown")
-			msg, _ := ipc.NewMessage(ipc.TypeShutdown, ipc.ShutdownPayload{
-				Reason: "main window closing",
-			})
-			if err := a.ipcServer.Broadcast(msg); err != nil {
-				log.Debug().Err(err).Msg("Failed to broadcast shutdown to composer windows")
-			}
-			// Give composers a moment to save drafts
-			time.Sleep(500 * time.Millisecond)
-		}
-		_ = a.ipcServer.Stop()
-		log.Info().Msg("IPC server stopped")
-	}
 
 	// Stop email sync scheduler
 	if a.syncScheduler != nil {
