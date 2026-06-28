@@ -27,10 +27,12 @@ const (
 	SourceIDLocalCollected = "local:collected"
 
 	// Role categories for auto-collected contacts (Contacts sidebar
-	// 发件人 / 收件人 / 抄送密送). Each filters by the matching role flag.
+	// 发件人 / 收件人 / 抄送 / 密送). Each filters by the matching role flag.
 	SourceIDRoleSender    = "role:sender"
 	SourceIDRoleRecipient = "role:recipient"
-	SourceIDRoleCcBcc     = "role:ccbcc"
+	SourceIDRoleCc        = "role:cc"
+	SourceIDRoleBcc       = "role:bcc"
+	SourceIDRoleCcBcc     = "role:ccbcc" // legacy combined (dormant)
 )
 
 // localKindFromSourceID returns the `contacts.kind` filter value for a local
@@ -54,6 +56,10 @@ func roleFromSourceID(id string) string {
 		return contact.RoleSender
 	case SourceIDRoleRecipient:
 		return contact.RoleRecipient
+	case SourceIDRoleCc:
+		return contact.RoleCc
+	case SourceIDRoleBcc:
+		return contact.RoleBcc
 	case SourceIDRoleCcBcc:
 		return contact.RoleCcBcc
 	default:

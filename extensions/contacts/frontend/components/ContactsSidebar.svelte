@@ -36,7 +36,8 @@
   //   ''                  → all local contacts
   //   'role:sender'       → 发件人 (collected from received mail's From)
   //   'role:recipient'    → 收件人 (collected from sent mail's To)
-  //   'role:ccbcc'        → 抄送密送 (collected from sent mail's Cc/Bcc)
+  //   'role:cc'           → 抄送 (collected from sent mail's Cc)
+  //   'role:bcc'          → 密送 (collected from sent mail's Bcc)
   type SidebarItem = {
     id: string
     label: string
@@ -49,7 +50,8 @@
       { id: '', label: $_('contacts.sidebar.all'), icon: 'mdi:account-multiple' },
       { id: 'role:sender', label: $_('contacts.sidebar.roleSender'), icon: 'mdi:email-arrow-left-outline' },
       { id: 'role:recipient', label: $_('contacts.sidebar.roleRecipient'), icon: 'mdi:email-arrow-right-outline' },
-      { id: 'role:ccbcc', label: $_('contacts.sidebar.roleCcBcc'), icon: 'mdi:email-multiple-outline' },
+      { id: 'role:cc', label: $_('contacts.sidebar.roleCc'), icon: 'mdi:email-multiple-outline' },
+      { id: 'role:bcc', label: $_('contacts.sidebar.roleBcc'), icon: 'mdi:email-off-outline' },
     ]
     return [{ items: builtins }]
   })

@@ -1321,4 +1321,19 @@ var migrations = []Migration{
 			UPDATE contact_records SET collected_sender = 1 WHERE source = 'local' AND kind = 'collected';
 		`,
 	},
+	{
+		Version: 41,
+		SQL: `
+			-- Split the combined Cc/Bcc role into separate Cc and Bcc flags so the
+			-- Contacts sidebar can show 抄送 and 密送 as distinct categories.
+			-- The old combined flag (collected_ccbcc) couldn't tell Cc from Bcc
+			-- retroactively, so backfill existing combined rows as Cc; a "refresh
+			-- contacts from mail" re-scan re-classifies them precisely afterward.
+
+			ALTER TABLE contact_records ADD COLUMN collected_cc INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE contact_records ADD COLUMN collected_bcc INTEGER NOT NULL DEFAULT 0;
+
+			UPDATE contact_records SET collected_cc = 1 WHERE collected_ccbcc = 1;
+		`,
+	},
 }

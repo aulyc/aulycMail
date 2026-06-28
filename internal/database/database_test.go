@@ -196,8 +196,8 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN body_failed`); err != nil {
 		t.Fatalf("drop messages.body_failed for re-migrate: %v", err)
 	}
-	// And v40's collected-role flags on contact_records.
-	for _, col := range []string{"collected_sender", "collected_recipient", "collected_ccbcc"} {
+	// And v40's collected-role flags + v41's split Cc/Bcc flags on contact_records.
+	for _, col := range []string{"collected_sender", "collected_recipient", "collected_ccbcc", "collected_cc", "collected_bcc"} {
 		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
 			t.Fatalf("drop contact_records.%s for re-migrate: %v", col, err)
 		}
@@ -354,8 +354,8 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN body_failed`); err != nil {
 		t.Fatalf("drop messages.body_failed for re-migrate: %v", err)
 	}
-	// And v40's collected-role flags on contact_records.
-	for _, col := range []string{"collected_sender", "collected_recipient", "collected_ccbcc"} {
+	// And v40's collected-role flags + v41's split Cc/Bcc flags on contact_records.
+	for _, col := range []string{"collected_sender", "collected_recipient", "collected_ccbcc", "collected_cc", "collected_bcc"} {
 		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
 			t.Fatalf("drop contact_records.%s for re-migrate: %v", col, err)
 		}

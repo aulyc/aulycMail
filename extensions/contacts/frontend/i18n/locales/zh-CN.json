@@ -15,6 +15,8 @@
       "all": "全部",
       "roleSender": "发件人",
       "roleRecipient": "收件人",
+      "roleCc": "抄送",
+      "roleBcc": "密送",
       "roleCcBcc": "抄送/密送",
       "localAll": "本地 - 全部",
       "localManual": "本地 - 联系人",

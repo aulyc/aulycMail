@@ -77,8 +77,8 @@ func (a *App) RefreshContactsFromMail() (int, error) {
 		switch folder.Type(ftype) {
 		case folder.TypeSent:
 			collectList(toList, contact.RoleRecipient)
-			collectList(ccList, contact.RoleCcBcc)
-			collectList(bccList, contact.RoleCcBcc)
+			collectList(ccList, contact.RoleCc)
+			collectList(bccList, contact.RoleBcc)
 		case folder.TypeDrafts, folder.TypeSpam, folder.TypeTrash:
 			// Skip — drafts/spam/trash aren't a source of real contacts.
 		default:

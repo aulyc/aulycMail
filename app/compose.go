@@ -326,15 +326,15 @@ func (ops *composeOps) sendMessage(ctx context.Context, accountID string, msg sm
 	}
 
 	// Add recipients to local contacts (best-effort; send already succeeded),
-	// tagged by role: To → 收件人 (recipient), Cc/Bcc → 抄送密送 (ccbcc).
+	// tagged by role: To → 收件人 (recipient), Cc → 抄送 (cc), Bcc → 密送 (bcc).
 	for _, to := range msg.To {
 		_ = ops.contactStore.AddOrUpdateWithRole(to.Address, to.Name, contact.RoleRecipient)
 	}
 	for _, cc := range msg.Cc {
-		_ = ops.contactStore.AddOrUpdateWithRole(cc.Address, cc.Name, contact.RoleCcBcc)
+		_ = ops.contactStore.AddOrUpdateWithRole(cc.Address, cc.Name, contact.RoleCc)
 	}
 	for _, bcc := range msg.Bcc {
-		_ = ops.contactStore.AddOrUpdateWithRole(bcc.Address, bcc.Name, contact.RoleCcBcc)
+		_ = ops.contactStore.AddOrUpdateWithRole(bcc.Address, bcc.Name, contact.RoleBcc)
 	}
 
 	// Delete draft if one was provided (send already succeeded — log errors, don't fail)

@@ -1004,14 +1004,39 @@
   }
 
   // Select a specific thread by ID (exposed for notification clicks and the
-  // Contacts related-mail list). Scroll it to the TOP of the viewport so the
-  // jumped-to conversation lands at the top, not the bottom edge.
-  export function selectThread(threadId: string) {
+  // Contacts related-mail list). The target may be an old conversation that
+  // isn't in the first loaded page, so page more conversations in (bounded)
+  // until it appears, then scroll it to the TOP. selectedThreadId is (re)set
+  // after loading so the folder-change auto-select-first doesn't override it.
+  export async function selectThread(threadId: string) {
     selectedThreadId = threadId
-    const index = activeList.findIndex(c => c.threadId === threadId)
-    if (index >= 0) {
-      scrollToIndex(index, 'start')
+    if (isSearchMode) return
+
+    let iterations = 0
+    let loads = 0
+    while (iterations++ < 100) {
+      const index = activeList.findIndex(c => c.threadId === threadId)
+      if (index >= 0) {
+        selectedThreadId = threadId
+        scrollToIndex(index, 'start')
+        return
+      }
+      // Wait for any in-flight load before deciding to page in more.
+      if (loading) {
+        await new Promise((r) => setTimeout(r, 40))
+        continue
+      }
+      // Stop if everything is loaded, or we've paged in enough (~12 pages).
+      const exhausted = lastLoadedFolderId === folderId && conversations.length >= totalCount
+      if (exhausted || loads >= 12) {
+        selectedThreadId = threadId
+        return
+      }
+      loads++
+      offset = conversations.length
+      await loadConversations()
     }
+    selectedThreadId = threadId
   }
 
   // Toggle search focus (exposed for keyboard navigation via Ctrl+S)

@@ -191,7 +191,9 @@ func mapSourceForLegacy(source string) string {
 const (
 	RoleSender    = "sender"    // appeared as the From of a received message
 	RoleRecipient = "recipient" // was a To recipient of a sent message
-	RoleCcBcc     = "ccbcc"     // was a Cc/Bcc recipient of a sent message
+	RoleCc        = "cc"        // was a Cc recipient of a sent message
+	RoleBcc       = "bcc"       // was a Bcc recipient of a sent message
+	RoleCcBcc     = "ccbcc"     // legacy combined Cc/Bcc role (dormant; split into RoleCc/RoleBcc)
 )
 
 // roleColumn maps a role string to its contact_records column, or "" for an
@@ -203,6 +205,10 @@ func roleColumn(role string) string {
 		return "collected_sender"
 	case RoleRecipient:
 		return "collected_recipient"
+	case RoleCc:
+		return "collected_cc"
+	case RoleBcc:
+		return "collected_bcc"
 	case RoleCcBcc:
 		return "collected_ccbcc"
 	default:
