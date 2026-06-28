@@ -7,8 +7,66 @@
   import { contactsView, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
   import { toasts } from '$lib/stores/toast'
+  import { formatRelativeDate } from '$lib/utils/date'
   // @ts-ignore - wailsjs bindings
   import type { v1 } from '$wailsjs/go/models'
+  // @ts-ignore - wailsjs bindings
+  import { GetContactMessages } from '$wailsjs/go/app/App'
+  // @ts-ignore - wailsjs bindings
+  import { EventsEmit } from '$wailsjs/runtime/runtime'
+
+  // Compact mail summary returned by GetContactMessages (mirrors the Go
+  // message.ContactMessage struct).
+  interface ContactMessage {
+    id: string
+    threadId: string
+    accountId: string
+    folderId: string
+    subject: string
+    fromName: string
+    fromEmail: string
+    date: string
+    isRead: boolean
+    incoming: boolean
+  }
+
+  let relatedMessages = $state<ContactMessage[]>([])
+  let loadingMessages = $state(false)
+
+  // Load the contact's related mail whenever the selected contact changes.
+  $effect(() => {
+    const email = primaryEmail
+    if (!email) {
+      relatedMessages = []
+      return
+    }
+    loadingMessages = true
+    let cancelled = false
+    GetContactMessages(email, 50)
+      .then((msgs: ContactMessage[]) => {
+        if (!cancelled) relatedMessages = msgs || []
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          console.error('Failed to load contact messages:', err)
+          relatedMessages = []
+        }
+      })
+      .finally(() => {
+        if (!cancelled) loadingMessages = false
+      })
+    return () => { cancelled = true }
+  })
+
+  // Jump to the mail view and open this conversation. App.svelte listens for
+  // 'mail:openConversation' and handles the rail switch + navigation.
+  function openConversation(m: ContactMessage) {
+    EventsEmit('mail:openConversation', {
+      accountId: m.accountId,
+      folderId: m.folderId,
+      threadId: m.threadId,
+    })
+  }
 
   // Edit-dialog state lives in ContactsPane (hoisted so the 'e' keyboard
   // shortcut can open it from anywhere within the pane). The button below
@@ -258,6 +316,43 @@
           {contact.updatedAt ? new Date(contact.updatedAt).toLocaleString() : '—'}
         </dd>
       </dl>
+
+      <!-- Related mail — click a row to open it in the mail view -->
+      <div class="mt-6">
+        <h2 class="text-sm font-semibold text-muted-foreground mb-2">
+          {$_('contacts.detail.relatedMail')}
+        </h2>
+        {#if loadingMessages}
+          <div class="flex items-center gap-2 text-sm text-muted-foreground py-4">
+            <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
+            <span>{$_('contacts.detail.relatedMailLoading')}</span>
+          </div>
+        {:else if relatedMessages.length === 0}
+          <p class="text-sm text-muted-foreground py-4">{$_('contacts.detail.relatedMailEmpty')}</p>
+        {:else}
+          <div class="border border-border rounded-md divide-y divide-border overflow-hidden">
+            {#each relatedMessages as m (m.id)}
+              <button
+                type="button"
+                class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+                onclick={() => openConversation(m)}
+                title={$_('contacts.detail.openInMail')}
+              >
+                <Icon
+                  icon={m.incoming ? 'mdi:email-arrow-left-outline' : 'mdi:email-arrow-right-outline'}
+                  class="w-4 h-4 flex-shrink-0 text-muted-foreground"
+                />
+                <span class="flex-1 min-w-0 truncate {m.isRead ? 'text-foreground' : 'font-semibold text-foreground'}">
+                  {m.subject || $_('contacts.common.unnamed')}
+                </span>
+                <span class="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
+                  {formatRelativeDate(new Date(m.date))}
+                </span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     {/if}
   {/snippet}
 </DetailPane>

@@ -246,6 +246,8 @@ export function ListAccountSetupHooksForProvider(arg1:string):Promise<Array<v1.A
 
 export function ListContacts(arg1:number):Promise<Array<contact.Contact>>;
 
+export function GetContactMessages(arg1:string,arg2:number):Promise<any>;
+
 export function ListDrafts(arg1:string):Promise<Array<draft.Draft>>;
 
 export function ListEnabledExtensions():Promise<Array<string>>;

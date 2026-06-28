@@ -462,6 +462,10 @@ export function ListContacts(arg1) {
   return window['go']['app']['App']['ListContacts'](arg1);
 }
 
+export function GetContactMessages(arg1, arg2) {
+  return window['go']['app']['App']['GetContactMessages'](arg1, arg2);
+}
+
 export function ListDrafts(arg1) {
   return window['go']['app']['App']['ListDrafts'](arg1);
 }

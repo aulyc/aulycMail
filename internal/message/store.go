@@ -2378,3 +2378,69 @@ func highlightMatches(text, query string) string {
 	return highlighted
 }
 
+
+// ContactMessage is a compact mail summary for the Contacts detail view —
+// one row per message involving a given contact address.
+type ContactMessage struct {
+	ID        string    `json:"id"`
+	ThreadID  string    `json:"threadId"`
+	AccountID string    `json:"accountId"`
+	FolderID  string    `json:"folderId"`
+	Subject   string    `json:"subject"`
+	FromName  string    `json:"fromName"`
+	FromEmail string    `json:"fromEmail"`
+	Date      time.Time `json:"date"`
+	IsRead    bool      `json:"isRead"`
+	Incoming  bool      `json:"incoming"` // true when the contact is the sender
+}
+
+// ListByParticipant returns recent messages where the given email address is a
+// participant (sender, To, Cc, or Bcc), across all folders and accounts, newest
+// first. Drafts are excluded (not real correspondence). Used by the Contacts
+// detail "related mail" list.
+func (s *Store) ListByParticipant(email string, limit int) ([]*ContactMessage, error) {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
+		return []*ContactMessage{}, nil
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	like := "%" + email + "%"
+
+	rows, err := s.db.Query(`
+		SELECT m.id, COALESCE(m.thread_id, m.id), m.subject, m.from_name, m.from_email,
+		       m.date, m.folder_id, f.account_id, m.is_read
+		FROM messages m
+		JOIN folders f ON m.folder_id = f.id
+		WHERE f.folder_type != 'drafts'
+		  AND (
+		    LOWER(m.from_email) = ?
+		    OR LOWER(COALESCE(m.to_list, '')) LIKE ?
+		    OR LOWER(COALESCE(m.cc_list, '')) LIKE ?
+		    OR LOWER(COALESCE(m.bcc_list, '')) LIKE ?
+		  )
+		ORDER BY m.date DESC
+		LIMIT ?
+	`, email, like, like, like, limit)
+	if err != nil {
+		return nil, fmt.Errorf("query contact messages: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*ContactMessage
+	for rows.Next() {
+		m := &ContactMessage{}
+		var dateStr sql.NullString
+		if err := rows.Scan(&m.ID, &m.ThreadID, &m.Subject, &m.FromName, &m.FromEmail,
+			&dateStr, &m.FolderID, &m.AccountID, &m.IsRead); err != nil {
+			return nil, fmt.Errorf("scan contact message: %w", err)
+		}
+		if dateStr.Valid {
+			m.Date = parseTimeString(dateStr.String)
+		}
+		m.Incoming = strings.EqualFold(m.FromEmail, email)
+		out = append(out, m)
+	}
+	return out, nil
+}

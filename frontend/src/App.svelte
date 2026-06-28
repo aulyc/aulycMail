@@ -240,34 +240,29 @@
     EventsOn('menu:openSettings', () => { showSettings = true })
     EventsOn('menu:openAbout', () => { showAbout = true })
 
-    // Listen for notification click events from backend
-    EventsOn('notification:clicked', (data: { accountId: string; folderId: string; threadId: string }) => {
-      // Find folder info for display
+    // Open a specific conversation in the mail view: switch the rail to mail,
+    // select the folder, and highlight the thread. Shared by notification
+    // clicks (from Go) and the Contacts detail's related-mail list (from the
+    // contacts frontend via EventsEmit).
+    const openMailConversation = (data: { accountId: string; folderId: string; threadId: string }) => {
       const folderInfo = findFolderById(data.accountId, data.folderId)
-
-      // Switch the rail back to mail in case the user was on an extension
-      // tab when the notification fired — without this the message-list
-      // state below would update but stay hidden behind the extension pane.
       setActiveExtension('mail')
 
-      // Navigate to the folder in the account tree
       selectedAccountId = data.accountId
       selectedFolderId = data.folderId
       selectedFolderName = folderInfo?.name || 'Inbox'
       selectedFolderType = folderInfo?.type || 'inbox'
       selectionSource = 'account'
 
-      // Select the conversation
       selectedThreadId = data.threadId
       selectedConversationAccountId = data.accountId
       selectedConversationFolderId = data.folderId
 
-      // Highlight the thread in the message list (with small delay to ensure list has loaded)
+      // Highlight the thread in the message list (small delay so the list loads)
       setTimeout(() => {
         messageListRef?.selectThread(data.threadId)
       }, 100)
 
-      // Persist state
       saveUIState({
         selectedAccountId: data.accountId,
         selectedFolderId: data.folderId,
@@ -277,7 +272,9 @@
         selectedConversationAccountId: data.accountId,
         selectedConversationFolderId: data.folderId,
       })
-    })
+    }
+    EventsOn('notification:clicked', openMailConversation)
+    EventsOn('mail:openConversation', openMailConversation)
 
     // Generic extension-routed notification clicks. The host switches the
     // rail tab here AND stashes the path in a pending-deep-link buffer.

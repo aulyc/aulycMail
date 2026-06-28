@@ -7,6 +7,7 @@ import (
 	"github.com/aulyc/aulycmail/internal/contact"
 	"github.com/aulyc/aulycmail/internal/folder"
 	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/aulyc/aulycmail/internal/message"
 )
 
 // RefreshContactsFromMail re-scans every stored message across all accounts and
@@ -126,4 +127,14 @@ func (a *App) DeleteContact(id string) error {
 // ListContacts returns all contacts
 func (a *App) ListContacts(limit int) ([]*contact.Contact, error) {
 	return a.contactStore.List(limit)
+}
+
+// GetContactMessages returns recent mail involving the given contact address
+// (as sender, To, Cc, or Bcc), newest first. Powers the Contacts detail's
+// "related mail" list; clicking a row navigates to that conversation in mail.
+func (a *App) GetContactMessages(email string, limit int) ([]*message.ContactMessage, error) {
+	if a.messageStore == nil {
+		return []*message.ContactMessage{}, nil
+	}
+	return a.messageStore.ListByParticipant(email, limit)
 }
