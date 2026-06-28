@@ -137,9 +137,6 @@
                 {#if item.type}
                   <span class="text-xs text-muted-foreground uppercase">{item.type}</span>
                 {/if}
-                {#if item.isPrimary}
-                  <span class="text-xs text-primary">{$_('contacts.common.primary')}</span>
-                {/if}
               </div>
             {/each}
           {/if}
@@ -254,11 +251,6 @@
         {#if contact.note}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.note')}</dt>
           <dd class="m-0 break-words text-foreground whitespace-pre-wrap">{contact.note}</dd>
-        {/if}
-
-        {#if contact.sourceId}
-          <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.source')}</dt>
-          <dd class="m-0 break-words text-foreground">{contact.sourceId}</dd>
         {/if}
 
         <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.lastUpdated')}</dt>
