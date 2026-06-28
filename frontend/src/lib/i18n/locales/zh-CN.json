@@ -906,7 +906,11 @@
     "serverSearching": "正在搜索服务器...",
     "notSyncedLocally": "（尚未同步到本地）",
     "serverResultsCapped": "显示\"{query}\"的 {shown} / {total} 条结果",
-    "showAllResults": "显示全部 {total} 条结果"
+    "showAllResults": "显示全部 {total} 条结果",
+    "overlayMail": "搜索邮件…",
+    "overlayContacts": "搜索联系人…",
+    "overlayNoResults": "没有结果",
+    "overlayHint": "输入以搜索,↑↓ 选择,回车打开,Esc 关闭"
   },
   "responsive": {
     "back": "返回",

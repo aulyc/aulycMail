@@ -13,6 +13,8 @@
   import ExtensionRail from './lib/components/rail/ExtensionRail.svelte'
   import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
   import AboutDialog from './lib/components/settings/AboutDialog.svelte'
+  import SearchOverlay from './lib/components/SearchOverlay.svelte'
+  import { activateContact as activateContactInView } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
   import { refreshExtensionRegistry, getRailTabs } from '$lib/stores/extensionRegistry.svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
@@ -149,6 +151,7 @@
   // any view (mail or an extension pane), not just the mail sidebar.
   let showSettings = $state(false)
   let showAbout = $state(false)
+  let showSearchOverlay = $state(false)
 
   // Certificate TOFU state (for background sync cert errors)
   let showCertDialog = $state(false)
@@ -240,39 +243,9 @@
     EventsOn('menu:openSettings', () => { showSettings = true })
     EventsOn('menu:openAbout', () => { showAbout = true })
 
-    // Open a specific conversation in the mail view: switch the rail to mail,
-    // select the folder, and highlight the thread. Shared by notification
-    // clicks (from Go) and the Contacts detail's related-mail list (from the
-    // contacts frontend via EventsEmit).
-    const openMailConversation = (data: { accountId: string; folderId: string; threadId: string }) => {
-      const folderInfo = findFolderById(data.accountId, data.folderId)
-      setActiveExtension('mail')
-
-      selectedAccountId = data.accountId
-      selectedFolderId = data.folderId
-      selectedFolderName = folderInfo?.name || 'Inbox'
-      selectedFolderType = folderInfo?.type || 'inbox'
-      selectionSource = 'account'
-
-      selectedThreadId = data.threadId
-      selectedConversationAccountId = data.accountId
-      selectedConversationFolderId = data.folderId
-
-      // Highlight the thread in the message list (small delay so the list loads)
-      setTimeout(() => {
-        messageListRef?.selectThread(data.threadId)
-      }, 100)
-
-      saveUIState({
-        selectedAccountId: data.accountId,
-        selectedFolderId: data.folderId,
-        selectedFolderName: folderInfo?.name || 'Inbox',
-        selectedFolderType: folderInfo?.type || 'inbox',
-        selectedThreadId: data.threadId,
-        selectedConversationAccountId: data.accountId,
-        selectedConversationFolderId: data.folderId,
-      })
-    }
+    // Notification clicks (from Go), the Contacts related-mail list (via
+    // EventsEmit), and the search overlay all route conversation-open through
+    // openMailConversation (defined at component scope).
     EventsOn('notification:clicked', openMailConversation)
     EventsOn('mail:openConversation', openMailConversation)
 
@@ -486,6 +459,40 @@
       selectedThreadId: threadId,
       selectedConversationAccountId: accountId,
       selectedConversationFolderId: folderId,
+    })
+  }
+
+  // Open a specific conversation in the mail view: switch the rail to mail,
+  // select the folder, and highlight the thread. Shared by notification clicks
+  // (from Go), the Contacts related-mail list (via EventsEmit), and the `/`
+  // search overlay.
+  function openMailConversation(data: { accountId: string; folderId: string; threadId: string }) {
+    const folderInfo = findFolderById(data.accountId, data.folderId)
+    setActiveExtension('mail')
+
+    selectedAccountId = data.accountId
+    selectedFolderId = data.folderId
+    selectedFolderName = folderInfo?.name || 'Inbox'
+    selectedFolderType = folderInfo?.type || 'inbox'
+    selectionSource = 'account'
+
+    selectedThreadId = data.threadId
+    selectedConversationAccountId = data.accountId
+    selectedConversationFolderId = data.folderId
+
+    // Highlight the thread in the message list (small delay so the list loads)
+    setTimeout(() => {
+      messageListRef?.selectThread(data.threadId)
+    }, 100)
+
+    saveUIState({
+      selectedAccountId: data.accountId,
+      selectedFolderId: data.folderId,
+      selectedFolderName: folderInfo?.name || 'Inbox',
+      selectedFolderType: folderInfo?.type || 'inbox',
+      selectedThreadId: data.threadId,
+      selectedConversationAccountId: data.accountId,
+      selectedConversationFolderId: data.folderId,
     })
   }
 
@@ -728,17 +735,12 @@
       return
     }
 
-    // `/` opens the active pane's search (same routing as Ctrl+S). Mail opens
-    // its own search; an active extension opens its list search via the pane-nav
-    // registry. Skipped while typing in an input (so `/` types normally there).
+    // `/` opens the command-palette search overlay (dimmed backdrop + centered
+    // search box + live results). Searches mail or contacts depending on the
+    // active rail. Skipped while typing in an input (so `/` types normally).
     if (!inInput && e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault()
-      if (getActiveExtension() === 'mail') {
-        messageListRef?.toggleSearchFocus()
-      } else {
-        getPaneNav('messageList')?.focusSearch?.()
-      }
-      setFocusedPane('messageList')
+      showSearchOverlay = true
       return
     }
 
@@ -760,6 +762,11 @@
           e.preventDefault()
           handleQuit()
           return
+        case 'f':
+          // Cmd/Ctrl+F — open the search overlay (same as `/`). Fires on any rail.
+          e.preventDefault()
+          showSearchOverlay = true
+          return
         case 'tab':
         case '`': {
           // Cycle through rail items: Mail + enabled extensions.
@@ -778,22 +785,6 @@
           setActiveExtension(order[next])
           return
         }
-      }
-
-      // Ctrl+S (no shift) — focus the active pane's search input.
-      // Mail dispatches to messageListRef; extensions dispatch via the
-      // pane-nav registry. Ctrl+Shift+S (sync folder) is mail-only and
-      // stays in the mail-domain switch below.
-      if (e.key.toLowerCase() === 's' && !e.shiftKey) {
-        e.preventDefault()
-        if (isMailActive()) {
-          messageListRef?.toggleSearchFocus()
-          setFocusedPane('messageList')
-          return
-        }
-        getPaneNav('messageList')?.focusSearch?.()
-        setFocusedPane('messageList')
-        return
       }
 
       // Below: MAIL-DOMAIN Ctrl/Cmd shortcuts. Guarded so they no-op when an
@@ -827,20 +818,9 @@
           handleReply(e.shiftKey ? 'reply-all' : 'reply', msgId, viewerRef?.isImagesLoaded(msgId) || false)
           return
         }
-        case 'f': {
-          if (!hasConversation) return
-          e.preventDefault()
-          if (focusedPane === 'viewer' && viewerRef?.hasFocusedMessage()) {
-            viewerRef.forward()
-            return
-          }
-          const msgId = getLastMessageId()
-          if (msgId) handleReply('forward', msgId, viewerRef?.isImagesLoaded(msgId) || false)
-          return
-        }
         case 's':
-          // Ctrl+S (no shift) is handled globally above. Only Ctrl+Shift+S
-          // (sync current folder) is mail-domain and lives here.
+          // Ctrl+Shift+S — sync the current folder. (Ctrl/Cmd+F opens search;
+          // plain Ctrl/Cmd+S is intentionally unused.)
           if (!e.shiftKey) return
           e.preventDefault()
           messageListRef?.toggleFolderSync()
@@ -1472,6 +1452,27 @@
 <!-- App Settings dialog — opened from the rail's gear (works in every view) -->
 <SettingsDialog bind:open={showSettings} onClose={() => { showSettings = false }} />
 <AboutDialog bind:open={showAbout} onClose={() => { showAbout = false }} />
+
+<SearchOverlay
+  bind:open={showSearchOverlay}
+  mode={getActiveExtension() === 'mail' ? 'mail' : 'contacts'}
+  accountId={resolveAccountId(selectedAccountId)}
+  folderId={selectedFolderId}
+  onClose={() => { showSearchOverlay = false }}
+  onSelectMail={(r) => {
+    showSearchOverlay = false
+    openMailConversation({
+      accountId: r.accountId || resolveAccountId(selectedAccountId) || '',
+      folderId: r.folderId || selectedFolderId || '',
+      threadId: r.threadId,
+    })
+  }}
+  onSelectContact={(c) => {
+    showSearchOverlay = false
+    setActiveExtension('contacts')
+    activateContactInView(c.id)
+  }}
+/>
 
 
 <!-- Certificate TOFU Dialog (for background sync cert errors) -->
