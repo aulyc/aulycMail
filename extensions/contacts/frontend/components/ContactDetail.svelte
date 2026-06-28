@@ -328,7 +328,7 @@
         {:else if relatedMessages.length === 0}
           <p class="text-sm text-muted-foreground py-2">{$_('contacts.detail.relatedMailEmpty')}</p>
         {:else}
-          <div class="divide-y divide-border">
+          <div class="border-y border-border divide-y divide-border">
             {#each relatedMessages as m (m.id)}
               <button
                 type="button"
