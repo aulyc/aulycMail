@@ -318,7 +318,7 @@
 
         <!-- Related mail — click a row to open it in the mail view -->
         <dt class="text-sm text-muted-foreground">{$_('contacts.detail.relatedMail')}</dt>
-        <dd class="m-0">
+        <dd class="m-0 min-w-0">
           {#if loadingMessages}
             <div class="flex items-center gap-2 text-sm text-muted-foreground">
               <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
@@ -327,11 +327,11 @@
           {:else if relatedMessages.length === 0}
             <p class="text-sm text-muted-foreground">{$_('contacts.detail.relatedMailEmpty')}</p>
           {:else}
-            <div class="border border-border rounded-md divide-y divide-border overflow-hidden">
+            <div class="divide-y divide-border">
               {#each relatedMessages as m (m.id)}
                 <button
                   type="button"
-                  class="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 transition-colors"
+                  class="w-full flex items-center gap-2 py-2 text-left hover:bg-muted/50 transition-colors"
                   onclick={() => openConversation(m)}
                   title={$_('contacts.detail.openInMail')}
                 >
