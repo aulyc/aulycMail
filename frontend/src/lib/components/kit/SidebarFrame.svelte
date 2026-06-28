@@ -21,6 +21,7 @@
   import Icon from '@iconify/svelte'
   import { _ } from 'svelte-i18n'
   import { getLayoutMode, getResponsiveView, hideSidebar } from '$lib/stores/layout.svelte'
+  import { getUIState, getUIStateVersion } from '$lib/stores/uiState.svelte'
 
   interface Props {
     /** Optional title rendered as <h2>. Omit for sidebars with no title. */
@@ -66,6 +67,9 @@
 
   const narrow = $derived(getLayoutMode() === 'narrow')
   const overlayVisible = $derived(narrow && getResponsiveView() === 'sidebar')
+  // Match the mail folder sidebar's fixed width so the Contacts view lines up
+  // with the mail view.
+  const paneWidth = $derived.by(() => { getUIStateVersion(); return getUIState().sidebarWidth })
 </script>
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -75,7 +79,8 @@
   role="navigation"
   aria-label={label ?? title ?? 'Sidebar'}
   tabindex={focusable ? 0 : undefined}
-  class="w-60 flex-shrink-0 flex flex-col pt-3 border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {extraClass}"
+  class="flex-shrink-0 flex flex-col pt-3 border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {extraClass}"
+  style="width: {paneWidth}px"
   {onkeydown}
   {onfocus}
   {onmousedown}

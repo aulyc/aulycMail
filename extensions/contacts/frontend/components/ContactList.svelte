@@ -25,8 +25,13 @@
   // badge, search-mode swap. Extension just supplies label/count + per-extension
   // search markup + trailing action buttons.
   import ListHeader from '$lib/components/kit/ListHeader.svelte'
+  import { getUIState, getUIStateVersion } from '$lib/stores/uiState.svelte'
   // @ts-ignore - wailsjs bindings
   import type { v1 } from '$wailsjs/go/models'
+
+  // Match the mail message-list fixed width so the Contacts view lines up with
+  // the mail view.
+  const listWidth = $derived.by(() => { getUIStateVersion(); return getUIState().listWidth })
 
   interface Props {
     onAdd?: () => void
@@ -178,7 +183,7 @@
   })
 </script>
 
-<div class="flex-1 min-w-0 min-h-0 flex flex-col border-r border-border bg-background">
+<div class="flex-shrink-0 min-h-0 flex flex-col border-r border-border bg-background" style="width: {listWidth}px">
   <ListHeader
     label={headerLabel}
     count={contactsView.contacts.length}
