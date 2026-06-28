@@ -16,6 +16,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/linux"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 //go:embed all:frontend/dist
@@ -147,6 +148,10 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 			WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand,
 			ProgramName:      "aulycmail",
 		},
+		// Provide a Mac options block so the green traffic-light zoom/maximize
+		// button stays enabled — Wails leaves it disabled when Mac is nil
+		// (DisableZoom defaults to false here, so zoom is on).
+		Mac: &mac.Options{},
 	})
 
 	if err != nil {

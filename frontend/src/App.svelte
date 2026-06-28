@@ -22,7 +22,7 @@
   import { loadSettings, getThemeMode, getComposerMode, getMailtoMode } from '$lib/stores/settings.svelte'
   import { loadImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
   import { initTheme, applyThemeFromMode, handleSystemThemeEvent, handleMediaQueryChange } from '$lib/stores/theme.svelte'
-  import { loadUIState, saveUIState, paneConstraints, getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
+  import { loadUIState, saveUIState, getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
   import { setPendingDeepLink } from '$lib/stores/extensionDeepLink.svelte'
   import {
     type FocusablePane,
@@ -647,64 +647,16 @@
     composerInitialMessage = null
   }
 
-  // Pane sizing state
+  // Pane sizing — fixed widths (no dragging). Restored from saved state on
+  // mount; the sidebar and list columns are not user-resizable.
   let sidebarWidth = $state(280)
   let listWidth = $state(420)
 
-  // Resizing state
-  let isResizingSidebar = $state(false)
-  let isResizingList = $state(false)
-  // Drag anchors captured at mousedown so resizing tracks the pointer delta
-  // rather than the absolute clientX. The panes sit to the right of the icon
-  // rail, so an absolute clientX would jump the divider by the rail's width on
-  // the first move; a delta from the grab point has no such offset.
-  let resizeStartX = 0
-  let resizeStartSidebarWidth = 0
-  let resizeStartListWidth = 0
-
-  function startResizeSidebar(e: MouseEvent) {
-    if (isResponsive()) return
-    isResizingSidebar = true
-    resizeStartX = e.clientX
-    resizeStartSidebarWidth = sidebarWidth
-    e.preventDefault()
-  }
-
-  function startResizeList(e: MouseEvent) {
-    if (isResponsive()) return
-    isResizingList = true
-    resizeStartX = e.clientX
-    resizeStartListWidth = listWidth
-    e.preventDefault()
-  }
-
-  function handleMouseMove(e: MouseEvent) {
-    if (isResizingSidebar) {
-      const next = resizeStartSidebarWidth + (e.clientX - resizeStartX)
-      sidebarWidth = Math.max(paneConstraints.sidebar.min, Math.min(paneConstraints.sidebar.max, next))
-    } else if (isResizingList) {
-      const next = resizeStartListWidth + (e.clientX - resizeStartX)
-      listWidth = Math.max(paneConstraints.list.min, Math.min(paneConstraints.list.max, next))
-    }
-  }
-
-  function handleMouseUp() {
-    // Save pane widths if we were resizing
-    if (isResizingSidebar || isResizingList) {
-      saveUIState({ sidebarWidth, listWidth })
-      updateWindowMinWidth()
-    }
-    isResizingSidebar = false
-    isResizingList = false
-  }
-
-  // Keep a window minimum width so the viewer's toolbar always fits. The viewer
-  // gets (window − rail − sidebar − list), so the floor must leave VIEWER_MIN
-  // for it. Recomputed whenever the panes are resized; with narrow panes the
-  // window can be narrower, with wide panes the floor grows.
+  // Window minimum width so the viewer's toolbar always fits. The viewer gets
+  // (window − rail − sidebar − list), so the floor leaves VIEWER_MIN for it.
   const RAIL_WIDTH = 48        // w-12 icon rail
   const VIEWER_MIN = 520       // fits the full viewer action toolbar (~12 icons)
-  const LAYOUT_BUFFER = 30     // resize handles + pane borders
+  const LAYOUT_BUFFER = 30     // pane borders
   const WINDOW_MIN_HEIGHT = 400
   function updateWindowMinWidth() {
     const minW = Math.round(RAIL_WIDTH + sidebarWidth + listWidth + VIEWER_MIN + LAYOUT_BUFFER)
@@ -1369,7 +1321,7 @@
   }
 </script>
 
-<svelte:window onmousemove={handleMouseMove} onmouseup={handleMouseUp} onkeydown={handleGlobalKeyDown} onkeyup={handleGlobalKeyUp} />
+<svelte:window onkeydown={handleGlobalKeyDown} onkeyup={handleGlobalKeyUp} />
 
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Main Content -->
@@ -1419,18 +1371,6 @@
       ></div>
     {/if}
 
-    <!-- Sidebar Resize Handle -->
-    {#if getLayoutMode() === 'full'}
-    <button
-      type="button"
-      class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors border-0 p-0 {isResizingSidebar
-        ? 'bg-primary/40'
-        : ''}"
-      onmousedown={startResizeSidebar}
-      aria-label={$_('aria.resizeSidebar')}
-    ></button>
-    {/if}
-
     <!-- Message List -->
     <section
       bind:this={messageListContainerRef}
@@ -1456,18 +1396,6 @@
         onToggleSidebar={showSidebar}
       />
     </section>
-
-    <!-- List Resize Handle -->
-    {#if getLayoutMode() === 'full'}
-    <button
-      type="button"
-      class="w-1 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors border-0 p-0 {isResizingList
-        ? 'bg-primary/40'
-        : ''}"
-      onmousedown={startResizeList}
-      aria-label={$_('aria.resizeMessageList')}
-    ></button>
-    {/if}
 
     <!-- Conversation Viewer -->
     <main
@@ -1500,11 +1428,6 @@
     </div>
   </div>
 </div>
-
-<!-- Resize cursor overlay when dragging -->
-{#if isResizingSidebar || isResizingList}
-  <div class="fixed inset-0 cursor-col-resize z-50"></div>
-{/if}
 
 <!-- Toast notifications -->
 <ToastContainer />
