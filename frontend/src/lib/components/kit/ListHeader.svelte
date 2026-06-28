@@ -53,18 +53,20 @@
   }: Props = $props()
 </script>
 
-<div class="flex items-center justify-between px-4 py-3 border-b border-border">
-  <div class="flex items-center gap-2 flex-1 min-w-0">
-    <ResponsiveSidebarToggle />
-    {#if searchMode && search}
-      {@render search()}
-    {:else}
-      <h2 class="font-semibold text-foreground truncate">{label}</h2>
-      {#if count != null}
-        <span class="text-sm text-muted-foreground flex-shrink-0">{count}</span>
-      {/if}
+<div class="flex items-center gap-2 px-4 py-3 border-b border-border">
+  <ResponsiveSidebarToggle />
+  <!-- Title (always shown). Search opens to its right via the `/` shortcut. -->
+  <div class="flex items-center gap-2 min-w-0">
+    <h2 class="font-semibold text-foreground truncate">{label}</h2>
+    {#if count != null}
+      <span class="text-sm text-muted-foreground flex-shrink-0">{count}</span>
     {/if}
   </div>
+  {#if searchMode && search}
+    {@render search()}
+  {:else}
+    <div class="flex-1"></div>
+  {/if}
   {#if actions}
     <div class="flex items-center gap-1 flex-shrink-0">
       {@render actions()}

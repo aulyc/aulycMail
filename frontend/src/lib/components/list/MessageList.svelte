@@ -707,17 +707,6 @@
     }
   }
 
-  // Toggle search visibility
-  function toggleSearch() {
-    showSearch = !showSearch
-    if (showSearch) {
-      // Focus input after it appears
-      setTimeout(() => searchInputRef?.focus(), 50)
-      return
-    }
-    clearSearch()
-  }
-
   // Check if we're in search mode with results
   const isSearchMode = $derived(showSearch && searchQuery.trim().length > 0)
 
@@ -1281,61 +1270,63 @@
 
 <div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
   <!-- Header -->
-  <div class="flex items-center justify-between px-4 py-3 border-b border-border">
+  <div class="flex items-center gap-2 px-4 py-3 border-b border-border">
+    {#if showFolderToggle}
+      <button
+        class="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors flex-shrink-0"
+        title={$_('responsive.folders')}
+        aria-label={$_('aria.toggleSidebar')}
+        onclick={onToggleSidebar}
+      >
+        <Icon icon="mdi:dock-left" class="w-5 h-5 text-muted-foreground" />
+      </button>
+    {/if}
+    <!-- Title (always shown). Search opens to its right via the `/` shortcut. -->
     <div class="flex items-center gap-2 min-w-0">
-      {#if showFolderToggle}
-        <button
-          class="p-1.5 -ml-1 rounded-md hover:bg-muted transition-colors"
-          title={$_('responsive.folders')}
-          aria-label={$_('aria.toggleSidebar')}
-          onclick={onToggleSidebar}
-        >
-          <Icon icon="mdi:dock-left" class="w-5 h-5 text-muted-foreground" />
-        </button>
-      {/if}
-      {#if showSearch}
-        <!-- Search input -->
-        <div class="flex items-center gap-1 bg-muted rounded-md px-2 flex-1">
-          <Icon icon="mdi:magnify" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
-          <input
-            bind:this={searchInputRef}
-            type="text"
-            placeholder={$_('messageList.searchMessages')}
-            class="bg-transparent border-none outline-none text-sm py-1.5 w-full min-w-[200px]"
-            bind:value={searchQuery}
-            oninput={handleSearchInput}
-            onkeydown={handleSearchKeydown}
-          />
-          {#if serverSearchMode}
-            <button
-              onclick={() => { serverSearchMode = false }}
-              class="px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-full flex-shrink-0 hover:bg-primary/30 transition-colors"
-              title={$_('search.localSearch')}
-            >
-              {$_('search.server')}
-            </button>
-          {/if}
-          {#if searchQuery || isSearching || isServerSearching}
-            <button
-              onclick={clearSearch}
-              class="p-0.5 hover:bg-muted-foreground/20 rounded"
-              title={$_('messageList.clearSearch')}
-            >
-              {#if isSearching || isServerSearching}
-                <Icon icon="mdi:loading" class="w-4 h-4 animate-spin text-muted-foreground" />
-              {:else}
-                <Icon icon="mdi:close" class="w-4 h-4 text-muted-foreground" />
-              {/if}
-            </button>
-          {/if}
-        </div>
-      {:else}
-        <h2 class="font-semibold text-foreground truncate">{folderName}</h2>
-        <span class="text-sm text-muted-foreground whitespace-nowrap flex-shrink-0">
-          {$_('messageList.unread', { values: { count: unreadCount } })}
-        </span>
-      {/if}
+      <h2 class="font-semibold text-foreground truncate">{folderName}</h2>
+      <span class="text-sm text-muted-foreground whitespace-nowrap flex-shrink-0">
+        {$_('messageList.unread', { values: { count: unreadCount } })}
+      </span>
     </div>
+    {#if showSearch}
+      <!-- Search input — sits where the search button used to be -->
+      <div class="flex items-center gap-1 bg-muted rounded-md px-2 flex-1 min-w-0">
+        <Icon icon="mdi:magnify" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+        <input
+          bind:this={searchInputRef}
+          type="text"
+          placeholder={$_('messageList.searchMessages')}
+          class="bg-transparent border-none outline-none text-sm py-1.5 w-full min-w-0"
+          bind:value={searchQuery}
+          oninput={handleSearchInput}
+          onkeydown={handleSearchKeydown}
+        />
+        {#if serverSearchMode}
+          <button
+            onclick={() => { serverSearchMode = false }}
+            class="px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-full flex-shrink-0 hover:bg-primary/30 transition-colors"
+            title={$_('search.localSearch')}
+          >
+            {$_('search.server')}
+          </button>
+        {/if}
+        {#if searchQuery || isSearching || isServerSearching}
+          <button
+            onclick={clearSearch}
+            class="p-0.5 hover:bg-muted-foreground/20 rounded flex-shrink-0"
+            title={$_('messageList.clearSearch')}
+          >
+            {#if isSearching || isServerSearching}
+              <Icon icon="mdi:loading" class="w-4 h-4 animate-spin text-muted-foreground" />
+            {:else}
+              <Icon icon="mdi:close" class="w-4 h-4 text-muted-foreground" />
+            {/if}
+          </button>
+        {/if}
+      </div>
+    {:else}
+      <div class="flex-1"></div>
+    {/if}
     <div class="flex items-center gap-1 flex-shrink-0">
       {#if syncing}
         <!-- While syncing, show spinning icon that cancels on click -->
@@ -1393,13 +1384,6 @@
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       {/if}
-      <button
-        class="p-2 rounded-md hover:bg-muted transition-colors {showSearch ? 'bg-muted' : ''}"
-        title={showSearch ? $_('common.close') : $_('common.search')}
-        onclick={toggleSearch}
-      >
-        <Icon icon={showSearch ? 'mdi:close' : 'mdi:magnify'} class="w-5 h-5 text-muted-foreground" />
-      </button>
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
           class="p-2 rounded-md hover:bg-muted transition-colors {filterMode ? 'bg-muted' : ''}"

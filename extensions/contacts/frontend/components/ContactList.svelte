@@ -117,6 +117,20 @@
     reloadContacts()
   }
 
+  // When the selected category changes, reset the search UI so the new category
+  // shows all its contacts. selectSource() already cleared the store's
+  // searchQuery; this keeps the local input + open state in sync.
+  let lastSourceId = contactsView.selectedSourceId
+  $effect(() => {
+    const sel = contactsView.selectedSourceId
+    if (sel !== lastSourceId) {
+      lastSourceId = sel
+      searchInput = ''
+      showSearch = false
+      if (debounce) clearTimeout(debounce)
+    }
+  })
+
   // Three-state Ctrl+S toggle (matches MessageList.toggleSearchFocus):
   //   closed                  → open + focus
   //   open but unfocused      → focus
@@ -216,14 +230,6 @@
     {/snippet}
 
     {#snippet actions()}
-      <button
-        class="p-2 rounded-md hover:bg-muted transition-colors {showSearch ? 'bg-muted' : ''}"
-        title={showSearch ? $_('contacts.list.searchClose') : $_('contacts.list.searchOpen')}
-        onclick={toggleSearchFocus}
-        type="button"
-      >
-        <Icon icon={showSearch ? 'mdi:close' : 'mdi:magnify'} class="w-5 h-5 text-muted-foreground" />
-      </button>
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors"
         title={sortOrder === 'name-asc' ? $_('contacts.list.sortAsc') : $_('contacts.list.sortDesc')}

@@ -59,6 +59,10 @@ export function selectSource(sourceId: string): void {
   selectedSourceId = sourceId
   selectedContactId = null
   detail = null
+  // Switching category resets the search filter so the new category shows all
+  // its contacts (not the intersection with a lingering query). The ContactList
+  // mirrors this by clearing its own search input + closing the search bar.
+  searchQuery = ''
   // Dismiss the sidebar overlay on narrow viewports. Self-gating store
   // call — no-op on full/medium.
   hideSidebar()

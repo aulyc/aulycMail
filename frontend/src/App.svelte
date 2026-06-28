@@ -728,6 +728,20 @@
       return
     }
 
+    // `/` opens the active pane's search (same routing as Ctrl+S). Mail opens
+    // its own search; an active extension opens its list search via the pane-nav
+    // registry. Skipped while typing in an input (so `/` types normally there).
+    if (!inInput && e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault()
+      if (getActiveExtension() === 'mail') {
+        messageListRef?.toggleSearchFocus()
+      } else {
+        getPaneNav('messageList')?.focusSearch?.()
+      }
+      setFocusedPane('messageList')
+      return
+    }
+
     // Handle Ctrl/Cmd shortcuts.
     //
     // Layout: GLOBAL cases first (fire regardless of which rail pane is active),
