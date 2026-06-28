@@ -178,6 +178,9 @@
 
   {#snippet body()}
     {#if contact}
+      <div class="h-full flex flex-col">
+      <!-- Fixed contact info — stays put while the mail list scrolls -->
+      <div class="flex-shrink-0">
       <dl class="grid grid-cols-[80px_1fr] gap-y-2 gap-x-3 items-baseline">
         <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.email')}</dt>
         <dd class="m-0 break-words">
@@ -317,9 +320,12 @@
         </dd>
       </dl>
 
-      <!-- Related mail — heading on its own line, list full-width below it -->
-      <div class="mt-2">
-        <h2 class="text-sm text-muted-foreground mb-1">{$_('contacts.detail.relatedMail')}</h2>
+      <!-- Related mail heading — fixed with the contact info above -->
+      <h2 class="text-sm text-muted-foreground mt-2 mb-2">{$_('contacts.detail.relatedMail')}</h2>
+      </div>
+
+      <!-- Scrolling related-mail list -->
+      <div class="flex-1 min-h-0 overflow-y-auto border-t border-border">
         {#if loadingMessages}
           <div class="flex items-center gap-2 text-sm text-muted-foreground py-2">
             <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
@@ -328,7 +334,7 @@
         {:else if relatedMessages.length === 0}
           <p class="text-sm text-muted-foreground py-2">{$_('contacts.detail.relatedMailEmpty')}</p>
         {:else}
-          <div class="border-y border-border divide-y divide-border">
+          <div class="divide-y divide-border border-b border-border">
             {#each relatedMessages as m (m.id)}
               <button
                 type="button"
@@ -349,6 +355,7 @@
             {/each}
           </div>
         {/if}
+      </div>
       </div>
     {/if}
   {/snippet}
