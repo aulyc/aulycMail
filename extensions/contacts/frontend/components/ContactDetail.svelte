@@ -178,7 +178,7 @@
 
   {#snippet body()}
     {#if contact}
-      <dl class="grid grid-cols-[120px_1fr] gap-y-2 gap-x-4">
+      <dl class="grid grid-cols-[80px_1fr] gap-y-2 gap-x-3 items-baseline">
         <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.email')}</dt>
         <dd class="m-0 break-words">
           {#if contact.emailItems && contact.emailItems.length > 0}
