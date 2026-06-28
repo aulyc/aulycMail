@@ -1003,12 +1003,14 @@
     }
   }
 
-  // Select a specific thread by ID (exposed for notification clicks)
+  // Select a specific thread by ID (exposed for notification clicks and the
+  // Contacts related-mail list). Scroll it to the TOP of the viewport so the
+  // jumped-to conversation lands at the top, not the bottom edge.
   export function selectThread(threadId: string) {
     selectedThreadId = threadId
     const index = activeList.findIndex(c => c.threadId === threadId)
     if (index >= 0) {
-      scrollToIndex(index)
+      scrollToIndex(index, 'start')
     }
   }
 
@@ -1241,13 +1243,13 @@
   }
 
   // Scroll to a specific index in the list
-  function scrollToIndex(index: number) {
+  function scrollToIndex(index: number, block: ScrollLogicalPosition = 'nearest') {
     if (!listContainerRef) return
 
     const rows = listContainerRef.querySelectorAll('[data-conversation-row]')
     const row = rows[index] as HTMLElement | undefined
     if (row) {
-      row.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      row.scrollIntoView({ block, behavior: 'smooth' })
     }
   }
 </script>
