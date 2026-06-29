@@ -120,7 +120,7 @@
   const displayColor = $derived(value || presets[0])
 </script>
 
-<div class="inline-block" bind:this={popoverRef}>
+<div class="inline-flex" bind:this={popoverRef}>
   <!-- Color swatch button -->
   <button
     type="button"

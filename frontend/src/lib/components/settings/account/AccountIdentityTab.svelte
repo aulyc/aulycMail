@@ -188,17 +188,24 @@
     }
   }
 
-  // Get a preview of the signature (first line, truncated)
+  // Get a preview of the signature (first line, truncated). Considers both the
+  // HTML signature and the plain-text signature so a text-only signature still
+  // shows as "has signature" rather than "no signature".
   function getSignaturePreview(identity: account.Identity): string {
     if (!identity.signatureEnabled) return $_('identity.noSignature')
-    if (!identity.signatureHtml) return $_('identity.noSignature')
 
-    // Strip HTML and get first line
-    const temp = document.createElement('div')
-    temp.innerHTML = identity.signatureHtml
-    const text = temp.textContent || ''
+    let text = ''
+    if (identity.signatureHtml) {
+      const temp = document.createElement('div')
+      temp.innerHTML = identity.signatureHtml
+      text = temp.textContent || ''
+    } else if (identity.signatureText) {
+      text = identity.signatureText
+    } else {
+      return $_('identity.noSignature')
+    }
+
     const firstLine = text.split('\n')[0].trim()
-
     if (firstLine.length > 50) {
       return firstLine.substring(0, 50) + '...'
     }

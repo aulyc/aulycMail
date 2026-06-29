@@ -6,6 +6,7 @@
   import * as Select from '$lib/components/ui/select'
   import { ColorPicker } from '$lib/components/ui/color-picker'
   import BoolSelect from '$lib/components/ui/bool-select/BoolSelect.svelte'
+  import Switch from '$lib/components/ui/switch/Switch.svelte'
   import {
     providers,
     detectProvider,
@@ -607,70 +608,77 @@
         </div>
       {/if}
 
-      <!-- Basic Fields -->
-      <div class="grid gap-4">
-        <div class="space-y-2">
-          <Label for="name">{$_('account.accountName')}</Label>
-          <div class="flex items-center gap-3">
-            <ColorPicker value={color} onchange={(c) => color = c} />
+      <!-- Basic Fields (label + control on one row, matching the edit dialog) -->
+      <div class="space-y-4">
+        <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <Label for="name">{$_('account.accountName')}</Label>
+              <p class="text-xs text-muted-foreground">{$_('account.colorHelp')}</p>
+            </div>
+            <div class="flex items-center gap-2 w-64 shrink-0">
+              <Input
+                id="name"
+                type="text"
+                placeholder={$_('account.accountNamePlaceholder')}
+                bind:value={name}
+                class="flex-1 min-w-0 {errors.name ? 'border-destructive' : ''}"
+              />
+              <ColorPicker value={color} onchange={(c) => color = c} class="w-6 h-6 rounded-full flex-shrink-0" />
+            </div>
+          </div>
+          {#if errors.name}
+            <p class="text-sm text-destructive mt-1">{errors.name}</p>
+          {/if}
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <Label for="displayName">{$_('account.displayName')}</Label>
+              <p class="text-xs text-muted-foreground">{$_('account.displayNameHelp')}</p>
+            </div>
             <Input
-              id="name"
+              id="displayName"
               type="text"
-              placeholder={$_('account.accountNamePlaceholder')}
-              bind:value={name}
-              class={errors.name ? 'border-destructive' : ''}
+              placeholder={$_('account.displayNamePlaceholder')}
+              bind:value={displayName}
+              class="w-64 shrink-0 {errors.displayName ? 'border-destructive' : ''}"
             />
           </div>
-          <p class="text-xs text-muted-foreground">
-            {$_('account.colorHelp')}
-          </p>
-          {#if errors.name}
-            <p class="text-sm text-destructive">{errors.name}</p>
-          {/if}
-        </div>
-
-        <div class="space-y-2">
-          <Label for="displayName">{$_('account.displayName')}</Label>
-          <Input
-            id="displayName"
-            type="text"
-            placeholder={$_('account.displayNamePlaceholder')}
-            bind:value={displayName}
-            class={errors.displayName ? 'border-destructive' : ''}
-          />
-          <p class="text-xs text-muted-foreground">
-            {$_('account.displayNameHelp')}
-          </p>
           {#if errors.displayName}
-            <p class="text-sm text-destructive">{errors.displayName}</p>
+            <p class="text-sm text-destructive mt-1">{errors.displayName}</p>
           {/if}
         </div>
 
-        <div class="space-y-2">
-          <Label for="email">{$_('account.emailAddress')}</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            bind:value={email}
-            class={errors.email ? 'border-destructive' : ''}
-          />
+        <div>
+          <div class="flex items-center justify-between gap-4">
+            <Label for="email">{$_('account.emailAddress')}</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              bind:value={email}
+              class="w-64 shrink-0 {errors.email ? 'border-destructive' : ''}"
+            />
+          </div>
           {#if errors.email}
-            <p class="text-sm text-destructive">{errors.email}</p>
+            <p class="text-sm text-destructive mt-1">{errors.email}</p>
           {/if}
         </div>
 
-        <div class="space-y-2">
-          <Label for="username">{$_('account.username')}</Label>
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <Label for="username">{$_('account.username')}</Label>
+            <p class="text-xs text-muted-foreground">{$_('account.usernameHelp')}</p>
+          </div>
           <Input
             id="username"
             type="text"
             placeholder={$_('account.usernamePlaceholder')}
             bind:value={username}
+            class="w-64 shrink-0"
           />
-          <p class="text-xs text-muted-foreground">
-            {$_('account.usernameHelp')}
-          </p>
         </div>
 
         <!-- Authentication Section -->
@@ -810,17 +818,19 @@
                 {/if}
               {:else}
                 <!-- Password field for app password -->
-                <div class="space-y-2">
-                  <Label for="password">{$_('account.appPassword')}</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder={$_('account.enterAppPassword')}
-                    bind:value={password}
-                    class={errors.password ? 'border-destructive' : ''}
-                  />
+                <div>
+                  <div class="flex items-center justify-between gap-4">
+                    <Label for="password">{$_('account.appPassword')}</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder={$_('account.enterAppPassword')}
+                      bind:value={password}
+                      class="w-64 shrink-0 {errors.password ? 'border-destructive' : ''}"
+                    />
+                  </div>
                   {#if errors.password}
-                    <p class="text-sm text-destructive">{errors.password}</p>
+                    <p class="text-sm text-destructive mt-1">{errors.password}</p>
                   {/if}
                 </div>
               {/if}
@@ -845,46 +855,48 @@
             </div>
           {:else}
             <!-- Standard password field -->
-            <div class="space-y-2">
-              <Label for="password">
-                {selectedProvider?.notes?.includes('App Password') ? $_('account.appPassword') : $_('account.password')}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder={editAccount ? $_('account.leaveEmptyToKeep') : $_('account.password')}
-                bind:value={password}
-                class={errors.password ? 'border-destructive' : ''}
-              />
+            <div>
+              <div class="flex items-center justify-between gap-4">
+                <Label for="password">
+                  {selectedProvider?.notes?.includes('App Password') ? $_('account.appPassword') : $_('account.password')}
+                </Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder={editAccount ? $_('account.leaveEmptyToKeep') : $_('account.password')}
+                  bind:value={password}
+                  class="w-64 shrink-0 {errors.password ? 'border-destructive' : ''}"
+                />
+              </div>
               {#if errors.password}
-                <p class="text-sm text-destructive">{errors.password}</p>
+                <p class="text-sm text-destructive mt-1">{errors.password}</p>
               {/if}
             </div>
           {/if}
         </div>
       </div>
 
-      <!-- Advanced Settings Toggle -->
+      <!-- Advanced Settings Toggle — label (styled like a field label) on the
+           left, an up/down triangle on the right (▼ = expand, ▲ = collapse). -->
       <button
         type="button"
-        class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        class="flex items-center gap-1.5 transition-colors"
         onclick={() => (showAdvanced = !showAdvanced)}
       >
+        <span class="text-sm font-medium text-foreground">{$_('account.advancedSettings')}</span>
         <Icon
-          icon={showAdvanced ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-          class="w-4 h-4"
+          icon={showAdvanced ? 'mdi:menu-up' : 'mdi:menu-down'}
+          class="w-4 h-4 text-muted-foreground"
         />
-        {$_('account.advancedSettings')}
       </button>
 
       {#if showAdvanced}
         <div class="space-y-4 pt-2 border-t border-border">
-          <!-- IMAP Settings -->
+          <!-- Incoming server (IMAP) — no group header -->
           <div class="space-y-3">
-            <h4 class="text-sm font-medium">{$_('account.incomingMail')}</h4>
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-2">
-                <Label for="imapHost">{$_('account.server')}</Label>
+                <Label for="imapHost">{$_('account.incomingServer')}</Label>
                 <Input
                   id="imapHost"
                   type="text"
@@ -931,15 +943,22 @@
             </div>
           </div>
 
-          <!-- "No outgoing server" toggle (above SMTP). When on, SMTP +
-               SMTP-auth sections collapse and the composer's From dropdown
-               excludes this account. -->
-          <div class="space-y-2">
-            <label class="flex items-center gap-3 text-sm">
-              <BoolSelect bind:checked={noOutgoingServer} />
-              <span class="font-medium">{$_('account.noOutgoingServer')}</span>
-            </label>
-            <p class="text-xs text-muted-foreground">{$_('account.noOutgoingServerHelp')}</p>
+          <!-- Divider -->
+          <div class="border-t border-border"></div>
+
+          <!-- Outgoing server (SMTP). Header carries the no-outgoing toggle
+               (help text is a tooltip on the info icon). -->
+          <div class="space-y-4">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-sm font-medium">{$_('account.outgoingServer')}</span>
+              <div class="flex items-center gap-2">
+                <Switch bind:checked={noOutgoingServer} />
+                <span class="text-sm text-muted-foreground">{$_('account.noOutgoingServer')}</span>
+                <span class="cursor-help text-muted-foreground" title={$_('account.noOutgoingServerHelp')}>
+                  <Icon icon="mdi:information-outline" class="w-4 h-4" />
+                </span>
+              </div>
+            </div>
 
             {#if noOutgoingServer}
               <!-- Reply/Forward-with picker. Same shape as the composer's
@@ -985,16 +1004,12 @@
                 </Select.Root>
                 <p class="text-xs text-muted-foreground">{$_('account.replyForwardWithHelp')}</p>
               </div>
-            {/if}
-          </div>
-
-          {#if !noOutgoingServer}
-          <!-- SMTP Settings -->
-          <div class="space-y-3">
-            <h4 class="text-sm font-medium">{$_('account.outgoingMail')}</h4>
+            {:else}
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-2">
-                <Label for="smtpHost">{$_('account.server')}</Label>
+                <!-- Label hidden (the section header already reads 发件服务器);
+                     kept for vertical alignment with Port/Security labels. -->
+                <Label for="smtpHost" class="invisible" aria-hidden="true">{$_('account.outgoingServer')}</Label>
                 <Input
                   id="smtpHost"
                   type="text"
@@ -1035,57 +1050,20 @@
               </div>
             </div>
 
-            {#if isGenericProvider}
-              <!-- SMTP authentication subsection — Generic only. -->
-              <div class="space-y-3 pt-3 border-t border-border">
-                <h4 class="text-sm font-medium">{$_('account.smtpAuthentication')}</h4>
-                <label class="flex items-center gap-3 text-sm">
-                  <BoolSelect
-                    checked={smtpUseSameAsIncoming}
-                    onCheckedChange={handleSmtpUseSameAsIncomingChange}
-                  />
-                  <span>{$_('account.smtpUseSameAsIncoming')}</span>
-                </label>
-                {#if !smtpUseSameAsIncoming}
-                  <div class="grid grid-cols-2 gap-3">
-                    <div class="space-y-2">
-                      <Label for="wizardSmtpUsername">{$_('account.username')}</Label>
-                      <Input
-                        id="wizardSmtpUsername"
-                        type="text"
-                        placeholder={$_('account.smtpUsernamePlaceholder')}
-                        bind:value={smtpUsername}
-                        class={errors.smtpUsername ? 'border-destructive' : ''}
-                      />
-                      {#if errors.smtpUsername}
-                        <p class="text-sm text-destructive">{errors.smtpUsername}</p>
-                      {/if}
-                    </div>
-                    <div class="space-y-2">
-                      <Label for="wizardSmtpPassword">{$_('account.password')}</Label>
-                      <Input
-                        id="wizardSmtpPassword"
-                        type="password"
-                        placeholder={$_('account.smtpPasswordPlaceholder')}
-                        bind:value={smtpPassword}
-                        class={errors.smtpPassword ? 'border-destructive' : ''}
-                      />
-                      {#if errors.smtpPassword}
-                        <p class="text-sm text-destructive">{errors.smtpPassword}</p>
-                      {/if}
-                    </div>
-                  </div>
-                {/if}
-              </div>
             {/if}
           </div>
-          {/if}
 
-          <!-- Sync Settings -->
-          <div class="space-y-2">
-            <Label>{$_('account.syncPeriod')}</Label>
+          <!-- Divider -->
+          <div class="border-t border-border"></div>
+
+          <!-- Sync settings (label + control on one row) -->
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <Label>{$_('account.syncPeriod')}</Label>
+              <p class="text-xs text-muted-foreground">{$_('account.syncPeriodHelp')}</p>
+            </div>
             <Select.Root bind:value={syncPeriodDays}>
-              <Select.Trigger>
+              <Select.Trigger class="w-48 shrink-0">
                 <Select.Value placeholder="Select">
                   {getSyncPeriodLabel(syncPeriodDays)}
                 </Select.Value>
@@ -1096,16 +1074,15 @@
                 {/each}
               </Select.Content>
             </Select.Root>
-            <p class="text-xs text-muted-foreground">
-              {$_('account.syncPeriodHelp')}
-            </p>
           </div>
 
-          <!-- Check Interval Settings -->
-          <div class="space-y-2">
-            <Label>{$_('account.checkNewMail')}</Label>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <Label>{$_('account.checkNewMail')}</Label>
+              <p class="text-xs text-muted-foreground">{$_('account.checkNewMailHelp')}</p>
+            </div>
             <Select.Root bind:value={syncInterval}>
-              <Select.Trigger>
+              <Select.Trigger class="w-48 shrink-0">
                 <Select.Value placeholder="Select">
                   {getSyncIntervalLabel(syncInterval)}
                 </Select.Value>
@@ -1116,16 +1093,15 @@
                 {/each}
               </Select.Content>
             </Select.Root>
-            <p class="text-xs text-muted-foreground">
-              {$_('account.checkNewMailHelp')}
-            </p>
           </div>
 
-          <!-- Read Receipt Settings -->
-          <div class="space-y-2">
-            <Label>{$_('account.requestReadReceipts')}</Label>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <Label>{$_('account.requestReadReceipts')}</Label>
+              <p class="text-xs text-muted-foreground">{$_('account.requestReadReceiptsHelp')}</p>
+            </div>
             <Select.Root bind:value={readReceiptRequestPolicy}>
-              <Select.Trigger>
+              <Select.Trigger class="w-48 shrink-0">
                 <Select.Value placeholder="Select">
                   {getReadReceiptLabel(readReceiptRequestPolicy)}
                 </Select.Value>
@@ -1136,9 +1112,6 @@
                 {/each}
               </Select.Content>
             </Select.Root>
-            <p class="text-xs text-muted-foreground">
-              {$_('account.requestReadReceiptsHelp')}
-            </p>
           </div>
 
           <!-- Folder Mapping -->

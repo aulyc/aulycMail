@@ -161,7 +161,7 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
-  <Dialog.Content class="max-w-2xl max-h-[90vh] overflow-y-auto">
+  <Dialog.Content class="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
     <Dialog.Header>
       <Dialog.Title>
         {identity ? $_('identity.editEmailTitle') : $_('identity.addEmailTitle')}
@@ -173,7 +173,8 @@
       </Dialog.Description>
     </Dialog.Header>
 
-    <form onsubmit={(e) => { e.preventDefault(); handleSave() }} class="space-y-6">
+    <form onsubmit={(e) => { e.preventDefault(); handleSave() }} class="flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div class="flex-1 min-h-0 overflow-y-auto space-y-6 pr-1">
       <!-- Email & Name -->
       <div class="space-y-4">
         <div class="space-y-2">
@@ -349,7 +350,9 @@
         </div>
       {/if}
 
-      <!-- Actions -->
+      </div>
+
+      <!-- Actions (fixed at the bottom of the dialog) -->
       <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="ghost" onclick={handleCancel} disabled={saving}>
           {$_('common.cancel')}

@@ -123,36 +123,13 @@
     onSyncFoldersEnabledChange,
   }: Props = $props()
 
-  // SMTP "Same as incoming server" toggle. Derived from the persisted
-  // editAccount.smtpUsername (empty string = on). Tracked as its own
-  // state so the user can toggle off, type a username, toggle back on
-  // (clearing), and toggle off again without losing UI continuity. On
-  // save the parent reads the final smtpUsername — empty means SMTP
-  // uses IMAP creds, non-empty means use the separate-creds path.
-  //
-  // IMPORTANT: capture from editAccount.smtpUsername, NOT from the
-  // smtpUsername prop. bits-ui Tabs.Content always-renders its children
-  // (only hides via CSS), so this component mounts immediately when the
-  // dialog opens — BEFORE the parent dialog's $effect has had a chance
-  // to populate the form state `smtpUsername` from editAccount. Reading
-  // the form prop here captured the parent's initial empty default,
-  // which is why the toggle always appeared as "Same as IMAP" on reopen
-  // / restart even when separate creds were persisted. The const indirection
-  // is to suppress Svelte's "only captures initial value" warning —
-  // initial-only capture is exactly what we want here (editAccount is
-  // stable for the life of this mount; the dialog unmounts on close).
-  // svelte-ignore state_referenced_locally
-  let smtpUseSameAsIncoming = $state(editAccount.smtpUsername === '')
-
-  function handleSmtpUseSameAsIncomingChange(v: boolean) {
-    smtpUseSameAsIncoming = v
-    if (v) {
-      smtpUsername = ''
-      smtpPassword = ''
-      onSmtpUsernameChange('')
-      onSmtpPasswordChange('')
-    }
-  }
+  // SMTP authentication is hardcoded to "same as incoming server": there is
+  // no separate-SMTP-credentials UI anymore. Force the SMTP username/password
+  // empty so the backend always reuses the IMAP credentials.
+  $effect(() => {
+    if (smtpUsername !== '') { smtpUsername = ''; onSmtpUsernameChange('') }
+    if (smtpPassword !== '') { smtpPassword = ''; onSmtpPasswordChange('') }
+  })
 
   // Folder mapping state
   let showFolderMapping = $state(false)
@@ -338,16 +315,11 @@
 </script>
 
 <div class="space-y-6">
-  <!-- Incoming Mail (IMAP) -->
+  <!-- Incoming server (IMAP) -->
   <div class="space-y-4">
-    <h3 class="text-sm font-medium flex items-center gap-2">
-      <Icon icon="mdi:email-receive-outline" class="w-4 h-4" />
-      {$_('account.incomingMail')}
-    </h3>
-
     <div class="grid grid-cols-2 gap-3">
       <div class="space-y-2">
-        <Label for="imapHost">{$_('account.server')}</Label>
+        <Label for="imapHost">{$_('account.incomingServer')}</Label>
         <Input
           id="imapHost"
           type="text"
@@ -396,18 +368,23 @@
   <!-- Divider -->
   <div class="border-t border-border"></div>
 
-  <!-- "No outgoing server" toggle. When on, the SMTP section + auth
-       subsection are hidden, the backend skips SMTP wiring, and the
-       composer's From dropdown excludes this account. -->
-  <div class="space-y-2">
-    <label class="flex items-center gap-3 text-sm">
-      <Switch
-        checked={noOutgoingServer}
-        onCheckedChange={(v) => { noOutgoingServer = v; onNoOutgoingServerChange(v) }}
-      />
-      <span class="font-medium">{$_('account.noOutgoingServer')}</span>
-    </label>
-    <p class="text-xs text-muted-foreground">{$_('account.noOutgoingServerHelp')}</p>
+  <!-- Outgoing server (SMTP). Header carries the "no outgoing server" toggle
+       (help text is a tooltip on the info icon). When on, the SMTP fields are
+       replaced by the reply/forward-with identity picker. -->
+  <div class="space-y-4">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-sm font-medium">{$_('account.outgoingServer')}</span>
+      <div class="flex items-center gap-2">
+        <Switch
+          checked={noOutgoingServer}
+          onCheckedChange={(v) => { noOutgoingServer = v; onNoOutgoingServerChange(v) }}
+        />
+        <span class="text-sm text-muted-foreground">{$_('account.noOutgoingServer')}</span>
+        <span class="cursor-help text-muted-foreground" title={$_('account.noOutgoingServerHelp')}>
+          <Icon icon="mdi:information-outline" class="w-4 h-4" />
+        </span>
+      </div>
+    </div>
 
     {#if noOutgoingServer}
       <!-- Reply/Forward-with identity picker. Mirrors the composer's
@@ -457,20 +434,12 @@
         </Select.Root>
         <p class="text-xs text-muted-foreground">{$_('account.replyForwardWithHelp')}</p>
       </div>
-    {/if}
-  </div>
-
-  {#if !noOutgoingServer}
-  <!-- Outgoing Mail (SMTP) -->
-  <div class="space-y-4">
-    <h3 class="text-sm font-medium flex items-center gap-2">
-      <Icon icon="mdi:email-send-outline" class="w-4 h-4" />
-      {$_('account.outgoingMail')}
-    </h3>
-
+    {:else}
     <div class="grid grid-cols-2 gap-3">
       <div class="space-y-2">
-        <Label for="smtpHost">{$_('account.server')}</Label>
+        <!-- Label hidden (the section header above already reads 发件服务器);
+             kept for vertical alignment with the Port/Security labels. -->
+        <Label for="smtpHost" class="invisible" aria-hidden="true">{$_('account.outgoingServer')}</Label>
         <Input
           id="smtpHost"
           type="text"
@@ -515,73 +484,24 @@
       </div>
     </div>
 
-    {#if isGenericProvider}
-      <!-- SMTP authentication: "Same as incoming server" toggle (on by
-           default). When off, the user supplies a separate SMTP
-           username + password. Generic provider only. -->
-      <div class="space-y-3 pt-3 border-t border-border">
-        <h4 class="text-sm font-medium">{$_('account.smtpAuthentication')}</h4>
-        <label class="flex items-center gap-3 text-sm">
-          <Switch
-            checked={smtpUseSameAsIncoming}
-            onCheckedChange={handleSmtpUseSameAsIncomingChange}
-          />
-          <span>{$_('account.smtpUseSameAsIncoming')}</span>
-        </label>
-        {#if !smtpUseSameAsIncoming}
-          <div class="grid grid-cols-2 gap-3">
-            <div class="space-y-2">
-              <Label for="smtpUsername">{$_('account.username')}</Label>
-              <Input
-                id="smtpUsername"
-                type="text"
-                placeholder={$_('account.smtpUsernamePlaceholder')}
-                bind:value={smtpUsername}
-                oninput={(e) => onSmtpUsernameChange((e.target as HTMLInputElement).value)}
-                class={errors.smtpUsername ? 'border-destructive' : ''}
-              />
-              {#if errors.smtpUsername}
-                <p class="text-sm text-destructive">{errors.smtpUsername}</p>
-              {/if}
-            </div>
-            <div class="space-y-2">
-              <Label for="smtpPassword">{$_('account.password')}</Label>
-              <Input
-                id="smtpPassword"
-                type="password"
-                placeholder={$_('account.leaveEmptyToKeep')}
-                bind:value={smtpPassword}
-                oninput={(e) => onSmtpPasswordChange((e.target as HTMLInputElement).value)}
-                class={errors.smtpPassword ? 'border-destructive' : ''}
-              />
-              {#if errors.smtpPassword}
-                <p class="text-sm text-destructive">{errors.smtpPassword}</p>
-              {/if}
-            </div>
-          </div>
-        {/if}
-      </div>
     {/if}
   </div>
-  {/if}
 
   <!-- Divider -->
   <div class="border-t border-border"></div>
 
-  <!-- Check for New Mail -->
+  <!-- Sync options (no group header; label + control on one row) -->
   <div class="space-y-4">
-    <h3 class="text-sm font-medium flex items-center gap-2">
-      <Icon icon="mdi:refresh" class="w-4 h-4" />
-      {$_('account.syncOptions')}
-    </h3>
-
-    <div class="space-y-2">
-      <Label>{$_('account.checkNewMail')}</Label>
+    <div class="flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <Label>{$_('account.checkNewMail')}</Label>
+        <p class="text-xs text-muted-foreground">{$_('account.checkNewMailHelp')}</p>
+      </div>
       <Select.Root
         value={syncInterval}
         onValueChange={(v) => { syncInterval = v; onSyncIntervalChange(v) }}
       >
-        <Select.Trigger>
+        <Select.Trigger class="w-48 shrink-0">
           <Select.Value placeholder="Select">
             {getSyncIntervalLabel(syncInterval)}
           </Select.Value>
@@ -592,18 +512,18 @@
           {/each}
         </Select.Content>
       </Select.Root>
-      <p class="text-xs text-muted-foreground">
-        {$_('account.checkNewMailHelp')}
-      </p>
     </div>
 
-    <div class="space-y-2">
-      <Label>{$_('account.requestReadReceipts')}</Label>
+    <div class="flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <Label>{$_('account.requestReadReceipts')}</Label>
+        <p class="text-xs text-muted-foreground">{$_('account.requestReadReceiptsHelp')}</p>
+      </div>
       <Select.Root
         value={readReceiptRequestPolicy}
         onValueChange={(v) => { readReceiptRequestPolicy = v; onReadReceiptPolicyChange(v) }}
       >
-        <Select.Trigger>
+        <Select.Trigger class="w-48 shrink-0">
           <Select.Value placeholder="Select">
             {getReadReceiptLabel(readReceiptRequestPolicy)}
           </Select.Value>
@@ -614,9 +534,6 @@
           {/each}
         </Select.Content>
       </Select.Root>
-      <p class="text-xs text-muted-foreground">
-        {$_('account.requestReadReceiptsHelp')}
-      </p>
     </div>
   </div>
 

@@ -835,6 +835,24 @@
             sidebarRef?.toggleSync()
             return
           }
+          // In a text field, Cmd/Ctrl+A selects that field's text. The custom
+          // macOS menu has no "Select All" item, so the native behavior never
+          // fires — handle it here (and don't fall through to select-all-messages).
+          if (inInput) {
+            e.preventDefault()
+            const el = e.target as HTMLInputElement | HTMLTextAreaElement
+            if (typeof el.select === 'function') {
+              el.select()
+            } else {
+              // contenteditable (e.g. rich editor): select its whole content
+              const range = document.createRange()
+              range.selectNodeContents(el)
+              const sel = window.getSelection()
+              sel?.removeAllRanges()
+              sel?.addRange(range)
+            }
+            return
+          }
           // Ctrl-A: Select all text in viewer, or select all messages in list
           e.preventDefault()
           if (focusedPane === 'viewer') {
