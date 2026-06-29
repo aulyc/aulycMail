@@ -4,6 +4,7 @@
   import { Button } from '$lib/components/ui/button'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
+  import * as Select from '$lib/components/ui/select'
   import { _ } from '$lib/i18n'
   import SignatureEditor from './SignatureEditor.svelte'
   // @ts-ignore - wailsjs path
@@ -174,37 +175,44 @@
     </Dialog.Header>
 
     <form onsubmit={(e) => { e.preventDefault(); handleSave() }} class="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div class="flex-1 min-h-0 overflow-y-auto space-y-6 pr-1">
-      <!-- Email & Name -->
+      <!-- Fixed-height scroll area: keeps the dialog height constant whether or
+           not the signature section is shown. pr-3/pl-1/pt-1.5 keep the
+           scrollbar + focus rings off the inputs. -->
+      <div class="h-[460px] max-h-[calc(90vh-200px)] overflow-y-auto space-y-6 pt-1.5 pl-1 pr-3 pb-2">
+      <!-- Email & Name (label + input on one row) -->
       <div class="space-y-4">
-        <div class="space-y-2">
-          <Label for="email">{$_('identity.emailAddressLabel')}</Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="you@example.com"
-            bind:value={email}
-            class={errors.email ? 'border-destructive' : ''}
-          />
+        <div>
+          <div class="flex items-center justify-between gap-4">
+            <Label for="email">{$_('identity.emailAddressLabel')}</Label>
+            <Input
+              id="email"
+              type="email"
+              placeholder="you@example.com"
+              bind:value={email}
+              class="w-64 shrink-0 {errors.email ? 'border-destructive' : ''}"
+            />
+          </div>
           {#if errors.email}
-            <p class="text-sm text-destructive">{errors.email}</p>
+            <p class="text-sm text-destructive mt-1">{errors.email}</p>
           {/if}
         </div>
 
-        <div class="space-y-2">
-          <Label for="name">{$_('identity.displayNameLabel')}</Label>
-          <Input
-            id="name"
-            type="text"
-            placeholder="John Smith"
-            bind:value={name}
-            class={errors.name ? 'border-destructive' : ''}
-          />
-          <p class="text-xs text-muted-foreground">
-            {$_('identity.displayNameHelp')}
-          </p>
+        <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <Label for="name">{$_('identity.displayNameLabel')}</Label>
+              <p class="text-xs text-muted-foreground">{$_('identity.displayNameHelp')}</p>
+            </div>
+            <Input
+              id="name"
+              type="text"
+              placeholder="John Smith"
+              bind:value={name}
+              class="w-64 shrink-0 {errors.name ? 'border-destructive' : ''}"
+            />
+          </div>
           {#if errors.name}
-            <p class="text-sm text-destructive">{errors.name}</p>
+            <p class="text-sm text-destructive mt-1">{errors.name}</p>
           {/if}
         </div>
       </div>
@@ -269,10 +277,10 @@
           <!-- Divider -->
           <div class="border-t border-border"></div>
 
-          <!-- Signature Behavior -->
-          <div class="space-y-4">
+          <!-- Signature Behavior (label + checkboxes on one row) -->
+          <div class="flex items-center justify-between gap-4">
             <Label class="font-medium">{$_('identity.appendSignatureTo')}</Label>
-            <div class="flex flex-wrap gap-4">
+            <div class="flex items-center gap-4 shrink-0">
               <label class="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -300,31 +308,20 @@
             </div>
           </div>
 
-          <!-- Signature Placement -->
-          <div class="space-y-3">
+          <!-- Signature Placement (label + dropdown on one row) -->
+          <div class="flex items-center justify-between gap-4">
             <Label class="font-medium">{$_('identity.signaturePlacementLabel')}</Label>
-            <div class="flex gap-4">
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="placement"
-                  value="above"
-                  bind:group={signaturePlacement}
-                  class="w-4 h-4 accent-primary"
-                />
-                <span class="text-sm">{$_('identity.aboveQuotedText')}</span>
-              </label>
-              <label class="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="placement"
-                  value="below"
-                  bind:group={signaturePlacement}
-                  class="w-4 h-4 accent-primary"
-                />
-                <span class="text-sm">{$_('identity.belowQuotedText')}</span>
-              </label>
-            </div>
+            <Select.Root value={signaturePlacement} onValueChange={(v) => { if (v) signaturePlacement = v as 'above' | 'below' }}>
+              <Select.Trigger class="w-48 shrink-0">
+                <Select.Value>
+                  {signaturePlacement === 'below' ? $_('identity.belowQuotedText') : $_('identity.aboveQuotedText')}
+                </Select.Value>
+              </Select.Trigger>
+              <Select.Content>
+                <Select.Item value="above" label={$_('identity.aboveQuotedText')} />
+                <Select.Item value="below" label={$_('identity.belowQuotedText')} />
+              </Select.Content>
+            </Select.Root>
           </div>
 
           <!-- Separator Option -->

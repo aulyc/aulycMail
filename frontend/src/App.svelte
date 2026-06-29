@@ -241,7 +241,25 @@
     return searchTree(acc.folders)
   }
 
+  // Cmd/Ctrl+A inside any text field selects that field's text. Registered on
+  // document in the CAPTURE phase so it fires before bits-ui dialogs (which can
+  // stop keydown propagation and otherwise swallow it). The custom macOS menu
+  // has no Select All, so without this the browser default never happens.
+  function handleSelectAllInInput(e: KeyboardEvent) {
+    if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.key.toLowerCase() !== 'a') return
+    const t = e.target as HTMLElement | null
+    if (!t) return
+    const tag = t.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA') {
+      e.preventDefault()
+      e.stopPropagation()
+      ;(t as HTMLInputElement | HTMLTextAreaElement).select()
+    }
+  }
+
   onMount(async () => {
+    document.addEventListener('keydown', handleSelectAllInInput, true)
+
     // Begin recording sync/connection successes + failures for the log dialog.
     syncLog.start()
 

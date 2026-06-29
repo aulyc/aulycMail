@@ -367,7 +367,7 @@
           </Tabs.Trigger>
         </Tabs.List>
 
-        <div class="overflow-y-auto mt-4 pl-1 pr-3 h-[460px] max-h-[calc(90vh-220px)]">
+        <div class="overflow-y-auto mt-4 pt-1.5 pl-1 pr-3 h-[460px] max-h-[calc(90vh-220px)]">
           <Tabs.Content value="general" class="mt-0">
             <AccountGeneralTab
               {editAccount}
@@ -475,8 +475,9 @@
         {/if}
       </Tabs.Root>
     {:else}
-      <!-- New Account Mode: Wizard -->
-      <div class="flex-1 overflow-y-auto pl-1 pr-3 pb-4" style="max-height: calc(90vh - 140px);">
+      <!-- New Account Mode: Wizard. Fixed-height scroll area so the dialog
+           height stays constant whether or not Advanced Settings is expanded. -->
+      <div class="overflow-y-auto pt-1.5 pl-1 pr-3 pb-4 h-[460px] max-h-[calc(90vh-140px)]">
         <AccountForm
           {editAccount}
           onSubmit={handleSubmit}

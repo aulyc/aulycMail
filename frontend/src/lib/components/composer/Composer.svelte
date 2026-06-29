@@ -681,10 +681,35 @@
 
   // Append signature for the current identity based on compose mode
   function appendSignatureForIdentity(identity: account.Identity) {
-    if (!editor) return
-
     const mode = getDisplayMode()
     if (!shouldAppendSignature(identity, mode)) return
+
+    // Plain-text composer: the visible surface is the textarea (plainTextContent),
+    // not the hidden rich editor — insert the signature there.
+    if (isPlainTextMode) {
+      let sig = (identity.signatureText || '').trim()
+      if (!sig && identity.signatureHtml) sig = htmlToPlainText(identity.signatureHtml).trim()
+      if (!sig) return
+      if (identity.signatureSeparator) sig = '-- \n' + sig
+
+      const fwd = '---------- Forwarded message ----------'
+      const body = plainTextContent
+      const wroteIdx = body.search(/^.*wrote:\s*$/m)
+      const fwdIdx = body.indexOf(fwd)
+      const cuts = [wroteIdx, fwdIdx].filter((i) => i > -1)
+      const quoteStart = cuts.length ? Math.min(...cuts) : -1
+
+      if ((identity.signaturePlacement || 'above') === 'above' && quoteStart > 0) {
+        plainTextContent = body.slice(0, quoteStart).replace(/\s*$/, '\n\n') + sig + '\n\n' + body.slice(quoteStart)
+      } else if (quoteStart < 0) {
+        plainTextContent = body ? body.replace(/\s*$/, '\n\n') + sig : '\n\n' + sig
+      } else {
+        plainTextContent = body.replace(/\s*$/, '\n\n') + sig
+      }
+      return
+    }
+
+    if (!editor) return
 
     const signatureHtml = buildSignatureHtml(identity)
     if (!signatureHtml) return

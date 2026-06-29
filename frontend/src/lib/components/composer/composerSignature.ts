@@ -20,7 +20,15 @@ export const SIGNATURE_MARKER = '\u200B\u200B\u200B'
  */
 export function buildSignatureHtml(identity: Identity): string {
   if (!identity.signatureEnabled) return ''
-  if (!identity.signatureHtml) return ''
+
+  // Prefer the HTML signature; fall back to the plain-text signature converted
+  // to simple HTML, so a text-only signature still gets inserted.
+  let sigHtml = identity.signatureHtml
+  if (!sigHtml && identity.signatureText) {
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    sigHtml = `<p>${esc(identity.signatureText).replace(/\n/g, '<br>')}</p>`
+  }
+  if (!sigHtml) return ''
 
   let html: string
 
@@ -30,16 +38,16 @@ export function buildSignatureHtml(identity: Identity): string {
   } else {
     // Inject marker into the first element of the signature
     // This ensures TipTap preserves it as text content
-    html = identity.signatureHtml.replace(/^(<p[^>]*>)/, `$1${SIGNATURE_MARKER}`)
+    html = sigHtml.replace(/^(<p[^>]*>)/, `$1${SIGNATURE_MARKER}`)
     // If signature doesn't start with <p>, wrap the marker
     if (!html.includes(SIGNATURE_MARKER)) {
-      html = `<p>${SIGNATURE_MARKER}</p>` + identity.signatureHtml
+      html = `<p>${SIGNATURE_MARKER}</p>` + sigHtml
     }
   }
 
   // If we added separator, append the rest of the signature
   if (identity.signatureSeparator) {
-    html += identity.signatureHtml
+    html += sigHtml
   }
 
   return html
