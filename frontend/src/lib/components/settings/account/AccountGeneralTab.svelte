@@ -3,7 +3,6 @@
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
   import * as Select from '$lib/components/ui/select'
-  import { ColorPicker } from '$lib/components/ui/color-picker'
   import { Button } from '$lib/components/ui/button'
   import {
     syncPeriodOptions,
@@ -16,9 +15,7 @@
     /** The account being edited */
     editAccount: account.Account
     /** Bound form values */
-    name: string
     displayName: string
-    color: string
     email: string
     username: string
     password: string
@@ -36,9 +33,7 @@
     /** Whether re-authorization succeeded */
     reauthorizeSuccess?: boolean
     /** Callbacks */
-    onNameChange: (value: string) => void
     onDisplayNameChange: (value: string) => void
-    onColorChange: (value: string) => void
     onUsernameChange: (value: string) => void
     onPasswordChange: (value: string) => void
     onSyncPeriodChange: (value: string) => void
@@ -47,9 +42,7 @@
 
   let {
     editAccount: _editAccount,
-    name = $bindable(),
     displayName = $bindable(),
-    color = $bindable(),
     email = $bindable(),
     username = $bindable(),
     password = $bindable(),
@@ -59,9 +52,7 @@
     errors,
     reauthorizing = false,
     reauthorizeSuccess = false,
-    onNameChange,
     onDisplayNameChange,
-    onColorChange,
     onUsernameChange,
     onPasswordChange,
     onSyncPeriodChange,
@@ -76,30 +67,6 @@
 </script>
 
 <div class="space-y-4">
-  <!-- Account name (+ color) -->
-  <div>
-    <div class="flex items-center justify-between gap-4">
-      <div class="min-w-0">
-        <Label for="name">{$_('account.accountName')}</Label>
-        <p class="text-xs text-muted-foreground">{$_('account.colorHelp')}</p>
-      </div>
-      <div class="flex items-center gap-2 w-64 shrink-0">
-        <Input
-          id="name"
-          type="text"
-          placeholder={$_('account.accountNamePlaceholder')}
-          bind:value={name}
-          oninput={(e) => onNameChange((e.target as HTMLInputElement).value)}
-          class="flex-1 min-w-0 {errors.name ? 'border-destructive' : ''}"
-        />
-        <ColorPicker value={color} onchange={(c) => { color = c; onColorChange(c) }} class="w-6 h-6 rounded-full flex-shrink-0" />
-      </div>
-    </div>
-    {#if errors.name}
-      <p class="text-sm text-destructive mt-1">{errors.name}</p>
-    {/if}
-  </div>
-
   <!-- Default display name -->
   <div>
     <div class="flex items-center justify-between gap-4">

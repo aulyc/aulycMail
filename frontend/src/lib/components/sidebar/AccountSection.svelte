@@ -97,7 +97,7 @@
         icon={isExpanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
         class="w-4 h-4 text-muted-foreground"
       />
-      <span class="truncate flex-1 text-left">{acc.name}</span>
+      <span class="truncate flex-1 text-left">{acc.name || acc.email}</span>
 
       {#if syncing}
         <Icon icon="mdi:sync" class="w-4 h-4 animate-spin text-muted-foreground" />

@@ -4,7 +4,6 @@
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
   import * as Select from '$lib/components/ui/select'
-  import { ColorPicker } from '$lib/components/ui/color-picker'
   import BoolSelect from '$lib/components/ui/bool-select/BoolSelect.svelte'
   import Switch from '$lib/components/ui/switch/Switch.svelte'
   import {
@@ -71,7 +70,6 @@
   let oauthInitialized = $state(false)
 
   // Form fields
-  let name = $state('')
   let displayName = $state('')
   let color = $state('')
   let email = $state('')
@@ -211,7 +209,6 @@
     if (editAccount && !initialized) {
       initialized = true
       step = 'details'
-      name = editAccount.name
       email = editAccount.email
       username = editAccount.username
       imapHost = editAccount.imapHost
@@ -421,20 +418,14 @@
     if (detected && detected.id !== selectedProvider?.id) {
       selectProvider(detected)
     }
-
-    // Auto-fill name from email if empty
-    if (!name) {
-      const localPart = email.split('@')[0]
-      if (localPart) {
-        name = localPart.charAt(0).toUpperCase() + localPart.slice(1)
-      }
-    }
   })
 
   // Build config from form fields
   function buildConfig(): account.AccountConfig {
     return new account.AccountConfig({
-      name,
+      // Account name is no longer user-editable; the sidebar label is just the
+      // email address. Keep name in sync with the email.
+      name: email,
       displayName,
       color,
       email,
@@ -469,7 +460,6 @@
   function validate(): boolean {
     errors = {}
 
-    if (!name.trim()) errors.name = $_('account.accountNameRequired')
     if (!displayName.trim()) errors.displayName = $_('account.displayNameRequired')
     if (!email.trim()) errors.email = $_('account.emailRequired')
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = $_('account.invalidEmail')
@@ -595,10 +585,11 @@
 
 </script>
 
-<form onsubmit={handleSubmit} class="space-y-6">
+<form onsubmit={handleSubmit} class="flex flex-col h-[460px] max-h-[calc(90vh-140px)]">
   {#if true}
-    <!-- Account Details (manual entry — provider grid removed) -->
-    <div class="space-y-4">
+    <!-- Account Details (manual entry — provider grid removed). The fields
+         scroll inside this flex-1 area; the actions footer below stays pinned. -->
+    <div class="flex-1 min-h-0 overflow-y-auto space-y-4 pt-1.5 pl-1 pr-3">
       {#if selectedProvider?.notes}
         <div class="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <Icon icon="mdi:information-outline" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -610,28 +601,6 @@
 
       <!-- Basic Fields (label + control on one row, matching the edit dialog) -->
       <div class="space-y-4">
-        <div>
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <Label for="name">{$_('account.accountName')}</Label>
-              <p class="text-xs text-muted-foreground">{$_('account.colorHelp')}</p>
-            </div>
-            <div class="flex items-center gap-2 w-64 shrink-0">
-              <Input
-                id="name"
-                type="text"
-                placeholder={$_('account.accountNamePlaceholder')}
-                bind:value={name}
-                class="flex-1 min-w-0 {errors.name ? 'border-destructive' : ''}"
-              />
-              <ColorPicker value={color} onchange={(c) => color = c} class="w-6 h-6 rounded-full flex-shrink-0" />
-            </div>
-          </div>
-          {#if errors.name}
-            <p class="text-sm text-destructive mt-1">{errors.name}</p>
-          {/if}
-        </div>
-
         <div>
           <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
@@ -1282,9 +1251,10 @@
           </div>
         </div>
       {/if}
+    </div>
 
-      <!-- Actions -->
-      <div class="flex items-center justify-between pt-4 border-t border-border">
+    <!-- Actions (pinned footer — stays visible while the fields scroll) -->
+    <div class="flex items-center justify-between pt-4 mt-4 border-t border-border shrink-0">
         <Button
           type="button"
           variant="outline"
@@ -1311,7 +1281,6 @@
           </Button>
         </div>
       </div>
-    </div>
   {/if}
 </form>
 

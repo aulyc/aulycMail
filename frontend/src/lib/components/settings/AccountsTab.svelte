@@ -133,16 +133,9 @@
             {index + 1}
           </div>
 
-          <!-- Account color dot -->
-          <div
-            class="w-3 h-3 rounded-full shrink-0"
-            style:background-color={acc.color || '#6b7280'}
-          ></div>
-
-          <!-- Account info -->
+          <!-- Account info (name == email now, so show the address only) -->
           <div class="flex-1 min-w-0">
-            <div class="font-medium text-sm truncate">{acc.name}</div>
-            <div class="text-xs text-muted-foreground truncate">{acc.email}</div>
+            <div class="text-sm truncate">{acc.email}</div>
           </div>
 
           <!-- Last-OK hint + test connection -->

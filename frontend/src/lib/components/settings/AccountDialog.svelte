@@ -50,7 +50,6 @@
   )
 
   // Form state (for edit mode)
-  let name = $state('')
   let displayName = $state('')
   let color = $state('')
   let email = $state('')
@@ -96,7 +95,6 @@
       activeTab = 'general'
 
       // Load account values
-      name = editAccount.name
       email = editAccount.email
       username = editAccount.username
       imapHost = editAccount.imapHost
@@ -185,7 +183,6 @@
   function validate(): boolean {
     errors = {}
 
-    if (!name.trim()) errors.name = $_('account.accountNameRequired')
     if (!displayName.trim()) errors.displayName = $_('account.displayNameRequired')
     if (!imapHost.trim()) errors.imapHost = $_('account.imapHostRequired')
     if (!smtpHost.trim()) errors.smtpHost = $_('account.smtpHostRequired')
@@ -201,7 +198,9 @@
     saving = true
     try {
       const config = new account.AccountConfig({
-        name,
+        // Account name is no longer user-editable; the sidebar label is just
+        // the email address. Keep name in sync with the email.
+        name: email,
         displayName,
         color,
         email,
@@ -371,9 +370,7 @@
           <Tabs.Content value="general" class="mt-0">
             <AccountGeneralTab
               {editAccount}
-              bind:name
               bind:displayName
-              bind:color
               bind:email
               bind:username
               bind:password
@@ -383,9 +380,7 @@
               {errors}
               {reauthorizing}
               {reauthorizeSuccess}
-              onNameChange={(v) => name = v}
               onDisplayNameChange={(v) => displayName = v}
-              onColorChange={(v) => color = v}
               onUsernameChange={(v) => username = v}
               onPasswordChange={(v) => password = v}
               onSyncPeriodChange={(v) => syncPeriodDays = v}
@@ -475,9 +470,11 @@
         {/if}
       </Tabs.Root>
     {:else}
-      <!-- New Account Mode: Wizard. Fixed-height scroll area so the dialog
-           height stays constant whether or not Advanced Settings is expanded. -->
-      <div class="overflow-y-auto pt-1.5 pl-1 pr-3 pb-4 h-[460px] max-h-[calc(90vh-140px)]">
+      <!-- New Account Mode. AccountForm is a fixed-height flex column that
+           scrolls its fields internally and pins its actions footer, so the
+           dialog height stays constant whether or not Advanced Settings is
+           expanded. -->
+      <div>
         <AccountForm
           {editAccount}
           onSubmit={handleSubmit}

@@ -46,6 +46,11 @@
   let saving = $state(false)
   let errors = $state<Record<string, string>>({})
 
+  // The default identity's email must stay in sync with the account's login
+  // email (providers like 163 reject a From/envelope-sender that doesn't match
+  // the authenticated account), so it's read-only — only aliases are editable.
+  const isDefaultIdentity = $derived(identity?.isDefault ?? false)
+
   // Initialize form when identity changes
   $effect(() => {
     if (open) {
@@ -165,11 +170,13 @@
   <Dialog.Content class="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
     <Dialog.Header>
       <Dialog.Title>
-        {identity ? $_('identity.editEmailTitle') : $_('identity.addEmailTitle')}
+        {identity
+          ? (identity.isDefault ? $_('identity.editDefaultEmailTitle') : $_('identity.editEmailTitle'))
+          : $_('identity.addEmailTitle')}
       </Dialog.Title>
       <Dialog.Description>
         {identity
-          ? $_('identity.editEmailDescription')
+          ? (identity.isDefault ? $_('identity.editDefaultEmailDescription') : $_('identity.editEmailDescription'))
           : $_('identity.addEmailDescription')}
       </Dialog.Description>
     </Dialog.Header>
@@ -183,13 +190,20 @@
       <div class="space-y-4">
         <div>
           <div class="flex items-center justify-between gap-4">
-            <Label for="email">{$_('identity.emailAddressLabel')}</Label>
+            <div class="min-w-0">
+              <Label for="email">{$_('identity.emailAddressLabel')}</Label>
+              {#if isDefaultIdentity}
+                <p class="text-xs text-muted-foreground">{$_('identity.defaultEmailReadonlyHelp')}</p>
+              {/if}
+            </div>
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
               bind:value={email}
-              class="w-64 shrink-0 {errors.email ? 'border-destructive' : ''}"
+              readonly={isDefaultIdentity}
+              tabindex={isDefaultIdentity ? -1 : undefined}
+              class="w-64 shrink-0 {isDefaultIdentity ? 'cursor-not-allowed opacity-60 focus-visible:ring-0 focus-visible:ring-offset-0' : ''} {errors.email ? 'border-destructive' : ''}"
             />
           </div>
           {#if errors.email}

@@ -270,7 +270,6 @@
               {identity.name}
             </div>
             <div class="text-xs text-muted-foreground truncate mt-0.5">
-              <Icon icon="mdi:signature-text" class="w-3 h-3 inline-block mr-1" />
               {getSignaturePreview(identity)}
             </div>
           </div>
