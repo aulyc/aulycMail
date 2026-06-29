@@ -1105,8 +1105,9 @@
       <Icon icon="mdi:email-open-outline" class="w-16 h-16 mb-4" />
       <p class="text-lg">{$_('viewer.selectConversation')}</p>
     </div>
-  {:else if loading}
-    <!-- Loading -->
+  {:else if loading && !conversation}
+    <!-- Loading (only when nothing is shown yet — keep the current conversation
+         and its toolbar in place when switching, to avoid a jump/flicker) -->
     <div class="flex items-center justify-center h-full">
       <Icon icon="mdi:loading" class="w-8 h-8 animate-spin text-muted-foreground" />
     </div>
@@ -1199,7 +1200,7 @@
           title={conversationLightened ? $_('viewer.darkMailToDark') : $_('viewer.darkMailToLight')}
           onclick={toggleDarkFilter}
         >
-          <Icon icon={conversationLightened ? 'mdi:weather-night' : 'mdi:white-balance-sunny'} class="w-5 h-5 text-muted-foreground" />
+          <Icon icon={conversationLightened ? 'mdi:white-balance-sunny' : 'mdi:weather-night'} class="w-5 h-5 text-muted-foreground" />
         </button>
       {/if}
       {#if conversation.messages && conversation.messages.length > 1}

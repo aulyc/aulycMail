@@ -1,13 +1,16 @@
 <script lang="ts">
   import { fly } from 'svelte/transition'
   import { _ } from '$lib/i18n'
+  import { cn } from '$lib/utils'
 
   interface Props {
     value: string
     onchange: (color: string) => void
+    /** Optional class override for the swatch trigger (size/shape). */
+    class?: string
   }
 
-  let { value, onchange }: Props = $props()
+  let { value, onchange, class: className = '' }: Props = $props()
 
   // Default color presets
   const presets = [
@@ -122,7 +125,7 @@
   <button
     type="button"
     bind:this={triggerRef}
-    class="w-8 h-8 rounded-md border border-border shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+    class={cn('w-8 h-8 rounded-md border border-border shadow-sm cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all', className)}
     style="background-color: {displayColor}"
     onclick={togglePopover}
     aria-label={$_('aria.selectColor')}
@@ -156,7 +159,7 @@
         ></div>
         <input
           type="text"
-          class="flex-1 h-8 px-2 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
+          class="flex-1 min-w-0 h-8 px-2 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
           placeholder="#000000"
           value={hexInput}
           oninput={handleHexInput}

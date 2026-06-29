@@ -25,6 +25,8 @@
     folderName?: string
     folderType?: string
     onConversationSelect?: (threadId: string, folderId: string, accountId: string) => void
+    /** Called when the loaded folder has no conversations (so the parent can clear the viewer). */
+    onEmptyFolder?: () => void
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
     onRowActionComplete?: () => void
     isFocused?: boolean
@@ -39,6 +41,7 @@
     folderName = 'Inbox',
     folderType = 'inbox',
     onConversationSelect,
+    onEmptyFolder,
     onReply,
     onRowActionComplete,
     isFocused: _isFocused = false,
@@ -423,11 +426,23 @@
       if (conversations.length === 0) {
         selectedThreadId = null
         totalCount = count
+        // Tell the parent to clear the viewer when arriving at an empty folder
+        // (the viewer kept the previous folder's conversation until now).
+        if (folderChanged && getLayoutMode() !== 'narrow') onEmptyFolder?.()
         return
       }
 
       if (folderChanged || !selectedThreadId) {
         selectedThreadId = conversations[0].threadId
+        // Also open it in the viewer so the right pane reflects the highlighted
+        // first row. In narrow layout the viewer is an overlay, so don't
+        // force it open on a folder switch.
+        if (getLayoutMode() !== 'narrow') {
+          const first = conversations[0] as any
+          const realFolderId = isUnifiedView && first.folderId ? first.folderId : folderId!
+          const realAccountId = isUnifiedView && first.accountId ? first.accountId : accountId!
+          onConversationSelect?.(first.threadId, realFolderId, realAccountId)
+        }
       }
       totalCount = count
     } catch (err) {

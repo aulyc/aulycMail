@@ -441,7 +441,6 @@
           {selectionSource}
           isHeaderFocused={focusedAccountId === accWithFolders.account.id}
           isExpanded={expandedAccounts[accWithFolders.account.id] ?? true}
-          syncError={accountStore.getSyncError(accWithFolders.account.id)}
           {collapsedFolders}
           {onMessagesMoved}
           onFolderSelect={handleFolderSelect}

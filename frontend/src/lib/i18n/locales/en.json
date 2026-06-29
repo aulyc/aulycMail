@@ -364,8 +364,9 @@
     "titleBarDisable": "Disable",
     "titleBarDisableDesc": "Disable for less UI clutter",
     "language": "Language",
+    "languageHelp": "Choose the app interface language",
     "theme": "Theme",
-    "themeHelp": "Choose light, dark, or follow system preference",
+    "themeHelp": "Choose a dark or light theme",
     "selectTheme": "Select theme",
     "messageListDensity": "Message list density",
     "messageListDensityHelp": "Adjust the spacing and text size in the message list",
@@ -912,6 +913,14 @@
     "overlayContacts": "Search contacts…",
     "overlayNoResults": "No results",
     "overlayHint": "Type to search · ↑↓ to select · Enter to open · Esc to close"
+  },
+  "syncLog": {
+    "title": "Sync log",
+    "clear": "Clear",
+    "empty": "No sync activity yet",
+    "succeeded": "Synced successfully",
+    "failed": "Sync failed",
+    "allDates": "All dates"
   },
   "responsive": {
     "back": "Back",

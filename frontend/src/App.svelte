@@ -11,6 +11,8 @@
   import TermsDialog from './lib/components/TermsDialog.svelte'
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
   import ExtensionRail from './lib/components/rail/ExtensionRail.svelte'
+  import SyncLogDialog from './lib/components/SyncLogDialog.svelte'
+  import { syncLog } from '$lib/stores/syncLog.svelte'
   import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
   import AboutDialog from './lib/components/settings/AboutDialog.svelte'
   import SearchOverlay from './lib/components/SearchOverlay.svelte'
@@ -151,6 +153,7 @@
   // any view (mail or an extension pane), not just the mail sidebar.
   let showSettings = $state(false)
   let showAbout = $state(false)
+  let showSyncLog = $state(false)
   let showSearchOverlay = $state(false)
 
   // Certificate TOFU state (for background sync cert errors)
@@ -239,6 +242,9 @@
   }
 
   onMount(async () => {
+    // Begin recording sync/connection successes + failures for the log dialog.
+    syncLog.start()
+
     // Native macOS App-menu items route here.
     EventsOn('menu:openSettings', () => { showSettings = true })
     EventsOn('menu:openAbout', () => { showAbout = true })
@@ -430,17 +436,27 @@
     selectedFolderName = folderName
     selectedFolderType = folderType
     selectionSource = 'account'
-    selectedThreadId = null // Clear conversation selection when changing folders
-    selectedConversationFolderId = null
-    selectedConversationAccountId = null
+    // Don't clear the viewer here — the message list auto-opens the new folder's
+    // first conversation (or calls onEmptyFolder for an empty folder), so the
+    // old conversation stays in place until the new one loads, avoiding a
+    // flicker/jump in the viewer when switching folders/accounts.
     hideSidebar()
 
-    // Persist state
+    // Persist state (thread selection is persisted by the auto-open that follows)
     saveUIState({
       selectedAccountId: accountId,
       selectedFolderId: folderId,
       selectedFolderName: folderName,
       selectedFolderType: folderType,
+    })
+  }
+
+  // The selected folder has no conversations — clear the viewer.
+  function handleEmptyFolder() {
+    selectedThreadId = null
+    selectedConversationFolderId = null
+    selectedConversationAccountId = null
+    saveUIState({
       selectedThreadId: null,
       selectedConversationAccountId: null,
       selectedConversationFolderId: null,
@@ -1304,7 +1320,7 @@
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Main Content -->
   <div class="flex flex-1 min-h-0 overflow-hidden relative">
-    <ExtensionRail onOpenSettings={() => showSettings = true} />
+    <ExtensionRail onOpenSettings={() => showSettings = true} onOpenLog={() => showSyncLog = true} />
 
     {#if getActiveExtension() === 'contacts'}
       <ContactsPane />
@@ -1366,6 +1382,7 @@
         folderName={selectedFolderName}
         folderType={selectedFolderType || 'inbox'}
         onConversationSelect={handleConversationSelect}
+        onEmptyFolder={handleEmptyFolder}
         onReply={handleReply}
         onRowActionComplete={() => viewerRef?.refreshFlags()}
         isFocused={getFocusedPane() === 'messageList'}
@@ -1439,6 +1456,7 @@
 <!-- App Settings dialog — opened from the rail's gear (works in every view) -->
 <SettingsDialog bind:open={showSettings} onClose={() => { showSettings = false }} />
 <AboutDialog bind:open={showAbout} onClose={() => { showAbout = false }} />
+<SyncLogDialog bind:open={showSyncLog} onClose={() => { showSyncLog = false }} />
 
 <SearchOverlay
   bind:open={showSearchOverlay}

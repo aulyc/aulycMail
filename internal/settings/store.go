@@ -114,7 +114,7 @@ const (
 )
 
 // DefaultComposerFormat is the default composer format
-const DefaultComposerFormat = ComposerFormatRich
+const DefaultComposerFormat = ComposerFormatPlain
 
 // Policy values for read receipts
 const (

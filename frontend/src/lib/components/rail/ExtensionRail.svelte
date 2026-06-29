@@ -4,14 +4,17 @@
   import { getRailTabs } from '$lib/stores/extensionRegistry.svelte'
   import { getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
   import { _ } from '$lib/i18n'
+  import { syncLog } from '$lib/stores/syncLog.svelte'
 
   interface Props {
     // Opens the app Settings dialog. Wired by App.svelte so the gear works
     // from every view (mail + any extension pane).
     onOpenSettings?: () => void
+    // Opens the sync/connection log dialog.
+    onOpenLog?: () => void
   }
 
-  const { onOpenSettings }: Props = $props()
+  const { onOpenSettings, onOpenLog }: Props = $props()
 
   // Mail is always present and always first; extensions follow in their
   // registered Order. The rail always renders now — it hosts the global
@@ -43,9 +46,23 @@
     />
   {/each}
 
+  <!-- Sync/connection log — pinned to the bottom, just above Settings. -->
+  <button
+    class="mt-auto relative flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+    type="button"
+    title={$_('syncLog.title')}
+    aria-label={$_('syncLog.title')}
+    onclick={() => onOpenLog?.()}
+  >
+    <Icon icon="mdi:history" width="22" height="22" />
+    {#if syncLog.unseenErrors > 0}
+      <span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-destructive"></span>
+    {/if}
+  </button>
+
   <!-- Settings — pinned to the bottom, available from mail AND extension views. -->
   <button
-    class="mt-auto mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+    class="mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
     type="button"
     title={$_('sidebar.settings')}
     aria-label={$_('sidebar.settings')}

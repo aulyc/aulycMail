@@ -367,7 +367,7 @@
           </Tabs.Trigger>
         </Tabs.List>
 
-        <div class="flex-1 overflow-y-auto mt-4 pl-1 pr-3" style="max-height: calc(90vh - 220px);">
+        <div class="overflow-y-auto mt-4 pl-1 pr-3 h-[460px] max-h-[calc(90vh-220px)]">
           <Tabs.Content value="general" class="mt-0">
             <AccountGeneralTab
               {editAccount}

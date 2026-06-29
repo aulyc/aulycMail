@@ -15,7 +15,6 @@
     selectionSource: 'unified' | 'account' | null
     isHeaderFocused?: boolean
     isExpanded?: boolean
-    syncError?: { folderId: string; error: string } | null
     onFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
     onToggleExpanded?: () => void
     onEdit?: () => void
@@ -36,7 +35,6 @@
     selectionSource,
     isHeaderFocused = false,
     isExpanded = true,
-    syncError = null,
     onFolderSelect,
     onToggleExpanded,
     onEdit,
@@ -153,15 +151,9 @@
     {/if}
   </div>
 
-  <!-- Sync Error — bar removed; spinner in header + phase label in bottom status convey sync state. -->
-  {#if syncError}
-    <div class="px-3 py-1.5">
-      <div class="flex items-center gap-2 text-destructive">
-        <Icon icon="mdi:alert-circle" class="w-4 h-4 flex-shrink-0" />
-        <p class="text-xs">{$_('sidebar.syncError')}</p>
-      </div>
-    </div>
-  {/if}
+  <!-- Sync errors are no longer shown inline here; they're recorded in the
+       sync log (rail icon → log dialog). The header spinner + bottom status
+       still convey live sync state. -->
 
   <!-- Folder List -->
   {#if isExpanded}

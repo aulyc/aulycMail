@@ -75,197 +75,154 @@
   }
 </script>
 
-<div class="space-y-6">
-  <!-- Account Identification -->
-  <div class="space-y-4">
-    <h3 class="text-sm font-medium flex items-center gap-2">
-      <Icon icon="mdi:account-circle-outline" class="w-4 h-4" />
-      {$_('account.accountIdentification')}
-    </h3>
-
-    <div class="space-y-2">
-      <Label for="name">{$_('account.accountName')}</Label>
-      <div class="flex items-center gap-3">
-        <ColorPicker value={color} onchange={(c) => { color = c; onColorChange(c) }} />
+<div class="space-y-4">
+  <!-- Account name (+ color) -->
+  <div>
+    <div class="flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <Label for="name">{$_('account.accountName')}</Label>
+        <p class="text-xs text-muted-foreground">{$_('account.colorHelp')}</p>
+      </div>
+      <div class="flex items-center gap-2 w-64 shrink-0">
         <Input
           id="name"
           type="text"
           placeholder={$_('account.accountNamePlaceholder')}
           bind:value={name}
           oninput={(e) => onNameChange((e.target as HTMLInputElement).value)}
-          class={errors.name ? 'border-destructive' : ''}
+          class="flex-1 min-w-0 {errors.name ? 'border-destructive' : ''}"
         />
+        <ColorPicker value={color} onchange={(c) => { color = c; onColorChange(c) }} class="w-6 h-6 rounded-full flex-shrink-0" />
       </div>
-      <p class="text-xs text-muted-foreground">
-        {$_('account.colorHelp')}
-      </p>
-      {#if errors.name}
-        <p class="text-sm text-destructive">{errors.name}</p>
-      {/if}
     </div>
+    {#if errors.name}
+      <p class="text-sm text-destructive mt-1">{errors.name}</p>
+    {/if}
+  </div>
 
-    <div class="space-y-2">
-      <Label for="displayName">{$_('account.displayName')}</Label>
+  <!-- Default display name -->
+  <div>
+    <div class="flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <Label for="displayName">{$_('account.displayName')}</Label>
+        <p class="text-xs text-muted-foreground">{$_('account.displayNameHelp')}</p>
+      </div>
       <Input
         id="displayName"
         type="text"
         placeholder={$_('account.displayNamePlaceholder')}
         bind:value={displayName}
         oninput={(e) => onDisplayNameChange((e.target as HTMLInputElement).value)}
-        class={errors.displayName ? 'border-destructive' : ''}
+        class="w-64 shrink-0 {errors.displayName ? 'border-destructive' : ''}"
       />
-      <p class="text-xs text-muted-foreground">
-        {$_('account.displayNameHelp')}
-      </p>
-      {#if errors.displayName}
-        <p class="text-sm text-destructive">{errors.displayName}</p>
-      {/if}
     </div>
+    {#if errors.displayName}
+      <p class="text-sm text-destructive mt-1">{errors.displayName}</p>
+    {/if}
   </div>
 
-  <!-- Divider -->
-  <div class="border-t border-border"></div>
-
-  <!-- Credentials -->
-  <div class="space-y-4">
-    <h3 class="text-sm font-medium flex items-center gap-2">
-      <Icon icon="mdi:key-outline" class="w-4 h-4" />
-      {$_('account.credentials')}
-    </h3>
-
-    <div class="space-y-2">
+  <!-- Email address (read-only) -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
       <Label for="email">{$_('account.emailAddress')}</Label>
-      <Input
-        id="email"
-        type="email"
-        value={email}
-        disabled
-        class="bg-muted"
-      />
-      <p class="text-xs text-muted-foreground">
-        {$_('account.emailReadOnly')}
-      </p>
+      <p class="text-xs text-muted-foreground">{$_('account.emailReadOnly')}</p>
     </div>
+    <Input id="email" type="email" value={email} disabled class="w-64 shrink-0 bg-muted" />
+  </div>
 
-    <div class="space-y-2">
+  <!-- Username -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
       <Label for="username">{$_('account.username')}</Label>
-      <Input
-        id="username"
-        type="text"
-        placeholder={$_('account.usernamePlaceholder')}
-        bind:value={username}
-        oninput={(e) => onUsernameChange((e.target as HTMLInputElement).value)}
-      />
-      <p class="text-xs text-muted-foreground">
-        {$_('account.usernameHelp')}
-      </p>
+      <p class="text-xs text-muted-foreground">{$_('account.usernameHelp')}</p>
     </div>
+    <Input
+      id="username"
+      type="text"
+      placeholder={$_('account.usernamePlaceholder')}
+      bind:value={username}
+      oninput={(e) => onUsernameChange((e.target as HTMLInputElement).value)}
+      class="w-64 shrink-0"
+    />
+  </div>
 
-    {#if authType === 'oauth2'}
-      <!-- OAuth account -->
-      <div class="space-y-2">
+  {#if authType === 'oauth2'}
+    <!-- OAuth account -->
+    <div class="flex items-center justify-between gap-4">
+      <div class="min-w-0">
         <Label>{$_('account.authentication')}</Label>
-        <div class="rounded-lg border {reauthorizeSuccess ? 'border-green-500 bg-green-500/5' : 'border-border'} p-4 transition-colors">
-          <div class="flex items-center gap-3">
-            <div class="flex-shrink-0 w-10 h-10 rounded-full {reauthorizeSuccess ? 'bg-green-500/20' : 'bg-primary/10'} flex items-center justify-center transition-colors">
-              {#if reauthorizeSuccess}
-                <Icon icon="mdi:check-circle" class="w-5 h-5 text-green-500" />
-              {:else}
-                <Icon icon="mdi:shield-check" class="w-5 h-5 text-primary" />
-              {/if}
-            </div>
-            <div class="flex-1">
-              {#if reauthorizeSuccess}
-                <p class="text-sm font-medium text-green-600 dark:text-green-400">{$_('account.oauthReauthorized')}</p>
-                <p class="text-xs text-muted-foreground">
-                  {$_('account.oauthFreshToken')}
-                </p>
-              {:else}
-                <p class="text-sm font-medium">{$_('account.oauthConnected')}</p>
-                <p class="text-xs text-muted-foreground">
-                  {$_('account.oauthSecurelyConnected')}
-                </p>
-              {/if}
-            </div>
-            {#if !reauthorizeSuccess}
-              <Button
-                variant="outline"
-                size="sm"
-                onclick={onReauthorize}
-                disabled={reauthorizing}
-              >
-                {#if reauthorizing}
-                  <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-                  {$_('account.authorizing')}
-                {:else}
-                  <Icon icon="mdi:refresh" class="w-4 h-4 mr-2" />
-                  {$_('account.reauthorize')}
-                {/if}
-              </Button>
+        <p class="text-xs text-muted-foreground">
+          {reauthorizeSuccess ? $_('account.oauthFreshToken') : $_('account.reauthorizeHelp')}
+        </p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        {#if reauthorizeSuccess}
+          <span class="text-xs text-green-500 flex items-center gap-1">
+            <Icon icon="mdi:check-circle" class="w-4 h-4" />
+            {$_('account.oauthReauthorized')}
+          </span>
+        {:else}
+          <span class="text-xs text-muted-foreground flex items-center gap-1">
+            <Icon icon="mdi:shield-check" class="w-4 h-4 text-primary" />
+            {$_('account.oauthConnected')}
+          </span>
+          <Button variant="outline" size="sm" onclick={onReauthorize} disabled={reauthorizing}>
+            {#if reauthorizing}
+              <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
+              {$_('account.authorizing')}
+            {:else}
+              <Icon icon="mdi:refresh" class="w-4 h-4 mr-2" />
+              {$_('account.reauthorize')}
             {/if}
-          </div>
-        </div>
-        {#if !reauthorizeSuccess}
-          <p class="text-xs text-muted-foreground">
-            {$_('account.reauthorizeHelp')}
-          </p>
+          </Button>
         {/if}
       </div>
-    {:else}
-      <!-- Password account -->
-      <div class="space-y-2">
-        <Label for="password">{$_('account.password')}</Label>
+    </div>
+  {:else}
+    <!-- Password account -->
+    <div>
+      <div class="flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <Label for="password">{$_('account.password')}</Label>
+          {#if isGenericProvider}
+            <p class="text-xs text-muted-foreground">{$_('account.smtpCredsNote')}</p>
+          {/if}
+        </div>
         <Input
           id="password"
           type="password"
           placeholder={$_('account.leaveEmptyToKeep')}
           bind:value={password}
           oninput={(e) => onPasswordChange((e.target as HTMLInputElement).value)}
-          class={errors.password ? 'border-destructive' : ''}
+          class="w-64 shrink-0 {errors.password ? 'border-destructive' : ''}"
         />
-        {#if errors.password}
-          <p class="text-sm text-destructive">{errors.password}</p>
-        {/if}
       </div>
-
-      {#if isGenericProvider}
-        <p class="text-xs text-muted-foreground">
-          {$_('account.smtpCredsNote')}
-        </p>
+      {#if errors.password}
+        <p class="text-sm text-destructive mt-1">{errors.password}</p>
       {/if}
-    {/if}
-  </div>
-
-  <!-- Divider -->
-  <div class="border-t border-border"></div>
-
-  <!-- Sync Settings -->
-  <div class="space-y-4">
-    <h3 class="text-sm font-medium flex items-center gap-2">
-      <Icon icon="mdi:sync" class="w-4 h-4" />
-      {$_('account.syncSettings')}
-    </h3>
-
-    <div class="space-y-2">
-      <Label>{$_('account.syncPeriod')}</Label>
-      <Select.Root
-        value={syncPeriodDays}
-        onValueChange={(v) => { syncPeriodDays = v; onSyncPeriodChange(v) }}
-      >
-        <Select.Trigger>
-          <Select.Value placeholder="Select">
-            {getSyncPeriodLabel(syncPeriodDays)}
-          </Select.Value>
-        </Select.Trigger>
-        <Select.Content>
-          {#each syncPeriodOptions as opt (opt.value)}
-            <Select.Item value={String(opt.value)} label={$_(opt.labelKey)} />
-          {/each}
-        </Select.Content>
-      </Select.Root>
-      <p class="text-xs text-muted-foreground">
-        {$_('account.syncPeriodHelp')}
-      </p>
     </div>
+  {/if}
+
+  <!-- Sync period -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('account.syncPeriod')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('account.syncPeriodHelp')}</p>
+    </div>
+    <Select.Root
+      value={syncPeriodDays}
+      onValueChange={(v) => { syncPeriodDays = v; onSyncPeriodChange(v) }}
+    >
+      <Select.Trigger class="w-48 shrink-0">
+        <Select.Value placeholder="Select">
+          {getSyncPeriodLabel(syncPeriodDays)}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        {#each syncPeriodOptions as opt (opt.value)}
+          <Select.Item value={String(opt.value)} label={$_(opt.labelKey)} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
   </div>
 </div>

@@ -72,6 +72,17 @@
 
   let { accountId, initialMessage = null, draftId = null, onClose, onSent, api: propApi, imagesLoaded = false }: Props = $props()
 
+  // Widen a 2-character CJK field label (抄送/密送/主题) with a full-width space
+  // so it lines up with the 3-character labels (发件人/收件人). Latin labels
+  // (Cc/Bcc/To/Subject) contain no CJK chars, so they pass through untouched.
+  function widenLabel(s: string): string {
+    const chars = [...s]
+    if (chars.length === 2 && /^[一-鿿]{2}$/.test(s)) {
+      return chars[0] + '　' + chars[1]
+    }
+    return s
+  }
+
   // Get API from context, props, or create default main window API
   const contextApi = getContext<ComposerApi | undefined>(COMPOSER_API_KEY)
   const defaultApi = createMainWindowApi()
@@ -1441,11 +1452,11 @@
   <!-- Compose form -->
   <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
     <!-- From -->
-    <div class="flex items-center gap-2 px-4 py-2 border-b border-border">
-      <span class="text-sm text-muted-foreground w-16">{$_('composer.from')}:</span>
+    <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
+      <span class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.from'))}:</span>
       <div class="flex-1">
         <Select.Root value={selectedIdentityId} onValueChange={handleIdentityChange}>
-          <Select.Trigger class="h-8 px-0 border-0 bg-transparent shadow-none focus:ring-0">
+          <Select.Trigger class="h-6 px-0 border-0 bg-transparent shadow-none focus:ring-0">
             <Select.Value placeholder={$_('composer.selectIdentity')}>
               {#if selectedIdentityId}
                 {@const identity = identities.find(i => i.id === selectedIdentityId)}
@@ -1487,8 +1498,8 @@
     </div>
 
     <!-- To -->
-    <div class="flex items-start gap-2 px-4 py-2 border-b border-border">
-      <span class="text-sm text-muted-foreground w-16 pt-1">{$_('composer.to')}:</span>
+    <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
+      <span class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.to'))}:</span>
       <div class="flex-1">
         <RecipientInput
           bind:this={toInputRef}
@@ -1497,7 +1508,7 @@
         />
       </div>
       {#if !showCc || !showBcc}
-        <div class="flex items-center gap-1 text-sm text-muted-foreground">
+        <div class="flex items-center gap-1 text-sm text-muted-foreground flex-shrink-0">
           {#if !showCc}
             <button onclick={() => showCc = true} class="hover:text-foreground">{$_('composer.cc')}</button>
           {/if}
@@ -1510,8 +1521,8 @@
 
     <!-- Cc -->
     {#if showCc}
-      <div class="flex items-start gap-2 px-4 py-2 border-b border-border">
-        <span class="text-sm text-muted-foreground w-16 pt-1">{$_('composer.cc')}:</span>
+      <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
+        <span class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.cc'))}:</span>
         <div class="flex-1">
           <RecipientInput
             bind:recipients={ccRecipients}
@@ -1523,8 +1534,8 @@
 
     <!-- Bcc -->
     {#if showBcc}
-      <div class="flex items-start gap-2 px-4 py-2 border-b border-border">
-        <span class="text-sm text-muted-foreground w-16 pt-1">{$_('composer.bcc')}:</span>
+      <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
+        <span class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.bcc'))}:</span>
         <div class="flex-1">
           <RecipientInput
             bind:recipients={bccRecipients}
@@ -1535,8 +1546,8 @@
     {/if}
 
     <!-- Subject -->
-    <div class="flex items-center gap-2 px-4 py-2 border-b border-border">
-      <label for="composer-subject" class="text-sm text-muted-foreground w-16">{$_('composer.subject')}:</label>
+    <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
+      <label for="composer-subject" class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.subject'))}:</label>
       <input
         id="composer-subject"
         bind:value={subject}

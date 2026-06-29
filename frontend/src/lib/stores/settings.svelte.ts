@@ -30,7 +30,7 @@ let runBackground = $state<boolean>(false)
 let startHidden = $state<boolean>(false)
 let autostart = $state<boolean>(false)
 let language = $state<string>('')
-let composerFormat = $state<ComposerFormat>('rich')
+let composerFormat = $state<ComposerFormat>('plain')
 let nativeTitleBar = $state<boolean>(false)
 let alwaysLoadImages = $state<boolean>(false)
 let darkMailContent = $state<boolean>(false)
@@ -200,7 +200,7 @@ export async function loadSettings(): Promise<ThemeMode> {
     runBackground = runBg ?? false
     startHidden = startHid ?? false
     autostart = autoSt ?? false
-    composerFormat = (compFormat as ComposerFormat) || 'rich'
+    composerFormat = (compFormat as ComposerFormat) || 'plain'
     nativeTitleBar = nativeTB ?? false
     alwaysLoadImages = alwaysImages ?? false
     darkMailContent = darkMail ?? false

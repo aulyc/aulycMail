@@ -332,7 +332,7 @@
     {/if}
 
     {#if showColorPicker && !isPlainTextMode}
-      <div class="absolute top-full left-0 mt-1 p-2 bg-popover border border-border rounded-md shadow-lg z-50">
+      <div class="absolute top-full left-0 mt-1 p-2 bg-popover border border-border rounded-md shadow-lg z-50 w-max">
         <div class="grid grid-cols-4 gap-1 mb-2">
           {#each presetColors as color (color)}
             <button
@@ -529,11 +529,8 @@
     {/if}
   </div>
 
-  <!-- Spacer -->
-  <div class="flex-1"></div>
-
-  <!-- Plain text toggle -->
-  <div class="relative">
+  <!-- Plain text toggle — pinned to the far left; mr-auto pushes the rest right -->
+  <div class="relative order-first mr-auto">
     <button
       onclick={onTogglePlainText}
       class="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-1.5 text-xs"
@@ -541,8 +538,8 @@
       tabindex="-1"
       title={isPlainTextMode ? $_('editor.switchToRichText') : $_('editor.switchToPlainText')}
     >
-      <Icon icon={isPlainTextMode ? 'mdi:format-text' : 'mdi:text'} class="w-5 h-5" />
-      <span class="hidden sm:inline">{isPlainTextMode ? $_('editor.richText') : $_('editor.plainText')}</span>
+      <Icon icon={isPlainTextMode ? 'mdi:text' : 'mdi:format-text'} class="w-5 h-5" />
+      <span class="hidden sm:inline">{isPlainTextMode ? $_('editor.plainText') : $_('editor.richText')}</span>
     </button>
     {#if hintMode}
       <span class="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded z-20">f</span>

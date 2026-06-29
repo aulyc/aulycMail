@@ -19,6 +19,10 @@
     onLanguageChange: (value: string) => void
     accentBarUnread: boolean
     darkMailContent: boolean
+    composerFormat: string
+    readReceiptResponsePolicy: string
+    onFormatChange: (value: string) => void
+    onPolicyChange: (value: string) => void
   }
 
   let {
@@ -34,7 +38,44 @@
     onLanguageChange,
     accentBarUnread = $bindable(),
     darkMailContent = $bindable(),
+    composerFormat = $bindable(),
+    readReceiptResponsePolicy = $bindable(),
+    onFormatChange,
+    onPolicyChange,
   }: Props = $props()
+
+  // Default composer format options
+  const formatOptions = $derived([
+    { value: 'rich', label: $_('settings.composerFormatRich') },
+    { value: 'plain', label: $_('settings.composerFormatPlain') },
+  ])
+
+  // Read-receipt response policy options
+  const readReceiptResponseOptions = $derived([
+    { value: 'never', label: $_('settingsGeneral.neverSendReceipts') },
+    { value: 'ask', label: $_('settingsGeneral.askEachTime') },
+    { value: 'always', label: $_('settingsGeneral.alwaysSendReceipts') },
+  ])
+
+  function getFormatLabel(value: string): string {
+    return formatOptions.find(o => o.value === value)?.label ?? value
+  }
+
+  function getPolicyLabel(value: string): string {
+    return readReceiptResponseOptions.find(o => o.value === value)?.label ?? value
+  }
+
+  function handleFormatChange(value: string | undefined) {
+    if (!value) return
+    composerFormat = value
+    onFormatChange?.(value)
+  }
+
+  function handlePolicyChange(value: string | undefined) {
+    if (!value) return
+    readReceiptResponsePolicy = value
+    onPolicyChange?.(value)
+  }
 
   // Message list density options
   const densityOptions = $derived([
@@ -44,12 +85,10 @@
     { value: 'large', label: $_('settingsGeneral.densityLarge') },
   ])
 
-  // Theme mode options
+  // Theme mode options — just dark (Pop!) and light.
   const themeModeOptions = $derived([
-    { value: 'system', label: $_('settingsGeneral.themeSystem') },
-    { value: 'yaru-dark', label: 'Yaru (Dark)' },
-    { value: 'pop-dark', label: 'Pop! (Dark)' },
-    { value: 'light-blue', label: $_('settingsGeneral.themeLightBlue') },
+    { value: 'pop-dark', label: $_('settingsGeneral.themeDark') },
+    { value: 'light-blue', label: $_('settingsGeneral.themeLight') },
   ])
 
   function getDensityLabel(value: string): string {
@@ -95,7 +134,10 @@
 <div class="space-y-4">
   <!-- Language -->
   <div class="flex items-center justify-between gap-4">
-    <Label>{$_('settingsGeneral.language')}</Label>
+    <div class="min-w-0">
+      <Label>{$_('settingsGeneral.language')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.languageHelp')}</p>
+    </div>
     <Select.Root value={language || 'en'} onValueChange={handleLanguageChange}>
       <Select.Trigger class="w-48 shrink-0">
         <Select.Value>{getLanguageLabel(language || 'en')}</Select.Value>
@@ -192,5 +234,45 @@
       </p>
     </div>
     <BoolSelect id="autostart" bind:checked={autostart} onCheckedChange={handleAutostartChange} />
+  </div>
+
+  <!-- Default composer format (moved here from the removed "Composer" tab) -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('settings.composerFormat')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settings.composerFormatDescription')}</p>
+    </div>
+    <Select.Root value={composerFormat} onValueChange={handleFormatChange}>
+      <Select.Trigger class="w-48 shrink-0">
+        <Select.Value placeholder={$_('settings.composerFormat')}>
+          {getFormatLabel(composerFormat)}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        {#each formatOptions as opt (opt.value)}
+          <Select.Item value={opt.value} label={opt.label} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
+  </div>
+
+  <!-- Read-receipt response policy (moved here from the removed "Composer" tab) -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('settingsGeneral.readReceiptPolicy')}</Label>
+      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.readReceiptPolicyHelp')}</p>
+    </div>
+    <Select.Root value={readReceiptResponsePolicy} onValueChange={handlePolicyChange}>
+      <Select.Trigger class="w-48 shrink-0">
+        <Select.Value placeholder={$_('settingsGeneral.selectPolicy')}>
+          {getPolicyLabel(readReceiptResponsePolicy)}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        {#each readReceiptResponseOptions as opt (opt.value)}
+          <Select.Item value={opt.value} label={opt.label} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
   </div>
 </div>

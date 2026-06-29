@@ -364,8 +364,9 @@
     "titleBarDisable": "禁用",
     "titleBarDisableDesc": "禁用以减少界面杂乱",
     "language": "语言",
+    "languageHelp": "选择应用界面语言",
     "theme": "主题",
-    "themeHelp": "选择浅色、深色或跟随系统偏好",
+    "themeHelp": "选择深色或浅色主题",
     "selectTheme": "选择主题",
     "messageListDensity": "邮件列表密度",
     "messageListDensityHelp": "调整邮件列表中的间距和字号",
@@ -912,6 +913,14 @@
     "overlayContacts": "搜索联系人…",
     "overlayNoResults": "没有结果",
     "overlayHint": "输入进行搜索，按 ↑或↓ 选择，回车打开，按 Esc 关闭搜索"
+  },
+  "syncLog": {
+    "title": "同步日志",
+    "clear": "清空",
+    "empty": "暂无同步记录",
+    "succeeded": "同步成功",
+    "failed": "同步失败",
+    "allDates": "全部日期"
   },
   "responsive": {
     "back": "返回",

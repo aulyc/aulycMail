@@ -13,7 +13,6 @@
   import { _ } from '$lib/i18n'
   import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
   import GeneralTab from './GeneralTab.svelte'
-  import ComposerTab from './ComposerTab.svelte'
   import ImagesTab from './ImagesTab.svelte'
   import AccountsTab from './AccountsTab.svelte'
 
@@ -112,8 +111,10 @@
       // Convert ms to seconds for display
       markAsReadDelaySeconds = delayMs < 0 ? -1 : delayMs / 1000
       messageListDensity = density
-      themeMode = theme
-      originalThemeMode = theme
+      // Only Dark (pop-dark) and Light (light-blue) remain; coerce any legacy
+      // value (system / yaru-dark) to Dark so the dropdown shows a valid option.
+      themeMode = (theme === 'pop-dark' || theme === 'light-blue') ? theme : 'pop-dark'
+      originalThemeMode = themeMode
       showTitleBar = titleBar
       runBackground = runBg
       startHidden = startHid
@@ -223,7 +224,7 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
-  <Dialog.Content class="max-w-3xl" preventCloseAutoFocus onInteractOutside={(e) => e.preventDefault()}>
+  <Dialog.Content class="max-w-2xl" preventCloseAutoFocus onInteractOutside={(e) => e.preventDefault()}>
     <Dialog.Header>
       <Dialog.Title>{$_('settings.title')}</Dialog.Title>
     </Dialog.Header>
@@ -234,14 +235,10 @@
       </div>
     {:else}
       <Tabs.Root bind:value={activeTab} class="w-full">
-        <Tabs.List class="grid w-full grid-cols-4">
+        <Tabs.List class="grid w-full grid-cols-3">
           <Tabs.Trigger value="general" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:settings-2" width="16" height="16" /></span>
             {$_('settings.general')}
-          </Tabs.Trigger>
-          <Tabs.Trigger value="composer" class="flex items-center gap-2">
-            <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:square-pen" width="46" height="46" /></span>
-            {$_('settings.composer')}
           </Tabs.Trigger>
           <Tabs.Trigger value="images" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:image" width="16" height="16" /></span>
@@ -268,11 +265,6 @@
               onLanguageChange={(v) => language = v}
               bind:accentBarUnread
               bind:darkMailContent
-            />
-          </Tabs.Content>
-
-          <Tabs.Content value="composer" class="mt-0">
-            <ComposerTab
               bind:composerFormat
               bind:readReceiptResponsePolicy
               onFormatChange={(v) => composerFormat = v}
@@ -293,8 +285,8 @@
         </div>
       </Tabs.Root>
 
-      <!-- Actions - show Save/Cancel on General and Composer tabs -->
-      {#if activeTab === 'general' || activeTab === 'composer' || activeTab === 'images'}
+      <!-- Actions - show Save/Cancel on editable tabs (General, Images) -->
+      {#if activeTab === 'general' || activeTab === 'images'}
         <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
           <Button variant="ghost" onclick={handleCancel} disabled={saving}>
             {$_('common.cancel')}
