@@ -17,9 +17,6 @@
     isExpanded?: boolean
     onFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
     onToggleExpanded?: () => void
-    onEdit?: () => void
-    onDelete?: () => void
-    onSync?: () => void
     collapsedFolders?: Record<string, boolean>
     onToggleFolderCollapse?: (folderId: string) => void
     onMessagesMoved?: () => void
@@ -37,15 +34,10 @@
     isExpanded = true,
     onFolderSelect,
     onToggleExpanded,
-    onEdit,
-    onDelete,
-    onSync,
     collapsedFolders = {},
     onToggleFolderCollapse,
     onMessagesMoved,
   }: Props = $props()
-
-  let showMenu = $state(false)
 
   // Toggle expand/collapse via callback
   function toggleExpanded() {
@@ -55,38 +47,12 @@
   function selectFolder(f: folder.Folder) {
     onFolderSelect?.(acc.id, f.id, f.path, f.name, f.type)
   }
-
-  function toggleMenu(e: MouseEvent) {
-    e.stopPropagation()
-    showMenu = !showMenu
-  }
-
-  function handleEdit() {
-    showMenu = false
-    onEdit?.()
-  }
-
-  function handleDelete() {
-    showMenu = false
-    onDelete?.()
-  }
-
-  function handleSync() {
-    showMenu = false
-    onSync?.()
-  }
-
-  // Close menu when clicking outside
-  function handleClickOutside() {
-    showMenu = false
-  }
 </script>
 
-<svelte:window onclick={handleClickOutside} />
-
 <div class="mb-1">
-  <!-- Account Header -->
-  <div class="relative group">
+  <!-- Account Header. Edit / delete / sync live in Settings → Accounts, so the
+       sidebar header is just an expand/collapse toggle. -->
+  <div>
     <button
       class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors {isHeaderFocused ? 'bg-muted ring-1 ring-primary/50' : ''}"
       data-sidebar-item="account-header"
@@ -107,48 +73,6 @@
         </span>
       {/if}
     </button>
-
-    <!-- Account Menu Button -->
-    <button
-      class="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-      onclick={toggleMenu}
-    >
-      <Icon icon="mdi:dots-vertical" class="w-4 h-4 text-muted-foreground" />
-    </button>
-
-    <!-- Dropdown Menu -->
-    {#if showMenu}
-      <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div
-        class="absolute right-2 top-full mt-1 z-50 min-w-[160px] bg-popover border border-border rounded-md shadow-md py-1"
-        role="menu"
-        tabindex="-1"
-        onclick={(e) => e.stopPropagation()}
-      >
-        <button
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
-          onclick={handleSync}
-        >
-          <Icon icon="mdi:sync" class="w-4 h-4" />
-          <span>{$_('sidebar.syncNow')}</span>
-        </button>
-        <button
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
-          onclick={handleEdit}
-        >
-          <Icon icon="mdi:pencil-outline" class="w-4 h-4" />
-          <span>{$_('sidebar.editAccount')}</span>
-        </button>
-        <div class="my-1 border-t border-border"></div>
-        <button
-          class="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-          onclick={handleDelete}
-        >
-          <Icon icon="mdi:delete-outline" class="w-4 h-4" />
-          <span>{$_('sidebar.deleteAccount')}</span>
-        </button>
-      </div>
-    {/if}
   </div>
 
   <!-- Sync errors are no longer shown inline here; they're recorded in the

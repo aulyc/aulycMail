@@ -53,6 +53,7 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 				folderID: folderObj.UnreadCount,
 			})
 		}
+		a.refreshDockBadge()
 	})
 
 	// Wire up network connectivity check so scheduler skips ticks when offline
@@ -217,6 +218,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 						fID: updatedFolder.UnreadCount,
 					})
 				}
+				a.refreshDockBadge()
 			}()
 
 			// Panic recovery - ensure we always emit an event so UI doesn't get stuck

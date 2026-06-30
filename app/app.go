@@ -627,6 +627,10 @@ func (a *App) Startup(ctx context.Context) {
 	// Initialize and start background email sync (polling + IDLE)
 	a.initBackgroundSync(ctx)
 
+	// Seed the Dock badge with the unread count carried over from the last
+	// session, before the first sync refreshes it.
+	a.refreshDockBadge()
+
 	// Sync any pending drafts from previous sessions
 	go a.syncAllPendingDrafts()
 

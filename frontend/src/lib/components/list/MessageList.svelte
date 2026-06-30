@@ -290,6 +290,12 @@
   let prevAccountId: string | null = null
   let prevFolderId: string | null = null
 
+  // True only for a load that was triggered by genuine folder navigation (the
+  // folder-change $effect below). Background/deferred reloads (sync events, the
+  // dialog-guard flush after a dialog closes, sort/filter) leave it false so
+  // they never clear or steal the user's current selection. (#selection-loss)
+  let folderNavLoad = false
+
   // Clear selection and search when folder changes
   $effect(() => {
     const currentAccount = isUnifiedView ? 'unified' : accountId
@@ -324,6 +330,7 @@
     serverSearchCount = 0
     serverSearchTotalCount = 0
     lastServerQuery = ''
+    folderNavLoad = true // this load is a real folder switch → may auto-select first
     loadConversations()
     checkFTSIndexStatus()
   })
@@ -418,17 +425,24 @@
         pendingFlagChanges = []
       }
 
-      // Check if we switched to a different folder
-      const folderChanged = lastLoadedFolderId !== folderId
-      lastLoadedFolderId = folderId
+      // Was this load triggered by genuine folder navigation? (Consume the flag.)
+      // A background/deferred reload of the SAME folder must NOT be treated as a
+      // folder switch — otherwise it clears or steals the current selection
+      // (e.g. opening then closing Settings replays a deferred reload).
+      const folderChanged = folderNavLoad
+      folderNavLoad = false
+      lastLoadedFolderId = folderId // still used by the pagination-exhausted check
 
       // Auto-select first message on folder navigation or initial load
       if (conversations.length === 0) {
-        selectedThreadId = null
         totalCount = count
-        // Tell the parent to clear the viewer when arriving at an empty folder
-        // (the viewer kept the previous folder's conversation until now).
-        if (folderChanged && getLayoutMode() !== 'narrow') onEmptyFolder?.()
+        // Only clear the selection / viewer when navigating to an empty folder.
+        // A transient empty result from a background reload leaves the current
+        // selection untouched.
+        if (folderChanged) {
+          selectedThreadId = null
+          if (getLayoutMode() !== 'narrow') onEmptyFolder?.()
+        }
         return
       }
 

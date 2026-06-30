@@ -111,6 +111,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 			folderID: folderObj.UnreadCount,
 		})
 	}
+	a.refreshDockBadge()
 
 	// Start background body fetching (emits progress events for "bodies" phase)
 	// Pass ctx so body fetch can also be cancelled

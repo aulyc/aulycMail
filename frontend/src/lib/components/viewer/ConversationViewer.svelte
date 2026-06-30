@@ -462,10 +462,10 @@
       error = $_('viewer.failedToLoad')
     } finally {
       loading = false
-      // Scroll to bottom to show the latest message
+      // Newest message is rendered at the top, so scroll to the top to show it.
       await tick()
       if (contentContainerRef) {
-        contentContainerRef.scrollTop = contentContainerRef.scrollHeight
+        contentContainerRef.scrollTop = 0
       }
     }
   }
@@ -924,10 +924,14 @@
   // Computed: messages visible in the viewer.
   // In message-focus mode, narrow to the single targeted message.
   // Otherwise show the whole thread.
+  // conversation.messages is oldest→newest (ORDER BY date ASC). The thread is
+  // displayed newest-first (descending), so reverse a copy for rendering. The
+  // underlying array stays ASC, so "latest = last element" logic elsewhere is
+  // unaffected.
   const visibleMessages = $derived(
     inFocusMode && focusModeKind === 'message' && focusedMessageIdInFocus
       ? (conversation?.messages?.filter(m => m.id === focusedMessageIdInFocus) ?? [])
-      : (conversation?.messages ?? [])
+      : [...(conversation?.messages ?? [])].reverse()
   )
 
   // Reference to the scrollable content area

@@ -272,6 +272,26 @@ func (s *Store) GetUnifiedInboxUnreadCount() (int, error) {
 	return count, nil
 }
 
+// GetBadgeUnreadCount returns the total unread across all enabled accounts that
+// should drive the Dock badge: the inbox plus user folders, but NOT the noise
+// folders (sent, drafts, trash, spam) or the virtual folders (all-mail,
+// starred, archive) that would double-count or surface junk. For IMAP accounts
+// a message lives in exactly one folder, so inbox + custom folders never
+// overlap.
+func (s *Store) GetBadgeUnreadCount() (int, error) {
+	query := `
+		SELECT COALESCE(SUM(f.unread_count), 0)
+		FROM folders f
+		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
+		WHERE f.folder_type IN ('inbox', 'folder')
+	`
+	var count int
+	if err := s.db.QueryRow(query).Scan(&count); err != nil {
+		return 0, fmt.Errorf("failed to count badge unread: %w", err)
+	}
+	return count, nil
+}
+
 // CountUnreadByFolder returns the unread message count for a folder
 func (s *Store) CountUnreadByFolder(folderID string) (int, error) {
 	var count int

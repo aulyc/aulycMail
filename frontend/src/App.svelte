@@ -716,6 +716,15 @@
     if (e.code === 'AltLeft') {
       leftAltHeld = true
     }
+
+    // If another layer already handled this key, don't act on it again. bits-ui
+    // dialogs/menus close on Escape via a document-level keydown listener that
+    // calls preventDefault(); that runs before this window-level handler, so a
+    // dialog-closing Escape arrives here already-prevented. Without this guard
+    // the same Escape would also close the open conversation (e.g. pressing Esc
+    // to dismiss Settings would blank the reading pane). (#esc-clears-viewer)
+    if (e.defaultPrevented) return
+
     const inInput = isInputElement(e.target)
     const focusedPane = getFocusedPane()
     const hasConversation = selectedThreadId !== null

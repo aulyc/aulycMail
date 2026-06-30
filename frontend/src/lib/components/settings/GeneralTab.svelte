@@ -77,9 +77,8 @@
     onPolicyChange?.(value)
   }
 
-  // Message list density options
+  // 小 (compact) / 中 (standard) / 大 (large) — the old 极小 (micro) is removed
   const densityOptions = $derived([
-    { value: 'micro', label: $_('settingsGeneral.densityMicro') },
     { value: 'compact', label: $_('settingsGeneral.densityCompact') },
     { value: 'standard', label: $_('settingsGeneral.densityStandard') },
     { value: 'large', label: $_('settingsGeneral.densityLarge') },
@@ -139,7 +138,7 @@
       <p class="text-xs text-muted-foreground">{$_('settingsGeneral.languageHelp')}</p>
     </div>
     <Select.Root value={language || 'en'} onValueChange={handleLanguageChange}>
-      <Select.Trigger class="w-48 shrink-0">
+      <Select.Trigger class="w-36 shrink-0">
         <Select.Value>{getLanguageLabel(language || 'en')}</Select.Value>
       </Select.Trigger>
       <Select.Content>
@@ -157,7 +156,7 @@
       <p class="text-xs text-muted-foreground">{$_('settingsGeneral.themeHelp')}</p>
     </div>
     <Select.Root value={themeMode} onValueChange={handleThemeChange}>
-      <Select.Trigger class="w-48 shrink-0">
+      <Select.Trigger class="w-36 shrink-0">
         <Select.Value placeholder={$_('settingsGeneral.selectTheme')}>
           {getThemeModeLabel(themeMode)}
         </Select.Value>
@@ -179,7 +178,7 @@
           {$_('settingsGeneral.darkMailContentHelp')}
         </p>
       </div>
-      <BoolSelect id="dark-mail-content" bind:checked={darkMailContent} />
+      <BoolSelect id="dark-mail-content" bind:checked={darkMailContent} class="w-36" />
     </div>
   {/if}
 
@@ -191,7 +190,7 @@
         {$_('settingsGeneral.accentBarUnreadHelp')}
       </p>
     </div>
-    <BoolSelect id="accent-bar-unread" bind:checked={accentBarUnread} />
+    <BoolSelect id="accent-bar-unread" bind:checked={accentBarUnread} class="w-36" />
   </div>
 
   <!-- Message list density -->
@@ -201,7 +200,7 @@
       <p class="text-xs text-muted-foreground">{$_('settingsGeneral.messageListDensityHelp')}</p>
     </div>
     <Select.Root value={messageListDensity} onValueChange={handleDensityChange}>
-      <Select.Trigger class="w-48 shrink-0">
+      <Select.Trigger class="w-36 shrink-0">
         <Select.Value placeholder={$_('settingsGeneral.selectDensity')}>
           {getDensityLabel(messageListDensity)}
         </Select.Value>
@@ -222,7 +221,7 @@
         {$_('settingsGeneral.runInBackgroundHelp')}
       </p>
     </div>
-    <BoolSelect id="run-background" bind:checked={runBackground} onCheckedChange={handleRunBackgroundChange} />
+    <BoolSelect id="run-background" bind:checked={runBackground} onCheckedChange={handleRunBackgroundChange} class="w-36" />
   </div>
 
   <!-- Autostart on login -->
@@ -233,7 +232,7 @@
         {$_('settingsGeneral.autostartHelp')}
       </p>
     </div>
-    <BoolSelect id="autostart" bind:checked={autostart} onCheckedChange={handleAutostartChange} />
+    <BoolSelect id="autostart" bind:checked={autostart} onCheckedChange={handleAutostartChange} class="w-36" />
   </div>
 
   <!-- Default composer format (moved here from the removed "Composer" tab) -->
@@ -243,7 +242,7 @@
       <p class="text-xs text-muted-foreground">{$_('settings.composerFormatDescription')}</p>
     </div>
     <Select.Root value={composerFormat} onValueChange={handleFormatChange}>
-      <Select.Trigger class="w-48 shrink-0">
+      <Select.Trigger class="w-36 shrink-0">
         <Select.Value placeholder={$_('settings.composerFormat')}>
           {getFormatLabel(composerFormat)}
         </Select.Value>
@@ -263,7 +262,7 @@
       <p class="text-xs text-muted-foreground">{$_('settingsGeneral.readReceiptPolicyHelp')}</p>
     </div>
     <Select.Root value={readReceiptResponsePolicy} onValueChange={handlePolicyChange}>
-      <Select.Trigger class="w-48 shrink-0">
+      <Select.Trigger class="w-36 shrink-0">
         <Select.Value placeholder={$_('settingsGeneral.selectPolicy')}>
           {getPolicyLabel(readReceiptResponsePolicy)}
         </Select.Value>

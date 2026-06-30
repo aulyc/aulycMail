@@ -51,7 +51,10 @@ void setupNotifications(void) {
         notifDelegate = [[aulycmailNotificationDelegate alloc] init];
         center.delegate = notifDelegate;
 
-        [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
+        // Badge is required for the Dock unread-count badge to render — without
+        // it macOS hides the "Badge app icon" setting and suppresses
+        // [[NSApp dockTile] setBadgeLabel:].
+        [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge)
                               completionHandler:^(BOOL granted, NSError *error) {
             if (error != nil) {
                 NSLog(@"[aulycmail] Notification authorization error: %@", error);

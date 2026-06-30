@@ -525,9 +525,12 @@
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
-<div class="border border-input rounded-md overflow-hidden bg-background" role="toolbar" aria-label={$_('aria.signatureEditor')} tabindex="-1" onclick={handleClickOutside}>
+<!-- No overflow-hidden on the root: the color / font-size popovers are absolutely
+     positioned and would be clipped by it. Rounded corners are kept via the
+     border + rounded-md here and rounded-t-md on the toolbar. -->
+<div class="border border-input rounded-md bg-background" role="toolbar" aria-label={$_('aria.signatureEditor')} tabindex="-1" onclick={handleClickOutside}>
   <!-- Toolbar -->
-  <div class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-border bg-muted/30">
+  <div class="flex flex-wrap items-center gap-0.5 px-2 py-1.5 border-b border-border bg-muted/30 rounded-t-md">
     {#if !rawHtmlMode}
       <button
         type="button"

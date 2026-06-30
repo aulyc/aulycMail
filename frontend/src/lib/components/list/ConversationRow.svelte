@@ -71,19 +71,19 @@
     row: {
       micro: 'px-3 py-2 gap-2',
       compact: 'px-4 py-3 gap-3',
-      standard: 'px-5 py-4 gap-4',
+      standard: 'px-5 py-3.5 gap-3.5',
       large: 'px-6 py-5 gap-5',
     },
     avatar: {
       micro: 'w-8 h-8 text-xs',
       compact: 'w-10 h-10 text-sm',
-      standard: 'w-12 h-12 text-base',
+      standard: 'w-11 h-11 text-sm',
       large: 'w-14 h-14 text-lg',
     },
     senderText: {
       micro: 'text-xs',
       compact: 'text-sm',
-      standard: 'text-base',
+      standard: 'text-[15px]',
       large: 'text-lg',
     },
     text: {
@@ -216,7 +216,7 @@
     draggable="true"
     class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
       ? 'bg-primary/20'
-      : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-2 border-l-primary' : ''}"
+      : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
     onclick={(e) => onSelect(e)}
     onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() }}}
     ondragstart={handleDragStart}

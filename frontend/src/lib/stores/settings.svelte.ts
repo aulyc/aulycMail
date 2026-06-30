@@ -110,7 +110,7 @@ export function getCurrentDateFnsLocale(): Locale | undefined {
 
 // Setter functions to update the state
 export function setMessageListDensity(density: MessageListDensity) {
-  messageListDensity = density
+  messageListDensity = density === 'micro' ? 'compact' : density
 }
 
 export function setMessageListSortOrder(sortOrder: MessageListSortOrder) {
@@ -193,7 +193,8 @@ export async function loadSettings(): Promise<ThemeMode> {
       GetShowMessageListCircles(),
       GetShowViewerCircles(),
     ])
-    messageListDensity = (density as MessageListDensity) || 'standard'
+    // 'micro' was removed from the UI; fold any stored value into 'compact' (小).
+    messageListDensity = (density === 'micro' ? 'compact' : (density as MessageListDensity)) || 'standard'
     messageListSortOrder = (sortOrder as MessageListSortOrder) || 'newest'
     themeMode = (theme as ThemeMode) || 'system'
     showTitleBar = titleBar ?? true // Default to true

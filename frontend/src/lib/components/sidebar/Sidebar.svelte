@@ -3,7 +3,6 @@
   import { onMount } from 'svelte'
   import AccountSection from './AccountSection.svelte'
   import AccountDialog from '$lib/components/settings/AccountDialog.svelte'
-  import DeleteAccountDialog from '$lib/components/settings/DeleteAccountDialog.svelte'
   import SidebarFooter from '$lib/components/kit/SidebarFooter.svelte'
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
@@ -126,9 +125,7 @@
 
   // Dialog state
   let showAccountDialog = $state(false)
-  let showDeleteDialog = $state(false)
   let editingAccount = $state<account.Account | null>(null)
-  let deletingAccount = $state<account.Account | null>(null)
 
   // Load accounts and contact sources on mount
   onMount(() => {
@@ -174,18 +171,6 @@
   function openAddAccount() {
     editingAccount = null
     showAccountDialog = true
-  }
-
-  // Open edit account dialog
-  function openEditAccount(acc: account.Account) {
-    editingAccount = acc
-    showAccountDialog = true
-  }
-
-  // Open delete confirmation
-  function openDeleteAccount(acc: account.Account) {
-    deletingAccount = acc
-    showDeleteDialog = true
   }
 
   // Sync all accounts (comprehensive sync)
@@ -446,13 +431,6 @@
           onFolderSelect={handleFolderSelect}
           onToggleExpanded={() => toggleAccountExpanded(accWithFolders.account.id)}
           onToggleFolderCollapse={toggleFolderCollapsed}
-          onEdit={() => openEditAccount(accWithFolders.account)}
-          onDelete={() => openDeleteAccount(accWithFolders.account)}
-          onSync={() => {
-            // Clear any sync error before retrying
-            accountStore.clearSyncError(accWithFolders.account.id)
-            accountStore.syncAccount(accWithFolders.account.id)
-          }}
         />
       {/each}
     {/if}
@@ -502,17 +480,6 @@
   onClose={() => {
     showAccountDialog = false
     editingAccount = null
-    setFocusedPane('messageList')
-  }}
-/>
-
-<!-- Delete Confirmation Dialog -->
-<DeleteAccountDialog
-  bind:open={showDeleteDialog}
-  account={deletingAccount}
-  onClose={() => {
-    showDeleteDialog = false
-    deletingAccount = null
     setFocusedPane('messageList')
   }}
 />
