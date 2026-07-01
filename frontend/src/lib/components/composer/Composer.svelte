@@ -49,7 +49,6 @@
   } from './composerSignature'
   import * as Select from '$lib/components/ui/select'
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
-  import Switch from '$lib/components/ui/switch/Switch.svelte'
   import { ThreeOptionDialog } from '$lib/components/ui/confirm-dialog'
   import { addToast } from '$lib/stores/toast'
   import { getComposerFormat } from '$lib/stores/settings.svelte'
@@ -1095,6 +1094,8 @@
 
   // Keyboard shortcuts
   function handleKeyDown(e: KeyboardEvent) {
+    if (e.defaultPrevented) return
+
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       handleSend()
