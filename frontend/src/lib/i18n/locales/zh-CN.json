@@ -927,10 +927,11 @@
     "notSyncedLocally": "（尚未同步到本地）",
     "serverResultsCapped": "显示\"{query}\"的 {shown} / {total} 条结果",
     "showAllResults": "显示全部 {total} 条结果",
+    "scopeAllMail": "全部邮箱",
+    "scopeAllContacts": "全部联系人",
     "overlayMail": "搜索邮件…",
     "overlayContacts": "搜索联系人…",
-    "overlayNoResults": "没有结果",
-    "overlayHint": "输入进行搜索，按 ↑或↓ 选择，回车打开，按 Esc 关闭搜索"
+    "overlayNoResults": "没有结果"
   },
   "syncLog": {
     "title": "同步日志",

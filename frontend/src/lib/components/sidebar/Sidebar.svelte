@@ -354,7 +354,7 @@
         class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
         onclick={onCompose}
       >
-        <Icon icon="mdi:pencil" class="w-4 h-4" />
+        <Icon icon="mdi:email-edit-outline" class="w-4 h-4" />
         <span>{$_('sidebar.compose')}</span>
       </button>
       {#if showBackButton}

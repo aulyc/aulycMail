@@ -18,6 +18,7 @@
   import SearchOverlay from './lib/components/SearchOverlay.svelte'
   import { activateContact as activateContactInView } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
+  import { preloadContactAccountGroups } from '$extensions/contacts/frontend/stores/contactAccountGroups.svelte'
   import { refreshExtensionRegistry, getRailTabs } from '$lib/stores/extensionRegistry.svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
@@ -344,6 +345,7 @@
     // Load extension registry (enabled extensions, rail tabs) so the rail can
     // render synchronously when the layout mounts.
     await refreshExtensionRegistry()
+    preloadContactAccountGroups()
 
     // Restore pane widths (already validated/clamped by loadUIState)
     sidebarWidth = uiState.sidebarWidth
@@ -1494,8 +1496,6 @@
 <SearchOverlay
   bind:open={showSearchOverlay}
   mode={getActiveExtension() === 'mail' ? 'mail' : 'contacts'}
-  accountId={resolveAccountId(selectedAccountId)}
-  folderId={selectedFolderId}
   onClose={() => { showSearchOverlay = false }}
   onSelectMail={(r) => {
     showSearchOverlay = false

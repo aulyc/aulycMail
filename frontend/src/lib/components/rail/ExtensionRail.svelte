@@ -5,6 +5,7 @@
   import { getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
   import { _ } from '$lib/i18n'
   import { syncLog } from '$lib/stores/syncLog.svelte'
+  import { accountStore } from '$lib/stores/accounts.svelte'
 
   interface Props {
     // Opens the app Settings dialog. Wired by App.svelte so the gear works
@@ -24,6 +25,18 @@
 
   function select(name: string) {
     setActiveExtension(name)
+  }
+
+  async function toggleSync() {
+    try {
+      if (accountStore.isAnySyncing) {
+        await accountStore.cancelAllSyncs()
+        return
+      }
+      await accountStore.syncAllComplete()
+    } catch (err) {
+      console.error('Rail sync failed:', err)
+    }
   }
 </script>
 
@@ -46,9 +59,25 @@
     />
   {/each}
 
-  <!-- Sync/connection log — pinned to the bottom, just above Settings. -->
+  <!-- Sync — pinned above the sync log and Settings. -->
   <button
     class="mt-auto relative flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+    type="button"
+    title={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
+    aria-label={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
+    onclick={toggleSync}
+  >
+    <Icon
+      icon="mdi:sync"
+      width="22"
+      height="22"
+      class={accountStore.isAnySyncing ? 'animate-spin text-primary' : ''}
+    />
+  </button>
+
+  <!-- Sync/connection log — pinned to the bottom, just above Settings. -->
+  <button
+    class="relative flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
     type="button"
     title={$_('syncLog.title')}
     aria-label={$_('syncLog.title')}

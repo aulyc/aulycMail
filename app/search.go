@@ -30,6 +30,15 @@ func (a *App) SearchMailInFolder(folderID, query string, limit int) ([]*message.
 	return a.messageStore.SearchMessagesInFolder(folderID, query, limit)
 }
 
+// SearchMailInAccount does the same substring search as SearchMailInFolder,
+// scoped to one account when accountID is set, or all accounts when empty.
+func (a *App) SearchMailInAccount(accountID, query string, limit int) ([]*message.ContactMessage, error) {
+	if a.messageStore == nil {
+		return []*message.ContactMessage{}, nil
+	}
+	return a.messageStore.SearchMessagesInAccount(accountID, query, limit)
+}
+
 // GetSearchCount returns the total count of search results in a folder
 func (a *App) GetSearchCount(accountID, folderID, query, filter string) (int, error) {
 	_, count, err := a.messageStore.SearchConversations(folderID, query, 0, 0, filter)

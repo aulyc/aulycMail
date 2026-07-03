@@ -22,8 +22,8 @@ function createToastStore() {
 
     update(() => [newToast])
 
-    // Auto-remove after duration (default 5 seconds, longer if there are actions)
-    const duration = toast.duration ?? (toast.actions ? 8000 : 5000)
+    // Auto-remove after duration (default 5 seconds)
+    const duration = toast.duration ?? 5000
     setTimeout(() => {
       remove(id)
     }, duration)

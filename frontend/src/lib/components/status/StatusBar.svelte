@@ -4,7 +4,7 @@
   import { _ } from '$lib/i18n'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
-  import { toasts, type Toast, type ToastAction } from '$lib/stores/toast'
+  import { toasts, type Toast } from '$lib/stores/toast'
 
   const toastIcons = {
     success: 'mdi:check-circle',
@@ -78,22 +78,6 @@
     }
   })
 
-  async function handleSyncClick() {
-    try {
-      if (accountStore.isAnySyncing) {
-        await accountStore.cancelAllSyncs()
-        return
-      }
-      await accountStore.syncAllComplete()
-    } catch (err) {
-      console.error('Status bar sync failed:', err)
-    }
-  }
-
-  function handleToastAction(toast: Toast, action: ToastAction) {
-    action.onClick()
-    toasts.remove(toast.id)
-  }
 </script>
 
 <footer
@@ -110,17 +94,10 @@
     </div>
   {/if}
 
-  <button
-    type="button"
-    class="h-full min-w-0 w-[360px] max-w-[42vw] border-r border-border px-3
-           flex items-center gap-2 hover:text-foreground transition-colors text-left"
-    onclick={handleSyncClick}
-    title={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
+  <div
+    class="h-full min-w-0 w-[360px] max-w-[42vw] px-3
+           flex items-center text-left"
   >
-    <Icon
-      icon="mdi:sync"
-      class="w-4 h-4 shrink-0 {accountStore.isAnySyncing ? 'animate-spin text-primary' : ''}"
-    />
     <span class="min-w-0 truncate">
       {#if syncStatus.accountName}
         <span class="text-foreground">{syncStatus.accountName}</span>
@@ -128,7 +105,7 @@
       {/if}
       {syncStatus.label}
     </span>
-  </button>
+  </div>
 
   <div class="min-w-0 flex-1 px-3 flex items-center justify-end">
     {#if latestToast}
@@ -141,29 +118,6 @@
           class="w-4 h-4 shrink-0 {toastIconClasses[latestToast.type]}"
         />
         <span class="truncate text-foreground">{latestToast.message}</span>
-
-        {#if latestToast.actions && latestToast.actions.length > 0}
-          <div class="shrink-0 flex items-center gap-1">
-            {#each latestToast.actions as action (action.label)}
-              <button
-                type="button"
-                class="px-2 py-0.5 rounded text-primary hover:bg-primary/10 transition-colors font-medium"
-                onclick={() => handleToastAction(latestToast, action)}
-              >
-                {action.label}
-              </button>
-            {/each}
-          </div>
-        {/if}
-
-        <button
-          type="button"
-          class="p-0.5 rounded hover:bg-accent hover:text-foreground transition-colors shrink-0"
-          onclick={() => toasts.remove(latestToast.id)}
-          aria-label={$_('aria.dismiss')}
-        >
-          <Icon icon="mdi:close" class="w-4 h-4" />
-        </button>
       </div>
     {/if}
   </div>

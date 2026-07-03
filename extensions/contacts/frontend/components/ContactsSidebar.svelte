@@ -4,20 +4,13 @@
   import Icon from '@iconify/svelte'
   import SourceSidebar from '$lib/components/kit/SourceSidebar.svelte'
   import { contactsView, selectSource, reloadContacts } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import {
+    contactAccountGroups,
+    loadContactAccountGroups,
+  } from '$extensions/contacts/frontend/stores/contactAccountGroups.svelte'
   import { toasts } from '$lib/stores/toast'
   // @ts-ignore - wailsjs bindings
-  import { RefreshContactsFromMail, Contacts_GetContactAccountGroups } from '$wailsjs/go/app/App'
-
-  type ContactAccountGroup = {
-    accountId: string
-    name?: string
-    email: string
-    count: number
-    senderCount: number
-    recipientCount: number
-    ccCount: number
-    bccCount: number
-  }
+  import { RefreshContactsFromMail } from '$wailsjs/go/app/App'
 
   interface Props {
     onSelect: () => void
@@ -26,9 +19,8 @@
   const { onSelect }: Props = $props()
 
   let refreshing = $state(false)
-  let loadingGroups = $state(false)
   let expandedAccounts = $state<Record<string, boolean>>({})
-  let accountGroups = $state<ContactAccountGroup[]>([])
+  let accountGroups = $derived(contactAccountGroups.groups)
 
   const roleItems = $derived.by(() => [
     { role: 'sender', label: $_('contacts.sidebar.roleSender'), icon: 'mdi:email-arrow-left-outline', countKey: 'senderCount' },
@@ -45,20 +37,8 @@
     return `account:${accountID}:${role}`
   }
 
-  async function loadAccountGroups() {
-    loadingGroups = true
-    try {
-      accountGroups = await Contacts_GetContactAccountGroups() || []
-    } catch (err) {
-      console.error('Failed to load contact account groups:', err)
-      accountGroups = []
-    } finally {
-      loadingGroups = false
-    }
-  }
-
   onMount(() => {
-    void loadAccountGroups()
+    void loadContactAccountGroups()
   })
 
   // Re-scan every account's mail and re-collect participants into the local
@@ -68,7 +48,7 @@
     refreshing = true
     try {
       const count = await RefreshContactsFromMail()
-      await loadAccountGroups()
+      await loadContactAccountGroups({ force: true })
       await reloadContacts()
       toasts.success($_('contacts.toast.refreshed', { values: { count } }))
     } catch (err) {
@@ -183,9 +163,7 @@
       {#if it.count !== undefined}
         <span class="text-xs text-muted-foreground flex-shrink-0">{it.count}</span>
       {/if}
-      {#if loadingGroups && it.id === ''}
-        <Icon icon="mdi:loading" class="w-4 h-4 flex-shrink-0 text-muted-foreground animate-spin" />
-      {:else if it.expandable}
+      {#if it.expandable}
         <button
           type="button"
           class="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground flex-shrink-0"

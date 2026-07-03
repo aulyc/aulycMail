@@ -2531,3 +2531,56 @@ func (s *Store) SearchMessagesInFolder(folderID, query string, limit int) ([]*Co
 	}
 	return out, nil
 }
+
+// SearchMessagesInAccount returns messages matching query across every folder
+// in an account. When accountID is empty, it searches every account.
+func (s *Store) SearchMessagesInAccount(accountID, query string, limit int) ([]*ContactMessage, error) {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return []*ContactMessage{}, nil
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	like := "%" + q + "%"
+
+	rows, err := s.db.Query(`
+		SELECT m.id, COALESCE(m.thread_id, m.id), m.subject, m.from_name, m.from_email,
+		       m.date, m.folder_id, f.account_id, m.is_read,
+		       COALESCE(m.snippet, ''), COALESCE(a.name, ''), COALESCE(a.email, '')
+		FROM messages m
+		JOIN folders f ON m.folder_id = f.id
+		JOIN accounts a ON f.account_id = a.id
+		WHERE (? = '' OR f.account_id = ?)
+		  AND (
+		    LOWER(COALESCE(m.subject, '')) LIKE ?
+		    OR LOWER(COALESCE(m.from_name, '')) LIKE ?
+		    OR LOWER(COALESCE(m.from_email, '')) LIKE ?
+		    OR LOWER(COALESCE(m.to_list, '')) LIKE ?
+		    OR LOWER(COALESCE(m.cc_list, '')) LIKE ?
+		    OR LOWER(COALESCE(m.snippet, '')) LIKE ?
+		  )
+		ORDER BY m.date DESC
+		LIMIT ?
+	`, accountID, accountID, like, like, like, like, like, like, limit)
+	if err != nil {
+		return nil, fmt.Errorf("search messages in account: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*ContactMessage
+	for rows.Next() {
+		m := &ContactMessage{}
+		var dateStr sql.NullString
+		if err := rows.Scan(&m.ID, &m.ThreadID, &m.Subject, &m.FromName, &m.FromEmail,
+			&dateStr, &m.FolderID, &m.AccountID, &m.IsRead, &m.Snippet, &m.AccountName, &m.AccountEmail); err != nil {
+			return nil, fmt.Errorf("scan message: %w", err)
+		}
+		if dateStr.Valid {
+			m.Date = parseTimeString(dateStr.String)
+		}
+		m.Incoming = !strings.EqualFold(strings.TrimSpace(m.FromEmail), strings.TrimSpace(m.AccountEmail))
+		out = append(out, m)
+	}
+	return out, nil
+}
