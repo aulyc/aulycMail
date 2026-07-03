@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/aulyc/aulycmail/extensions/contacts/backend/imaging"
 	"github.com/aulyc/aulycmail/internal/contact"
 	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	"github.com/google/uuid"
 )
 
 // Source IDs for aulycmail's single local contact store. There are no remote
@@ -33,6 +33,8 @@ const (
 	SourceIDRoleCc        = "role:cc"
 	SourceIDRoleBcc       = "role:bcc"
 	SourceIDRoleCcBcc     = "role:ccbcc" // legacy combined (dormant)
+
+	SourceIDAccountPrefix = "account:"
 )
 
 // localKindFromSourceID returns the `contacts.kind` filter value for a local
@@ -64,6 +66,45 @@ func roleFromSourceID(id string) string {
 		return contact.RoleCcBcc
 	default:
 		return ""
+	}
+}
+
+func roleFromKey(key string) string {
+	switch key {
+	case contact.RoleSender:
+		return contact.RoleSender
+	case contact.RoleRecipient:
+		return contact.RoleRecipient
+	case contact.RoleCc:
+		return contact.RoleCc
+	case contact.RoleBcc:
+		return contact.RoleBcc
+	case contact.RoleCcBcc:
+		return contact.RoleCcBcc
+	default:
+		return ""
+	}
+}
+
+type browseScope struct {
+	kind      string
+	role      string
+	accountID string
+}
+
+func browseScopeFromSourceID(id string) browseScope {
+	if strings.HasPrefix(id, SourceIDAccountPrefix) {
+		rest := strings.TrimPrefix(id, SourceIDAccountPrefix)
+		accountID, roleKey, hasRole := strings.Cut(rest, ":")
+		scope := browseScope{accountID: strings.TrimSpace(accountID)}
+		if hasRole {
+			scope.role = roleFromKey(roleKey)
+		}
+		return scope
+	}
+	return browseScope{
+		kind: localKindFromSourceID(id),
+		role: roleFromSourceID(id),
 	}
 }
 
@@ -110,7 +151,10 @@ func (a *API) GetContact(emailOrID string) (*coreapi.Contact, error) {
 		return nil, fmt.Errorf("contacts.GetContact: %w", err)
 	}
 	if rec != nil {
-		out := fromRecord(rec)
+		out, err := a.fromRecordWithAssociations(rec)
+		if err != nil {
+			return nil, err
+		}
 		return &out, nil
 	}
 
@@ -120,7 +164,10 @@ func (a *API) GetContact(emailOrID string) (*coreapi.Contact, error) {
 			return nil, fmt.Errorf("contacts.GetContact: %w", err)
 		}
 		if rec != nil {
-			out := fromRecord(rec)
+			out, err := a.fromRecordWithAssociations(rec)
+			if err != nil {
+				return nil, err
+			}
 			return &out, nil
 		}
 	}
@@ -137,13 +184,15 @@ func (a *API) ListContacts(filter coreapi.ContactFilter) ([]coreapi.Contact, err
 	if a.localStore == nil {
 		return nil, nil
 	}
+	scope := browseScopeFromSourceID(filter.SourceID)
 	records, err := a.localStore.ListRecords(contact.RecordFilter{
-		Source: "local",
-		Kind:   localKindFromSourceID(filter.SourceID),
-		Role:   roleFromSourceID(filter.SourceID),
-		Query:  filter.Query,
-		Limit:  filter.Limit,
-		Offset: filter.Offset,
+		Source:    "local",
+		Kind:      scope.kind,
+		Role:      scope.role,
+		AccountID: scope.accountID,
+		Query:     filter.Query,
+		Limit:     filter.Limit,
+		Offset:    filter.Offset,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("contacts.ListContacts: %w", err)
@@ -151,6 +200,46 @@ func (a *API) ListContacts(filter coreapi.ContactFilter) ([]coreapi.Contact, err
 	out := make([]coreapi.Contact, 0, len(records))
 	for _, rec := range records {
 		out = append(out, fromRecord(rec))
+	}
+	return out, nil
+}
+
+func (a *API) ListAccountGroups() ([]coreapi.ContactAccountGroup, error) {
+	if a.localStore == nil {
+		return nil, nil
+	}
+	associations, err := a.localStore.ListAccountAssociations()
+	if err != nil {
+		return nil, fmt.Errorf("contacts.ListAccountGroups: %w", err)
+	}
+	out := make([]coreapi.ContactAccountGroup, 0, len(associations))
+	for _, assoc := range associations {
+		out = append(out, coreapi.ContactAccountGroup{
+			AccountID:      assoc.AccountID,
+			Name:           assoc.Name,
+			Email:          assoc.Email,
+			Count:          assoc.Count,
+			SenderCount:    assoc.SenderCount,
+			RecipientCount: assoc.RecipientCount,
+			CcCount:        assoc.CcCount,
+			BccCount:       assoc.BccCount,
+		})
+	}
+	return out, nil
+}
+
+func (a *API) fromRecordWithAssociations(rec *contact.Record) (coreapi.Contact, error) {
+	out := fromRecord(rec)
+	associations, err := a.localStore.ListAssociatedAccountsForEmails(out.Emails)
+	if err != nil {
+		return out, fmt.Errorf("contacts.GetContact associated accounts: %w", err)
+	}
+	for _, assoc := range associations {
+		out.AssociatedAccounts = append(out.AssociatedAccounts, coreapi.ContactAssociatedAccount{
+			AccountID: assoc.AccountID,
+			Name:      assoc.Name,
+			Email:     assoc.Email,
+		})
 	}
 	return out, nil
 }

@@ -17,17 +17,26 @@
     identity?: account.Identity | null
     /** Account ID (required for creating new identity) */
     accountId: string
+    /** Live-linked name for the account's default identity */
+    linkedName?: string
     /** Callback when dialog should close */
     onClose?: () => void
+    /** Callback when the display name changes */
+    onNameChange?: (value: string) => void
     /** Callback when identity is saved */
     onSave?: (config: account.IdentityConfig) => Promise<void>
   }
+
+  type SignatureMode = 'none' | 'html' | 'plain'
+  type SignatureSeparatorOption = 'none' | 'dash' | 'asterisk'
 
   let {
     open = $bindable(false),
     identity = null,
     accountId: _accountId,
+    linkedName,
     onClose,
+    onNameChange,
     onSave,
   }: Props = $props()
 
@@ -36,20 +45,14 @@
   let name = $state('')
   let signatureHtml = $state('')
   let signatureText = $state('')
-  let signatureEnabled = $state(true)
+  let signatureMode = $state<SignatureMode>('html')
   let signatureForNew = $state(true)
   let signatureForReply = $state(true)
   let signatureForForward = $state(true)
-  let signaturePlacement = $state<'above' | 'below'>('above')
-  let signatureSeparator = $state(false)
+  let signatureSeparator = $state<SignatureSeparatorOption>('none')
 
   let saving = $state(false)
   let errors = $state<Record<string, string>>({})
-
-  // The default identity's email must stay in sync with the account's login
-  // email (providers like 163 reject a From/envelope-sender that doesn't match
-  // the authenticated account), so it's read-only — only aliases are editable.
-  const isDefaultIdentity = $derived(identity?.isDefault ?? false)
 
   // Initialize form when identity changes
   $effect(() => {
@@ -60,26 +63,32 @@
         name = identity.name || ''
         signatureHtml = identity.signatureHtml || ''
         signatureText = identity.signatureText || ''
-        signatureEnabled = identity.signatureEnabled ?? true
+        signatureMode = identity.signatureEnabled === false
+          ? 'none'
+          : (signatureHtml || !signatureText ? 'html' : 'plain')
         signatureForNew = identity.signatureForNew ?? true
         signatureForReply = identity.signatureForReply ?? true
         signatureForForward = identity.signatureForForward ?? true
-        signaturePlacement = (identity.signaturePlacement as 'above' | 'below') || 'above'
-        signatureSeparator = identity.signatureSeparator ?? false
+        signatureSeparator = getSeparatorOption(identity.signatureSeparatorStyle, identity.signatureSeparator)
       } else {
         // New identity - reset to defaults
         email = ''
         name = ''
         signatureHtml = ''
         signatureText = ''
-        signatureEnabled = true
+        signatureMode = 'html'
         signatureForNew = true
         signatureForReply = true
         signatureForForward = true
-        signaturePlacement = 'above'
-        signatureSeparator = false
+        signatureSeparator = 'none'
       }
       errors = {}
+    }
+  })
+
+  $effect(() => {
+    if (open && identity?.isDefault && linkedName !== undefined && name !== linkedName) {
+      name = linkedName
     }
   })
 
@@ -107,14 +116,15 @@
       const config = new account.IdentityConfig({
         email: email.trim(),
         name: name.trim(),
-        signatureHtml,
-        signatureText,
-        signatureEnabled,
+        signatureHtml: signatureMode === 'html' ? signatureHtml : '',
+        signatureText: signatureMode === 'plain' ? signatureText : '',
+        signatureEnabled: signatureMode !== 'none',
         signatureForNew,
         signatureForReply,
         signatureForForward,
-        signaturePlacement,
-        signatureSeparator,
+        signaturePlacement: 'above',
+        signatureSeparator: signatureSeparator !== 'none',
+        signatureSeparatorStyle: getSeparatorStyle(signatureSeparator),
       })
 
       await onSave?.(config)
@@ -140,76 +150,78 @@
     }
   }
 
-  // Convert HTML to plain text for the "Generate from HTML" button
-  function generatePlainTextFromHtml() {
-    if (!signatureHtml) return
-
-    const temp = document.createElement('div')
-    temp.innerHTML = signatureHtml
-
-    // Replace <br> and block elements with newlines
-    const blockElements = temp.querySelectorAll('p, div, br, li')
-    blockElements.forEach(el => {
-      if (el.tagName === 'BR') {
-        el.replaceWith('\n')
-      } else if (el.tagName === 'LI') {
-        el.prepend(document.createTextNode('- '))
-        el.append(document.createTextNode('\n'))
-      } else {
-        el.append(document.createTextNode('\n'))
-      }
-    })
-
-    let text = temp.textContent || ''
-    text = text.replace(/\n{3,}/g, '\n\n')
-    signatureText = text.trim()
+  function handleNameInput(value: string) {
+    name = value
+    if (identity?.isDefault) {
+      onNameChange?.(value)
+    }
   }
+
+  function getSignatureStatusLabel(mode: SignatureMode): string {
+    if (mode === 'none') return $_('identity.signatureStatusDisabled')
+    if (mode === 'plain') return $_('identity.signatureStatusPlain')
+    return $_('identity.signatureStatusHtml')
+  }
+
+  function getSeparatorOption(style: string | undefined, legacySeparator: boolean | undefined): SignatureSeparatorOption {
+    if (style === '*****') return 'asterisk'
+    if (style === '-----' || legacySeparator) return 'dash'
+    return 'none'
+  }
+
+  function getSeparatorStyle(option: SignatureSeparatorOption): string {
+    if (option === 'dash') return '-----'
+    if (option === 'asterisk') return '*****'
+    return ''
+  }
+
+  function getSeparatorLabel(option: SignatureSeparatorOption): string {
+    if (option === 'dash') return '-----'
+    if (option === 'asterisk') return '*****'
+    return $_('identity.signatureSeparatorDisabled')
+  }
+
+  function getDialogTitle(): string {
+    if (!identity) return $_('identity.addEmailTitle')
+    return `${email || identity.email} ${$_('identity.editEmailTitle')}`
+  }
+
 </script>
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
   <Dialog.Content class="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
     <Dialog.Header>
       <Dialog.Title>
-        {identity
-          ? (identity.isDefault ? $_('identity.editDefaultEmailTitle') : $_('identity.editEmailTitle'))
-          : $_('identity.addEmailTitle')}
+        {getDialogTitle()}
       </Dialog.Title>
-      <Dialog.Description>
-        {identity
-          ? (identity.isDefault ? $_('identity.editDefaultEmailDescription') : $_('identity.editEmailDescription'))
-          : $_('identity.addEmailDescription')}
-      </Dialog.Description>
     </Dialog.Header>
 
     <form onsubmit={(e) => { e.preventDefault(); handleSave() }} class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <!-- Fixed-height scroll area: keeps the dialog height constant whether or
            not the signature section is shown. pr-3/pl-1/pt-1.5 keep the
            scrollbar + focus rings off the inputs. -->
-      <div class="h-[460px] max-h-[calc(90vh-200px)] overflow-y-auto space-y-6 pt-1.5 pl-1 pr-3 pb-2">
+      <div class="h-[460px] max-h-[calc(90vh-200px)] overflow-y-auto space-y-5 pt-1.5 pl-1 pr-3 pb-2">
       <!-- Email & Name (label + input on one row) -->
       <div class="space-y-4">
-        <div>
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <Label for="email">{$_('identity.emailAddressLabel')}</Label>
-              {#if isDefaultIdentity}
-                <p class="text-xs text-muted-foreground">{$_('identity.defaultEmailReadonlyHelp')}</p>
-              {/if}
+        {#if !identity}
+          <div>
+            <div class="flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <Label for="email">{$_('identity.emailAddressLabel')}</Label>
+              </div>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                bind:value={email}
+                class="w-64 shrink-0 {errors.email ? 'border-destructive' : ''}"
+              />
             </div>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              bind:value={email}
-              readonly={isDefaultIdentity}
-              tabindex={isDefaultIdentity ? -1 : undefined}
-              class="w-64 shrink-0 {isDefaultIdentity ? 'cursor-not-allowed opacity-60 focus-visible:ring-0 focus-visible:ring-offset-0' : ''} {errors.email ? 'border-destructive' : ''}"
-            />
+            {#if errors.email}
+              <p class="text-sm text-destructive mt-1">{errors.email}</p>
+            {/if}
           </div>
-          {#if errors.email}
-            <p class="text-sm text-destructive mt-1">{errors.email}</p>
-          {/if}
-        </div>
+        {/if}
 
         <div>
           <div class="flex items-center justify-between gap-4">
@@ -222,6 +234,7 @@
               type="text"
               placeholder="John Smith"
               bind:value={name}
+              oninput={(e) => handleNameInput((e.target as HTMLInputElement).value)}
               class="w-64 shrink-0 {errors.name ? 'border-destructive' : ''}"
             />
           </div>
@@ -231,71 +244,64 @@
         </div>
       </div>
 
-      <!-- Divider -->
-      <div class="border-t border-border"></div>
-
       <!-- Signature Section -->
-      <div class="space-y-4">
-        <div class="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="signatureEnabled"
-            bind:checked={signatureEnabled}
-            class="w-4 h-4 rounded border-input accent-primary"
-          />
-          <Label for="signatureEnabled" class="cursor-pointer font-medium">
-            {$_('identity.useSignature')}
-          </Label>
+      <div class="space-y-5">
+        <div class="flex items-center justify-between gap-4">
+          <Label class="font-medium">{$_('identity.signatureStatus')}</Label>
+          <Select.Root
+            value={signatureMode}
+            onValueChange={(v) => {
+              if (v === 'none' || v === 'html' || v === 'plain') {
+                signatureMode = v
+              }
+            }}
+          >
+            <Select.Trigger class="w-64 shrink-0">
+              <Select.Value>
+                {getSignatureStatusLabel(signatureMode)}
+              </Select.Value>
+            </Select.Trigger>
+            <Select.Content>
+              <Select.Item value="none" label={$_('identity.signatureStatusDisabled')} />
+              <Select.Item value="html" label={$_('identity.signatureStatusHtml')} />
+              <Select.Item value="plain" label={$_('identity.signatureStatusPlain')} />
+            </Select.Content>
+          </Select.Root>
         </div>
 
-        {#if signatureEnabled}
-          <!-- HTML Signature Editor -->
-          <div class="space-y-2">
-            <Label>{$_('identity.htmlSignature')}</Label>
-            <SignatureEditor
-              value={signatureHtml}
-              placeholder="Enter your signature..."
-              onchange={(html) => signatureHtml = html}
-            />
-            <p class="text-xs text-muted-foreground">
-              {$_('identity.signatureHelp')}
-            </p>
-          </div>
-
-          <!-- Plain Text Signature -->
-          <div class="space-y-2">
-            <div class="flex items-center justify-between">
-              <Label for="signatureText">{$_('identity.plainTextSignature')}</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onclick={generatePlainTextFromHtml}
-                disabled={!signatureHtml}
-                class="text-xs h-7"
-              >
-                {$_('identity.generateFromHtml')}
-              </Button>
+        {#if signatureMode !== 'none'}
+          {#if signatureMode === 'html'}
+            <!-- HTML Signature Editor -->
+            <div class="space-y-2">
+              <Label>{$_('identity.htmlSignature')}</Label>
+              <SignatureEditor
+                value={signatureHtml}
+                placeholder="Enter your signature..."
+                onchange={(html) => signatureHtml = html}
+              />
+              <p class="text-xs text-muted-foreground">
+                {$_('identity.signatureHelp')}
+              </p>
             </div>
-            <textarea
-              id="signatureText"
-              bind:value={signatureText}
-              placeholder="Plain text version for text-only emails..."
-              class="w-full min-h-[80px] p-3 text-sm bg-background border border-input rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-ring font-mono"
-            ></textarea>
-            <p class="text-xs text-muted-foreground">
-              {$_('identity.plainTextHelp')}
-            </p>
-          </div>
+          {:else}
+            <!-- Plain Text Signature -->
+            <div class="space-y-2">
+              <Label for="signatureText">{$_('identity.plainTextSignature')}</Label>
+              <textarea
+                id="signatureText"
+                bind:value={signatureText}
+                rows="4"
+                placeholder="Plain text version for text-only emails..."
+                class="w-full p-3 text-sm bg-background border border-input rounded-md resize-none overflow-y-auto focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+              ></textarea>
+            </div>
+          {/if}
 
-          <!-- Divider -->
-          <div class="border-t border-border"></div>
-
-          <!-- Signature Behavior (label + checkboxes on one row) -->
-          <div class="flex items-center justify-between gap-4">
+          <!-- Signature behavior and separator share one grid so row spacing stays consistent. -->
+          <div class="grid grid-cols-[minmax(0,1fr)_16rem] items-center gap-x-4 gap-y-2">
             <Label class="font-medium">{$_('identity.appendSignatureTo')}</Label>
-            <div class="flex items-center gap-4 shrink-0">
-              <label class="flex items-center gap-2 cursor-pointer">
+            <div class="contents">
+              <label class="flex h-10 items-center gap-2 cursor-pointer rounded-md border border-input bg-background px-3 hover:bg-muted/50 transition-colors">
                 <input
                   type="checkbox"
                   bind:checked={signatureForNew}
@@ -303,7 +309,8 @@
                 />
                 <span class="text-sm">{$_('identity.newMessages')}</span>
               </label>
-              <label class="flex items-center gap-2 cursor-pointer">
+              <div></div>
+              <label class="flex h-10 items-center gap-2 cursor-pointer rounded-md border border-input bg-background px-3 hover:bg-muted/50 transition-colors">
                 <input
                   type="checkbox"
                   bind:checked={signatureForReply}
@@ -311,7 +318,8 @@
                 />
                 <span class="text-sm">{$_('identity.replies')}</span>
               </label>
-              <label class="flex items-center gap-2 cursor-pointer">
+              <div></div>
+              <label class="flex h-10 items-center gap-2 cursor-pointer rounded-md border border-input bg-background px-3 hover:bg-muted/50 transition-colors">
                 <input
                   type="checkbox"
                   bind:checked={signatureForForward}
@@ -320,35 +328,26 @@
                 <span class="text-sm">{$_('identity.forwards')}</span>
               </label>
             </div>
-          </div>
-
-          <!-- Signature Placement (label + dropdown on one row) -->
-          <div class="flex items-center justify-between gap-4">
-            <Label class="font-medium">{$_('identity.signaturePlacementLabel')}</Label>
-            <Select.Root value={signaturePlacement} onValueChange={(v) => { if (v) signaturePlacement = v as 'above' | 'below' }}>
-              <Select.Trigger class="w-48 shrink-0">
+            <Label class="font-medium">{$_('identity.signatureSeparatorLabel')}</Label>
+            <Select.Root
+              value={signatureSeparator}
+              onValueChange={(v) => {
+                if (v === 'none' || v === 'dash' || v === 'asterisk') {
+                  signatureSeparator = v
+                }
+              }}
+            >
+              <Select.Trigger class="w-64 h-10 shrink-0">
                 <Select.Value>
-                  {signaturePlacement === 'below' ? $_('identity.belowQuotedText') : $_('identity.aboveQuotedText')}
+                  {getSeparatorLabel(signatureSeparator)}
                 </Select.Value>
               </Select.Trigger>
               <Select.Content>
-                <Select.Item value="above" label={$_('identity.aboveQuotedText')} />
-                <Select.Item value="below" label={$_('identity.belowQuotedText')} />
+                <Select.Item value="none" label={$_('identity.signatureSeparatorDisabled')} />
+                <Select.Item value="dash" label="-----" />
+                <Select.Item value="asterisk" label="*****" />
               </Select.Content>
             </Select.Root>
-          </div>
-
-          <!-- Separator Option -->
-          <div class="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="signatureSeparator"
-              bind:checked={signatureSeparator}
-              class="w-4 h-4 rounded border-input accent-primary"
-            />
-            <Label for="signatureSeparator" class="cursor-pointer text-sm">
-              {$_('identity.addSeparator')} (<code class="text-xs bg-muted px-1 rounded">-- </code>)
-            </Label>
           </div>
         {/if}
       </div>
@@ -364,7 +363,7 @@
       </div>
 
       <!-- Actions (fixed at the bottom of the dialog) -->
-      <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
+      <div class="flex items-center justify-end gap-2 pt-4">
         <Button type="button" variant="ghost" onclick={handleCancel} disabled={saving}>
           {$_('common.cancel')}
         </Button>

@@ -4,6 +4,7 @@ package email
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -11,11 +12,16 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/aulyc/aulycmail/internal/message"
 	gomessage "github.com/emersion/go-message"
 	msgcharset "github.com/emersion/go-message/charset"
-	"github.com/aulyc/aulycmail/internal/message"
 	"golang.org/x/text/encoding/htmlindex"
 )
+
+// MaxAttachmentContentSize bounds in-memory attachment extraction.
+const MaxAttachmentContentSize = 50 * 1024 * 1024
+
+var ErrAttachmentTooLarge = errors.New("attachment exceeds maximum size")
 
 // AttachmentDownloader handles downloading and saving attachments
 type AttachmentDownloader struct {
@@ -45,12 +51,12 @@ func (d *AttachmentDownloader) ExtractAttachmentContent(raw []byte, targetFilena
 
 	// Single-part message: the whole entity may itself be the attachment.
 	if getFilename(entity) == targetFilename {
-		content, err := io.ReadAll(entity.Body)
+		content, err := readAttachmentContent(entity.Body)
 		if err != nil {
 			return nil, err
 		}
 		transferEncoding := strings.ToLower(entity.Header.Get("Content-Transfer-Encoding"))
-		return decodeContent(content, transferEncoding), nil
+		return decodeAttachmentContent(content, transferEncoding)
 	}
 
 	return nil, fmt.Errorf("attachment not found: %s", targetFilename)
@@ -112,14 +118,17 @@ func (d *AttachmentDownloader) findInlineAttachmentsInMultipart(mr gomessage.Mul
 		}
 
 		// Read content
-		content, err := io.ReadAll(part.Body)
+		content, err := readAttachmentContent(part.Body)
 		if err != nil {
 			continue
 		}
 
 		// Decode content if transfer-encoded
 		transferEncoding := strings.ToLower(part.Header.Get("Content-Transfer-Encoding"))
-		decodedContent := decodeContent(content, transferEncoding)
+		decodedContent, err := decodeAttachmentContent(content, transferEncoding)
+		if err != nil {
+			continue
+		}
 
 		// Build data URL
 		dataURL := buildDataURL(contentType, decodedContent)
@@ -155,14 +164,14 @@ func (d *AttachmentDownloader) findAttachmentInMultipart(mr gomessage.MultipartR
 		// Check filename
 		filename := getFilename(part)
 		if filename == targetFilename {
-			content, err := io.ReadAll(part.Body)
+			content, err := readAttachmentContent(part.Body)
 			if err != nil {
 				return nil, err
 			}
 
 			// Decode content if transfer-encoded
 			transferEncoding := strings.ToLower(part.Header.Get("Content-Transfer-Encoding"))
-			return decodeContent(content, transferEncoding), nil
+			return decodeAttachmentContent(content, transferEncoding)
 		}
 	}
 
@@ -232,8 +241,73 @@ func getFilename(part *gomessage.Entity) string {
 	return "attachment" + ext
 }
 
+// SafeAttachmentFilename strips any path components from untrusted attachment
+// metadata before using it as a filesystem name.
+func SafeAttachmentFilename(filename string) (string, error) {
+	name := strings.TrimSpace(strings.ReplaceAll(filename, "\x00", ""))
+	name = strings.ReplaceAll(name, "\\", "/")
+	name = filepath.Base(name)
+	name = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, name)
+	name = strings.TrimSpace(name)
+
+	if name == "" || name == "." || name == ".." {
+		return "", fmt.Errorf("unsafe attachment filename %q", filename)
+	}
+	if strings.ContainsAny(name, `/\`) {
+		return "", fmt.Errorf("unsafe attachment filename %q", filename)
+	}
+	return name, nil
+}
+
+// DefaultAttachmentFilename returns a safe name suitable for save dialogs.
+func DefaultAttachmentFilename(filename string) string {
+	name, err := SafeAttachmentFilename(filename)
+	if err != nil {
+		return "attachment.bin"
+	}
+	return name
+}
+
+// UniqueAttachmentPath returns a non-existing path under dir for an attachment.
+func UniqueAttachmentPath(dir, filename string) (string, error) {
+	safeName, err := SafeAttachmentFilename(filename)
+	if err != nil {
+		return "", err
+	}
+
+	savePath := filepath.Join(dir, safeName)
+	if _, err := os.Stat(savePath); os.IsNotExist(err) {
+		return savePath, nil
+	} else if err != nil {
+		return "", err
+	}
+
+	ext := filepath.Ext(safeName)
+	base := strings.TrimSuffix(safeName, ext)
+	for i := 1; ; i++ {
+		savePath = filepath.Join(dir, fmt.Sprintf("%s_%d%s", base, i, ext))
+		if _, err := os.Stat(savePath); os.IsNotExist(err) {
+			return savePath, nil
+		} else if err != nil {
+			return "", err
+		}
+	}
+}
+
 // SaveAttachment saves attachment content to disk
 func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content []byte, customPath string) (string, error) {
+	if att == nil {
+		return "", fmt.Errorf("attachment is required")
+	}
+	if len(content) > MaxAttachmentContentSize {
+		return "", fmt.Errorf("%w: %d bytes exceeds %d", ErrAttachmentTooLarge, len(content), MaxAttachmentContentSize)
+	}
+
 	var savePath string
 
 	if customPath != "" {
@@ -242,25 +316,16 @@ func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content [
 	} else {
 		// Save to default attachments directory
 		// Create subdirectory based on message ID for organization
-		subDir := filepath.Join(d.attachmentsDir, att.MessageID[:8])
+		subDir := filepath.Join(d.attachmentsDir, attachmentMessagePrefix(att.MessageID))
 		if err := os.MkdirAll(subDir, 0700); err != nil {
 			return "", fmt.Errorf("failed to create attachment directory: %w", err)
 		}
 
 		// Generate unique filename to avoid conflicts
-		safeName := filepath.Base(att.Filename)
-		savePath = filepath.Join(subDir, safeName)
-
-		// If file exists, append a number
-		if _, err := os.Stat(savePath); err == nil {
-			ext := filepath.Ext(safeName)
-			base := safeName[:len(safeName)-len(ext)]
-			for i := 1; ; i++ {
-				savePath = filepath.Join(subDir, fmt.Sprintf("%s_%d%s", base, i, ext))
-				if _, err := os.Stat(savePath); os.IsNotExist(err) {
-					break
-				}
-			}
+		var err error
+		savePath, err = UniqueAttachmentPath(subDir, att.Filename)
+		if err != nil {
+			return "", err
 		}
 	}
 
@@ -270,4 +335,38 @@ func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content [
 	}
 
 	return savePath, nil
+}
+
+func readAttachmentContent(r io.Reader) ([]byte, error) {
+	return readAllBounded(r, MaxAttachmentContentSize)
+}
+
+func readAllBounded(r io.Reader, maxBytes int) ([]byte, error) {
+	content, err := io.ReadAll(io.LimitReader(r, int64(maxBytes)+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(content) > maxBytes {
+		return nil, fmt.Errorf("%w: %d bytes exceeds %d", ErrAttachmentTooLarge, len(content), maxBytes)
+	}
+	return content, nil
+}
+
+func decodeAttachmentContent(content []byte, encoding string) ([]byte, error) {
+	decoded := decodeContent(content, encoding)
+	if len(decoded) > MaxAttachmentContentSize {
+		return nil, fmt.Errorf("%w: %d bytes exceeds %d", ErrAttachmentTooLarge, len(decoded), MaxAttachmentContentSize)
+	}
+	return decoded, nil
+}
+
+func attachmentMessagePrefix(messageID string) string {
+	const prefixLen = 8
+	if len(messageID) >= prefixLen {
+		return messageID[:prefixLen]
+	}
+	if messageID == "" {
+		return "unknown"
+	}
+	return messageID
 }

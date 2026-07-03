@@ -8,6 +8,18 @@
 
 // @ts-ignore - Wails generated imports
 import { smtp, account, contact, app } from '../../wailsjs/go/models'
+import {
+  DeleteDraft,
+  GetAccount,
+  GetAllAccountIdentities,
+  GetIdentities,
+  IsFlatpak,
+  PickAttachmentFiles,
+  ReadFileAsAttachment,
+  SaveDraft,
+  SearchContacts,
+  SendMessage
+} from '../../wailsjs/go/app/App.js'
 
 /**
  * Interface for composer API operations.
@@ -55,57 +67,45 @@ export const COMPOSER_API_KEY = 'composer-api'
  * Uses App bindings.
  */
 export function createMainWindowApi(): ComposerApi {
-  // Dynamic import to avoid bundling issues
-  // These will be resolved at runtime based on which entry point is used
   return {
     sendMessage: async (accountId: string, message: smtp.ComposeMessage) => {
-      const { SendMessage } = await import('../../wailsjs/go/app/App.js')
       return SendMessage(accountId, message)
     },
 
     searchContacts: async (query: string, limit: number) => {
-      const { SearchContacts } = await import('../../wailsjs/go/app/App.js')
       return SearchContacts(query, limit) || []
     },
 
     getIdentities: async (accountId: string) => {
-      const { GetIdentities } = await import('../../wailsjs/go/app/App.js')
       return GetIdentities(accountId)
     },
 
     saveDraft: async (accountId: string, message: smtp.ComposeMessage, draftId: string) => {
-      const { SaveDraft } = await import('../../wailsjs/go/app/App.js')
       const result = await SaveDraft(accountId, message, draftId)
       return { id: result?.draft?.id || '', syncStatus: result?.draft?.syncStatus || 'pending' }
     },
 
     deleteDraft: async (draftId: string) => {
-      const { DeleteDraft } = await import('../../wailsjs/go/app/App.js')
       return DeleteDraft(draftId)
     },
 
     pickAttachmentFiles: async () => {
-      const { PickAttachmentFiles } = await import('../../wailsjs/go/app/App.js')
       return PickAttachmentFiles()
     },
 
     getAccount: async (accountId: string) => {
-      const { GetAccount } = await import('../../wailsjs/go/app/App.js')
       return GetAccount(accountId)
     },
 
     readFileAsAttachment: async (filePath: string) => {
-      const { ReadFileAsAttachment } = await import('../../wailsjs/go/app/App.js')
       return ReadFileAsAttachment(filePath)
     },
 
     isFlatpak: async () => {
-      const { IsFlatpak } = await import('../../wailsjs/go/app/App.js')
       return IsFlatpak()
     },
 
     getAllAccountIdentities: async () => {
-      const { GetAllAccountIdentities } = await import('../../wailsjs/go/app/App.js')
       return GetAllAccountIdentities()
     },
   }

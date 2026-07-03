@@ -29,9 +29,9 @@
   // @ts-ignore - wailsjs bindings
   import type { v1 } from '$wailsjs/go/models'
 
-  // Match the mail message-list fixed width so the Contacts view lines up with
-  // the mail view.
-  const listWidth = $derived.by(() => { getUIStateVersion(); return getUIState().listWidth })
+  // Contacts needs a denser middle column than mail. Keep following the user's
+  // saved mail list width, but render contacts at 70% of that width.
+  const listWidth = $derived.by(() => { getUIStateVersion(); return Math.round(getUIState().listWidth * 0.7) })
 
   interface Props {
     onAdd?: () => void

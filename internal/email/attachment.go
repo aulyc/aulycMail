@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/aulyc/aulycmail/internal/message"
 	gomessage "github.com/emersion/go-message"
 	"github.com/google/uuid"
-	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/teamwork/tnef"
 )
 
@@ -117,15 +117,18 @@ func (e *AttachmentExtractor) extractFromMultipart(messageID string, mr gomessag
 				filename = decodedFilename
 			}
 
-			// Read content
-			content, err := io.ReadAll(part.Body)
+			// Read bounded content to avoid memory exhaustion from hostile messages.
+			content, err := readAttachmentContent(part.Body)
 			if err != nil {
 				continue
 			}
 
 			// Decode content if transfer-encoded
 			transferEncoding := strings.ToLower(part.Header.Get("Content-Transfer-Encoding"))
-			decodedContent := decodeContent(content, transferEncoding)
+			decodedContent, err := decodeAttachmentContent(content, transferEncoding)
+			if err != nil {
+				continue
+			}
 
 			att := &message.Attachment{
 				ID:          uuid.New().String(),
@@ -151,7 +154,7 @@ func (e *AttachmentExtractor) extractFromMultipart(messageID string, mr gomessag
 func (e *AttachmentExtractor) extractFromTNEF(messageID string, reader io.Reader) []*AttachmentData {
 	var attachments []*AttachmentData
 
-	data, err := io.ReadAll(reader)
+	data, err := readAttachmentContent(reader)
 	if err != nil {
 		return attachments
 	}
@@ -164,6 +167,9 @@ func (e *AttachmentExtractor) extractFromTNEF(messageID string, reader io.Reader
 
 	// Extract attachments
 	for _, att := range tnefData.Attachments {
+		if len(att.Data) > MaxAttachmentContentSize {
+			continue
+		}
 		filename := att.Title
 		if filename == "" {
 			filename = "attachment"
@@ -220,4 +226,3 @@ func decodeRFC2047(s string) (string, error) {
 	dec := new(mime.WordDecoder)
 	return dec.DecodeHeader(s)
 }
-

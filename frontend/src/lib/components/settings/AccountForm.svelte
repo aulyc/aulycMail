@@ -4,7 +4,6 @@
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
   import * as Select from '$lib/components/ui/select'
-  import BoolSelect from '$lib/components/ui/bool-select/BoolSelect.svelte'
   import Switch from '$lib/components/ui/switch/Switch.svelte'
   import {
     providers,
@@ -57,7 +56,6 @@
   }: Props = $props()
 
   // Form state
-  let step = $state<'provider' | 'details'>('details')
   let selectedProvider = $state<EmailProvider | null>(null)
   let showAdvanced = $state(false)
 
@@ -85,26 +83,16 @@
   let noOutgoingServer = $state(false)
   let smtpUsername = $state('')
   let smtpPassword = $state('')
-  let smtpUseSameAsIncoming = $state(true)
-  // Auto-mirror IMAP host into SMTP host for new Generic accounts: most
-  // providers use the same hostname or a near-identical subdomain swap,
-  // so typing the IMAP host pre-fills SMTP. Goes sticky-off the moment
-  // the user types directly into the SMTP field — manual edits stick.
+  // Auto-infer SMTP host from the IMAP host for new Generic accounts. Goes
+  // sticky-off the moment the user types directly into the SMTP field —
+  // manual edits stick.
   let smtpHostMirrorsImap = $state(true)
   let replyForwardIdentityID = $state('')
   let availableIdentityGroups = $state<app.AccountIdentityGroup[]>([])
-  // True only when the user explicitly picked Generic/Custom (or the
-  // detector fell back to it). The "Same as incoming server" toggle is
-  // gated on this; pre-configured providers always reuse IMAP creds.
+  // True only when the user explicitly picked Generic/Custom (or the detector
+  // fell back to it). Used to mirror IMAP host edits into SMTP host for manual
+  // setup until the user edits SMTP directly.
   const isGenericProvider = $derived(selectedProvider?.id === 'custom' || selectedProvider?.id === 'generic')
-
-  function handleSmtpUseSameAsIncomingChange(v: boolean) {
-    smtpUseSameAsIncoming = v
-    if (v) {
-      smtpUsername = ''
-      smtpPassword = ''
-    }
-  }
   let syncPeriodDays = $state<string>('180')
   let syncInterval = $state<string>('30') // Default: 30 minutes
   let readReceiptRequestPolicy = $state<string>('never')
@@ -135,6 +123,14 @@
 
   function getReadReceiptLabel(value: string): string {
     return readReceiptRequestOptions.find(opt => opt.value === value)?.label || value
+  }
+
+  function inferSmtpHostFromImapHost(value: string): string {
+    const host = value.trim()
+    if (!host) return ''
+    if (/^imap(?=[.-])/i.test(host)) return host.replace(/^imap/i, 'smtp')
+    if (/[.-]imap[.-]/i.test(host)) return host.replace(/([.-])imap([.-])/i, '$1smtp$2')
+    return ''
   }
 
   // UI state
@@ -208,7 +204,6 @@
   $effect(() => {
     if (editAccount && !initialized) {
       initialized = true
-      step = 'details'
       email = editAccount.email
       username = editAccount.username
       imapHost = editAccount.imapHost
@@ -400,7 +395,6 @@
 
     // Show advanced for custom provider
     showAdvanced = provider.id === 'custom'
-    step = 'details'
   }
 
   // Auto-detect provider and auto-fill fields when email changes
@@ -481,14 +475,6 @@
       if (!smtpHost.trim()) errors.smtpHost = $_('account.smtpHostRequired')
       if (smtpPort < 1 || smtpPort > 65535) errors.smtpPort = $_('account.invalidPort')
     }
-    // Separate SMTP credentials (Generic only, toggle off): username
-    // always required; password required on NEW accounts. Blank on EDIT
-    // is "keep existing keyring entry."
-    if (!noOutgoingServer && isGenericProvider && !smtpUseSameAsIncoming) {
-      if (!smtpUsername.trim()) errors.smtpUsername = $_('account.usernameRequired')
-      if (!editAccount && !smtpPassword) errors.smtpPassword = $_('account.passwordRequired')
-    }
-
     return Object.keys(errors).length === 0
   }
 
@@ -874,7 +860,7 @@
                   oninput={(e) => {
                     const v = (e.target as HTMLInputElement).value
                     if (isGenericProvider && !editAccount && smtpHostMirrorsImap) {
-                      smtpHost = v
+                      smtpHost = inferSmtpHostFromImapHost(v)
                     }
                   }}
                   class={errors.imapHost ? 'border-destructive' : ''}
@@ -915,17 +901,13 @@
           <!-- Divider -->
           <div class="border-t border-border"></div>
 
-          <!-- Outgoing server (SMTP). Header carries the no-outgoing toggle
-               (help text is a tooltip on the info icon). -->
+          <!-- Outgoing server (SMTP). Header carries the no-outgoing toggle. -->
           <div class="space-y-4">
             <div class="flex items-center justify-between gap-2">
-              <span class="text-sm font-medium">{$_('account.outgoingServer')}</span>
+              <span class={noOutgoingServer ? 'text-sm font-medium' : 'sr-only'}>{$_('account.outgoingServer')}</span>
               <div class="flex items-center gap-2">
                 <Switch bind:checked={noOutgoingServer} />
                 <span class="text-sm text-muted-foreground">{$_('account.noOutgoingServer')}</span>
-                <span class="cursor-help text-muted-foreground" title={$_('account.noOutgoingServerHelp')}>
-                  <Icon icon="mdi:information-outline" class="w-4 h-4" />
-                </span>
               </div>
             </div>
 
@@ -976,9 +958,7 @@
             {:else}
             <div class="grid grid-cols-2 gap-3">
               <div class="space-y-2">
-                <!-- Label hidden (the section header already reads 发件服务器);
-                     kept for vertical alignment with Port/Security labels. -->
-                <Label for="smtpHost" class="invisible" aria-hidden="true">{$_('account.outgoingServer')}</Label>
+                <Label for="smtpHost">{$_('account.outgoingServer')}</Label>
                 <Input
                   id="smtpHost"
                   type="text"

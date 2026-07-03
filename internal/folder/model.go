@@ -39,7 +39,7 @@ type Folder struct {
 	UnreadCount int `json:"unreadCount"`
 
 	// Sync state
-	LastSync   *time.Time `json:"lastSync,omitempty"`
+	LastSync   *time.Time `json:"lastSync,omitempty" ts_type:"string"`
 	Subscribed bool       `json:"subscribed"` // IMAP subscription state
 }
 

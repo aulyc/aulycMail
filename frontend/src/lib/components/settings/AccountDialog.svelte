@@ -7,8 +7,6 @@
   import AccountGeneralTab from './account/AccountGeneralTab.svelte'
   import AccountIdentityTab from './account/AccountIdentityTab.svelte'
   import AccountServerTab from './account/AccountServerTab.svelte'
-  // @ts-ignore - wailsjs path
-  import type { v1 } from '../../../../wailsjs/go/models'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { oauthStore } from '$lib/stores/oauth.svelte'
   import { addToast } from '$lib/stores/toast'
@@ -40,15 +38,6 @@
   // Tab state (for edit mode)
   let activeTab = $state('general')
 
-  // True when editing a generic-provider account (non-Gmail/Outlook/etc).
-  // Controls visibility of the SMTP-authentication UI on the Server tab
-  // and the corresponding hint on the General tab.
-  const KNOWN_PROVIDER_HOSTS = ['gmail.com', 'googlemail.com', 'outlook.com', 'office365.com', 'yahoo.com', 'aol.com', 'icloud.com', 'me.com', 'mac.com']
-  const isGenericProvider = $derived(
-    (editAccount?.imapHost ?? '') !== ''
-    && !KNOWN_PROVIDER_HOSTS.some(h => (editAccount?.imapHost ?? '').includes(h))
-  )
-
   // Form state (for edit mode)
   let displayName = $state('')
   let color = $state('')
@@ -72,6 +61,7 @@
   let syncFoldersEnabled = $state(false)
   let readReceiptRequestPolicy = $state('never')
   let authType = $state('password')
+  let displayNameLoaded = $state(false)
 
   // Folder mappings
   let sentFolderPath = $state('')
@@ -115,6 +105,7 @@
       readReceiptRequestPolicy = editAccount.readReceiptRequestPolicy || 'never'
       authType = editAccount.authType || 'password'
       color = editAccount.color || ''
+      displayNameLoaded = false
 
       // Folder mappings
       sentFolderPath = editAccount.sentFolderPath || ''
@@ -160,6 +151,8 @@
       }
     } catch (err) {
       console.error('Failed to load display name:', err)
+    } finally {
+      displayNameLoaded = true
     }
   }
 
@@ -185,9 +178,11 @@
 
     if (!displayName.trim()) errors.displayName = $_('account.displayNameRequired')
     if (!imapHost.trim()) errors.imapHost = $_('account.imapHostRequired')
-    if (!smtpHost.trim()) errors.smtpHost = $_('account.smtpHostRequired')
     if (imapPort < 1 || imapPort > 65535) errors.imapPort = $_('account.invalidPort')
-    if (smtpPort < 1 || smtpPort > 65535) errors.smtpPort = $_('account.invalidPort')
+    if (!noOutgoingServer) {
+      if (!smtpHost.trim()) errors.smtpHost = $_('account.smtpHostRequired')
+      if (smtpPort < 1 || smtpPort > 65535) errors.smtpPort = $_('account.invalidPort')
+    }
 
     return Object.keys(errors).length === 0
   }
@@ -255,19 +250,16 @@
   // Handlers for new account wizard (delegated to AccountForm)
   async function handleSubmit(config: account.AccountConfig, oauthCredentials?: OAuthCredentials) {
     let result: account.Account
-    let provider: string
 
     if (config.authType === 'oauth2' && oauthCredentials) {
-      provider = oauthCredentials.provider
       result = await accountStore.addOAuthAccount(
-        provider,
+        oauthCredentials.provider,
         config.email,
         config.name,
         config.displayName,
         config.color
       )
     } else {
-      provider = 'imap'
       result = await accountStore.addAccount(config)
     }
 
@@ -341,11 +333,6 @@
       <Dialog.Title>
         {editAccount?.sharedMailboxParentId ? $_('account.editSharedMailboxTitle') : editAccount ? $_('account.editTitle') : $_('account.addTitle')}
       </Dialog.Title>
-      <Dialog.Description>
-        {editAccount
-          ? $_('account.editDescription')
-          : $_('account.addDescription')}
-      </Dialog.Description>
     </Dialog.Header>
 
     {#if editAccount}
@@ -374,22 +361,36 @@
               bind:email
               bind:username
               bind:password
+              bind:noOutgoingServer
+              bind:replyForwardIdentityID
+              {availableIdentityGroups}
               bind:syncPeriodDays
+              bind:syncInterval
+              bind:readReceiptRequestPolicy
               {authType}
-              {isGenericProvider}
               {errors}
               {reauthorizing}
               {reauthorizeSuccess}
               onDisplayNameChange={(v) => displayName = v}
               onUsernameChange={(v) => username = v}
               onPasswordChange={(v) => password = v}
+              onNoOutgoingServerChange={(v) => noOutgoingServer = v}
+              onReplyForwardIdentityIDChange={(v) => replyForwardIdentityID = v}
               onSyncPeriodChange={(v) => syncPeriodDays = v}
+              onSyncIntervalChange={(v) => syncInterval = v}
+              onReadReceiptPolicyChange={(v) => readReceiptRequestPolicy = v}
               onReauthorize={handleReauthorize}
             />
           </Tabs.Content>
 
           <Tabs.Content value="identity" class="mt-0">
-            <AccountIdentityTab accountId={editAccount.id} {editAccount} />
+            <AccountIdentityTab
+              accountId={editAccount.id}
+              {editAccount}
+              defaultDisplayName={displayName}
+              {displayNameLoaded}
+              onDefaultDisplayNameChange={(v) => displayName = v}
+            />
           </Tabs.Content>
 
           <Tabs.Content value="server" class="mt-0">
@@ -404,11 +405,6 @@
               bind:noOutgoingServer
               bind:smtpUsername
               bind:smtpPassword
-              bind:replyForwardIdentityID
-              {availableIdentityGroups}
-              {isGenericProvider}
-              bind:syncInterval
-              bind:readReceiptRequestPolicy
               bind:sentFolderPath
               bind:draftsFolderPath
               bind:trashFolderPath
@@ -423,12 +419,8 @@
               onSmtpHostChange={(v) => smtpHost = v}
               onSmtpPortChange={(v) => smtpPort = v}
               onSmtpSecurityChange={(v) => smtpSecurity = v}
-              onNoOutgoingServerChange={(v) => noOutgoingServer = v}
               onSmtpUsernameChange={(v) => smtpUsername = v}
               onSmtpPasswordChange={(v) => smtpPassword = v}
-              onReplyForwardIdentityIDChange={(v) => replyForwardIdentityID = v}
-              onSyncIntervalChange={(v) => syncInterval = v}
-              onReadReceiptPolicyChange={(v) => readReceiptRequestPolicy = v}
               bind:syncAllFolders
               onSyncAllFoldersChange={(v) => syncAllFolders = v}
               bind:syncFoldersEnabled

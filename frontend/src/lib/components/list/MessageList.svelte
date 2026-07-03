@@ -13,7 +13,7 @@
   // @ts-ignore - wailsjs path
   import { message } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
-  import { EventsOn, EventsOff } from '../../../../wailsjs/runtime/runtime'
+  import { EventsOn } from '../../../../wailsjs/runtime/runtime'
   import { getMessageListDensity, getMessageListSortOrder, setMessageListSortOrder } from '$lib/stores/settings.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { getLayoutMode, hideViewer } from '$lib/stores/layout.svelte'
@@ -29,6 +29,8 @@
     onEmptyFolder?: () => void
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
     onRowActionComplete?: () => void
+    /** Double-click a draft row → open it in the composer (drafts folder only). */
+    onOpenDraft?: (messageId: string) => void
     isFocused?: boolean
     isFlashing?: boolean
     showFolderToggle?: boolean
@@ -44,6 +46,7 @@
     onEmptyFolder,
     onReply,
     onRowActionComplete,
+    onOpenDraft,
     isFocused: _isFocused = false,
     isFlashing = false,
     showFolderToggle = false,
@@ -88,6 +91,7 @@
   // Deferred reload: when a dialog (e.g. folder picker) is open, defer the reload
   // so the component tree isn't destroyed mid-interaction
   let pendingReload = false
+  let eventUnsubscribers: Array<() => void> = []
 
   // Buffer for flag changes that arrive while loadConversations() is in-flight.
   // On notification click, loadConversations (folder change) and MarkAsRead race —
@@ -172,75 +176,77 @@
 
   // Listen for folder sync events from backend
   onMount(() => {
-    EventsOn('folder:synced', (data: { accountId: string; folderId: string }) => {
-      // Reload if this is the current folder, or unified inbox when an inbox folder synced
-      if ((isUnifiedView && isInboxFolder(data.accountId, data.folderId)) || (!isUnifiedView && accountId && folderId && data.accountId === accountId && data.folderId === folderId)) {
-        scheduleReload()
-      }
-    })
-
-    // Listen for messages:updated events (e.g., from IDLE push notifications)
-    EventsOn('messages:updated', (data: { accountId: string; folderId: string }) => {
-      // Reload if this is the current folder, or unified inbox when an inbox folder updated
-      if ((isUnifiedView && isInboxFolder(data.accountId, data.folderId)) || (!isUnifiedView && accountId && folderId && data.accountId === accountId && data.folderId === folderId)) {
-        scheduleReload()
-      }
-    })
-
-    // Listen for message read-state changes. Star changes ride their own
-    // `messages:starredChanged` event and don't affect unread counts here.
-    EventsOn('messages:readChanged', (data: { messageIds: string[], isRead: boolean }) => {
-      // Update conversations locally instead of reloading from DB
-      let anyUpdated = false
-      for (const c of conversations) {
-        const affectedCount = (c.messageIds || []).filter(id => data.messageIds.includes(id)).length
-        if (affectedCount > 0) {
-          anyUpdated = true
-          const delta = data.isRead ? -affectedCount : affectedCount
-          c.unreadCount = Math.max(0, (c.unreadCount || 0) + delta)
+    eventUnsubscribers = [
+      EventsOn('folder:synced', (data: { accountId: string; folderId: string }) => {
+        // Reload if this is the current folder, or unified inbox when an inbox folder synced
+        if ((isUnifiedView && isInboxFolder(data.accountId, data.folderId)) || (!isUnifiedView && accountId && folderId && data.accountId === accountId && data.folderId === folderId)) {
+          scheduleReload()
         }
-      }
-      if (anyUpdated) {
-        conversations = conversations
-        return
-      }
-      // loadConversations() is in-flight — the new array isn't ready yet.
-      // Buffer this change so we can apply it after the load completes.
-      if (loading) {
-        pendingFlagChanges.push({ messageIds: data.messageIds, isRead: data.isRead })
-      }
-    })
+      }),
 
-    // Listen for FTS indexing progress
-    EventsOn('fts:progress', (data: { folderId: string; indexed: number; total: number; percentage: number }) => {
-      if (folderId && data.folderId === folderId) {
-        indexProgress = data.percentage
-        indexComplete = false
-        isIndexing = true
-      }
-    })
+      // Listen for messages:updated events (e.g., from IDLE push notifications)
+      EventsOn('messages:updated', (data: { accountId: string; folderId: string }) => {
+        // Reload if this is the current folder, or unified inbox when an inbox folder updated
+        if ((isUnifiedView && isInboxFolder(data.accountId, data.folderId)) || (!isUnifiedView && accountId && folderId && data.accountId === accountId && data.folderId === folderId)) {
+          scheduleReload()
+        }
+      }),
 
-    // Listen for FTS indexing completion
-    EventsOn('fts:complete', (data: { folderId: string }) => {
-      if (folderId && data.folderId === folderId) {
-        indexComplete = true
-        isIndexing = false
-        indexProgress = 100
-      }
-    })
+      // Listen for message read-state changes. Star changes ride their own
+      // `messages:starredChanged` event and don't affect unread counts here.
+      EventsOn('messages:readChanged', (data: { messageIds: string[], isRead: boolean }) => {
+        // Update conversations locally instead of reloading from DB
+        let anyUpdated = false
+        for (const c of conversations) {
+          const affectedCount = (c.messageIds || []).filter(id => data.messageIds.includes(id)).length
+          if (affectedCount > 0) {
+            anyUpdated = true
+            const delta = data.isRead ? -affectedCount : affectedCount
+            c.unreadCount = Math.max(0, (c.unreadCount || 0) + delta)
+          }
+        }
+        if (anyUpdated) {
+          conversations = conversations
+          return
+        }
+        // loadConversations() is in-flight — the new array isn't ready yet.
+        // Buffer this change so we can apply it after the load completes.
+        if (loading) {
+          pendingFlagChanges.push({ messageIds: data.messageIds, isRead: data.isRead })
+        }
+      }),
 
-    // Listen for FTS indexing status changes
-    EventsOn('fts:indexing', (data: { status: string }) => {
-      switch (data.status) {
-        case 'completed':
+      // Listen for FTS indexing progress
+      EventsOn('fts:progress', (data: { folderId: string; indexed: number; total: number; percentage: number }) => {
+        if (folderId && data.folderId === folderId) {
+          indexProgress = data.percentage
+          indexComplete = false
+          isIndexing = true
+        }
+      }),
+
+      // Listen for FTS indexing completion
+      EventsOn('fts:complete', (data: { folderId: string }) => {
+        if (folderId && data.folderId === folderId) {
           indexComplete = true
           isIndexing = false
-          break
-        case 'started':
-          isIndexing = true
-          break
-      }
-    })
+          indexProgress = 100
+        }
+      }),
+
+      // Listen for FTS indexing status changes
+      EventsOn('fts:indexing', (data: { status: string }) => {
+        switch (data.status) {
+          case 'completed':
+            indexComplete = true
+            isIndexing = false
+            break
+          case 'started':
+            isIndexing = true
+            break
+        }
+      }),
+    ]
 
     // Check initial FTS index status for current folder
     checkFTSIndexStatus()
@@ -257,12 +263,8 @@
   let dialogGuardInterval: ReturnType<typeof setInterval> | null = null
 
   onDestroy(() => {
-    EventsOff('folder:synced')
-    EventsOff('messages:updated')
-    EventsOff('messages:readChanged')
-    EventsOff('fts:progress')
-    EventsOff('fts:complete')
-    EventsOff('fts:indexing')
+    eventUnsubscribers.forEach(unsubscribe => unsubscribe())
+    eventUnsubscribers = []
     if (reloadTimer) clearTimeout(reloadTimer)
     if (syncReloadTimer) clearTimeout(syncReloadTimer)
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
@@ -1291,7 +1293,7 @@
   }
 
   // Scroll to a specific index in the list
-  function scrollToIndex(index: number, block: ScrollLogicalPosition = 'nearest') {
+  function scrollToIndex(index: number, block: 'start' | 'center' | 'end' | 'nearest' = 'nearest') {
     if (!listContainerRef) return
 
     const rows = listContainerRef.querySelectorAll('[data-conversation-row]')
@@ -1735,6 +1737,9 @@
           onClearSelection={clearSelection}
           onActionComplete={handleActionComplete}
           {onReply}
+          onOpenDraft={folderType === 'drafts' && conv.messageIds?.[0]
+            ? () => onOpenDraft?.(conv.messageIds[0])
+            : undefined}
         />
       {/each}
 

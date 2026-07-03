@@ -28,7 +28,7 @@ type Message struct {
 	CcList    string    `json:"ccList,omitempty"`  // JSON array
 	BccList   string    `json:"bccList,omitempty"` // JSON array
 	ReplyTo   string    `json:"replyTo,omitempty"`
-	Date      time.Time `json:"date"`
+	Date      time.Time `json:"date" ts_type:"string"`
 
 	// Preview
 	Snippet string `json:"snippet,omitempty"`
@@ -56,7 +56,7 @@ type Message struct {
 	ReadReceiptHandled bool   `json:"readReceiptHandled"`      // Whether user has responded (sent or ignored)
 
 	// Timestamps
-	ReceivedAt time.Time `json:"receivedAt"`
+	ReceivedAt time.Time `json:"receivedAt" ts_type:"string"`
 }
 
 // Address represents an email address
@@ -75,7 +75,7 @@ type MessageHeader struct {
 	Subject   string    `json:"subject"`
 	FromName  string    `json:"fromName"`
 	FromEmail string    `json:"fromEmail"`
-	Date      time.Time `json:"date"`
+	Date      time.Time `json:"date" ts_type:"string"`
 	Snippet   string    `json:"snippet"`
 
 	IsRead         bool `json:"isRead"`
@@ -110,7 +110,7 @@ type Conversation struct {
 	UnreadCount    int        `json:"unreadCount"`
 	HasAttachments bool       `json:"hasAttachments"`
 	IsStarred      bool       `json:"isStarred"`
-	LatestDate     time.Time  `json:"latestDate"`
+	LatestDate     time.Time  `json:"latestDate" ts_type:"string"`
 	Participants   []Address  `json:"participants"`
 	MessageIDs     []string   `json:"messageIds"`         // Message IDs for context menu actions
 	IsEncrypted    bool       `json:"isEncrypted"`        // Any message in thread is encrypted (S/MIME or PGP)

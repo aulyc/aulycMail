@@ -7,9 +7,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
-	"github.com/aulyc/aulycmail/internal/message"
 )
 
 // IMAPSearchResponse wraps search results with the total count of matching UIDs.
@@ -29,7 +29,7 @@ type IMAPSearchResult struct {
 	Subject   string    `json:"subject"`
 	FromName  string    `json:"fromName"`
 	FromEmail string    `json:"fromEmail"`
-	Date      time.Time `json:"date"`
+	Date      time.Time `json:"date" ts_type:"string"`
 	Snippet   string    `json:"snippet,omitempty"` // Only for local messages
 
 	// Flags

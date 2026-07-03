@@ -11,7 +11,7 @@
     cancelLabel?: string             // default: "Cancel"
     variant?: 'default' | 'destructive'  // default: 'default'
     loading?: boolean                // show spinner on confirm button
-    onConfirm: () => void
+    onConfirm: () => void | Promise<void>
     onCancel?: () => void
   }
 
@@ -56,10 +56,13 @@
     }
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     closedByButton = true
-    open = false
-    onConfirm()
+    try {
+      await onConfirm()
+    } finally {
+      open = false
+    }
   }
 
   function handleCancel() {

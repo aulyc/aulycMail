@@ -51,9 +51,19 @@ export default defineConfig({
     target: 'esnext',
     minify: 'esbuild',
     sourcemap: false,
+    // Desktop app bundle: after manual vendor splitting, the remaining vendor
+    // chunk is expected to be under this cap and no longer masks app-code size.
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
+      },
+      output: {
+        manualChunks(id) {
+          if (id.includes('/wailsjs/')) return 'wails'
+          if (id.includes('/extensions/contacts/')) return 'extension-contacts'
+          if (id.includes('/node_modules/')) return 'vendor'
+        },
       },
     },
   },

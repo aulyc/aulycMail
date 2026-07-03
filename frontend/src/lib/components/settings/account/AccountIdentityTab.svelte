@@ -2,6 +2,7 @@
   import { onMount } from 'svelte'
   import Icon from '@iconify/svelte'
   import { Button } from '$lib/components/ui/button'
+  import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
   import IdentityEditor from './IdentityEditor.svelte'
   import AccountDialog from '../AccountDialog.svelte'
   import { addToast } from '$lib/stores/toast'
@@ -20,16 +21,32 @@
     accountId: string
     /** The full account object (for detecting Microsoft OAuth) */
     editAccount?: account.Account
+    /** Live display name for the account's default identity */
+    defaultDisplayName?: string
+    /** Whether the default display name has been loaded from the default identity */
+    displayNameLoaded?: boolean
+    /** Keep the General tab's display name in sync with the default identity editor */
+    onDefaultDisplayNameChange?: (value: string) => void
   }
 
-  let { accountId, editAccount }: Props = $props()
+  let {
+    accountId,
+    editAccount,
+    defaultDisplayName = '',
+    displayNameLoaded = false,
+    onDefaultDisplayNameChange,
+  }: Props = $props()
 
   // State
   let identities = $state<account.Identity[]>([])
   let loading = $state(true)
   let showEditor = $state(false)
   let editingIdentity = $state<account.Identity | null>(null)
+  let identityEditorSaved = $state(false)
+  let defaultDisplayNameBeforeEdit = $state<string | null>(null)
   let deletingId = $state<string | null>(null)
+  let identityToDelete = $state<account.Identity | null>(null)
+  let showDeleteConfirm = $state(false)
 
   // Shared mailbox state
   let sharedMailboxes = $state<account.Account[]>([])
@@ -46,6 +63,13 @@
     !editAccount?.sharedMailboxParentId &&
     (editAccount?.imapHost === 'outlook.office365.com' || editAccount?.imapHost === 'imap-mail.outlook.com')
   )
+
+  function getSignatureBadge(identity: account.Identity): string {
+    if (identity.signatureEnabled === false) return $_('identity.signatureBadgeNone')
+    if ((identity.signatureHtml || '').trim()) return $_('identity.signatureBadgeHtml')
+    if ((identity.signatureText || '').trim()) return $_('identity.signatureBadgePlain')
+    return $_('identity.signatureBadgeNone')
+  }
 
   onMount(async () => {
     await loadIdentities()
@@ -114,11 +138,17 @@
 
   function handleAddIdentity() {
     editingIdentity = null
+    identityEditorSaved = false
+    defaultDisplayNameBeforeEdit = null
     showEditor = true
   }
 
   function handleEditIdentity(identity: account.Identity) {
-    editingIdentity = identity
+    identityEditorSaved = false
+    defaultDisplayNameBeforeEdit = identity.isDefault ? defaultDisplayName : null
+    editingIdentity = identity.isDefault && displayNameLoaded
+      ? new account.Identity({ ...identity, name: defaultDisplayName })
+      : identity
     showEditor = true
   }
 
@@ -130,6 +160,10 @@
         type: 'success',
         message: $_('identity.emailUpdated'),
       })
+      if (editingIdentity.isDefault) {
+        identityEditorSaved = true
+        onDefaultDisplayNameChange?.(config.name)
+      }
     } else {
       // Create new
       await CreateIdentity(accountId, config)
@@ -141,7 +175,23 @@
     await loadIdentities()
   }
 
-  async function handleDeleteIdentity(identity: account.Identity) {
+  function handleEditorNameChange(value: string) {
+    if (editingIdentity?.isDefault) {
+      onDefaultDisplayNameChange?.(value)
+    }
+  }
+
+  function handleEditorClose() {
+    if (editingIdentity?.isDefault && !identityEditorSaved && defaultDisplayNameBeforeEdit !== null) {
+      onDefaultDisplayNameChange?.(defaultDisplayNameBeforeEdit)
+    }
+    showEditor = false
+    editingIdentity = null
+    identityEditorSaved = false
+    defaultDisplayNameBeforeEdit = null
+  }
+
+  function handleDeleteIdentity(identity: account.Identity) {
     if (identity.isDefault) {
       addToast({
         type: 'error',
@@ -150,6 +200,14 @@
       return
     }
 
+    identityToDelete = identity
+    showDeleteConfirm = true
+  }
+
+  async function confirmDeleteIdentity() {
+    if (!identityToDelete) return
+
+    const identity = identityToDelete
     deletingId = identity.id
     try {
       await DeleteIdentity(identity.id)
@@ -166,7 +224,12 @@
       })
     } finally {
       deletingId = null
+      identityToDelete = null
     }
+  }
+
+  function cancelDeleteIdentity() {
+    identityToDelete = null
   }
 
   async function handleSetDefault(identity: account.Identity) {
@@ -188,29 +251,6 @@
     }
   }
 
-  // Get a preview of the signature (first line, truncated). Considers both the
-  // HTML signature and the plain-text signature so a text-only signature still
-  // shows as "has signature" rather than "no signature".
-  function getSignaturePreview(identity: account.Identity): string {
-    if (!identity.signatureEnabled) return $_('identity.noSignature')
-
-    let text = ''
-    if (identity.signatureHtml) {
-      const temp = document.createElement('div')
-      temp.innerHTML = identity.signatureHtml
-      text = temp.textContent || ''
-    } else if (identity.signatureText) {
-      text = identity.signatureText
-    } else {
-      return $_('identity.noSignature')
-    }
-
-    const firstLine = text.split('\n')[0].trim()
-    if (firstLine.length > 50) {
-      return firstLine.substring(0, 50) + '...'
-    }
-    return firstLine || $_('identity.emptySignature')
-  }
 </script>
 
 <div class="space-y-4">
@@ -220,9 +260,6 @@
         <Icon icon="mdi:email-multiple-outline" class="w-4 h-4" />
         {$_('identity.emailAddresses')}
       </h3>
-      <p class="text-xs text-muted-foreground mt-1">
-        {$_('identity.emailAddressesHelp')}
-      </p>
     </div>
     <Button size="sm" onclick={handleAddIdentity}>
       <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
@@ -247,14 +284,14 @@
           <button
             type="button"
             onclick={() => handleSetDefault(identity)}
-            class="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
+            class="flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors
               {identity.isDefault
                 ? 'border-primary bg-primary'
                 : 'border-muted-foreground hover:border-primary'}"
             title={identity.isDefault ? $_('identity.defaultAddress') : $_('identity.setAsDefaultAddress')}
           >
             {#if identity.isDefault}
-              <div class="w-2 h-2 rounded-full bg-white"></div>
+              <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
             {/if}
           </button>
 
@@ -265,12 +302,9 @@
               {#if identity.isDefault}
                 <span class="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">{$_('identity.default')}</span>
               {/if}
-            </div>
-            <div class="text-xs text-muted-foreground truncate">
-              {identity.name}
-            </div>
-            <div class="text-xs text-muted-foreground truncate mt-0.5">
-              {getSignaturePreview(identity)}
+              <span class="text-xs bg-muted/60 text-muted-foreground border border-border px-1.5 py-0.5 rounded shrink-0">
+                {getSignatureBadge(identity)}
+              </span>
             </div>
           </div>
 
@@ -305,9 +339,6 @@
     </div>
   {/if}
 
-  <p class="text-xs text-muted-foreground">
-    {$_('identity.defaultHelp')}
-  </p>
 </div>
 
 {#if isMicrosoft}
@@ -420,8 +451,22 @@
   bind:open={showEditor}
   {accountId}
   identity={editingIdentity}
+  linkedName={editingIdentity?.isDefault && displayNameLoaded ? defaultDisplayName : undefined}
+  onNameChange={handleEditorNameChange}
   onSave={handleSaveIdentity}
-  onClose={() => { showEditor = false; editingIdentity = null }}
+  onClose={handleEditorClose}
+/>
+
+<ConfirmDialog
+  bind:open={showDeleteConfirm}
+  title={$_('identity.deleteAliasTitle')}
+  description={$_('identity.deleteAliasConfirm', { values: { email: identityToDelete?.email ?? '' } })}
+  confirmLabel={$_('common.delete')}
+  cancelLabel={$_('common.cancel')}
+  variant="destructive"
+  loading={deletingId !== null}
+  onConfirm={confirmDeleteIdentity}
+  onCancel={cancelDeleteIdentity}
 />
 
 <!-- Shared Mailbox Editor Dialog (reuses AccountDialog) -->

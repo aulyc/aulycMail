@@ -21,6 +21,8 @@
     id: string
     threadId: string
     accountId: string
+    accountName?: string
+    accountEmail?: string
     folderId: string
     subject: string
     fromName: string
@@ -78,6 +80,7 @@
 
   let contact = $derived(contactsView.detail)
   let primaryEmail = $derived(contact && contact.emails && contact.emails.length > 0 ? contact.emails[0] : '')
+  let associatedAccounts = $derived(contact?.associatedAccounts ?? [])
 
   // Local records are always writable. CardDAV records are writable when the
   // source's `writable` flag is enabled (Settings → source → "Enable write
@@ -217,6 +220,15 @@
           {/if}
         </dd>
 
+        {#if associatedAccounts.length > 0}
+          <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.associatedAccounts')}</dt>
+          <dd class="m-0 break-words text-foreground space-y-1">
+            {#each associatedAccounts as account (account.accountId)}
+              <div class="break-all">{account.email || account.name}</div>
+            {/each}
+          </dd>
+        {/if}
+
         {#if contact.phones && contact.phones.length > 0}
           <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.phone')}</dt>
           <dd class="m-0 break-words text-foreground">
@@ -347,6 +359,9 @@
                 />
                 <span class="flex-1 min-w-0 truncate {m.isRead ? 'text-foreground' : 'font-semibold text-foreground'}">
                   {m.subject || $_('contacts.common.unnamed')}
+                </span>
+                <span class="w-40 max-w-[40%] flex-shrink-0 truncate text-xs text-muted-foreground" title={m.accountEmail || m.accountName || ''}>
+                  {m.accountEmail || m.accountName || '—'}
                 </span>
                 <span class="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
                   {formatRelativeDate(new Date(m.date))}

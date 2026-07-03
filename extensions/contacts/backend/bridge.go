@@ -5,8 +5,8 @@ import (
 	"sync"
 
 	"github.com/aulyc/aulycmail/internal/contact"
-	"github.com/aulyc/aulycmail/internal/database"
 	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	"github.com/aulyc/aulycmail/internal/database"
 	"github.com/aulyc/aulycmail/internal/platform"
 )
 
@@ -180,6 +180,18 @@ func (b *ContactsBridge) Contacts_ListContactsForBrowse(query, sourceID string, 
 		Limit:    limit,
 		Offset:   offset,
 	})
+}
+
+// Contacts_GetContactAccountGroups returns the enabled mail accounts that back
+// the Contacts sidebar tree, including per-role counts for each account.
+func (b *ContactsBridge) Contacts_GetContactAccountGroups() ([]coreapi.ContactAccountGroup, error) {
+	if !b.gateEnabled() {
+		return nil, nil
+	}
+	if err := b.ensureInit(); err != nil {
+		return nil, err
+	}
+	return b.api.ListAccountGroups()
 }
 
 // Contacts_GetContactDetail returns a single contact by email (if argument

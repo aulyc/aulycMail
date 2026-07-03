@@ -175,7 +175,7 @@ func (a *App) SaveAttachmentAs(attachmentID string) (string, error) {
 
 	// In Flatpak, use portal save dialog (Wails GTK dialog doesn't route through portal)
 	if platform.IsFlatpak() {
-		savePath, err := platform.PortalSaveFile("Save Attachment", att.Filename, defaultDir)
+		savePath, err := platform.PortalSaveFile("Save Attachment", email.DefaultAttachmentFilename(att.Filename), defaultDir)
 		if err != nil {
 			log.Error().Err(err).Msg("Failed to show portal save dialog")
 			return "", fmt.Errorf("failed to show save dialog: %w", err)
@@ -190,7 +190,7 @@ func (a *App) SaveAttachmentAs(attachmentID string) (string, error) {
 	// Native: use Wails dialog
 	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
 		DefaultDirectory: defaultDir,
-		DefaultFilename:  att.Filename,
+		DefaultFilename:  email.DefaultAttachmentFilename(att.Filename),
 		Title:            "Save Attachment",
 	})
 	if err != nil {
@@ -379,7 +379,11 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 			continue
 		}
 
-		savePath := filepath.Join(saveDir, att.Filename)
+		savePath, err := email.UniqueAttachmentPath(saveDir, att.Filename)
+		if err != nil {
+			log.Warn().Err(err).Str("filename", att.Filename).Msg("Skipping attachment with unsafe filename")
+			continue
+		}
 		_, err = downloader.SaveAttachment(att, content, savePath)
 		if err != nil {
 			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
@@ -398,7 +402,7 @@ func (a *App) saveAllAttachmentsViaPortal(messageID string, attachments []*messa
 
 	filenames := make([]string, len(attachments))
 	for i, att := range attachments {
-		filenames[i] = att.Filename
+		filenames[i] = email.DefaultAttachmentFilename(att.Filename)
 	}
 
 	savePaths, err := platform.PortalSaveFiles("Save All Attachments", filenames, defaultDir)

@@ -15,12 +15,12 @@ import (
 
 // OAuthStatus represents the OAuth status for an account
 type OAuthStatus struct {
-	IsOAuth     bool      `json:"isOAuth"`     // Whether the account uses OAuth
-	Provider    string    `json:"provider"`    // OAuth provider name (google, microsoft)
-	Email       string    `json:"email"`       // Authenticated email address
-	ExpiresAt   time.Time `json:"expiresAt"`   // Token expiry time
-	IsExpired   bool      `json:"isExpired"`   // Whether the token has expired
-	NeedsReauth bool      `json:"needsReauth"` // Whether re-authorization is required
+	IsOAuth     bool      `json:"isOAuth"`                    // Whether the account uses OAuth
+	Provider    string    `json:"provider"`                   // OAuth provider name (google, microsoft)
+	Email       string    `json:"email"`                      // Authenticated email address
+	ExpiresAt   time.Time `json:"expiresAt" ts_type:"string"` // Token expiry time
+	IsExpired   bool      `json:"isExpired"`                  // Whether the token has expired
+	NeedsReauth bool      `json:"needsReauth"`                // Whether re-authorization is required
 }
 
 // ============================================================================

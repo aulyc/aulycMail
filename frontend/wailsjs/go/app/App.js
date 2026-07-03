@@ -26,7 +26,6 @@ export function Archive(arg1) {
   return window['go']['app']['App']['Archive'](arg1);
 }
 
-
 export function CanUndo() {
   return window['go']['app']['App']['CanUndo']();
 }
@@ -65,6 +64,10 @@ export function Contacts_CreateContact(arg1) {
 
 export function Contacts_DeleteLocalContact(arg1) {
   return window['go']['app']['App']['Contacts_DeleteLocalContact'](arg1);
+}
+
+export function Contacts_GetContactAccountGroups() {
+  return window['go']['app']['App']['Contacts_GetContactAccountGroups']();
 }
 
 export function Contacts_GetContactDetail(arg1) {
@@ -143,6 +146,10 @@ export function GetAccount(arg1) {
   return window['go']['app']['App']['GetAccount'](arg1);
 }
 
+export function GetAccountConnOK(arg1) {
+  return window['go']['app']['App']['GetAccountConnOK'](arg1);
+}
+
 export function GetAccountFoldersForMapping(arg1) {
   return window['go']['app']['App']['GetAccountFoldersForMapping'](arg1);
 }
@@ -183,14 +190,16 @@ export function GetComposerFormat() {
   return window['go']['app']['App']['GetComposerFormat']();
 }
 
-
 export function GetConfiguredOAuthProviders() {
   return window['go']['app']['App']['GetConfiguredOAuthProviders']();
 }
 
-
 export function GetContact(arg1) {
   return window['go']['app']['App']['GetContact'](arg1);
+}
+
+export function GetContactMessages(arg1, arg2) {
+  return window['go']['app']['App']['GetContactMessages'](arg1, arg2);
 }
 
 export function GetContext() {
@@ -237,7 +246,6 @@ export function GetIMAPConnectionForUndo(arg1, arg2) {
   return window['go']['app']['App']['GetIMAPConnectionForUndo'](arg1, arg2);
 }
 
-
 export function GetIdentities(arg1) {
   return window['go']['app']['App']['GetIdentities'](arg1);
 }
@@ -261,7 +269,6 @@ export function GetLanguage() {
 export function GetLastSeenVersion() {
   return window['go']['app']['App']['GetLastSeenVersion']();
 }
-
 
 export function GetMarkAsReadDelay() {
   return window['go']['app']['App']['GetMarkAsReadDelay']();
@@ -447,10 +454,6 @@ export function ListContacts(arg1) {
   return window['go']['app']['App']['ListContacts'](arg1);
 }
 
-export function GetContactMessages(arg1, arg2) {
-  return window['go']['app']['App']['GetContactMessages'](arg1, arg2);
-}
-
 export function ListDrafts(arg1) {
   return window['go']['app']['App']['ListDrafts'](arg1);
 }
@@ -515,7 +518,6 @@ export function OpenAttachment(arg1) {
   return window['go']['app']['App']['OpenAttachment'](arg1);
 }
 
-
 export function OpenFile(arg1) {
   return window['go']['app']['App']['OpenFile'](arg1);
 }
@@ -554,6 +556,10 @@ export function ReauthorizeAccount(arg1) {
 
 export function RebuildFTSIndex(arg1) {
   return window['go']['app']['App']['RebuildFTSIndex'](arg1);
+}
+
+export function RefreshContactsFromMail() {
+  return window['go']['app']['App']['RefreshContactsFromMail']();
 }
 
 export function RefreshWindowConstraints() {
@@ -644,7 +650,6 @@ export function SetComposerFormat(arg1) {
   return window['go']['app']['App']['SetComposerFormat'](arg1);
 }
 
-
 export function SetDarkMailContent(arg1) {
   return window['go']['app']['App']['SetDarkMailContent'](arg1);
 }
@@ -664,7 +669,6 @@ export function SetLanguage(arg1) {
 export function SetLastSeenVersion(arg1) {
   return window['go']['app']['App']['SetLastSeenVersion'](arg1);
 }
-
 
 export function SetMarkAsReadDelay(arg1) {
   return window['go']['app']['App']['SetMarkAsReadDelay'](arg1);
@@ -766,20 +770,12 @@ export function SyncPendingDrafts(arg1) {
   return window['go']['app']['App']['SyncPendingDrafts'](arg1);
 }
 
-export function TestConnection(arg1) {
-  return window['go']['app']['App']['TestConnection'](arg1);
-}
-
 export function TestAccountConnection(arg1) {
   return window['go']['app']['App']['TestAccountConnection'](arg1);
 }
 
-export function GetAccountConnOK(arg1) {
-  return window['go']['app']['App']['GetAccountConnOK'](arg1);
-}
-
-export function RefreshContactsFromMail() {
-  return window['go']['app']['App']['RefreshContactsFromMail']();
+export function TestConnection(arg1) {
+  return window['go']['app']['App']['TestConnection'](arg1);
 }
 
 export function TestOAuthConnection(arg1) {

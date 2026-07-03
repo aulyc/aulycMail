@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/aulyc/aulycmail/internal/database"
+	"github.com/google/uuid"
 )
 
 // Store provides account storage operations
@@ -496,7 +496,7 @@ func (s *Store) GetIdentities(accountID string) ([]*Identity, error) {
 	rows, err := s.db.Query(`
 		SELECT id, account_id, email, name, is_default, signature_html, signature_text,
 			signature_enabled, signature_for_new, signature_for_reply, signature_for_forward,
-			signature_placement, signature_separator, order_index, created_at, updated_at
+			signature_placement, signature_separator, signature_separator_style, order_index, created_at, updated_at
 		FROM identities WHERE account_id = ? ORDER BY order_index
 	`, accountID)
 	if err != nil {
@@ -507,23 +507,23 @@ func (s *Store) GetIdentities(accountID string) ([]*Identity, error) {
 	var identities []*Identity
 	for rows.Next() {
 		identity := &Identity{}
-		var sigHTML, sigText, placement sql.NullString
+		var sigHTML, sigText, placement, separatorStyle sql.NullString
 		var updatedAt sql.NullTime
 		err := rows.Scan(
 			&identity.ID, &identity.AccountID, &identity.Email, &identity.Name,
 			&identity.IsDefault, &sigHTML, &sigText,
 			&identity.SignatureEnabled, &identity.SignatureForNew, &identity.SignatureForReply, &identity.SignatureForForward,
-			&placement, &identity.SignatureSeparator, &identity.OrderIndex, &identity.CreatedAt, &updatedAt,
+			&placement, &identity.SignatureSeparator, &separatorStyle, &identity.OrderIndex, &identity.CreatedAt, &updatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan identity: %w", err)
 		}
 		identity.SignatureHTML = sigHTML.String
 		identity.SignatureText = sigText.String
-		identity.SignaturePlacement = placement.String
-		if identity.SignaturePlacement == "" {
-			identity.SignaturePlacement = "above"
-		}
+		_ = placement
+		identity.SignaturePlacement = "above"
+		identity.SignatureSeparatorStyle = normalizeSignatureSeparatorStyle(separatorStyle.String, identity.SignatureSeparator)
+		identity.SignatureSeparator = identity.SignatureSeparatorStyle != ""
 		if updatedAt.Valid {
 			identity.UpdatedAt = updatedAt.Time
 		} else {
@@ -538,18 +538,18 @@ func (s *Store) GetIdentities(accountID string) ([]*Identity, error) {
 // GetIdentity retrieves a single identity by ID
 func (s *Store) GetIdentity(id string) (*Identity, error) {
 	identity := &Identity{}
-	var sigHTML, sigText, placement sql.NullString
+	var sigHTML, sigText, placement, separatorStyle sql.NullString
 	var updatedAt sql.NullTime
 	err := s.db.QueryRow(`
 		SELECT id, account_id, email, name, is_default, signature_html, signature_text,
 			signature_enabled, signature_for_new, signature_for_reply, signature_for_forward,
-			signature_placement, signature_separator, order_index, created_at, updated_at
+			signature_placement, signature_separator, signature_separator_style, order_index, created_at, updated_at
 		FROM identities WHERE id = ?
 	`, id).Scan(
 		&identity.ID, &identity.AccountID, &identity.Email, &identity.Name,
 		&identity.IsDefault, &sigHTML, &sigText,
 		&identity.SignatureEnabled, &identity.SignatureForNew, &identity.SignatureForReply, &identity.SignatureForForward,
-		&placement, &identity.SignatureSeparator, &identity.OrderIndex, &identity.CreatedAt, &updatedAt,
+		&placement, &identity.SignatureSeparator, &separatorStyle, &identity.OrderIndex, &identity.CreatedAt, &updatedAt,
 	)
 	if err == sql.ErrNoRows {
 		return nil, ErrIdentityNotFound
@@ -559,10 +559,10 @@ func (s *Store) GetIdentity(id string) (*Identity, error) {
 	}
 	identity.SignatureHTML = sigHTML.String
 	identity.SignatureText = sigText.String
-	identity.SignaturePlacement = placement.String
-	if identity.SignaturePlacement == "" {
-		identity.SignaturePlacement = "above"
-	}
+	_ = placement
+	identity.SignaturePlacement = "above"
+	identity.SignatureSeparatorStyle = normalizeSignatureSeparatorStyle(separatorStyle.String, identity.SignatureSeparator)
+	identity.SignatureSeparator = identity.SignatureSeparatorStyle != ""
 	if updatedAt.Valid {
 		identity.UpdatedAt = updatedAt.Time
 	} else {
@@ -585,35 +585,36 @@ func (s *Store) CreateIdentity(accountID string, config *IdentityConfig) (*Ident
 
 	now := time.Now()
 	identity := &Identity{
-		ID:                  uuid.New().String(),
-		AccountID:           accountID,
-		Email:               config.Email,
-		Name:                config.Name,
-		IsDefault:           false, // New identities are not default
-		SignatureHTML:       config.SignatureHTML,
-		SignatureText:       config.SignatureText,
-		SignatureEnabled:    config.SignatureEnabled,
-		SignatureForNew:     config.SignatureForNew,
-		SignatureForReply:   config.SignatureForReply,
-		SignatureForForward: config.SignatureForForward,
-		SignaturePlacement:  config.SignaturePlacement,
-		SignatureSeparator:  config.SignatureSeparator,
-		OrderIndex:          maxOrder + 1,
-		CreatedAt:           now,
-		UpdatedAt:           now,
+		ID:                      uuid.New().String(),
+		AccountID:               accountID,
+		Email:                   config.Email,
+		Name:                    config.Name,
+		IsDefault:               false, // New identities are not default
+		SignatureHTML:           config.SignatureHTML,
+		SignatureText:           config.SignatureText,
+		SignatureEnabled:        config.SignatureEnabled,
+		SignatureForNew:         config.SignatureForNew,
+		SignatureForReply:       config.SignatureForReply,
+		SignatureForForward:     config.SignatureForForward,
+		SignaturePlacement:      config.SignaturePlacement,
+		SignatureSeparator:      config.SignatureSeparator,
+		SignatureSeparatorStyle: config.SignatureSeparatorStyle,
+		OrderIndex:              maxOrder + 1,
+		CreatedAt:               now,
+		UpdatedAt:               now,
 	}
 
 	_, err := s.db.Exec(`
 		INSERT INTO identities (
 			id, account_id, email, name, is_default, signature_html, signature_text,
 			signature_enabled, signature_for_new, signature_for_reply, signature_for_forward,
-			signature_placement, signature_separator, order_index, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			signature_placement, signature_separator, signature_separator_style, order_index, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		identity.ID, identity.AccountID, identity.Email, identity.Name, identity.IsDefault,
 		nullableString(identity.SignatureHTML), nullableString(identity.SignatureText),
 		identity.SignatureEnabled, identity.SignatureForNew, identity.SignatureForReply, identity.SignatureForForward,
-		identity.SignaturePlacement, identity.SignatureSeparator, identity.OrderIndex, identity.CreatedAt, identity.UpdatedAt,
+		identity.SignaturePlacement, identity.SignatureSeparator, identity.SignatureSeparatorStyle, identity.OrderIndex, identity.CreatedAt, identity.UpdatedAt,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create identity: %w", err)
@@ -639,12 +640,12 @@ func (s *Store) UpdateIdentity(id string, config *IdentityConfig) (*Identity, er
 		UPDATE identities SET
 			email = ?, name = ?, signature_html = ?, signature_text = ?,
 			signature_enabled = ?, signature_for_new = ?, signature_for_reply = ?, signature_for_forward = ?,
-			signature_placement = ?, signature_separator = ?, updated_at = ?
+			signature_placement = ?, signature_separator = ?, signature_separator_style = ?, updated_at = ?
 		WHERE id = ?
 	`,
 		config.Email, config.Name, nullableString(config.SignatureHTML), nullableString(config.SignatureText),
 		config.SignatureEnabled, config.SignatureForNew, config.SignatureForReply, config.SignatureForForward,
-		config.SignaturePlacement, config.SignatureSeparator, now, id,
+		config.SignaturePlacement, config.SignatureSeparator, config.SignatureSeparatorStyle, now, id,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update identity: %w", err)
@@ -660,6 +661,7 @@ func (s *Store) UpdateIdentity(id string, config *IdentityConfig) (*Identity, er
 	existing.SignatureForForward = config.SignatureForForward
 	existing.SignaturePlacement = config.SignaturePlacement
 	existing.SignatureSeparator = config.SignatureSeparator
+	existing.SignatureSeparatorStyle = config.SignatureSeparatorStyle
 	existing.UpdatedAt = now
 
 	return existing, nil

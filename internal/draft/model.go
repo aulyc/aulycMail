@@ -45,12 +45,12 @@ type Draft struct {
 	SyncStatus      SyncStatus `json:"syncStatus"`
 	IMAPUID         uint32     `json:"imapUid,omitempty"`
 	FolderID        string     `json:"folderId,omitempty"`
-	LastSyncAttempt *time.Time `json:"lastSyncAttempt,omitempty"`
+	LastSyncAttempt *time.Time `json:"lastSyncAttempt,omitempty" ts_type:"string"`
 	SyncError       string     `json:"syncError,omitempty"`
 
 	// Timestamps
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	CreatedAt time.Time `json:"createdAt" ts_type:"string"`
+	UpdatedAt time.Time `json:"updatedAt" ts_type:"string"`
 }
 
 // IsSynced returns true if the draft is synced with IMAP

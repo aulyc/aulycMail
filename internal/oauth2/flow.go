@@ -23,7 +23,7 @@ type AuthSession struct {
 	State          string          `json:"state"`
 	CodeVerifier   string          `json:"codeVerifier"` // PKCE
 	RedirectPort   int             `json:"redirectPort"`
-	CreatedAt      time.Time       `json:"createdAt"`
+	CreatedAt      time.Time       `json:"createdAt" ts_type:"string"`
 	ProviderConfig *ProviderConfig `json:"-"` // Optional custom provider config
 }
 

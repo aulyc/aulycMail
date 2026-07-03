@@ -69,6 +69,12 @@
     (tree.folder?.unreadCount || 0) + (tree.children ? sumTreeUnread(tree.children) : 0)
   )
 
+  // Drafts are stored \Seen, so they never contribute unread. Show the total
+  // number of drafts instead, as a neutral (non-unread) count badge.
+  let draftCount = $derived(
+    tree.folder?.type === 'drafts' ? (tree.folder?.totalCount || 0) : 0
+  )
+
   let isCollapsed = $derived(
     hasChildren
       ? collapsedFolders[tree.folder!.id] !== false  // collapsed unless explicitly set to false
@@ -183,6 +189,12 @@
           class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground"
         >
           {aggregateUnread}
+        </span>
+      {:else if draftCount > 0}
+        <span
+          class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-muted text-muted-foreground"
+        >
+          {draftCount}
         </span>
       {/if}
     </button>

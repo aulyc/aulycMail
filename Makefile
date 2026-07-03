@@ -7,7 +7,7 @@
 
 .PHONY: all build dev dev-race generate clean test lint lint-go lint-frontend \
         fmt frontend-deps frontend-update install uninstall \
-        install-darwin uninstall-darwin help
+        install-darwin quit-running-darwin uninstall-darwin help
 
 # Go module path
 MODULE := github.com/aulyc/aulycmail
@@ -17,6 +17,33 @@ LDFLAGS :=
 
 # Wails build tags
 BUILD_TAGS := webkit2_41
+GO_BUILD_TAGS := desktop,$(BUILD_TAGS),wv2runtime.download,production
+APP_BUNDLE := build/bin/aulycmail.app
+APP_BINARY := build/bin/aulycmail
+
+# Darwin cgo/linker flags keep build output actionable with current Xcode SDKs:
+# - suppress duplicate libobjc linker noise from multiple Objective-C packages
+# - link UniformTypeIdentifiers explicitly for Wails' macOS file dialog code
+# - use one deployment target across cgo objects and the final link
+# - silence Wails' macOS 15+ NSToolbar deprecation warning until upstream moves
+#   off setShowsBaselineSeparator:
+DARWIN_LINK_WARN_ENV :=
+ifeq ($(shell uname -s),Darwin)
+DARWIN_MIN_VERSION := 11.0
+DARWIN_LINK_WARN_ENV := \
+	CGO_CFLAGS_ALLOW='-mmacosx-version-min=.*|-Wno-deprecated-declarations' \
+	CGO_CFLAGS='-mmacosx-version-min=$(DARWIN_MIN_VERSION) -Wno-deprecated-declarations' \
+	CGO_LDFLAGS_ALLOW='-Wl,-no_warn_duplicate_libraries|-framework|Cocoa|Network|IOKit|CoreFoundation|Foundation|UserNotifications|Security|WebKit|AppKit|UniformTypeIdentifiers|-mmacosx-version-min=.*' \
+	CGO_LDFLAGS='-Wl,-no_warn_duplicate_libraries -framework UniformTypeIdentifiers -mmacosx-version-min=$(DARWIN_MIN_VERSION)'
+endif
+
+# Go package directories. Do not use `go test ./...` directly: npm packages can
+# vendor their own Go modules under frontend/node_modules, and those should not
+# become part of this repository's Go test surface.
+GO_PACKAGES := $(shell find . \
+	-path './frontend/node_modules' -prune -o \
+	-path './frontend/dist' -prune -o \
+	-name '*.go' -print | xargs -n1 dirname | sort -u | sed 's,^\./,./,')
 
 # Default target
 all: build
@@ -27,16 +54,37 @@ all: build
 # (ad-hoc signature is required for macOS notifications to work).
 build:
 	@echo "Building aulycmail..."
-	wails build -ldflags "$(LDFLAGS) -s -w" -tags $(BUILD_TAGS)
+	$(DARWIN_LINK_WARN_ENV) wails generate module
+	@perl -pi -e 's/[ \t]+$$//' frontend/wailsjs/go/app/App.d.ts frontend/wailsjs/go/app/App.js frontend/wailsjs/go/models.ts
+	@if [ ! -d frontend/node_modules ]; then \
+		echo "Installing frontend dependencies..."; \
+		cd frontend && npm install; \
+	else \
+		echo "Skipping npm install"; \
+	fi
+	@echo "Compiling frontend..."
+	cd frontend && npm run build
+	@echo "Compiling application..."
+	mkdir -p build/bin
+	$(DARWIN_LINK_WARN_ENV) go build -buildvcs=false -tags $(GO_BUILD_TAGS) -ldflags "$(LDFLAGS) -s -w -w -s" -o $(APP_BINARY)
+	@echo "Packaging macOS app bundle..."
+	bash tools/package_macos_app.sh
 	@echo "Injecting macOS asset-catalog icon (fills the Liquid Glass plate on macOS 26)..."
-	bash tools/inject_macos_icon.sh build/bin/aulycmail.app build/appicon.png
+	bash tools/inject_macos_icon.sh $(APP_BUNDLE) build/appicon.png
 	@echo "Ad-hoc signing aulycmail.app (required for macOS notifications)..."
-	codesign --force --deep --sign - build/bin/aulycmail.app
+	@codesign_log=$$(mktemp); \
+	if codesign --force --deep --sign - $(APP_BUNDLE) >"$$codesign_log" 2>&1; then \
+		rm -f "$$codesign_log"; \
+	else \
+		cat "$$codesign_log"; \
+		rm -f "$$codesign_log"; \
+		exit 1; \
+	fi
 
 # Run in development mode with hot reload
 dev:
 	@echo "Starting aulycmail in development mode..."
-	wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+	$(DARWIN_LINK_WARN_ENV) wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
 
 # Run in development mode with Go's race detector enabled. Builds significantly
 # slower and adds ~5-10x runtime overhead, but instruments every memory access
@@ -45,7 +93,7 @@ dev:
 # reproduce the crash and the detector report points right at it.
 dev-race:
 	@echo "Starting aulycmail in development mode with -race..."
-	wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
+	$(DARWIN_LINK_WARN_ENV) wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
 
 # Generate Wails TypeScript bindings
 generate:
@@ -57,15 +105,21 @@ generate:
 # Run Go tests
 test:
 	@echo "Running tests..."
-	go test ./...
+	$(DARWIN_LINK_WARN_ENV) go test $(GO_PACKAGES)
 
 # Run all linters (Go + frontend)
 lint: lint-go lint-frontend
 
-# Run Go linter (requires golangci-lint)
+# Run Go linter. Prefer golangci-lint when installed; otherwise keep the local
+# quality gate usable with go vet.
 lint-go:
 	@echo "Running Go linter..."
-	golangci-lint run
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
+	else \
+		echo "golangci-lint not found; running go vet instead"; \
+		go vet $(GO_PACKAGES); \
+	fi
 
 # Run frontend linter (ESLint)
 lint-frontend:
@@ -102,8 +156,25 @@ frontend-update:
 install: install-darwin
 uninstall: uninstall-darwin
 
+# Quit a running installed app before replacing the bundle.
+quit-running-darwin:
+	@echo "Checking for running aulycmail..."
+	@if pgrep -x aulycmail >/dev/null; then \
+		echo "Quitting running aulycmail..."; \
+		osascript -e 'tell application id "com.aulyc.aulycmail" to quit'; \
+	fi
+	@for i in $$(seq 1 20); do \
+		if ! pgrep -x aulycmail >/dev/null; then \
+			echo "No running aulycmail process found."; \
+			exit 0; \
+		fi; \
+		sleep 0.5; \
+	done; \
+	echo "aulycmail is still running; quit it and retry installation."; \
+	exit 1
+
 # Install aulycmail on macOS
-install-darwin: build
+install-darwin: quit-running-darwin build
 	@echo "Installing aulycmail.app to /Applications..."
 	@if [ -d "/Applications/aulycmail.app" ]; then \
 		echo "Removing existing installation..."; \
@@ -111,7 +182,14 @@ install-darwin: build
 	fi
 	cp -R "build/bin/aulycmail.app" "/Applications/"
 	@echo "Re-signing installed copy..."
-	codesign --force --deep --sign - "/Applications/aulycmail.app"
+	@codesign_log=$$(mktemp); \
+	if codesign --force --deep --sign - "/Applications/aulycmail.app" >"$$codesign_log" 2>&1; then \
+		rm -f "$$codesign_log"; \
+	else \
+		cat "$$codesign_log"; \
+		rm -f "$$codesign_log"; \
+		exit 1; \
+	fi
 	@echo ""
 	@echo "Installation complete!"
 	@echo "aulycmail is now available in /Applications."

@@ -2,7 +2,7 @@
 // Provides reactive state for application settings
 
 // @ts-ignore - wailsjs path
-import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetShowTitleBar, GetRunBackground, GetStartHidden, GetAutostart, GetLanguage, GetComposerFormat, GetNativeTitleBar, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread, GetShowMessageListCircles, GetShowViewerCircles } from '../../../wailsjs/go/app/App'
+import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetRunBackground, GetStartHidden, GetAutostart, GetLanguage, GetComposerFormat, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread, GetShowMessageListCircles, GetShowViewerCircles } from '../../../wailsjs/go/app/App'
 import { setLocale as setI18nLocale, detectSystemLocale } from '$lib/i18n'
 import { loadDateFnsLocale, getDateFnsLocale } from '$lib/i18n/dateFnsLocale'
 import type { Locale } from 'date-fns'
@@ -25,13 +25,11 @@ export type ThemeMode =
 let messageListDensity = $state<MessageListDensity>('standard')
 let messageListSortOrder = $state<MessageListSortOrder>('newest')
 let themeMode = $state<ThemeMode>('system')
-let showTitleBar = $state<boolean>(true)
 let runBackground = $state<boolean>(false)
 let startHidden = $state<boolean>(false)
 let autostart = $state<boolean>(false)
 let language = $state<string>('')
 let composerFormat = $state<ComposerFormat>('plain')
-let nativeTitleBar = $state<boolean>(false)
 let alwaysLoadImages = $state<boolean>(false)
 let darkMailContent = $state<boolean>(false)
 let accentBarUnread = $state<boolean>(false)
@@ -122,7 +120,7 @@ export function setThemeMode(mode: ThemeMode) {
 }
 
 export function setShowTitleBar(show: boolean) {
-  showTitleBar = show
+  void show
 }
 
 export function setRunBackground(v: boolean) {
@@ -150,7 +148,7 @@ export function setComposerFormat(format: ComposerFormat) {
 }
 
 export function setNativeTitleBar(v: boolean) {
-  nativeTitleBar = v
+  void v
 }
 
 export function setAlwaysLoadImages(v: boolean) {
@@ -176,17 +174,15 @@ export function setShowViewerCircles(v: boolean) {
 // Load settings from backend (call on app startup)
 export async function loadSettings(): Promise<ThemeMode> {
   try {
-    const [density, sortOrder, theme, titleBar, runBg, startHid, autoSt, lang, compFormat, nativeTB, alwaysImages, darkMail, accentBar, listCircles, viewerCircles] = await Promise.all([
+    const [density, sortOrder, theme, runBg, startHid, autoSt, lang, compFormat, alwaysImages, darkMail, accentBar, listCircles, viewerCircles] = await Promise.all([
       GetMessageListDensity(),
       GetMessageListSortOrder(),
       GetThemeMode(),
-      GetShowTitleBar(),
       GetRunBackground(),
       GetStartHidden(),
       GetAutostart(),
       GetLanguage(),
       GetComposerFormat(),
-      GetNativeTitleBar(),
       GetAlwaysLoadImages(),
       GetDarkMailContent(),
       GetAccentBarUnread(),
@@ -197,12 +193,10 @@ export async function loadSettings(): Promise<ThemeMode> {
     messageListDensity = (density === 'micro' ? 'compact' : (density as MessageListDensity)) || 'standard'
     messageListSortOrder = (sortOrder as MessageListSortOrder) || 'newest'
     themeMode = (theme as ThemeMode) || 'system'
-    showTitleBar = titleBar ?? true // Default to true
     runBackground = runBg ?? false
     startHidden = startHid ?? false
     autostart = autoSt ?? false
     composerFormat = (compFormat as ComposerFormat) || 'plain'
-    nativeTitleBar = nativeTB ?? false
     alwaysLoadImages = alwaysImages ?? false
     darkMailContent = darkMail ?? false
     accentBarUnread = accentBar ?? false

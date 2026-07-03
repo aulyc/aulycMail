@@ -36,10 +36,12 @@ A standalone lightweight e-mail client inspired by [Geary](https://wiki.gnome.or
 ### 🖥 OS Support
 ---
 
-Although Linux is a first-class citizen here, it also works on:
+This checkout currently targets the local macOS desktop build:
 
-- MacOS
-- Windows
+- macOS
+
+The upstream project has broader cross-platform history, but this repository's
+active build/install flow is macOS-only.
 
 
 ### 🪶 Features
@@ -66,14 +68,13 @@ Although Linux is a first-class citizen here, it also works on:
 - Basic Removal of Tracking Elements in Mail Content
 - WYSIWYG Detachable Composer ([TipTap Editor](https://github.com/ueberdosis/tiptap))
 - WYSIWYG Signatures ([TipTap Editor](https://github.com/ueberdosis/tiptap))
-- CardDav/Google/Microsoft Contact Sync for auto-complete
+- Local contacts and autocomplete through the built-in Contacts extension
 - Basic Local and IMAP Search
 - Notification that brings focus to the e-mail when clicked
 - Auto-Sync when system wakes from suspend
 - Multiple color themes (More to come...)
 - PGP & S/MIME support
 - 1st party extension system with the following shipped:
-    - Calendar (ALPHA) - Disabled by Default
     - Contacts (ALPHA) - Disabled by Default
 - [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)
 

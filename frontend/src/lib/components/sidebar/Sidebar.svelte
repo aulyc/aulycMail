@@ -3,7 +3,6 @@
   import { onMount } from 'svelte'
   import AccountSection from './AccountSection.svelte'
   import AccountDialog from '$lib/components/settings/AccountDialog.svelte'
-  import SidebarFooter from '$lib/components/kit/SidebarFooter.svelte'
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { isAccountExpanded, setAccountExpanded, setFolderCollapsed, getUIState, getUIStateVersion, saveUIState } from '$lib/stores/uiState.svelte'
@@ -11,8 +10,6 @@
   import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { account, folder } from '../../../../wailsjs/go/models'
-  import { formatDistanceToNow } from 'date-fns'
-  import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
 
   // Folder item type for flat navigation list
   interface FolderNavItem {
@@ -137,28 +134,6 @@
         console.error('Failed to sync on launch:', err)
       }
     })
-  })
-
-  // Sync status: { accountName, label, percentage } — accountName + percentage are populated only when a sync is active
-  let syncStatus = $derived.by<{ accountName: string | null; label: string; percentage: number | null }>(() => {
-    if (accountStore.isAnySyncing) {
-      const syncingAcc = accountStore.accounts.find((a) => a.syncing)
-      if (syncingAcc) {
-        const accountName = syncingAcc.account.name
-        const progress = accountStore.getSyncProgress(syncingAcc.account.id)
-        if (progress) {
-          if (progress.phase === 'folders') return { accountName, label: $_('sidebar.syncingFolders'), percentage: null }
-          if (progress.phase === 'messages') return { accountName, label: $_('sidebar.fetchingMessageList'), percentage: null }
-          if (progress.phase === 'headers') return { accountName, label: $_('sidebar.fetchingHeaders', { values: { percentage: progress.percentage } }), percentage: progress.percentage }
-          return { accountName, label: $_('sidebar.syncingContent', { values: { percentage: progress.percentage } }), percentage: progress.percentage }
-        }
-        return { accountName, label: $_('sidebar.syncing'), percentage: null }
-      }
-      return { accountName: null, label: $_('sidebar.syncing'), percentage: null }
-    }
-    if (!accountStore.isOnline) return { accountName: null, label: $_('sidebar.offline'), percentage: null }
-    if (!accountStore.lastSyncTime) return { accountName: null, label: $_('sidebar.notSynced'), percentage: null }
-    return { accountName: null, label: $_('sidebar.synced', { values: { time: formatDistanceToNow(accountStore.lastSyncTime, { addSuffix: true, locale: getCurrentDateFnsLocale() }) } }), percentage: null }
   })
 
   // Handle folder selection
@@ -436,41 +411,6 @@
     {/if}
   </div>
 
-  <!-- Footer: Sync Status + Settings. Chrome (padding/border/min-height)
-       lives in kit `SidebarFooter` so mail, calendar, and contacts all
-       render the same strip height. Mail's progress bar overlay + 2-line
-       leading content (account name + status label) pass through
-       SidebarFooter's overlay/leading snippets unchanged. -->
-  <SidebarFooter>
-    {#snippet overlay()}
-      {#if syncStatus.percentage !== null}
-        <div class="absolute top-0 left-0 right-0 h-1 bg-muted overflow-hidden">
-          <div
-            class="h-full bg-primary transition-all duration-300 ease-out"
-            style="width: {syncStatus.percentage}%"
-          ></div>
-        </div>
-      {/if}
-    {/snippet}
-    {#snippet leading()}
-      <button
-        class="flex-1 min-w-0 flex items-end gap-2 hover:text-foreground transition-colors text-left"
-        onclick={accountStore.isAnySyncing ? cancelSync : syncAllAccounts}
-        title={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
-      >
-        <Icon
-          icon="mdi:sync"
-          class="w-4 h-4 flex-shrink-0 {accountStore.isAnySyncing ? 'animate-spin' : ''}"
-        />
-        <div class="flex-1 min-w-0">
-          {#if syncStatus.accountName}
-            <div class="truncate text-foreground font-medium leading-tight mb-0.5">{syncStatus.accountName}</div>
-          {/if}
-          <span class="block leading-tight">{syncStatus.label}</span>
-        </div>
-      </button>
-    {/snippet}
-  </SidebarFooter>
 </div>
 
 <!-- Account Dialog -->

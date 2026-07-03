@@ -43,13 +43,14 @@ func openTestStore(t *testing.T) *Store {
 	}
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS trusted_certificates (
 		id TEXT PRIMARY KEY,
-		fingerprint TEXT NOT NULL UNIQUE,
+		fingerprint TEXT NOT NULL,
 		host TEXT NOT NULL,
 		subject TEXT,
 		issuer TEXT,
 		not_before TEXT,
 		not_after TEXT,
-		accepted_at DATETIME
+		accepted_at DATETIME,
+		UNIQUE(host, fingerprint)
 	)`)
 	if err != nil {
 		t.Fatalf("failed to create table: %v", err)
@@ -174,10 +175,15 @@ func TestAcceptSession(t *testing.T) {
 	store := openTestStore(t)
 
 	fp := "aabbccdd11223344aabbccdd11223344aabbccdd11223344aabbccdd11223344"
-	store.AcceptSession(fp)
+	if err := store.AcceptSession("imap.example.com", fp); err != nil {
+		t.Fatalf("AcceptSession() error = %v", err)
+	}
 
-	if !store.IsTrusted(fp) {
+	if !store.IsTrusted("imap.example.com", fp) {
 		t.Fatal("IsTrusted = false after AcceptSession, want true")
+	}
+	if store.IsTrusted("smtp.example.com", fp) {
+		t.Fatal("IsTrusted = true for different host, want false")
 	}
 }
 
@@ -185,8 +191,41 @@ func TestIsTrustedDefault(t *testing.T) {
 	store := openTestStore(t)
 
 	fp := "0000000000000000000000000000000000000000000000000000000000000000"
-	if store.IsTrusted(fp) {
+	if store.IsTrusted("imap.example.com", fp) {
 		t.Fatal("IsTrusted = true for unknown fingerprint, want false")
+	}
+}
+
+func TestAcceptPermanentlyScopesTrustToHost(t *testing.T) {
+	store := openTestStore(t)
+	der := generateTestCert(t)
+	info := ExtractCertInfo(der, errors.New("self-signed"))
+
+	if err := store.AcceptPermanently("IMAP.EXAMPLE.COM", info); err != nil {
+		t.Fatalf("AcceptPermanently() error = %v", err)
+	}
+	if !store.IsTrusted("imap.example.com", info.Fingerprint) {
+		t.Fatal("trusted certificate was not accepted for normalized host")
+	}
+	if store.IsTrusted("smtp.example.com", info.Fingerprint) {
+		t.Fatal("trusted certificate leaked to a different host")
+	}
+}
+
+func TestBuildTLSConfigTrustedCertificateRequiresMatchingHost(t *testing.T) {
+	store := openTestStore(t)
+	der := generateTestCert(t)
+	fp := Fingerprint(der)
+
+	if err := store.AcceptSession("test.example.com", fp); err != nil {
+		t.Fatalf("AcceptSession() error = %v", err)
+	}
+
+	if err := BuildTLSConfig("test.example.com", store).VerifyPeerCertificate([][]byte{der}, nil); err != nil {
+		t.Fatalf("VerifyPeerCertificate() trusted host error = %v", err)
+	}
+	if err := BuildTLSConfig("other.example.com", store).VerifyPeerCertificate([][]byte{der}, nil); err == nil {
+		t.Fatal("VerifyPeerCertificate() trusted certificate for different host, want error")
 	}
 }
 

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/aulyc/aulycmail/internal/database"
 	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
@@ -199,8 +199,6 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder, filt
 
 	return conversations, nil
 }
-
-
 
 // CountConversationsUnifiedInbox returns the total count of conversations across all inbox folders
 func (s *Store) CountConversationsUnifiedInbox(filter string) (int, error) {
@@ -1411,8 +1409,11 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		trashFilter = "AND f.folder_type != 'trash'"
 	}
 
-	// Scope to current folder + Sent + Drafts (for full conversation context)
-	folderFilter := "AND (m.folder_id = ? OR f.folder_type IN ('sent', 'drafts'))"
+	// Scope to the current folder + Sent (for full conversation context). Drafts
+	// are folded in ONLY when actually viewing the Drafts folder — otherwise an
+	// unsent draft reply would show inline inside the inbox thread as if it had
+	// been sent. When viewing Drafts, the draft already matches via m.folder_id.
+	folderFilter := "AND (m.folder_id = ? OR f.folder_type = 'sent')"
 
 	summaryQuery := fmt.Sprintf(`
 		SELECT
@@ -2398,21 +2399,22 @@ func highlightMatches(text, query string) string {
 	return highlighted
 }
 
-
 // ContactMessage is a compact mail summary for the Contacts detail view —
 // one row per message involving a given contact address.
 type ContactMessage struct {
-	ID        string    `json:"id"`
-	ThreadID  string    `json:"threadId"`
-	AccountID string    `json:"accountId"`
-	FolderID  string    `json:"folderId"`
-	Subject   string    `json:"subject"`
-	FromName  string    `json:"fromName"`
-	FromEmail string    `json:"fromEmail"`
-	Date      time.Time `json:"date"`
-	IsRead    bool      `json:"isRead"`
-	Incoming  bool      `json:"incoming"` // true when the contact is the sender
-	Snippet   string    `json:"snippet"`  // short body preview (search overlay)
+	ID           string    `json:"id"`
+	ThreadID     string    `json:"threadId"`
+	AccountID    string    `json:"accountId"`
+	AccountName  string    `json:"accountName,omitempty"`
+	AccountEmail string    `json:"accountEmail,omitempty"`
+	FolderID     string    `json:"folderId"`
+	Subject      string    `json:"subject"`
+	FromName     string    `json:"fromName"`
+	FromEmail    string    `json:"fromEmail"`
+	Date         time.Time `json:"date" ts_type:"string"`
+	IsRead       bool      `json:"isRead"`
+	Incoming     bool      `json:"incoming"` // true when the contact is the sender
+	Snippet      string    `json:"snippet"`  // short body preview (search overlay)
 }
 
 // ListByParticipant returns recent messages where the given email address is a
@@ -2427,23 +2429,29 @@ func (s *Store) ListByParticipant(email string, limit int) ([]*ContactMessage, e
 	if limit <= 0 {
 		limit = 50
 	}
-	like := "%" + email + "%"
+	jsonAddressMatch := `
+		EXISTS (
+			SELECT 1
+			FROM json_each(CASE WHEN json_valid(COALESCE(%s, '')) THEN %s ELSE '[]' END) addr
+			WHERE LOWER(COALESCE(json_extract(addr.value, '$.email'), json_extract(addr.value, '$.address'), '')) = ?
+		)`
 
 	rows, err := s.db.Query(`
 		SELECT m.id, COALESCE(m.thread_id, m.id), m.subject, m.from_name, m.from_email,
-		       m.date, m.folder_id, f.account_id, m.is_read
+		       m.date, m.folder_id, f.account_id, COALESCE(a.name, ''), COALESCE(a.email, ''), m.is_read
 		FROM messages m
 		JOIN folders f ON m.folder_id = f.id
+		JOIN accounts a ON f.account_id = a.id
 		WHERE f.folder_type != 'drafts'
 		  AND (
 		    LOWER(m.from_email) = ?
-		    OR LOWER(COALESCE(m.to_list, '')) LIKE ?
-		    OR LOWER(COALESCE(m.cc_list, '')) LIKE ?
-		    OR LOWER(COALESCE(m.bcc_list, '')) LIKE ?
+		    OR `+fmt.Sprintf(jsonAddressMatch, "m.to_list", "m.to_list")+`
+		    OR `+fmt.Sprintf(jsonAddressMatch, "m.cc_list", "m.cc_list")+`
+		    OR `+fmt.Sprintf(jsonAddressMatch, "m.bcc_list", "m.bcc_list")+`
 		  )
 		ORDER BY m.date DESC
 		LIMIT ?
-	`, email, like, like, like, limit)
+	`, email, email, email, email, limit)
 	if err != nil {
 		return nil, fmt.Errorf("query contact messages: %w", err)
 	}
@@ -2454,7 +2462,7 @@ func (s *Store) ListByParticipant(email string, limit int) ([]*ContactMessage, e
 		m := &ContactMessage{}
 		var dateStr sql.NullString
 		if err := rows.Scan(&m.ID, &m.ThreadID, &m.Subject, &m.FromName, &m.FromEmail,
-			&dateStr, &m.FolderID, &m.AccountID, &m.IsRead); err != nil {
+			&dateStr, &m.FolderID, &m.AccountID, &m.AccountName, &m.AccountEmail, &m.IsRead); err != nil {
 			return nil, fmt.Errorf("scan contact message: %w", err)
 		}
 		if dateStr.Valid {
@@ -2484,7 +2492,7 @@ func (s *Store) SearchMessagesInFolder(folderID, query string, limit int) ([]*Co
 	rows, err := s.db.Query(`
 		SELECT m.id, COALESCE(m.thread_id, m.id), m.subject, m.from_name, m.from_email,
 		       m.date, m.folder_id, f.account_id, m.is_read,
-		       COALESCE(m.snippet, ''), COALESCE(a.email, '')
+		       COALESCE(m.snippet, ''), COALESCE(a.name, ''), COALESCE(a.email, '')
 		FROM messages m
 		JOIN folders f ON m.folder_id = f.id
 		JOIN accounts a ON f.account_id = a.id
@@ -2509,9 +2517,8 @@ func (s *Store) SearchMessagesInFolder(folderID, query string, limit int) ([]*Co
 	for rows.Next() {
 		m := &ContactMessage{}
 		var dateStr sql.NullString
-		var accountEmail string
 		if err := rows.Scan(&m.ID, &m.ThreadID, &m.Subject, &m.FromName, &m.FromEmail,
-			&dateStr, &m.FolderID, &m.AccountID, &m.IsRead, &m.Snippet, &accountEmail); err != nil {
+			&dateStr, &m.FolderID, &m.AccountID, &m.IsRead, &m.Snippet, &m.AccountName, &m.AccountEmail); err != nil {
 			return nil, fmt.Errorf("scan message: %w", err)
 		}
 		if dateStr.Valid {
@@ -2519,7 +2526,7 @@ func (s *Store) SearchMessagesInFolder(folderID, query string, limit int) ([]*Co
 		}
 		// Direction: received unless the sender is this account's own address
 		// (mirrors the Contacts "related mail" arrow icons).
-		m.Incoming = !strings.EqualFold(strings.TrimSpace(m.FromEmail), strings.TrimSpace(accountEmail))
+		m.Incoming = !strings.EqualFold(strings.TrimSpace(m.FromEmail), strings.TrimSpace(m.AccountEmail))
 		out = append(out, m)
 	}
 	return out, nil

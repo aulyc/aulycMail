@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Icon from '@iconify/svelte'
-  import * as AlertDialog from '$lib/components/ui/alert-dialog'
+  import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
+  import { addToast } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
   import { account } from '../../../../wailsjs/go/models'
@@ -25,13 +25,11 @@
   }: Props = $props()
 
   let deleting = $state(false)
-  let error = $state<string | null>(null)
 
   async function handleDelete() {
     if (!accountToDelete) return
 
     deleting = true
-    error = null
 
     try {
       await accountStore.removeAccount(accountToDelete.id)
@@ -40,7 +38,7 @@
       onClose?.()
     } catch (err) {
       console.error('Failed to delete account:', err)
-      error = $_('toast.failedToDelete')
+      addToast({ type: 'error', message: $_('toast.failedToDelete') })
     } finally {
       deleting = false
     }
@@ -51,47 +49,16 @@
     onClose?.()
   }
 
-  function handleOpenChange(isOpen: boolean) {
-    open = isOpen
-    if (!isOpen) {
-      onClose?.()
-      error = null
-    }
-  }
 </script>
 
-<AlertDialog.Root bind:open onOpenChange={handleOpenChange}>
-  <AlertDialog.Content preventCloseAutoFocus>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$_('account.deleteTitle')}</AlertDialog.Title>
-      <AlertDialog.Description>
-        {$_('account.deleteConfirm', { values: { name: accountToDelete?.name ?? '', email: accountToDelete?.email ?? '' } })}
-        <br /><br />
-        {$_('account.deleteWarning')}
-      </AlertDialog.Description>
-    </AlertDialog.Header>
-
-    {#if error}
-      <div class="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-        <Icon icon="mdi:alert-circle" class="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-        <p class="text-sm text-destructive">{error}</p>
-      </div>
-    {/if}
-
-    <AlertDialog.Footer>
-      <AlertDialog.Cancel onclick={handleCancel} disabled={deleting}>
-        {$_('common.cancel')}
-      </AlertDialog.Cancel>
-      <AlertDialog.Action
-        onclick={handleDelete}
-        disabled={deleting}
-        class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-      >
-        {#if deleting}
-          <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-        {/if}
-        {$_('account.deleteAccount')}
-      </AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
+<ConfirmDialog
+  bind:open
+  title={$_('account.deleteTitle')}
+  description={`${$_('account.deleteConfirm', { values: { name: accountToDelete?.name ?? '', email: accountToDelete?.email ?? '' } })} ${$_('account.deleteWarning')}`}
+  confirmLabel={$_('account.deleteAccount')}
+  cancelLabel={$_('common.cancel')}
+  variant="destructive"
+  loading={deleting}
+  onConfirm={handleDelete}
+  onCancel={handleCancel}
+/>

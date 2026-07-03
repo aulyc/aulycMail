@@ -28,7 +28,6 @@ export function AddMicrosoftSharedMailbox(arg1:string,arg2:string,arg3:string):P
 
 export function Archive(arg1:Array<string>):Promise<void>;
 
-
 export function CanUndo():Promise<boolean>;
 
 export function CancelAccountSync(arg1:string):Promise<void>;
@@ -48,6 +47,8 @@ export function CompleteOAuthAccountSetup(arg1:string,arg2:string,arg3:string,ar
 export function Contacts_CreateContact(arg1:v1.ContactCreateInput):Promise<string>;
 
 export function Contacts_DeleteLocalContact(arg1:string):Promise<void>;
+
+export function Contacts_GetContactAccountGroups():Promise<Array<v1.ContactAccountGroup>>;
 
 export function Contacts_GetContactDetail(arg1:string):Promise<v1.Contact>;
 
@@ -87,6 +88,8 @@ export function GetAccentBarUnread():Promise<boolean>;
 
 export function GetAccount(arg1:string):Promise<account.Account>;
 
+export function GetAccountConnOK(arg1:string):Promise<string>;
+
 export function GetAccountFoldersForMapping(arg1:string):Promise<Array<folder.Folder>>;
 
 export function GetAccounts():Promise<Array<account.Account>>;
@@ -107,11 +110,11 @@ export function GetAutostart():Promise<boolean>;
 
 export function GetComposerFormat():Promise<string>;
 
-
 export function GetConfiguredOAuthProviders():Promise<Array<string>>;
 
-
 export function GetContact(arg1:string):Promise<contact.Contact>;
+
+export function GetContactMessages(arg1:string,arg2:number):Promise<Array<message.ContactMessage>>;
 
 export function GetContext():Promise<context.Context>;
 
@@ -135,7 +138,6 @@ export function GetFolders(arg1:string):Promise<Array<folder.Folder>>;
 
 export function GetIMAPConnectionForUndo(arg1:context.Context,arg2:string):Promise<imap.Client>;
 
-
 export function GetIdentities(arg1:string):Promise<Array<account.Identity>>;
 
 export function GetIdentity(arg1:string):Promise<account.Identity>;
@@ -147,7 +149,6 @@ export function GetInlineAttachments(arg1:string):Promise<Record<string, string>
 export function GetLanguage():Promise<string>;
 
 export function GetLastSeenVersion():Promise<string>;
-
 
 export function GetMarkAsReadDelay():Promise<number>;
 
@@ -241,8 +242,6 @@ export function ListAccountSetupHooksForProvider(arg1:string):Promise<Array<v1.A
 
 export function ListContacts(arg1:number):Promise<Array<contact.Contact>>;
 
-export function GetContactMessages(arg1:string,arg2:number):Promise<any>;
-
 export function ListDrafts(arg1:string):Promise<Array<draft.Draft>>;
 
 export function ListEnabledExtensions():Promise<Array<string>>;
@@ -275,7 +274,6 @@ export function NotifyStartupComplete():Promise<void>;
 
 export function OpenAttachment(arg1:string):Promise<void>;
 
-
 export function OpenFile(arg1:string):Promise<void>;
 
 export function OpenFolder(arg1:string):Promise<void>;
@@ -295,6 +293,8 @@ export function ReadFileAsAttachment(arg1:string):Promise<app.ComposerAttachment
 export function ReauthorizeAccount(arg1:string):Promise<void>;
 
 export function RebuildFTSIndex(arg1:string):Promise<void>;
+
+export function RefreshContactsFromMail():Promise<number>;
 
 export function RefreshWindowConstraints():Promise<void>;
 
@@ -322,7 +322,7 @@ export function SearchContacts(arg1:string,arg2:number):Promise<Array<contact.Co
 
 export function SearchConversations(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number,arg6:string):Promise<Array<message.ConversationSearchResult>>;
 
-export function SearchMailInFolder(arg1:string,arg2:string,arg3:number):Promise<any>;
+export function SearchMailInFolder(arg1:string,arg2:string,arg3:number):Promise<Array<message.ContactMessage>>;
 
 export function SearchUnifiedInbox(arg1:string,arg2:number,arg3:number,arg4:string):Promise<Array<message.ConversationSearchResult>>;
 
@@ -340,7 +340,6 @@ export function SetAutostart(arg1:boolean):Promise<void>;
 
 export function SetComposerFormat(arg1:string):Promise<void>;
 
-
 export function SetDarkMailContent(arg1:boolean):Promise<void>;
 
 export function SetDefaultIdentity(arg1:string,arg2:string):Promise<void>;
@@ -350,7 +349,6 @@ export function SetExtensionEnabled(arg1:string,arg2:boolean):Promise<void>;
 export function SetLanguage(arg1:string):Promise<void>;
 
 export function SetLastSeenVersion(arg1:string):Promise<void>;
-
 
 export function SetMarkAsReadDelay(arg1:number):Promise<void>;
 
@@ -402,13 +400,9 @@ export function SyncFolders(arg1:string):Promise<void>;
 
 export function SyncPendingDrafts(arg1:string):Promise<void>;
 
-export function TestConnection(arg1:account.AccountConfig):Promise<app.ConnectionTestResult>;
-
 export function TestAccountConnection(arg1:string):Promise<app.ConnectionTestResult>;
 
-export function GetAccountConnOK(arg1:string):Promise<string>;
-
-export function RefreshContactsFromMail():Promise<number>;
+export function TestConnection(arg1:account.AccountConfig):Promise<app.ConnectionTestResult>;
 
 export function TestOAuthConnection(arg1:string):Promise<void>;
 

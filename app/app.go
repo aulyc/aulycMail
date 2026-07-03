@@ -11,6 +11,7 @@ import (
 	goSync "sync"
 	"time"
 
+	extcontactsbe "github.com/aulyc/aulycmail/extensions/contacts/backend"
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/appstate"
 	"github.com/aulyc/aulycmail/internal/certificate"
@@ -19,7 +20,6 @@ import (
 	"github.com/aulyc/aulycmail/internal/credentials"
 	"github.com/aulyc/aulycmail/internal/database"
 	"github.com/aulyc/aulycmail/internal/draft"
-	extcontactsbe "github.com/aulyc/aulycmail/extensions/contacts/backend"
 	extauth "github.com/aulyc/aulycmail/internal/extensions/auth"
 	extcompose "github.com/aulyc/aulycmail/internal/extensions/compose"
 	extmail "github.com/aulyc/aulycmail/internal/extensions/mail"
@@ -225,13 +225,13 @@ type App struct {
 	// into App via its Bridge struct (declared at the top of this struct
 	// definition); the *Extension field below is the lightweight lifecycle
 	// handle the host's knownExtensions Register loop iterates.
-	authBroker       *extauth.Broker      // coreapi.Auth impl for extensions
-	mailAPI          *extmail.API         // coreapi.Mail impl wrapping core stores
-	composerAPI      *extcompose.API      // coreapi.Composer impl (currently unimplemented)
-	uiRegistry       *extui.Registry      // coreapi.UI impl: rail tabs, account-setup hooks, ...
-	contactsExt      *extcontactsbe.Extension // Contacts lifecycle handle (manifest + Register only)
-	knownExtensions  []coreapi.Extension      // all first-party extensions, iterated by ListExtensions
-	extensionUnregs  []coreapi.Unregister     // teardown funcs returned from each Extension.Register
+	authBroker      *extauth.Broker          // coreapi.Auth impl for extensions
+	mailAPI         *extmail.API             // coreapi.Mail impl wrapping core stores
+	composerAPI     *extcompose.API          // coreapi.Composer impl (currently unimplemented)
+	uiRegistry      *extui.Registry          // coreapi.UI impl: rail tabs, account-setup hooks, ...
+	contactsExt     *extcontactsbe.Extension // Contacts lifecycle handle (manifest + Register only)
+	knownExtensions []coreapi.Extension      // all first-party extensions, iterated by ListExtensions
+	extensionUnregs []coreapi.Unregister     // teardown funcs returned from each Extension.Register
 
 	// coreapi.EventBus implementation, lazily constructed on first
 	// Core.Events() call (via eventBusInitOnce). Extensions consume via
@@ -272,7 +272,7 @@ type App struct {
 
 	// Draft IMAP sync goroutine tracking — cancel in-flight syncDraftToIMAP
 	draftSyncContexts map[string]context.CancelFunc // keyed by draft ID
-	draftSyncDone     map[string]chan struct{}       // closed when goroutine exits
+	draftSyncDone     map[string]chan struct{}      // closed when goroutine exits
 
 	// Sleep/wake detection for auto-sync on wake
 	sleepWakeMonitor platform.SleepWakeMonitor
@@ -529,11 +529,11 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize shared draft operations (used by both App and ComposerApp)
 	a.draftOps = draftOps{
-		accountStore:   a.accountStore,
-		folderStore:    a.folderStore,
-		messageStore:   a.messageStore,
-		draftStore:     a.draftStore,
-		imapPool:       a.imapPool,
+		accountStore: a.accountStore,
+		folderStore:  a.folderStore,
+		messageStore: a.messageStore,
+		draftStore:   a.draftStore,
+		imapPool:     a.imapPool,
 	}
 
 	// Initialize sync engine
@@ -610,13 +610,13 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize shared compose operations (used by both App and ComposerApp)
 	a.composeOps = composeOps{
-		accountStore:   a.accountStore,
-		folderStore:    a.folderStore,
-		credStore:      a.credStore,
-		certStore:      a.certStore,
-		contactStore:   a.contactStore,
-		oauth2Manager:  a.oauth2Manager,
-		draftOps:       &a.draftOps,
+		accountStore:  a.accountStore,
+		folderStore:   a.folderStore,
+		credStore:     a.credStore,
+		certStore:     a.certStore,
+		contactStore:  a.contactStore,
+		oauth2Manager: a.oauth2Manager,
+		draftOps:      &a.draftOps,
 	}
 
 	// Initialize network connectivity monitor (event-driven, zero polling).
@@ -968,7 +968,7 @@ func (a *App) menuLabels() platform.MenuLabels {
 // This bypasses Wails' BrowserOpenURL which has strict validation against shell metacharacters
 func (a *App) OpenURL(url string) error {
 	log := logging.WithComponent("app")
-	log.Debug().Str("url", url).Msg("Opening URL in system browser")
+	log.Debug().Str("url", redactURLForLog(url)).Msg("Opening URL in system browser")
 
 	// Validate URL and check protocol for security
 	// This prevents file:// URLs and other potentially dangerous schemes
@@ -980,7 +980,7 @@ func (a *App) OpenURL(url string) error {
 	// Note: We're being permissive here to allow legitimate email links
 	// The main security comes from using exec.Command properly
 	if !isAllowedProtocol(url) {
-		log.Warn().Str("url", url).Msg("Rejecting URL with disallowed protocol")
+		log.Warn().Str("url", redactURLForLog(url)).Msg("Rejecting URL with disallowed protocol")
 		return fmt.Errorf("URL protocol not allowed for security reasons")
 	}
 
@@ -1017,30 +1017,49 @@ func (a *App) OpenURL(url string) error {
 	// Start the command without waiting for it to complete
 	// Browser opening should be async - we don't need to wait
 	if err := cmd.Start(); err != nil {
-		log.Error().Err(err).Str("url", url).Msg("Failed to open URL in browser")
+		log.Error().Err(err).Str("url", redactURLForLog(url)).Msg("Failed to open URL in browser")
 		return fmt.Errorf("failed to open URL: %w", err)
 	}
 
-	log.Debug().Str("url", url).Msg("Successfully started browser process")
+	log.Debug().Str("url", redactURLForLog(url)).Msg("Successfully started browser process")
 	return nil
+}
+
+func redactURLForLog(rawURL string) string {
+	if rawURL == "" {
+		return ""
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Sprintf("[invalid-url length=%d]", len(rawURL))
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "http", "https", "mailto":
+	default:
+		if parsed.Scheme == "" {
+			return fmt.Sprintf("[relative-or-invalid-url length=%d]", len(rawURL))
+		}
+		return parsed.Scheme + ":[redacted]"
+	}
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	parsed.User = nil
+	return parsed.String()
 }
 
 // isAllowedProtocol checks if a URL uses an allowed protocol
 // Prevents file:// URLs and other potentially dangerous schemes
-func isAllowedProtocol(url string) bool {
-	// Common safe protocols for an email client
-	allowedPrefixes := []string{
-		"http://",
-		"https://",
-		"mailto:",
-		// Note: We could add more if needed, but being conservative
+func isAllowedProtocol(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
 	}
-
-	for _, prefix := range allowedPrefixes {
-		if len(url) >= len(prefix) && url[:len(prefix)] == prefix {
-			return true
-		}
+	switch strings.ToLower(parsed.Scheme) {
+	case "http", "https":
+		return parsed.Host != ""
+	case "mailto":
+		return true
+	default:
+		return false
 	}
-
-	return false
 }

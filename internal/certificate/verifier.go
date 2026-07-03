@@ -36,7 +36,7 @@ func BuildTLSConfig(host string, store *Store) *tls.Config {
 
 			// Check our trust store
 			fingerprint := Fingerprint(rawCerts[0])
-			if store != nil && store.IsTrusted(fingerprint) {
+			if store != nil && store.IsTrusted(host, fingerprint) {
 				return nil // We trust this cert
 			}
 

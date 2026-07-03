@@ -70,16 +70,21 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 	}
 
 	// Single-instance detection: if another instance is running, activate it and exit
-	lock := platform.NewSingleInstanceLock()
-	locked, err := lock.TryLock(activateMsg)
-	if err != nil {
-		println("Warning: single-instance check failed:", err.Error())
+	var lock platform.SingleInstanceLock
+	var err error
+	if !isBindingGeneration() {
+		lock = platform.NewSingleInstanceLock()
+		var locked bool
+		locked, err = lock.TryLock(activateMsg)
+		if err != nil {
+			println("Warning: single-instance check failed:", err.Error())
+		}
+		if !locked {
+			// Existing instance was activated
+			return
+		}
+		defer lock.Unlock()
 	}
-	if !locked {
-		// Existing instance was activated
-		return
-	}
-	defer lock.Unlock()
 
 	// Title bar is hardcoded to the OS-native chrome — Frameless off.
 	nativeTitleBar := true
@@ -103,9 +108,9 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 
 	// Create application with options
 	err = wails.Run(&options.App{
-		Title:                    "aulycmail",
-		Width:                    1300,
-		Height:                   800,
+		Title:  "aulycmail",
+		Width:  1300,
+		Height: 800,
 		// Floor for the narrowest pane layout (rail + sidebar-min + list-min +
 		// viewer toolbar). The frontend raises this dynamically when the panes
 		// are widened so the viewer's action toolbar always fits.

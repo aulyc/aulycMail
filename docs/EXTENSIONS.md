@@ -34,13 +34,13 @@ This doc is the contract every aulycmail extension uses to interact with the hos
 
 ## Overview
 
-aulycmail's extension system lets first-party extensions (Calendar, Contacts, Notes/Chat in the future) ship inside the same binary as Mail, while staying invisible to users who don't enable them. Design principles, in order of importance:
+aulycmail's extension system lets first-party extensions ship inside the same binary as Mail, while staying invisible to users who don't enable them. In this checkout, `extensions/contacts/` is the only shipped first-party extension. Calendar, Notes, and Chat references in this document are design examples or future targets, not buildable modules in the current tree. Design principles, in order of importance:
 
 1. **Built-in, disabled by default.** Extensions compile into the binary but do nothing until enabled. Minimalists never see them.
-2. **Per-extension SQLite isolation.** Each extension owns its own database file under `<dataDir>/extensions/<name>/data.db`. Extensions never query each other's tables — cross-extension data access goes through Go interfaces in `internal/core/api/v1`.
+2. **Per-extension SQLite isolation for new extensions.** New extensions own their own database file under `<dataDir>/extensions/<name>/data.db`. The current Contacts extension is a first-party special case that uses host-owned contact tables because mail autocomplete already depends on that data.
 3. **Shared infrastructure stays shared.** One Wails process, one OAuth manager, one credential store, one IPC bus, one notification system. The extension system adds an additional **Auth Broker** layer so extensions never see access tokens or refresh tokens.
 4. **Inline + detach pattern.** Every extension works inside the main window. Workflows can optionally pop out to a separate window via IPC (identical to the existing detached composer; not yet exercised by any extension in v0.3.x).
-5. **Strict zero overhead when disabled.** Each extension contributes ONE `Bridge` struct allocation (~80 bytes) at App construction. The Bridge's per-extension SQLite, stores, and API wrapper are **lazy-initialized via `sync.Once` on the first enabled method call** — disabled extensions never open their database file, never construct stores, never allocate beyond the bridge stub. The only baseline cost is binary size + 80 bytes per bridge.
+5. **Strict zero overhead when disabled.** Each extension contributes ONE `Bridge` struct allocation (~80 bytes) at App construction. Extension-specific stores and API wrappers are **lazy-initialized via `sync.Once` on the first enabled method call** — disabled extensions never open extension-specific storage, never construct stores, never allocate beyond the bridge stub. The only baseline cost is binary size + 80 bytes per bridge.
 
 Full architectural rationale lives in [`context/EXTENSION_ARCHITECTURE.md`](../context/EXTENSION_ARCHITECTURE.md). This doc is the **developer reference**; that doc is the **design rationale**.
 
@@ -325,9 +325,9 @@ func (a *App) initContactsExtension() {
 
 When you add a new first-party extension, the host side is similarly thin: embed the extension's `*Bridge` on App, add an `init<Name>Extension()` helper, append the lifecycle `Extension` to `a.knownExtensions`. Everything else (Settings UI listing, rail rendering, hook discovery, Wails bindings generation) flows automatically.
 
-### Example: Calendar extension
+### Future example: Calendar extension
 
-The Calendar extension is the second canonical extension and exercises every Phase 1 capability the SDK exposes. Where Contacts focuses on a single domain (per-source contact CRUD wrapped around the host's `coreapi.Contacts` surface), Calendar is **fully self-contained at the data layer** — it owns its per-extension SQLite with five tables, runs its own CalDAV sync engine, parses iCal events / RRULE expansions / VALARM blocks, and schedules desktop notifications via `coreapi.Notifications`. Use it as the reference when your extension needs to do more than wrap an existing host surface.
+Calendar is not present in the current source tree. This section is a future-design reference for an extension that would exercise every Phase 1 capability the SDK exposes. Where Contacts focuses on a single domain (per-source contact CRUD wrapped around the host's `coreapi.Contacts` surface), Calendar would be **fully self-contained at the data layer** — owning per-extension SQLite, running its own CalDAV sync engine, parsing iCal events / RRULE expansions / VALARM blocks, and scheduling desktop notifications via `coreapi.Notifications`. Use it as a design sketch when planning an extension that needs to do more than wrap an existing host surface.
 
 **Package layout** ([`extensions/calendar/`](../extensions/calendar)):
 

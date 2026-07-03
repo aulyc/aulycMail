@@ -12,7 +12,9 @@
     "sidebar": {
       "title": "联系人",
       "refresh": "从邮件刷新通讯录",
-      "all": "全部",
+      "expand": "展开",
+      "collapse": "收缩",
+      "all": "全部联系人",
       "roleSender": "发件人",
       "roleRecipient": "收件人",
       "roleCc": "抄送",
@@ -60,6 +62,7 @@
       "oauthReadOnlyNote": "只读 — Google/Microsoft 联系人的写入功能将在未来版本中推出。",
       "labels": {
         "email": "电子邮件",
+        "associatedAccounts": "关联邮箱",
         "phone": "电话",
         "address": "地址",
         "org": "组织",

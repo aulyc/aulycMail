@@ -59,9 +59,9 @@
   }
 
   async function handleCreated(id: string) {
-    // After a successful Add, switch to the manual sub-list so the user sees
-    // the new contact in context.
-    selectSource('local:manual')
+    // The sidebar is now account-grouped rather than manual/collected-grouped,
+    // so return to the visible all-contacts source after a successful add.
+    selectSource('')
     await reloadContacts()
     await activateContact(id)
   }

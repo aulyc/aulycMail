@@ -6,7 +6,7 @@
   // @ts-ignore - Wails generated imports
   import { smtp, account, app } from '../../../../wailsjs/go/models'
   // @ts-ignore - Wails runtime for events
-  import { EventsOn, EventsOff } from '../../../../wailsjs/runtime/runtime.js'
+  import { EventsOn } from '../../../../wailsjs/runtime/runtime.js'
   import { type ComposerApi, COMPOSER_API_KEY, createMainWindowApi } from '$lib/composerApi'
   import { isImageAllowedSync } from '$lib/stores/imageAllowlist.svelte'
   import { getAlwaysLoadImages } from '$lib/stores/settings.svelte'
@@ -42,6 +42,7 @@
   } from './composerUtils'
   import {
     buildSignatureHtml,
+    getSignatureSeparator,
     shouldAppendSignature,
     insertSignatureIntoContent,
     removeSignatureFromContent,
@@ -155,6 +156,7 @@
   })
 
   let syncStatus = $state<'pending' | 'synced' | 'failed'>('pending') // IMAP sync status
+  let unsubscribeDraftSync: (() => void) | null = null
   let lastSavedAt = $state<Date | null>(null)
   let saveTimeoutId: ReturnType<typeof setTimeout> | null = null
   let lastContent = ''  // Track content changes to avoid unnecessary saves
@@ -657,7 +659,7 @@
     }, 50)
 
     // Listen for draft sync status changes from backend
-    EventsOn('draft:syncStatusChanged', (data: { draftId: string, syncStatus: string, imapUid: number, error: string }) => {
+    unsubscribeDraftSync = EventsOn('draft:syncStatusChanged', (data: { draftId: string, syncStatus: string, imapUid: number, error: string }) => {
       if (data.draftId === currentDraftId) {
         syncStatus = data.syncStatus as 'pending' | 'synced' | 'failed'
       }
@@ -689,7 +691,8 @@
       let sig = (identity.signatureText || '').trim()
       if (!sig && identity.signatureHtml) sig = htmlToPlainText(identity.signatureHtml).trim()
       if (!sig) return
-      if (identity.signatureSeparator) sig = '-- \n' + sig
+      const separator = getSignatureSeparator(identity)
+      if (separator) sig = separator + '\n' + sig
 
       const fwd = '---------- Forwarded message ----------'
       const body = plainTextContent
@@ -698,12 +701,10 @@
       const cuts = [wroteIdx, fwdIdx].filter((i) => i > -1)
       const quoteStart = cuts.length ? Math.min(...cuts) : -1
 
-      if ((identity.signaturePlacement || 'above') === 'above' && quoteStart > 0) {
+      if (quoteStart >= 0) {
         plainTextContent = body.slice(0, quoteStart).replace(/\s*$/, '\n\n') + sig + '\n\n' + body.slice(quoteStart)
-      } else if (quoteStart < 0) {
-        plainTextContent = body ? body.replace(/\s*$/, '\n\n') + sig : '\n\n' + sig
       } else {
-        plainTextContent = body.replace(/\s*$/, '\n\n') + sig
+        plainTextContent = body ? body.replace(/\s*$/, '\n\n') + sig : '\n\n' + sig
       }
       return
     }
@@ -718,7 +719,7 @@
       content,
       signatureHtml,
       mode,
-      identity.signaturePlacement || 'above'
+      'above'
     )
 
     editor.commands.setContent(newContent)
@@ -764,7 +765,8 @@
 
   onDestroy(() => {
     // Unsubscribe from draft sync events
-    EventsOff('draft:syncStatusChanged')
+    unsubscribeDraftSync?.()
+    unsubscribeDraftSync = null
     // Clear any pending save timeout
     if (saveTimeoutId) {
       clearTimeout(saveTimeoutId)

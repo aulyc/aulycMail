@@ -20,7 +20,7 @@ function createToastStore() {
     const id = crypto.randomUUID()
     const newToast: Toast = { ...toast, id }
 
-    update(toasts => [...toasts, newToast])
+    update(() => [newToast])
 
     // Auto-remove after duration (default 5 seconds, longer if there are actions)
     const duration = toast.duration ?? (toast.actions ? 8000 : 5000)

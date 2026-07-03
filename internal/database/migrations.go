@@ -508,19 +508,20 @@ var migrations = []Migration{
 	{
 		Version: 18,
 		SQL: `
-			-- Trusted certificates table for certificate trust-on-first-use (TOFU)
-			-- Trust is checked by fingerprint (global). Host is stored for UI filtering.
-			CREATE TABLE IF NOT EXISTS trusted_certificates (
-				id TEXT PRIMARY KEY,
-				fingerprint TEXT NOT NULL UNIQUE,
-				host TEXT NOT NULL DEFAULT '',
-				subject TEXT NOT NULL,
-				issuer TEXT NOT NULL,
-				not_before DATETIME,
-				not_after DATETIME,
-				accepted_at DATETIME DEFAULT CURRENT_TIMESTAMP
-			);
-		`,
+				-- Trusted certificates table for certificate trust-on-first-use (TOFU)
+				-- Trust is scoped to the host that the user accepted.
+				CREATE TABLE IF NOT EXISTS trusted_certificates (
+					id TEXT PRIMARY KEY,
+					fingerprint TEXT NOT NULL,
+					host TEXT NOT NULL DEFAULT '',
+					subject TEXT NOT NULL,
+					issuer TEXT NOT NULL,
+					not_before DATETIME,
+					not_after DATETIME,
+					accepted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					UNIQUE(host, fingerprint)
+				);
+			`,
 	},
 	{
 		Version: 19,
@@ -1334,6 +1335,46 @@ var migrations = []Migration{
 			ALTER TABLE contact_records ADD COLUMN collected_bcc INTEGER NOT NULL DEFAULT 0;
 
 			UPDATE contact_records SET collected_cc = 1 WHERE collected_ccbcc = 1;
+			`,
+	},
+	{
+		Version: 42,
+		SQL: `
+				-- Scope TOFU certificate trust to the accepted host instead of making
+				-- a fingerprint globally trusted for every IMAP/SMTP endpoint.
+				CREATE TABLE trusted_certificates_new (
+					id TEXT PRIMARY KEY,
+					fingerprint TEXT NOT NULL,
+					host TEXT NOT NULL DEFAULT '',
+					subject TEXT NOT NULL,
+					issuer TEXT NOT NULL,
+					not_before DATETIME,
+					not_after DATETIME,
+					accepted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					UNIQUE(host, fingerprint)
+				);
+
+				INSERT OR REPLACE INTO trusted_certificates_new
+					(id, fingerprint, host, subject, issuer, not_before, not_after, accepted_at)
+				SELECT
+					id, fingerprint, LOWER(TRIM(COALESCE(host, ''))), subject, issuer, not_before, not_after, accepted_at
+				FROM trusted_certificates;
+
+				DROP TABLE trusted_certificates;
+				ALTER TABLE trusted_certificates_new RENAME TO trusted_certificates;
+				CREATE INDEX IF NOT EXISTS idx_trusted_certificates_host ON trusted_certificates(host);
+			`,
+	},
+	{
+		Version: 43,
+		SQL: `
+			-- Signature separator style. Keeps the old signature_separator boolean
+			-- for compatibility, while allowing explicit separator text choices.
+			-- Existing enabled separators become the new five-dash separator.
+			ALTER TABLE identities ADD COLUMN signature_separator_style TEXT NOT NULL DEFAULT '';
+			UPDATE identities
+			SET signature_separator_style = '-----'
+			WHERE signature_separator = 1 AND signature_separator_style = '';
 		`,
 	},
 }

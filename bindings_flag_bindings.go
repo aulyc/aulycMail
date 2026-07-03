@@ -1,0 +1,7 @@
+//go:build bindings
+
+package main
+
+func isBindingGeneration() bool {
+	return true
+}

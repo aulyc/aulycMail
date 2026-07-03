@@ -11,12 +11,12 @@ type Address struct {
 // Attachment represents file content attached to a message or compose request.
 // Either Data or Path must be set; Data takes precedence when both are present.
 type Attachment struct {
-	Filename string `json:"filename"`
-	MIMEType string `json:"mimeType"`
-	Size     int64  `json:"size"`
-	Data     []byte `json:"data,omitempty"`
-	Path     string `json:"path,omitempty"`
-	IsInline bool   `json:"isInline,omitempty"`
+	Filename  string `json:"filename"`
+	MIMEType  string `json:"mimeType"`
+	Size      int64  `json:"size"`
+	Data      []byte `json:"data,omitempty"`
+	Path      string `json:"path,omitempty"`
+	IsInline  bool   `json:"isInline,omitempty"`
 	ContentID string `json:"contentId,omitempty"`
 }
 
@@ -55,27 +55,27 @@ const (
 // internal/message.Message but is decoupled from core's storage shape so core
 // can evolve without breaking the extension API.
 type Message struct {
-	ID         string    `json:"id"`
-	AccountID  string    `json:"accountId"`
-	FolderID   string    `json:"folderId"`
-	UID        uint32    `json:"uid"`
-	MessageID  string    `json:"messageId"`  // RFC 5322 Message-ID
-	InReplyTo  string    `json:"inReplyTo"`
-	References []string  `json:"references"`
-	ThreadID   string    `json:"threadId"`
-	Subject    string    `json:"subject"`
-	From       Address   `json:"from"`
-	To         []Address `json:"to"`
-	Cc         []Address `json:"cc"`
-	Bcc        []Address `json:"bcc"`
-	ReplyTo    string    `json:"replyTo"`
-	Date       time.Time `json:"date"`
-	BodyHTML   string    `json:"bodyHtml,omitempty"`
-	BodyText   string    `json:"bodyText,omitempty"`
-	Snippet    string    `json:"snippet"`
-	Flags      Flags     `json:"flags"`
-	Size       int       `json:"size"`
-	HasAttachments bool  `json:"hasAttachments"`
+	ID             string    `json:"id"`
+	AccountID      string    `json:"accountId"`
+	FolderID       string    `json:"folderId"`
+	UID            uint32    `json:"uid"`
+	MessageID      string    `json:"messageId"` // RFC 5322 Message-ID
+	InReplyTo      string    `json:"inReplyTo"`
+	References     []string  `json:"references"`
+	ThreadID       string    `json:"threadId"`
+	Subject        string    `json:"subject"`
+	From           Address   `json:"from"`
+	To             []Address `json:"to"`
+	Cc             []Address `json:"cc"`
+	Bcc            []Address `json:"bcc"`
+	ReplyTo        string    `json:"replyTo"`
+	Date           time.Time `json:"date" ts_type:"string"`
+	BodyHTML       string    `json:"bodyHtml,omitempty"`
+	BodyText       string    `json:"bodyText,omitempty"`
+	Snippet        string    `json:"snippet"`
+	Flags          Flags     `json:"flags"`
+	Size           int       `json:"size"`
+	HasAttachments bool      `json:"hasAttachments"`
 }
 
 // Folder is the API-surface representation of a mail folder.
@@ -99,7 +99,7 @@ type MessageFilter struct {
 	Unread    *bool     `json:"unread,omitempty"`
 	Starred   *bool     `json:"starred,omitempty"`
 	From      string    `json:"from,omitempty"`
-	Since     time.Time `json:"since,omitempty"`
+	Since     time.Time `json:"since,omitempty" ts_type:"string"`
 	Limit     int       `json:"limit,omitempty"`
 	Offset    int       `json:"offset,omitempty"`
 }
@@ -112,30 +112,52 @@ type MessageFilter struct {
 // Empty/zero-valued sub-fields are omitted from JSON so the frontend can
 // cleanly hide UI sections that have no data.
 type Contact struct {
-	ID         string           `json:"id"`
-	Name       string           `json:"name"`
-	Emails     []string         `json:"emails"`
-	EmailItems []ContactEmail   `json:"emailItems,omitempty"` // richer per-email metadata (type, isPrimary)
-	Phones     []ContactPhone   `json:"phones,omitempty"`
-	Addresses  []ContactAddress `json:"addresses,omitempty"`
-	URLs       []ContactURL     `json:"urls,omitempty"`
-	IMPPs      []ContactIMPP    `json:"impps,omitempty"`
-	Org        string           `json:"org,omitempty"`
-	Title      string           `json:"title,omitempty"`
-	Note       string           `json:"note,omitempty"`
-	Bday       string           `json:"bday,omitempty"`
-	Nickname   string           `json:"nickname,omitempty"`
-	Categories []string         `json:"categories,omitempty"`
+	ID                 string                     `json:"id"`
+	Name               string                     `json:"name"`
+	Emails             []string                   `json:"emails"`
+	EmailItems         []ContactEmail             `json:"emailItems,omitempty"` // richer per-email metadata (type, isPrimary)
+	AssociatedAccounts []ContactAssociatedAccount `json:"associatedAccounts,omitempty"`
+	Phones             []ContactPhone             `json:"phones,omitempty"`
+	Addresses          []ContactAddress           `json:"addresses,omitempty"`
+	URLs               []ContactURL               `json:"urls,omitempty"`
+	IMPPs              []ContactIMPP              `json:"impps,omitempty"`
+	Org                string                     `json:"org,omitempty"`
+	Title              string                     `json:"title,omitempty"`
+	Note               string                     `json:"note,omitempty"`
+	Bday               string                     `json:"bday,omitempty"`
+	Nickname           string                     `json:"nickname,omitempty"`
+	Categories         []string                   `json:"categories,omitempty"`
 	// Photo fields (Phase 2b.2.b.2). Flat-scalar pattern matching Org/Title/Note.
 	// At most one of {PhotoData + PhotoMediaType} OR PhotoURL is populated:
 	//   - PhotoData (base64) + PhotoMediaType (e.g. "image/jpeg") = inline embed
 	//   - PhotoURL = vCard URL-ref (PHOTO;VALUE=URI). Avatar falls back to initials
 	//     in this phase; fetching is its own track.
-	PhotoData      string `json:"photoData,omitempty"`
-	PhotoMediaType string `json:"photoMediaType,omitempty"`
-	PhotoURL       string `json:"photoUrl,omitempty"`
-	SourceID   string           `json:"sourceId,omitempty"`
-	UpdatedAt  time.Time        `json:"updatedAt"`
+	PhotoData      string    `json:"photoData,omitempty"`
+	PhotoMediaType string    `json:"photoMediaType,omitempty"`
+	PhotoURL       string    `json:"photoUrl,omitempty"`
+	SourceID       string    `json:"sourceId,omitempty"`
+	UpdatedAt      time.Time `json:"updatedAt" ts_type:"string"`
+}
+
+// ContactAssociatedAccount is one mail account where a contact appears in
+// related messages. It is distinct from the contact's own email addresses.
+type ContactAssociatedAccount struct {
+	AccountID string `json:"accountId"`
+	Name      string `json:"name,omitempty"`
+	Email     string `json:"email"`
+}
+
+// ContactAccountGroup backs the Contacts sidebar tree:
+// All contacts -> mail account -> sender/recipient/cc/bcc roles.
+type ContactAccountGroup struct {
+	AccountID      string `json:"accountId"`
+	Name           string `json:"name,omitempty"`
+	Email          string `json:"email"`
+	Count          int    `json:"count"`
+	SenderCount    int    `json:"senderCount"`
+	RecipientCount int    `json:"recipientCount"`
+	CcCount        int    `json:"ccCount"`
+	BccCount       int    `json:"bccCount"`
 }
 
 // ContactEmail is one email on a Contact, with its TYPE and primary flag.

@@ -7,7 +7,7 @@
   import MessageList from './lib/components/list/MessageList.svelte'
   import ConversationViewer from './lib/components/viewer/ConversationViewer.svelte'
   import Composer from './lib/components/composer/Composer.svelte'
-  import ToastContainer from './lib/components/ui/toast/ToastContainer.svelte'
+  import StatusBar from './lib/components/status/StatusBar.svelte'
   import TermsDialog from './lib/components/TermsDialog.svelte'
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
   import ExtensionRail from './lib/components/rail/ExtensionRail.svelte'
@@ -107,16 +107,6 @@
     }
     focusMode = 'thread'
     focusedMessageIdInFocus = null
-  }
-
-  function toggleMessageFocus(messageId: string) {
-    if (focusMode === 'message' && focusedMessageIdInFocus === messageId) {
-      focusMode = 'off'
-      focusedMessageIdInFocus = null
-      return
-    }
-    focusMode = 'message'
-    focusedMessageIdInFocus = messageId
   }
 
   // Auto-reset focus mode when the conversation changes (or is closed).
@@ -1429,6 +1419,7 @@
         onConversationSelect={handleConversationSelect}
         onEmptyFolder={handleEmptyFolder}
         onReply={handleReply}
+        onOpenDraft={handleEditDraft}
         onRowActionComplete={() => viewerRef?.refreshFlags()}
         isFocused={getFocusedPane() === 'messageList'}
         isFlashing={isPaneFlashing('messageList')}
@@ -1462,15 +1453,12 @@
         focusModeKind={focusMode === 'off' ? null : focusMode}
         focusedMessageIdInFocus={focusedMessageIdInFocus}
         onToggleThreadFocus={toggleThreadFocus}
-        onToggleMessageFocus={toggleMessageFocus}
       />
     </main>
     </div>
   </div>
+  <StatusBar />
 </div>
-
-<!-- Toast notifications -->
-<ToastContainer />
 
 <!-- Composer Modal -->
 {#if showComposer && composerAccountId}

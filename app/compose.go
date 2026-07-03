@@ -10,20 +10,20 @@ import (
 	"strings"
 	"time"
 
-	goImap "github.com/emersion/go-imap/v2"
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/certificate"
 	"github.com/aulyc/aulycmail/internal/contact"
 	"github.com/aulyc/aulycmail/internal/credentials"
 	"github.com/aulyc/aulycmail/internal/draft"
-	"github.com/aulyc/aulycmail/internal/folder"
 	"github.com/aulyc/aulycmail/internal/email"
+	"github.com/aulyc/aulycmail/internal/folder"
 	"github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/rs/zerolog"
 	"github.com/aulyc/aulycmail/internal/oauth2"
 	"github.com/aulyc/aulycmail/internal/smtp"
+	goImap "github.com/emersion/go-imap/v2"
+	"github.com/rs/zerolog"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -38,13 +38,13 @@ type ComposerAttachment struct {
 // composeOps holds shared dependencies for compose-related operations
 // used by both App and ComposerApp.
 type composeOps struct {
-	accountStore   *account.Store
-	folderStore    *folder.Store
-	credStore      *credentials.Store
-	certStore      *certificate.Store
-	contactStore   *contact.Store
-	oauth2Manager  *oauth2.Manager
-	draftOps       *draftOps // for draft cleanup on send
+	accountStore  *account.Store
+	folderStore   *folder.Store
+	credStore     *credentials.Store
+	certStore     *certificate.Store
+	contactStore  *contact.Store
+	oauth2Manager *oauth2.Manager
+	draftOps      *draftOps // for draft cleanup on send
 }
 
 // getValidOAuthToken returns a valid OAuth token, refreshing if needed.
@@ -435,7 +435,7 @@ func (a *App) handleExternalMailto(rawURL string) {
 
 	mailtoData := ParseMailtoURL(rawURL)
 	if mailtoData == nil {
-		log.Warn().Str("url", rawURL).Msg("Invalid mailto URL from second instance")
+		log.Warn().Int("urlLength", len(rawURL)).Msg("Invalid mailto URL from second instance")
 		return
 	}
 
@@ -917,7 +917,7 @@ func quoteText(s string) string {
 func providerAutoSavesSentMail(host string) bool {
 	host = strings.ToLower(host)
 	autoSaveProviders := []string{
-		"imap.gmail.com",       // Gmail
+		"imap.gmail.com",        // Gmail
 		"outlook.office365.com", // Microsoft 365
 		"imap-mail.outlook.com", // Outlook.com
 	}
@@ -1030,4 +1030,3 @@ func detectContentType(filename string) string {
 		return "application/octet-stream"
 	}
 }
-

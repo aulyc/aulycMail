@@ -12,7 +12,9 @@
     "sidebar": {
       "title": "Contacts",
       "refresh": "Refresh contacts from mail",
-      "all": "All",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "all": "All Contacts",
       "roleSender": "Senders",
       "roleRecipient": "Recipients",
       "roleCc": "Cc",
@@ -60,6 +62,7 @@
       "oauthReadOnlyNote": "Read-only — write capability for Google/Microsoft contacts is coming in a future release.",
       "labels": {
         "email": "Email",
+        "associatedAccounts": "Associated mailboxes",
         "phone": "Phone",
         "address": "Address",
         "org": "Organization",

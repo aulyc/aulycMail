@@ -16,7 +16,7 @@ import {
   GetAccount,
 } from '../../../wailsjs/go/app/App'
 // @ts-ignore - wailsjs runtime
-import { EventsOn, EventsOff } from '../../../wailsjs/runtime/runtime'
+import { EventsOn } from '../../../wailsjs/runtime/runtime'
 import { get } from 'svelte/store'
 import { _ } from '$lib/i18n'
 import { addToast } from './toast'
@@ -55,6 +55,7 @@ class OAuthStore {
 
   // Event listener cleanup tracking
   private eventsInitialized = false
+  private eventUnsubscribers: Array<() => void> = []
 
   /**
    * Initialize event listeners for OAuth events from backend.
@@ -64,56 +65,58 @@ class OAuthStore {
     if (this.eventsInitialized) return
     this.eventsInitialized = true
 
-    EventsOn('oauth:started', (data: { provider: string; authURL?: string }) => {
-      this.flowState = 'pending'
-      this.flowProvider = data.provider as OAuthProvider
-      this.flowError = null
-      this.flowResult = null
-      this.authURL = data.authURL ?? null
-    })
+    this.eventUnsubscribers = [
+      EventsOn('oauth:started', (data: { provider: string; authURL?: string }) => {
+        this.flowState = 'pending'
+        this.flowProvider = data.provider as OAuthProvider
+        this.flowError = null
+        this.flowResult = null
+        this.authURL = data.authURL ?? null
+      }),
 
-    EventsOn('oauth:success', (data: { provider: string; email: string; expiresIn: number }) => {
-      this.flowState = 'success'
-      this.flowResult = {
-        provider: data.provider as OAuthProvider,
-        email: data.email,
-        expiresIn: data.expiresIn,
-      }
-      this.flowError = null
-    })
-
-    EventsOn('oauth:error', (data: { provider: string; error: string }) => {
-      this.flowState = 'error'
-      this.flowError = data.error
-      this.flowResult = null
-    })
-
-    EventsOn('oauth:cancelled', () => {
-      this.flowState = 'cancelled'
-      this.flowError = null
-      this.flowResult = null
-    })
-
-    // Listen for reauth required events (token refresh failed)
-    EventsOn('oauth:reauth-required', async (data: { accountId: string; provider: string; error: string }) => {
-      // Get account name for better UX
-      let accountName = data.provider
-      try {
-        const account = await GetAccount(data.accountId)
-        if (account?.name) {
-          accountName = account.name
+      EventsOn('oauth:success', (data: { provider: string; email: string; expiresIn: number }) => {
+        this.flowState = 'success'
+        this.flowResult = {
+          provider: data.provider as OAuthProvider,
+          email: data.email,
+          expiresIn: data.expiresIn,
         }
-      } catch {
-        // Ignore error, use provider name as fallback
-      }
+        this.flowError = null
+      }),
 
-      // Show toast notification to user
-      addToast({
-        type: 'error',
-        message: get(_)('toast.oauthExpired', { values: { name: accountName } }),
-        duration: 10000, // Show for 10 seconds
-      })
-    })
+      EventsOn('oauth:error', (data: { provider: string; error: string }) => {
+        this.flowState = 'error'
+        this.flowError = data.error
+        this.flowResult = null
+      }),
+
+      EventsOn('oauth:cancelled', () => {
+        this.flowState = 'cancelled'
+        this.flowError = null
+        this.flowResult = null
+      }),
+
+      // Listen for reauth required events (token refresh failed)
+      EventsOn('oauth:reauth-required', async (data: { accountId: string; provider: string; error: string }) => {
+        // Get account name for better UX
+        let accountName = data.provider
+        try {
+          const account = await GetAccount(data.accountId)
+          if (account?.name) {
+            accountName = account.name
+          }
+        } catch {
+          // Ignore error, use provider name as fallback
+        }
+
+        // Show toast notification to user
+        addToast({
+          type: 'error',
+          message: get(_)('toast.oauthExpired', { values: { name: accountName } }),
+          duration: 10000, // Show for 10 seconds
+        })
+      }),
+    ]
   }
 
   /**
@@ -124,11 +127,8 @@ class OAuthStore {
     if (!this.eventsInitialized) return
     this.eventsInitialized = false
 
-    EventsOff('oauth:started')
-    EventsOff('oauth:success')
-    EventsOff('oauth:error')
-    EventsOff('oauth:cancelled')
-    EventsOff('oauth:reauth-required')
+    this.eventUnsubscribers.forEach(unsubscribe => unsubscribe())
+    this.eventUnsubscribers = []
   }
 
   /**

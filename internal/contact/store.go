@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
@@ -214,6 +214,100 @@ func roleColumn(role string) string {
 	default:
 		return ""
 	}
+}
+
+func accountRolePredicate(role string) string {
+	sender := `(f.folder_type NOT IN ('sent', 'drafts', 'spam', 'trash') AND LOWER(COALESCE(m.from_email, '')) = LOWER(ce.email))`
+	recipient := `(f.folder_type = 'sent' AND ` + jsonListContainsRecordEmail("m.to_list") + `)`
+	cc := `(f.folder_type = 'sent' AND ` + jsonListContainsRecordEmail("m.cc_list") + `)`
+	bcc := `(f.folder_type = 'sent' AND ` + jsonListContainsRecordEmail("m.bcc_list") + `)`
+
+	switch role {
+	case RoleSender:
+		return sender
+	case RoleRecipient:
+		return recipient
+	case RoleCc:
+		return cc
+	case RoleBcc:
+		return bcc
+	case RoleCcBcc:
+		return `(` + cc + ` OR ` + bcc + `)`
+	default:
+		return `(` + strings.Join([]string{sender, recipient, cc, bcc}, ` OR `) + `)`
+	}
+}
+
+func accountRecordExistsSQL(role string) string {
+	return `
+		EXISTS (
+			SELECT 1
+			FROM contact_emails ce
+			JOIN messages m ON (
+				LOWER(COALESCE(m.from_email, '')) = LOWER(ce.email)
+				OR ` + jsonListContainsRecordEmail("m.to_list") + `
+				OR ` + jsonListContainsRecordEmail("m.cc_list") + `
+				OR ` + jsonListContainsRecordEmail("m.bcc_list") + `
+			)
+			JOIN folders f ON m.folder_id = f.id
+			WHERE ce.record_id = cr.id
+			  AND f.account_id = ?
+			  AND ` + accountRolePredicate(role) + `
+		)`
+}
+
+func jsonListContainsRecordEmail(column string) string {
+	return `
+		EXISTS (
+			SELECT 1
+			FROM json_each(CASE WHEN json_valid(COALESCE(` + column + `, '')) THEN ` + column + ` ELSE '[]' END) addr
+			WHERE LOWER(COALESCE(json_extract(addr.value, '$.email'), json_extract(addr.value, '$.address'), '')) = LOWER(ce.email)
+		)`
+}
+
+func normalizeEmails(emails []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(emails))
+	for _, email := range emails {
+		email = strings.ToLower(strings.TrimSpace(email))
+		if email == "" {
+			continue
+		}
+		if _, ok := seen[email]; ok {
+			continue
+		}
+		seen[email] = struct{}{}
+		out = append(out, email)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func participantPredicateForEmails(emails []string) (string, []any) {
+	placeholders := strings.TrimRight(strings.Repeat("?,", len(emails)), ",")
+	conds := []string{`LOWER(COALESCE(m.from_email, '')) IN (` + placeholders + `)`}
+	args := make([]any, 0, len(emails)*4)
+	for _, email := range emails {
+		args = append(args, email)
+	}
+
+	for _, col := range []string{"to_list", "cc_list", "bcc_list"} {
+		conds = append(conds, jsonListContainsAnyEmail("m."+col, placeholders))
+		for _, email := range emails {
+			args = append(args, email)
+		}
+	}
+
+	return `(` + strings.Join(conds, ` OR `) + `)`, args
+}
+
+func jsonListContainsAnyEmail(column, placeholders string) string {
+	return `
+		EXISTS (
+			SELECT 1
+			FROM json_each(CASE WHEN json_valid(COALESCE(` + column + `, '')) THEN ` + column + ` ELSE '[]' END) addr
+			WHERE LOWER(COALESCE(json_extract(addr.value, '$.email'), json_extract(addr.value, '$.address'), '')) IN (` + placeholders + `)
+		)`
 }
 
 // AddOrUpdate inserts or updates an auto-collected contact for the given email,
@@ -884,9 +978,15 @@ func (s *Store) ListRecords(filter RecordFilter) ([]*Record, error) {
 		conds = append(conds, `cr.kind = ?`)
 		args = append(args, filter.Kind)
 	}
-	if col := roleColumn(filter.Role); col != "" {
-		// col is a whitelisted literal from roleColumn — safe to interpolate.
-		conds = append(conds, `cr.`+col+` = 1`)
+	if filter.AccountID == "" {
+		if col := roleColumn(filter.Role); col != "" {
+			// col is a whitelisted literal from roleColumn — safe to interpolate.
+			conds = append(conds, `cr.`+col+` = 1`)
+		}
+	}
+	if filter.AccountID != "" {
+		conds = append(conds, accountRecordExistsSQL(filter.Role))
+		args = append(args, filter.AccountID)
 	}
 	if filter.SourceRef != "" {
 		conds = append(conds, `cr.source_ref = ?`)
@@ -939,6 +1039,100 @@ func (s *Store) ListRecords(filter RecordFilter) ([]*Record, error) {
 		records = append(records, rec)
 	}
 	return records, nil
+}
+
+// ListAccountAssociations returns every enabled mail account plus the number of
+// local contacts currently linked to that account overall and by sidebar role.
+func (s *Store) ListAccountAssociations() ([]AccountAssociation, error) {
+	rows, err := s.db.Query(`
+		SELECT id, COALESCE(name, ''), COALESCE(email, '')
+		FROM accounts
+		WHERE enabled = 1
+		ORDER BY order_index ASC, name ASC, email ASC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list contact account associations: %w", err)
+	}
+	defer rows.Close()
+
+	var out []AccountAssociation
+	for rows.Next() {
+		var a AccountAssociation
+		if err := rows.Scan(&a.AccountID, &a.Name, &a.Email); err != nil {
+			return nil, fmt.Errorf("scan contact account association: %w", err)
+		}
+		counts := []struct {
+			role string
+			dst  *int
+		}{
+			{"", &a.Count},
+			{RoleSender, &a.SenderCount},
+			{RoleRecipient, &a.RecipientCount},
+			{RoleCc, &a.CcCount},
+			{RoleBcc, &a.BccCount},
+		}
+		for _, c := range counts {
+			count, err := s.countRecordsForAccountRole(a.AccountID, c.role)
+			if err != nil {
+				return nil, err
+			}
+			*c.dst = count
+		}
+		out = append(out, a)
+	}
+	return out, nil
+}
+
+func (s *Store) countRecordsForAccountRole(accountID, role string) (int, error) {
+	var count int
+	query := `
+		SELECT COUNT(DISTINCT cr.id)
+		FROM contact_records cr
+		WHERE cr.source = 'local'
+		  AND ` + accountRecordExistsSQL(role)
+	if err := s.db.QueryRow(query, accountID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("count contact account role: %w", err)
+	}
+	return count, nil
+}
+
+// ListAssociatedAccountsForEmails returns the enabled mail accounts that have
+// non-draft messages involving any of the given contact email addresses.
+func (s *Store) ListAssociatedAccountsForEmails(emails []string) ([]AccountAssociation, error) {
+	emails = normalizeEmails(emails)
+	if len(emails) == 0 {
+		return nil, nil
+	}
+	predicate, args := participantPredicateForEmails(emails)
+	query := `
+		SELECT a.id, COALESCE(a.name, ''), COALESCE(a.email, '')
+		FROM accounts a
+		WHERE a.enabled = 1
+		  AND EXISTS (
+			SELECT 1
+			FROM messages m
+			JOIN folders f ON m.folder_id = f.id
+			WHERE f.account_id = a.id
+			  AND f.folder_type != 'drafts'
+			  AND ` + predicate + `
+		  )
+		ORDER BY a.order_index ASC, a.name ASC, a.email ASC
+	`
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list associated accounts for contact: %w", err)
+	}
+	defer rows.Close()
+
+	var out []AccountAssociation
+	for rows.Next() {
+		var a AccountAssociation
+		if err := rows.Scan(&a.AccountID, &a.Name, &a.Email); err != nil {
+			return nil, fmt.Errorf("scan associated account: %w", err)
+		}
+		out = append(out, a)
+	}
+	return out, nil
 }
 
 // DBOrTx is the minimal interface satisfied by both *sql.DB and *sql.Tx —

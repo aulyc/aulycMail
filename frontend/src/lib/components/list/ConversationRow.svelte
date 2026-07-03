@@ -34,6 +34,7 @@
     onClearSelection: () => void  // Clear multi-select when right-clicking unchecked row
     onActionComplete?: (autoSelectNext?: boolean) => void
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
+    onOpenDraft?: () => void  // Double-click in the Drafts folder → open the draft in the composer
   }
 
   let {
@@ -60,6 +61,7 @@
     onClearSelection,
     onActionComplete,
     onReply,
+    onOpenDraft,
   }: Props = $props()
 
   // Check if we're in search mode (have highlighted content)
@@ -218,6 +220,7 @@
       ? 'bg-primary/20'
       : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
     onclick={(e) => onSelect(e)}
+    ondblclick={() => onOpenDraft?.()}
     onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() }}}
     ondragstart={handleDragStart}
     role="button"

@@ -39,7 +39,6 @@
     focusModeKind?: 'thread' | 'message' | null
     focusedMessageIdInFocus?: string | null
     onToggleThreadFocus?: () => void
-    onToggleMessageFocus?: (messageId: string) => void
   }
 
   let {
@@ -59,7 +58,6 @@
     focusModeKind = null,
     focusedMessageIdInFocus = null,
     onToggleThreadFocus,
-    onToggleMessageFocus,
   }: Props = $props()
 
   // Track which messages have had their remote images loaded by the user

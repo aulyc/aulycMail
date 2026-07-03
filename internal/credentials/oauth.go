@@ -12,13 +12,12 @@ import (
 
 // OAuthTokens represents OAuth2 tokens and metadata for an account
 type OAuthTokens struct {
-	Provider     string    `json:"provider"`     // "google", "microsoft"
-	AccessToken  string    `json:"accessToken"`  // Stored in keyring (sensitive)
-	RefreshToken string    `json:"refreshToken"` // Stored in keyring (sensitive)
-	ExpiresAt    time.Time `json:"expiresAt"`    // Stored in DB
-	Scopes       []string  `json:"scopes"`       // Stored in DB
+	Provider     string    `json:"provider"`                   // "google", "microsoft"
+	AccessToken  string    `json:"accessToken"`                // Stored in keyring (sensitive)
+	RefreshToken string    `json:"refreshToken"`               // Stored in keyring (sensitive)
+	ExpiresAt    time.Time `json:"expiresAt" ts_type:"string"` // Stored in DB
+	Scopes       []string  `json:"scopes"`                     // Stored in DB
 }
-
 
 // IsExpired returns true if the access token has expired
 func (t *OAuthTokens) IsExpired() bool {

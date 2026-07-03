@@ -2,6 +2,7 @@
 package account
 
 import (
+	"strings"
 	"time"
 )
 
@@ -20,6 +21,11 @@ type AuthType string
 const (
 	AuthPassword AuthType = "password"
 	AuthOAuth2   AuthType = "oauth2"
+)
+
+const (
+	SignatureSeparatorDash     = "-----"
+	SignatureSeparatorAsterisk = "*****"
 )
 
 // Account represents an email account configuration
@@ -72,8 +78,8 @@ type Account struct {
 	Color      string `json:"color"` // Hex color for account identification in unified inbox
 
 	// Sync settings
-	SyncPeriodDays int  `json:"syncPeriodDays"`
-	SyncInterval   int  `json:"syncInterval"`   // Minutes between polls (0 = manual only)
+	SyncPeriodDays     int  `json:"syncPeriodDays"`
+	SyncInterval       int  `json:"syncInterval"`       // Minutes between polls (0 = manual only)
 	SyncAllFolders     bool `json:"syncAllFolders"`     // Sync all folders instead of just subscribed ones
 	SyncFoldersEnabled bool `json:"syncFoldersEnabled"` // User opted into folder sync management
 
@@ -92,8 +98,8 @@ type Account struct {
 	StarredFolderPath string `json:"starredFolderPath,omitempty"`
 
 	// Timestamps
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	CreatedAt time.Time `json:"createdAt" ts_type:"string"`
+	UpdatedAt time.Time `json:"updatedAt" ts_type:"string"`
 }
 
 // GetFolderMapping returns the mapped folder path for a folder type, or empty string if not mapped
@@ -128,30 +134,32 @@ type Identity struct {
 	SignatureText string `json:"signatureText,omitempty"`
 
 	// Signature behavior settings
-	SignatureEnabled    bool   `json:"signatureEnabled"`    // Master toggle (default: true)
-	SignatureForNew     bool   `json:"signatureForNew"`     // Append to new messages (default: true)
-	SignatureForReply   bool   `json:"signatureForReply"`   // Append to replies (default: true)
-	SignatureForForward bool   `json:"signatureForForward"` // Append to forwards (default: true)
-	SignaturePlacement  string `json:"signaturePlacement"`  // "above" or "below" quoted text (default: "above")
-	SignatureSeparator  bool   `json:"signatureSeparator"`  // Add "-- " before signature (default: false)
+	SignatureEnabled        bool   `json:"signatureEnabled"`    // Master toggle (default: true)
+	SignatureForNew         bool   `json:"signatureForNew"`     // Append to new messages (default: true)
+	SignatureForReply       bool   `json:"signatureForReply"`   // Append to replies (default: true)
+	SignatureForForward     bool   `json:"signatureForForward"` // Append to forwards (default: true)
+	SignaturePlacement      string `json:"signaturePlacement"`  // Always "above"; kept for stored-data compatibility.
+	SignatureSeparator      bool   `json:"signatureSeparator"`  // Legacy boolean; true maps to SignatureSeparatorDash.
+	SignatureSeparatorStyle string `json:"signatureSeparatorStyle"`
 
 	OrderIndex int       `json:"orderIndex"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	CreatedAt  time.Time `json:"createdAt" ts_type:"string"`
+	UpdatedAt  time.Time `json:"updatedAt" ts_type:"string"`
 }
 
 // IdentityConfig is used for creating/updating identities
 type IdentityConfig struct {
-	Email               string `json:"email"`
-	Name                string `json:"name"`
-	SignatureHTML       string `json:"signatureHtml,omitempty"`
-	SignatureText       string `json:"signatureText,omitempty"`
-	SignatureEnabled    bool   `json:"signatureEnabled"`
-	SignatureForNew     bool   `json:"signatureForNew"`
-	SignatureForReply   bool   `json:"signatureForReply"`
-	SignatureForForward bool   `json:"signatureForForward"`
-	SignaturePlacement  string `json:"signaturePlacement"`
-	SignatureSeparator  bool   `json:"signatureSeparator"`
+	Email                   string `json:"email"`
+	Name                    string `json:"name"`
+	SignatureHTML           string `json:"signatureHtml,omitempty"`
+	SignatureText           string `json:"signatureText,omitempty"`
+	SignatureEnabled        bool   `json:"signatureEnabled"`
+	SignatureForNew         bool   `json:"signatureForNew"`
+	SignatureForReply       bool   `json:"signatureForReply"`
+	SignatureForForward     bool   `json:"signatureForForward"`
+	SignaturePlacement      string `json:"signaturePlacement"`
+	SignatureSeparator      bool   `json:"signatureSeparator"`
+	SignatureSeparatorStyle string `json:"signatureSeparatorStyle"`
 }
 
 // Validate validates the identity configuration
@@ -162,14 +170,26 @@ func (c *IdentityConfig) Validate() error {
 	if c.Name == "" {
 		return ErrDisplayNameRequired
 	}
-	// Set defaults for placement
-	if c.SignaturePlacement == "" {
-		c.SignaturePlacement = "above"
-	}
-	if c.SignaturePlacement != "above" && c.SignaturePlacement != "below" {
-		c.SignaturePlacement = "above"
-	}
+	c.SignaturePlacement = "above"
+	c.SignatureSeparatorStyle = normalizeSignatureSeparatorStyle(c.SignatureSeparatorStyle, c.SignatureSeparator)
+	c.SignatureSeparator = c.SignatureSeparatorStyle != ""
 	return nil
+}
+
+func normalizeSignatureSeparatorStyle(style string, legacySeparator bool) string {
+	switch strings.TrimSpace(style) {
+	case SignatureSeparatorDash:
+		return SignatureSeparatorDash
+	case SignatureSeparatorAsterisk:
+		return SignatureSeparatorAsterisk
+	case "", "none":
+		if legacySeparator {
+			return SignatureSeparatorDash
+		}
+		return ""
+	default:
+		return ""
+	}
 }
 
 // AccountConfig is used for creating/updating accounts
@@ -209,8 +229,8 @@ type AccountConfig struct {
 
 	Color string `json:"color"` // Hex color for account identification
 
-	SyncPeriodDays int  `json:"syncPeriodDays"`
-	SyncInterval   int  `json:"syncInterval"`   // Minutes between polls (0 = manual only)
+	SyncPeriodDays     int  `json:"syncPeriodDays"`
+	SyncInterval       int  `json:"syncInterval"`       // Minutes between polls (0 = manual only)
 	SyncAllFolders     bool `json:"syncAllFolders"`     // Sync all folders instead of just subscribed ones
 	SyncFoldersEnabled bool `json:"syncFoldersEnabled"` // User opted into folder sync management
 

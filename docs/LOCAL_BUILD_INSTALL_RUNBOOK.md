@@ -12,25 +12,21 @@ This records the local macOS rebuild/install flow used for this checkout.
 
 ## Required Order
 
-1. Quit the running installed app first.
-
-   ```sh
-   osascript -e 'tell application id "com.aulyc.aulycmail" to quit'
-   ```
-
-2. Verify the old process is gone.
-
-   ```sh
-   ps -p <old-pid> -o pid=,command=
-   ```
-
-3. Rebuild and install with the local Node and Wails paths.
+1. Rebuild and install with the local Node and Wails paths. The `install-darwin`
+   target now quits a running installed `aulycmail` process before replacing the
+   bundle.
 
    ```sh
    /bin/zsh -lc "PATH=/Users/crp/.nvm/versions/node/v24.13.0/bin:/Users/crp/go/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin make install-darwin"
    ```
 
-4. Verify the installed app bundle.
+2. If install fails because the app is still running, quit it manually and retry.
+
+   ```sh
+   osascript -e 'tell application id "com.aulyc.aulycmail" to quit'
+   ```
+
+3. Verify the installed app bundle.
 
    ```sh
    ls -ld /Applications/aulycmail.app /Applications/aulycmail.app/Contents/MacOS/aulycmail
@@ -39,16 +35,16 @@ This records the local macOS rebuild/install flow used for this checkout.
 
 ## Last Confirmed Run
 
-- Date/time: 2026-07-01 18:31 CST
-- Running app PID before quit: none observed after quit request
-- Quit result: no `aulycmail` main process was present before reinstall
+- Date/time: 2026-07-01 23:21 CST
+- Running app PID before quit: a running `aulycmail` process was detected by `make install-darwin`
+- Quit result: the first AppleScript quit request returned `-128` ("user cancelled"), but a follow-up process-table check showed no installed `aulycmail` main process; retrying `make install-darwin` then reported no running process and continued
 - Install result: success
 - Installed binary: `/Applications/aulycmail.app/Contents/MacOS/aulycmail`
-- Installed timestamp observed: `Jul 1 18:31`
+- Installed timestamp observed: `Jul 1 23:21`
 - Codesign verification: valid on disk; satisfies Designated Requirement
 
 ## Notes
 
-- Running `make install-darwin` while the app is still open can leave the user testing an old process. Always quit first.
+- `make install-darwin` runs `quit-running-darwin` first so a running app process does not keep testing the old binary.
 - The elevated/sanitized command environment may not include `npm`; include the explicit Node/npm path above.
 - `wails build` regenerates `frontend/wailsjs/go/*` bindings. Review those generated diffs before committing.

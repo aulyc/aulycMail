@@ -1,6 +1,5 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
-  import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime'
   import { GetInlineAttachments, AddImageAllowlist, OpenURL } from '../../../../wailsjs/go/app/App'
   import { getCached, setCache } from '../../stores/inlineAttachmentCache'
   import { isImageAllowedSync, refreshImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
@@ -64,6 +63,19 @@
   // Used as a string so we can create fresh RegExp instances (avoids lastIndex issues with /g)
   const CSS_QUOTE = `(?:['"]|&#(?:39|x27|34|x22);|&(?:apos|quot);)?`
   const CSS_REMOTE_URL_PATTERN = `url\\(\\s*${CSS_QUOTE}\\s*https?://[^)]*?${CSS_QUOTE}\\s*\\)`
+  const MAX_IFRAME_URL_LENGTH = 4096
+  const MAX_IFRAME_TEXT_LENGTH = 10000
+  const MAX_IFRAME_COORDINATE = 100000
+
+  type IframeMessage =
+    | { type: 'iframe-height'; height: number }
+    | { type: 'iframe-ready' }
+    | { type: 'open-link'; url: string }
+    | { type: 'iframe-keydown'; key: string; code: string; altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }
+    | { type: 'iframe-focus' }
+    | { type: 'link-hover'; url: string; x: number; y: number }
+    | { type: 'link-hover-end' }
+    | { type: 'contextmenu'; text: string; url: string; x: number; y: number }
 
   function checkForRemoteImages(html: string): boolean {
     if (!html) return false
@@ -74,6 +86,101 @@
     // Check HTML background attribute with remote URLs
     if (/\bbackground\s*=\s*["'](https?:\/\/[^"']+)["']/i.test(html)) return true
     return false
+  }
+
+  function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null
+  }
+
+  function boundedString(value: unknown, maxLength: number): string | null {
+    if (typeof value !== 'string') return null
+    if (value.length > maxLength) return value.slice(0, maxLength)
+    return value
+  }
+
+  function boundedNumber(value: unknown, min: number, max: number): number | null {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null
+    if (value < min || value > max) return null
+    return value
+  }
+
+  function parseIframeMessage(data: unknown): IframeMessage | null {
+    if (!isRecord(data) || typeof data.type !== 'string') return null
+
+    switch (data.type) {
+      case 'iframe-height': {
+        const height = boundedNumber(data.height, 0, MAX_IFRAME_COORDINATE)
+        return height === null ? null : { type: 'iframe-height', height }
+      }
+      case 'iframe-ready':
+        return { type: 'iframe-ready' }
+      case 'open-link': {
+        const url = boundedString(data.url, MAX_IFRAME_URL_LENGTH)
+        return url === null ? null : { type: 'open-link', url }
+      }
+      case 'iframe-keydown': {
+        const key = boundedString(data.key, 64)
+        const code = boundedString(data.code, 64)
+        if (key === null || code === null) return null
+        return {
+          type: 'iframe-keydown',
+          key,
+          code,
+          altKey: data.altKey === true,
+          ctrlKey: data.ctrlKey === true,
+          metaKey: data.metaKey === true,
+          shiftKey: data.shiftKey === true
+        }
+      }
+      case 'iframe-focus':
+        return { type: 'iframe-focus' }
+      case 'link-hover': {
+        const url = boundedString(data.url, MAX_IFRAME_URL_LENGTH)
+        const x = boundedNumber(data.x, -MAX_IFRAME_COORDINATE, MAX_IFRAME_COORDINATE)
+        const y = boundedNumber(data.y, -MAX_IFRAME_COORDINATE, MAX_IFRAME_COORDINATE)
+        return url === null || x === null || y === null ? null : { type: 'link-hover', url, x, y }
+      }
+      case 'link-hover-end':
+        return { type: 'link-hover-end' }
+      case 'contextmenu': {
+        const text = boundedString(data.text ?? '', MAX_IFRAME_TEXT_LENGTH)
+        const url = boundedString(data.url ?? '', MAX_IFRAME_URL_LENGTH)
+        const x = boundedNumber(data.x, -MAX_IFRAME_COORDINATE, MAX_IFRAME_COORDINATE)
+        const y = boundedNumber(data.y, -MAX_IFRAME_COORDINATE, MAX_IFRAME_COORDINATE)
+        return text === null || url === null || x === null || y === null ? null : { type: 'contextmenu', text, url, x, y }
+      }
+      default:
+        return null
+    }
+  }
+
+  function parseAllowedEmailURL(rawURL: string): URL | null {
+    try {
+      const parsed = new URL(rawURL)
+      const protocol = parsed.protocol.toLowerCase()
+      if (protocol !== 'http:' && protocol !== 'https:' && protocol !== 'mailto:') return null
+      if ((protocol === 'http:' || protocol === 'https:') && !parsed.host) return null
+      return parsed
+    } catch {
+      return null
+    }
+  }
+
+  function redactURLForLog(rawURL: string): string {
+    try {
+      const parsed = new URL(rawURL)
+      const protocol = parsed.protocol.toLowerCase()
+      if (protocol !== 'http:' && protocol !== 'https:' && protocol !== 'mailto:') {
+        return `${parsed.protocol}[redacted]`
+      }
+      parsed.search = ''
+      parsed.hash = ''
+      parsed.username = ''
+      parsed.password = ''
+      return parsed.toString()
+    } catch {
+      return `[invalid-url length=${rawURL.length}]`
+    }
   }
 
   function processCidReferences(html: string): string {
@@ -390,8 +497,9 @@ ${processedHtml}
   // Handle a clicked link URL — routes mailto: to composer, others to system browser.
   // Used by both the iframe message handler and the plain text div click handler.
   function handleLinkClick(url: string) {
-    if (url.startsWith('mailto:')) {
-      const emailAddress = url.replace('mailto:', '').split('?')[0]
+    const parsed = parseAllowedEmailURL(url)
+    if (parsed?.protocol.toLowerCase() === 'mailto:') {
+      const emailAddress = parsed.pathname
       if (onCompose) {
         onCompose(emailAddress)
         return
@@ -403,45 +511,36 @@ ${processedHtml}
   // Helper function to safely open URLs
   // Uses our custom OpenURL backend function which properly handles shell escaping
   async function safeOpenURL(url: string) {
-    console.log('[EmailBody] Opening URL:', url)
+    const parsed = parseAllowedEmailURL(url)
+    if (!parsed) {
+      console.warn('[EmailBody] Blocked invalid or disallowed URL:', redactURLForLog(url))
+      return
+    }
 
-    // Validate URL format first
     try {
-      new URL(url) // Validate it's a proper URL
-
-      // Use our backend OpenURL function which properly handles shell escaping
-      try {
-        await OpenURL(url)
-        toasts.info($_('toast.linkOpened'))
-      } catch (err) {
-        console.error('[EmailBody] OpenURL failed:', err)
-        // Fallback to direct BrowserOpenURL
-        try {
-          BrowserOpenURL(url)
-          toasts.info($_('toast.linkOpened'))
-        } catch (err2) {
-          console.error('[EmailBody] BrowserOpenURL also failed:', err2)
-        }
-      }
-    } catch (e) {
-      console.error('[EmailBody] Invalid URL:', url, e)
+      await OpenURL(parsed.href)
+      toasts.info($_('toast.linkOpened'))
+    } catch (err) {
+      console.error('[EmailBody] OpenURL failed:', err)
     }
   }
 
   function handleIframeMessage(event: MessageEvent) {
     // Only handle messages from this component's iframe
     if (event.source !== iframeElement?.contentWindow) return
+    const message = parseIframeMessage(event.data)
+    if (!message) return
 
-    if (event.data?.type === 'iframe-height' && iframeElement) {
-      iframeElement.style.height = `${event.data.height + 20}px`
-    } else if (event.data?.type === 'iframe-ready') {
+    if (message.type === 'iframe-height' && iframeElement) {
+      iframeElement.style.height = `${message.height + 20}px`
+    } else if (message.type === 'iframe-ready') {
       iframeReady = true
-    } else if (event.data?.type === 'open-link') {
-      handleLinkClick(event.data.url as string)
-    } else if (event.data?.type === 'iframe-keydown') {
+    } else if (message.type === 'open-link') {
+      handleLinkClick(message.url)
+    } else if (message.type === 'iframe-keydown') {
       // Handle Alt+arrow/hjkl directly for pane navigation
-      if (event.data.altKey) {
-        const key = event.data.key
+      if (message.altKey) {
+        const key = message.key
         if (key === 'ArrowLeft' || key === 'h') {
           focusPreviousPane()
           // Dispatch event to let App.svelte handle focus
@@ -455,39 +554,39 @@ ${processedHtml}
       }
       // For other shortcuts (Ctrl+, Escape), dispatch to window
       const syntheticEvent = new KeyboardEvent('keydown', {
-        key: event.data.key,
-        code: event.data.code,
-        altKey: event.data.altKey,
-        ctrlKey: event.data.ctrlKey,
-        metaKey: event.data.metaKey,
-        shiftKey: event.data.shiftKey,
+        key: message.key,
+        code: message.code,
+        altKey: message.altKey,
+        ctrlKey: message.ctrlKey,
+        metaKey: message.metaKey,
+        shiftKey: message.shiftKey,
         bubbles: true,
         cancelable: true
       })
       window.dispatchEvent(syntheticEvent)
-    } else if (event.data?.type === 'iframe-focus') {
+    } else if (message.type === 'iframe-focus') {
       // Set focus to viewer pane when iframe is clicked/focused
       setFocusedPane('viewer')
-    } else if (event.data?.type === 'link-hover') {
+    } else if (message.type === 'link-hover') {
       // Show tooltip with link URL - adjust coordinates relative to iframe position
       if (iframeElement) {
         const iframeRect = iframeElement.getBoundingClientRect()
-        tooltipUrl = event.data.url
-        tooltipX = iframeRect.left + event.data.x
-        tooltipY = iframeRect.top + event.data.y
+        tooltipUrl = message.url
+        tooltipX = iframeRect.left + message.x
+        tooltipY = iframeRect.top + message.y
         tooltipVisible = true
       }
-    } else if (event.data?.type === 'link-hover-end') {
+    } else if (message.type === 'link-hover-end') {
       // Hide tooltip
       tooltipVisible = false
-    } else if (event.data?.type === 'contextmenu') {
+    } else if (message.type === 'contextmenu') {
       // Show unified context menu for text selection and/or links
       if (iframeElement) {
         const iframeRect = iframeElement.getBoundingClientRect()
-        ctxMenuText = event.data.text || ''
-        ctxMenuUrl = event.data.url || ''
-        ctxMenuX = iframeRect.left + event.data.x
-        ctxMenuY = iframeRect.top + event.data.y
+        ctxMenuText = message.text
+        ctxMenuUrl = message.url
+        ctxMenuX = iframeRect.left + message.x
+        ctxMenuY = iframeRect.top + message.y
         ctxMenuVisible = true
       }
     }
@@ -497,6 +596,7 @@ ${processedHtml}
     if (iframeElement?.contentWindow && Object.keys(images).length > 0) {
       // Use spread operator to create plain object from Svelte 5 $state proxy
       // This is needed because postMessage uses structured clone which can't handle proxies
+      // srcdoc iframes have an opaque origin, so targetOrigin must remain '*'.
       iframeElement.contentWindow.postMessage({
         type: 'inline-images',
         images: { ...images }
@@ -691,6 +791,7 @@ ${processedHtml}
 
   // Select all text in iframe
   function selectAllInIframe() {
+    // srcdoc iframes have an opaque origin, so targetOrigin must remain '*'.
     iframeElement?.contentWindow?.postMessage({ type: 'select-all' }, '*')
     ctxMenuVisible = false
   }

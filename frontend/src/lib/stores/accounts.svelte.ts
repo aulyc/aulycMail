@@ -147,6 +147,15 @@ class AccountStore {
           this.accounts = [...this.accounts]
         }
       }
+
+      // The Drafts folder badge shows a TOTAL count, which the live count
+      // events don't carry. Saving/sending/deleting a draft re-syncs the Drafts
+      // folder, so when it finishes, reload this account's folders to refresh
+      // the draft count in the sidebar.
+      const acc = this.accounts.find((a) => a.account.id === data.accountId)
+      if (acc && this.findFolderById(acc.folders, data.folderId)?.type === 'drafts') {
+        this.loadFolders(data.accountId)
+      }
     })
 
     // Listen for sync errors
@@ -250,6 +259,18 @@ class AccountStore {
         this.updateFolderCountsInTree(tree.children, counts)
       }
     }
+  }
+
+  /** Find a folder anywhere in a tree by id (depth-first). */
+  private findFolderById(trees: folder.FolderTree[], folderId: string): folder.Folder | null {
+    for (const tree of trees) {
+      if (tree.folder?.id === folderId) return tree.folder
+      if (tree.children) {
+        const found = this.findFolderById(tree.children, folderId)
+        if (found) return found
+      }
+    }
+    return null
   }
 
   /**

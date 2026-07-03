@@ -6,10 +6,9 @@
   import Switch from '$lib/components/ui/switch/Switch.svelte'
   import {
     securityOptions,
-    syncIntervalOptions,
   } from '$lib/config/providers'
   // @ts-ignore - wailsjs path
-  import { account, certificate, app } from '../../../../../wailsjs/go/models'
+  import { account, certificate } from '../../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
   import { GetAccountFoldersForMapping, GetAutoDetectedFolders, GetTrustedCertificates, RemoveTrustedCertificate, GetFolders, SubscribeFolder, UnsubscribeFolder, SubscribeAllFolders } from '../../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
@@ -36,20 +35,6 @@
     /** SMTP-specific password (write-only; blank on edit means "keep
      *  existing keyring entry"). */
     smtpPassword: string
-    /** True when the editing account uses the generic provider, so the
-     *  separate-SMTP-credentials UI is allowed to render. */
-    isGenericProvider: boolean
-    /** Identity to pre-select in the composer when replying/forwarding on
-     *  a message received via this account. Only consulted when
-     *  noOutgoingServer is true. Empty = fall back to default sending
-     *  account. */
-    replyForwardIdentityID: string
-    /** Sendable account+identity groups available as Reply/Forward-with
-     *  candidates. Parent excludes the account being edited and any
-     *  no-outgoing-server accounts. */
-    availableIdentityGroups: app.AccountIdentityGroup[]
-    syncInterval: string
-    readReceiptRequestPolicy: string
     /** Folder mappings */
     sentFolderPath: string
     draftsFolderPath: string
@@ -67,12 +52,8 @@
     onSmtpHostChange: (value: string) => void
     onSmtpPortChange: (value: number) => void
     onSmtpSecurityChange: (value: string) => void
-    onNoOutgoingServerChange: (value: boolean) => void
     onSmtpUsernameChange: (value: string) => void
     onSmtpPasswordChange: (value: string) => void
-    onReplyForwardIdentityIDChange: (value: string) => void
-    onSyncIntervalChange: (value: string) => void
-    onReadReceiptPolicyChange: (value: string) => void
     onFolderMappingChange: (type: string, value: string) => void
     syncAllFolders: boolean
     onSyncAllFoldersChange: (value: boolean) => void
@@ -91,11 +72,6 @@
     noOutgoingServer = $bindable(false),
     smtpUsername = $bindable(''),
     smtpPassword = $bindable(''),
-    isGenericProvider,
-    replyForwardIdentityID = $bindable(''),
-    availableIdentityGroups,
-    syncInterval = $bindable(),
-    readReceiptRequestPolicy = $bindable(),
     sentFolderPath = $bindable(),
     draftsFolderPath = $bindable(),
     trashFolderPath = $bindable(),
@@ -110,12 +86,8 @@
     onSmtpHostChange,
     onSmtpPortChange,
     onSmtpSecurityChange,
-    onNoOutgoingServerChange,
     onSmtpUsernameChange,
     onSmtpPasswordChange,
-    onReplyForwardIdentityIDChange,
-    onSyncIntervalChange,
-    onReadReceiptPolicyChange,
     onFolderMappingChange,
     syncAllFolders = $bindable(),
     onSyncAllFoldersChange,
@@ -196,31 +168,9 @@
   let confirmRemoveFingerprint = $state<string | null>(null)
   let showRemoveConfirm = $state(false)
 
-  // Read receipt request policy options
-  const readReceiptRequestOptions = [
-    { value: 'never', labelKey: 'account.neverRequest' },
-    { value: 'ask', labelKey: 'account.askEachTime' },
-    { value: 'always', labelKey: 'account.alwaysRequest' },
-  ]
-
   // Helper functions
   function getSecurityLabel(value: string): string {
     return securityOptions.find(opt => opt.value === value)?.label || value
-  }
-
-  function getSyncIntervalLabel(value: string): string {
-    const numValue = Number(value)
-    const option = syncIntervalOptions.find(opt => opt.value === numValue)
-    return option ? $_(option.labelKey) : `${value} min`
-  }
-
-  function getReadReceiptLabel(value: string): string {
-    switch (value) {
-      case 'never': return $_('account.neverRequest')
-      case 'ask': return $_('account.askEachTime')
-      case 'always': return $_('account.alwaysRequest')
-      default: return value
-    }
   }
 
   // Load folders for mapping UI
@@ -365,177 +315,61 @@
     </div>
   </div>
 
-  <!-- Divider -->
-  <div class="border-t border-border"></div>
+  {#if !noOutgoingServer}
+    <!-- Divider -->
+    <div class="border-t border-border"></div>
 
-  <!-- Outgoing server (SMTP). Header carries the "no outgoing server" toggle
-       (help text is a tooltip on the info icon). When on, the SMTP fields are
-       replaced by the reply/forward-with identity picker. -->
-  <div class="space-y-4">
-    <div class="flex items-center justify-between gap-2">
-      <span class="text-sm font-medium">{$_('account.outgoingServer')}</span>
-      <div class="flex items-center gap-2">
-        <Switch
-          checked={noOutgoingServer}
-          onCheckedChange={(v) => { noOutgoingServer = v; onNoOutgoingServerChange(v) }}
-        />
-        <span class="text-sm text-muted-foreground">{$_('account.noOutgoingServer')}</span>
-        <span class="cursor-help text-muted-foreground" title={$_('account.noOutgoingServerHelp')}>
-          <Icon icon="mdi:information-outline" class="w-4 h-4" />
-        </span>
-      </div>
-    </div>
-
-    {#if noOutgoingServer}
-      <!-- Reply/Forward-with identity picker. Mirrors the composer's
-           From-dropdown shape (grouped by sendable account, with color
-           dots). Default = empty value, which the composer resolves to
-           the user's default sending identity at compose time. -->
-      <div class="pt-2 space-y-1">
-        <Label>{$_('account.replyForwardWith')}</Label>
-        <Select.Root
-          value={replyForwardIdentityID}
-          onValueChange={(v) => { replyForwardIdentityID = v; onReplyForwardIdentityIDChange(v) }}
-        >
-          <Select.Trigger class="h-10">
-            <Select.Value placeholder={$_('account.replyForwardWithDefault')}>
-              {#if replyForwardIdentityID}
-                {@const allIdentities = (availableIdentityGroups || []).flatMap(g => (g.identities || []).map(i => ({ identity: i, group: g })))}
-                {@const found = allIdentities.find(x => x.identity.id === replyForwardIdentityID)}
-                {#if found}
-                  {#if found.group.account?.color}
-                    <span class="inline-block w-2 h-2 rounded-full mr-1.5 flex-shrink-0" style="background-color: {found.group.account.color}"></span>
-                  {/if}
-                  {found.identity.name} &lt;{found.identity.email}&gt;
-                {:else}
-                  {$_('account.replyForwardWithDefault')}
-                {/if}
-              {:else}
-                {$_('account.replyForwardWithDefault')}
-              {/if}
-            </Select.Value>
-          </Select.Trigger>
-          <Select.Content>
-            <Select.Item value="" label={$_('account.replyForwardWithDefault')} />
-            {#each availableIdentityGroups || [] as group (group.account?.id)}
-              <Select.Group>
-                <Select.GroupHeading class="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted-foreground">
-                  {#if group.account?.color}
-                    <span class="inline-block w-2 h-2 rounded-full flex-shrink-0" style="background-color: {group.account.color}"></span>
-                  {/if}
-                  {group.account?.name || group.account?.email}
-                </Select.GroupHeading>
-                {#each group.identities || [] as identity (identity.id)}
-                  <Select.Item value={identity.id} label="{identity.name} <{identity.email}>" />
-                {/each}
-              </Select.Group>
-            {/each}
-          </Select.Content>
-        </Select.Root>
-        <p class="text-xs text-muted-foreground">{$_('account.replyForwardWithHelp')}</p>
-      </div>
-    {:else}
-    <div class="grid grid-cols-2 gap-3">
-      <div class="space-y-2">
-        <!-- Label hidden (the section header above already reads 发件服务器);
-             kept for vertical alignment with the Port/Security labels. -->
-        <Label for="smtpHost" class="invisible" aria-hidden="true">{$_('account.outgoingServer')}</Label>
-        <Input
-          id="smtpHost"
-          type="text"
-          placeholder="smtp.example.com"
-          bind:value={smtpHost}
-          oninput={(e) => onSmtpHostChange((e.target as HTMLInputElement).value)}
-          class={errors.smtpHost ? 'border-destructive' : ''}
-        />
-        {#if errors.smtpHost}
-          <p class="text-sm text-destructive">{errors.smtpHost}</p>
-        {/if}
-      </div>
-      <div class="grid grid-cols-2 gap-2">
+    <!-- Outgoing server (SMTP). Hidden when account mail sending is disabled
+         on the General tab. -->
+    <div class="space-y-4">
+      <div class="grid grid-cols-2 gap-3">
         <div class="space-y-2">
-          <Label for="smtpPort">{$_('account.port')}</Label>
+          <Label for="smtpHost">{$_('account.outgoingServer')}</Label>
           <Input
-            id="smtpPort"
-            type="number"
-            bind:value={smtpPort}
-            oninput={(e) => onSmtpPortChange(Number((e.target as HTMLInputElement).value))}
-            class={errors.smtpPort ? 'border-destructive' : ''}
+            id="smtpHost"
+            type="text"
+            placeholder="smtp.example.com"
+            bind:value={smtpHost}
+            oninput={(e) => onSmtpHostChange((e.target as HTMLInputElement).value)}
+            class={errors.smtpHost ? 'border-destructive' : ''}
           />
+          {#if errors.smtpHost}
+            <p class="text-sm text-destructive">{errors.smtpHost}</p>
+          {/if}
         </div>
-        <div class="space-y-2">
-          <Label>{$_('account.security')}</Label>
-          <Select.Root
-            value={smtpSecurity}
-            onValueChange={(v) => { smtpSecurity = v; onSmtpSecurityChange(v) }}
-          >
-            <Select.Trigger class="h-10">
-              <Select.Value placeholder="Select">
-                {getSecurityLabel(smtpSecurity)}
-              </Select.Value>
-            </Select.Trigger>
-            <Select.Content>
-              {#each securityOptions as opt (opt.value)}
-                <Select.Item value={opt.value} label={opt.label} />
-              {/each}
-            </Select.Content>
-          </Select.Root>
+        <div class="grid grid-cols-2 gap-2">
+          <div class="space-y-2">
+            <Label for="smtpPort">{$_('account.port')}</Label>
+            <Input
+              id="smtpPort"
+              type="number"
+              bind:value={smtpPort}
+              oninput={(e) => onSmtpPortChange(Number((e.target as HTMLInputElement).value))}
+              class={errors.smtpPort ? 'border-destructive' : ''}
+            />
+          </div>
+          <div class="space-y-2">
+            <Label>{$_('account.security')}</Label>
+            <Select.Root
+              value={smtpSecurity}
+              onValueChange={(v) => { smtpSecurity = v; onSmtpSecurityChange(v) }}
+            >
+              <Select.Trigger class="h-10">
+                <Select.Value placeholder="Select">
+                  {getSecurityLabel(smtpSecurity)}
+                </Select.Value>
+              </Select.Trigger>
+              <Select.Content>
+                {#each securityOptions as opt (opt.value)}
+                  <Select.Item value={opt.value} label={opt.label} />
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
         </div>
       </div>
     </div>
-
-    {/if}
-  </div>
-
-  <!-- Divider -->
-  <div class="border-t border-border"></div>
-
-  <!-- Sync options (no group header; label + control on one row) -->
-  <div class="space-y-4">
-    <div class="flex items-center justify-between gap-4">
-      <div class="min-w-0">
-        <Label>{$_('account.checkNewMail')}</Label>
-        <p class="text-xs text-muted-foreground">{$_('account.checkNewMailHelp')}</p>
-      </div>
-      <Select.Root
-        value={syncInterval}
-        onValueChange={(v) => { syncInterval = v; onSyncIntervalChange(v) }}
-      >
-        <Select.Trigger class="w-48 shrink-0">
-          <Select.Value placeholder="Select">
-            {getSyncIntervalLabel(syncInterval)}
-          </Select.Value>
-        </Select.Trigger>
-        <Select.Content>
-          {#each syncIntervalOptions as opt (opt.value)}
-            <Select.Item value={String(opt.value)} label={$_(opt.labelKey)} />
-          {/each}
-        </Select.Content>
-      </Select.Root>
-    </div>
-
-    <div class="flex items-center justify-between gap-4">
-      <div class="min-w-0">
-        <Label>{$_('account.requestReadReceipts')}</Label>
-        <p class="text-xs text-muted-foreground">{$_('account.requestReadReceiptsHelp')}</p>
-      </div>
-      <Select.Root
-        value={readReceiptRequestPolicy}
-        onValueChange={(v) => { readReceiptRequestPolicy = v; onReadReceiptPolicyChange(v) }}
-      >
-        <Select.Trigger class="w-48 shrink-0">
-          <Select.Value placeholder="Select">
-            {getReadReceiptLabel(readReceiptRequestPolicy)}
-          </Select.Value>
-        </Select.Trigger>
-        <Select.Content>
-          {#each readReceiptRequestOptions as opt (opt.value)}
-            <Select.Item value={opt.value} label={$_(opt.labelKey)} />
-          {/each}
-        </Select.Content>
-      </Select.Root>
-    </div>
-  </div>
+  {/if}
 
   <!-- Divider -->
   <div class="border-t border-border"></div>
@@ -688,10 +522,6 @@
 
     {#if showTrustedCerts}
       <div class="space-y-3 pl-6 pt-2 border-l border-border ml-2">
-        <p class="text-xs text-muted-foreground">
-          {$_('account.trustedCertsHelp')}
-        </p>
-
         {#if loadingCerts}
           <div class="flex items-center gap-2 text-sm text-muted-foreground">
             <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
@@ -703,7 +533,7 @@
           </p>
         {:else}
           <div class="space-y-3">
-            {#each trustedCerts as cert (cert.fingerprint)}
+            {#each trustedCerts as cert, index (`${cert.host ?? ''}:${cert.fingerprint}:${index}`)}
               <div class="flex items-start justify-between gap-3 rounded-lg border bg-muted/30 p-3">
                 <div class="space-y-1 min-w-0">
                   <div class="flex items-center gap-2">

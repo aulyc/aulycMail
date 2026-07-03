@@ -36,10 +36,13 @@ cat > "$WORK/AppIcon.appiconset/Contents.json" <<'JSON'
 JSON
 echo '{"info":{"author":"xcode","version":1}}' > "$WORK/Contents.json"
 
-xcrun actool --compile "$WORK/out" --app-icon AppIcon \
+if ! xcrun actool --compile "$WORK/out" --app-icon AppIcon \
   --output-partial-info-plist "$WORK/partial.plist" \
   --platform macosx --minimum-deployment-target 11.0 \
-  --errors --warnings "$WORK" >/dev/null
+  --errors --warnings "$WORK" >"$WORK/actool.out" 2>"$WORK/actool.err"; then
+  cat "$WORK/actool.out" "$WORK/actool.err" >&2
+  exit 1
+fi
 
 cp "$WORK/out/Assets.car" "$APP/Contents/Resources/Assets.car"
 cp "$WORK/out/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"

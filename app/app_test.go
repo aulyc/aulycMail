@@ -91,3 +91,48 @@ func TestParseMailtoURL_NoAddress(t *testing.T) {
 		t.Errorf("Subject = %q, want %q", result.Subject, "Hello")
 	}
 }
+
+func TestRedactURLForLogRemovesSensitiveParts(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"https query", "https://example.com/reset?token=secret#frag", "https://example.com/reset"},
+		{"userinfo", "https://user:pass@example.com/path?x=1", "https://example.com/path"},
+		{"mailto query", "mailto:user@example.com?subject=secret&body=token", "mailto:user@example.com"},
+		{"disallowed scheme", "data:text/html,secret-token", "data:[redacted]"},
+		{"relative", "/reset?token=secret", "[relative-or-invalid-url length=19]"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := redactURLForLog(tt.in); got != tt.want {
+				t.Fatalf("redactURLForLog(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestIsAllowedProtocolParsesScheme(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"https://example.com/path?token=secret", true},
+		{"HTTPS://example.com/path", true},
+		{"http:example.com/path", false},
+		{"mailto:user@example.com?subject=Hi", true},
+		{"file:///tmp/secret", false},
+		{"data:text/html,secret", false},
+		{"/relative/path", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.in, func(t *testing.T) {
+			if got := isAllowedProtocol(tt.in); got != tt.want {
+				t.Fatalf("isAllowedProtocol(%q) = %v, want %v", tt.in, got, tt.want)
+			}
+		})
+	}
+}

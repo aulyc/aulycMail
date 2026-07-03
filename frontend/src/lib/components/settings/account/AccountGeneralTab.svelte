@@ -6,10 +6,11 @@
   import { Button } from '$lib/components/ui/button'
   import {
     syncPeriodOptions,
+    syncIntervalOptions,
   } from '$lib/config/providers'
   import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
-  import { account } from '../../../../../wailsjs/go/models'
+  import { account, app } from '../../../../../wailsjs/go/models'
 
   interface Props {
     /** The account being edited */
@@ -19,13 +20,14 @@
     email: string
     username: string
     password: string
+    noOutgoingServer: boolean
+    replyForwardIdentityID: string
+    availableIdentityGroups: app.AccountIdentityGroup[]
     syncPeriodDays: string
+    syncInterval: string
+    readReceiptRequestPolicy: string
     /** Auth type from account */
     authType: string
-    /** Whether the editing account uses the generic provider (controls
-     *  whether to hint about the separate SMTP credentials UI on the
-     *  Server tab). */
-    isGenericProvider: boolean
     /** Validation errors */
     errors: Record<string, string>
     /** Whether re-authorization is in progress */
@@ -36,7 +38,11 @@
     onDisplayNameChange: (value: string) => void
     onUsernameChange: (value: string) => void
     onPasswordChange: (value: string) => void
+    onNoOutgoingServerChange: (value: boolean) => void
+    onReplyForwardIdentityIDChange: (value: string) => void
     onSyncPeriodChange: (value: string) => void
+    onSyncIntervalChange: (value: string) => void
+    onReadReceiptPolicyChange: (value: string) => void
     onReauthorize?: () => void
   }
 
@@ -46,23 +52,59 @@
     email = $bindable(),
     username = $bindable(),
     password = $bindable(),
+    noOutgoingServer = $bindable(false),
+    replyForwardIdentityID = $bindable(''),
+    availableIdentityGroups = [],
     syncPeriodDays = $bindable(),
+    syncInterval = $bindable(),
+    readReceiptRequestPolicy = $bindable(),
     authType,
-    isGenericProvider,
     errors,
     reauthorizing = false,
     reauthorizeSuccess = false,
     onDisplayNameChange,
     onUsernameChange,
     onPasswordChange,
+    onNoOutgoingServerChange,
+    onReplyForwardIdentityIDChange,
     onSyncPeriodChange,
+    onSyncIntervalChange,
+    onReadReceiptPolicyChange,
     onReauthorize,
   }: Props = $props()
+
+  const selectTriggerClass = 'w-64 shrink-0'
+  const readReceiptRequestOptions = [
+    { value: 'never', labelKey: 'account.neverRequest' },
+    { value: 'ask', labelKey: 'account.askEachTime' },
+    { value: 'always', labelKey: 'account.alwaysRequest' },
+  ]
 
   function getSyncPeriodLabel(value: string): string {
     const numValue = Number(value)
     const option = syncPeriodOptions.find(opt => opt.value === numValue)
     return option ? $_(option.labelKey) : `${value} days`
+  }
+
+  function getSyncIntervalLabel(value: string): string {
+    const numValue = Number(value)
+    const option = syncIntervalOptions.find(opt => opt.value === numValue)
+    return option ? $_(option.labelKey) : `${value} min`
+  }
+
+  function getReadReceiptLabel(value: string): string {
+    switch (value) {
+      case 'never': return $_('account.neverRequest')
+      case 'ask': return $_('account.askEachTime')
+      case 'always': return $_('account.alwaysRequest')
+      default: return value
+    }
+  }
+
+  function getSendingLabel(value: string): string {
+    return value === 'disabled'
+      ? $_('account.mailSendingDisabled')
+      : $_('account.mailSendingEnabled')
   }
 </script>
 
@@ -72,7 +114,6 @@
     <div class="flex items-center justify-between gap-4">
       <div class="min-w-0">
         <Label for="displayName">{$_('account.displayName')}</Label>
-        <p class="text-xs text-muted-foreground">{$_('account.displayNameHelp')}</p>
       </div>
       <Input
         id="displayName"
@@ -92,7 +133,6 @@
   <div class="flex items-center justify-between gap-4">
     <div class="min-w-0">
       <Label for="email">{$_('account.emailAddress')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('account.emailReadOnly')}</p>
     </div>
     <Input id="email" type="email" value={email} disabled class="w-64 shrink-0 bg-muted" />
   </div>
@@ -101,7 +141,6 @@
   <div class="flex items-center justify-between gap-4">
     <div class="min-w-0">
       <Label for="username">{$_('account.username')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('account.usernameHelp')}</p>
     </div>
     <Input
       id="username"
@@ -118,9 +157,6 @@
     <div class="flex items-center justify-between gap-4">
       <div class="min-w-0">
         <Label>{$_('account.authentication')}</Label>
-        <p class="text-xs text-muted-foreground">
-          {reauthorizeSuccess ? $_('account.oauthFreshToken') : $_('account.reauthorizeHelp')}
-        </p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
         {#if reauthorizeSuccess}
@@ -151,9 +187,6 @@
       <div class="flex items-center justify-between gap-4">
         <div class="min-w-0">
           <Label for="password">{$_('account.password')}</Label>
-          {#if isGenericProvider}
-            <p class="text-xs text-muted-foreground">{$_('account.smtpCredsNote')}</p>
-          {/if}
         </div>
         <Input
           id="password"
@@ -170,17 +203,91 @@
     </div>
   {/if}
 
+  <!-- Mail sending -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('account.mailSending')}</Label>
+    </div>
+    <Select.Root
+      value={noOutgoingServer ? 'disabled' : 'enabled'}
+      onValueChange={(v) => {
+        const disabled = v === 'disabled'
+        noOutgoingServer = disabled
+        onNoOutgoingServerChange(disabled)
+      }}
+    >
+      <Select.Trigger class={selectTriggerClass}>
+        <Select.Value placeholder="Select">
+          {getSendingLabel(noOutgoingServer ? 'disabled' : 'enabled')}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        <Select.Item value="enabled" label={$_('account.mailSendingEnabled')} />
+        <Select.Item value="disabled" label={$_('account.mailSendingDisabled')} />
+      </Select.Content>
+    </Select.Root>
+  </div>
+
+  {#if noOutgoingServer}
+    <!-- Reply/Forward-with identity picker. Default = empty value, which the
+         composer resolves to the user's default sending identity at compose time. -->
+    <div class="space-y-1">
+      <Label>{$_('account.replyForwardWith')}</Label>
+      <Select.Root
+        value={replyForwardIdentityID}
+        onValueChange={(v) => {
+          replyForwardIdentityID = v
+          onReplyForwardIdentityIDChange(v)
+        }}
+      >
+        <Select.Trigger class="h-10">
+          <Select.Value placeholder={$_('account.replyForwardWithDefault')}>
+            {#if replyForwardIdentityID}
+              {@const allIdentities = (availableIdentityGroups || []).flatMap(g => (g.identities || []).map(i => ({ identity: i, group: g })))}
+              {@const found = allIdentities.find(x => x.identity.id === replyForwardIdentityID)}
+              {#if found}
+                {#if found.group.account?.color}
+                  <span class="inline-block w-2 h-2 rounded-full mr-1.5 flex-shrink-0" style="background-color: {found.group.account.color}"></span>
+                {/if}
+                {found.identity.name} &lt;{found.identity.email}&gt;
+              {:else}
+                {$_('account.replyForwardWithDefault')}
+              {/if}
+            {:else}
+              {$_('account.replyForwardWithDefault')}
+            {/if}
+          </Select.Value>
+        </Select.Trigger>
+        <Select.Content>
+          <Select.Item value="" label={$_('account.replyForwardWithDefault')} />
+          {#each availableIdentityGroups || [] as group (group.account?.id)}
+            <Select.Group>
+              <Select.GroupHeading class="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted-foreground">
+                {#if group.account?.color}
+                  <span class="inline-block w-2 h-2 rounded-full flex-shrink-0" style="background-color: {group.account.color}"></span>
+                {/if}
+                {group.account?.name || group.account?.email}
+              </Select.GroupHeading>
+              {#each group.identities || [] as identity (identity.id)}
+                <Select.Item value={identity.id} label="{identity.name} <{identity.email}>" />
+              {/each}
+            </Select.Group>
+          {/each}
+        </Select.Content>
+      </Select.Root>
+    </div>
+  {/if}
+
   <!-- Sync period -->
   <div class="flex items-center justify-between gap-4">
     <div class="min-w-0">
       <Label>{$_('account.syncPeriod')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('account.syncPeriodHelp')}</p>
     </div>
     <Select.Root
       value={syncPeriodDays}
       onValueChange={(v) => { syncPeriodDays = v; onSyncPeriodChange(v) }}
     >
-      <Select.Trigger class="w-48 shrink-0">
+      <Select.Trigger class={selectTriggerClass}>
         <Select.Value placeholder="Select">
           {getSyncPeriodLabel(syncPeriodDays)}
         </Select.Value>
@@ -188,6 +295,50 @@
       <Select.Content>
         {#each syncPeriodOptions as opt (opt.value)}
           <Select.Item value={String(opt.value)} label={$_(opt.labelKey)} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
+  </div>
+
+  <!-- Check new mail -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('account.checkNewMail')}</Label>
+    </div>
+    <Select.Root
+      value={syncInterval}
+      onValueChange={(v) => { syncInterval = v; onSyncIntervalChange(v) }}
+    >
+      <Select.Trigger class={selectTriggerClass}>
+        <Select.Value placeholder="Select">
+          {getSyncIntervalLabel(syncInterval)}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        {#each syncIntervalOptions as opt (opt.value)}
+          <Select.Item value={String(opt.value)} label={$_(opt.labelKey)} />
+        {/each}
+      </Select.Content>
+    </Select.Root>
+  </div>
+
+  <!-- Read receipt requests -->
+  <div class="flex items-center justify-between gap-4">
+    <div class="min-w-0">
+      <Label>{$_('account.requestReadReceipts')}</Label>
+    </div>
+    <Select.Root
+      value={readReceiptRequestPolicy}
+      onValueChange={(v) => { readReceiptRequestPolicy = v; onReadReceiptPolicyChange(v) }}
+    >
+      <Select.Trigger class={selectTriggerClass}>
+        <Select.Value placeholder="Select">
+          {getReadReceiptLabel(readReceiptRequestPolicy)}
+        </Select.Value>
+      </Select.Trigger>
+      <Select.Content>
+        {#each readReceiptRequestOptions as opt (opt.value)}
+          <Select.Item value={opt.value} label={$_(opt.labelKey)} />
         {/each}
       </Select.Content>
     </Select.Root>

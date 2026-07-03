@@ -135,7 +135,6 @@
   <div class="flex items-center justify-between gap-4">
     <div class="min-w-0">
       <Label>{$_('settingsGeneral.language')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.languageHelp')}</p>
     </div>
     <Select.Root value={language || 'en'} onValueChange={handleLanguageChange}>
       <Select.Trigger class="w-36 shrink-0">
@@ -153,7 +152,6 @@
   <div class="flex items-center justify-between gap-4">
     <div class="min-w-0">
       <Label>{$_('settingsGeneral.theme')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.themeHelp')}</p>
     </div>
     <Select.Root value={themeMode} onValueChange={handleThemeChange}>
       <Select.Trigger class="w-36 shrink-0">
@@ -174,9 +172,6 @@
     <div class="flex items-center justify-between gap-3">
       <div>
         <Label for="dark-mail-content">{$_('settingsGeneral.darkMailContent')}</Label>
-        <p class="text-xs text-muted-foreground">
-          {$_('settingsGeneral.darkMailContentHelp')}
-        </p>
       </div>
       <BoolSelect id="dark-mail-content" bind:checked={darkMailContent} class="w-36" />
     </div>
@@ -186,9 +181,6 @@
   <div class="flex items-center justify-between gap-3">
     <div>
       <Label for="accent-bar-unread">{$_('settingsGeneral.accentBarUnread')}</Label>
-      <p class="text-xs text-muted-foreground">
-        {$_('settingsGeneral.accentBarUnreadHelp')}
-      </p>
     </div>
     <BoolSelect id="accent-bar-unread" bind:checked={accentBarUnread} class="w-36" />
   </div>
@@ -197,7 +189,6 @@
   <div class="flex items-center justify-between gap-4">
     <div class="min-w-0">
       <Label>{$_('settingsGeneral.messageListDensity')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.messageListDensityHelp')}</p>
     </div>
     <Select.Root value={messageListDensity} onValueChange={handleDensityChange}>
       <Select.Trigger class="w-36 shrink-0">
@@ -217,9 +208,6 @@
   <div class="flex items-center justify-between gap-3">
     <div class="space-y-0.5">
       <Label for="run-background">{$_('settingsGeneral.runInBackground')}</Label>
-      <p class="text-xs text-muted-foreground">
-        {$_('settingsGeneral.runInBackgroundHelp')}
-      </p>
     </div>
     <BoolSelect id="run-background" bind:checked={runBackground} onCheckedChange={handleRunBackgroundChange} class="w-36" />
   </div>
@@ -228,9 +216,6 @@
   <div class="flex items-center justify-between gap-3">
     <div class="space-y-0.5">
       <Label for="autostart">{$_('settingsGeneral.autostartOnLogin')}</Label>
-      <p class="text-xs text-muted-foreground">
-        {$_('settingsGeneral.autostartHelp')}
-      </p>
     </div>
     <BoolSelect id="autostart" bind:checked={autostart} onCheckedChange={handleAutostartChange} class="w-36" />
   </div>
@@ -239,7 +224,6 @@
   <div class="flex items-center justify-between gap-4">
     <div class="min-w-0">
       <Label>{$_('settings.composerFormat')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('settings.composerFormatDescription')}</p>
     </div>
     <Select.Root value={composerFormat} onValueChange={handleFormatChange}>
       <Select.Trigger class="w-36 shrink-0">
@@ -259,7 +243,6 @@
   <div class="flex items-center justify-between gap-4">
     <div class="min-w-0">
       <Label>{$_('settingsGeneral.readReceiptPolicy')}</Label>
-      <p class="text-xs text-muted-foreground">{$_('settingsGeneral.readReceiptPolicyHelp')}</p>
     </div>
     <Select.Root value={readReceiptResponsePolicy} onValueChange={handlePolicyChange}>
       <Select.Trigger class="w-36 shrink-0">

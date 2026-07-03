@@ -3,11 +3,14 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
 	"github.com/aulyc/aulycmail/internal/credentials"
 	"github.com/aulyc/aulycmail/internal/oauth2"
 )
+
+const authenticatedHTTPClientTimeout = 30 * time.Second
 
 // Broker is the concrete implementation of coreapi.Auth. It mediates between
 // extensions and aulycmail's credential store + OAuth manager. Extensions get
@@ -75,6 +78,7 @@ func (b *Broker) HTTPClient(accountID string, scopes []coreapi.AuthScope) (*http
 	}
 
 	return &http.Client{
+		Timeout: authenticatedHTTPClientTimeout,
 		Transport: &bearerRefreshTransport{
 			base:           http.DefaultTransport,
 			credStore:      b.credStore,
@@ -177,6 +181,7 @@ func (b *Broker) HTTPClientForExtension(
 	}
 
 	return &http.Client{
+		Timeout: authenticatedHTTPClientTimeout,
 		Transport: &bearerRefreshTransport{
 			base:           http.DefaultTransport,
 			credStore:      b.credStore,

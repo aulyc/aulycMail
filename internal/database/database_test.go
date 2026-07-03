@@ -140,6 +140,26 @@ func TestMigrationV29_OAuthCompositeKey(t *testing.T) {
 	}
 }
 
+func TestMigrationV42_TrustedCertificatesScopedByHost(t *testing.T) {
+	db := openTestDB(t)
+
+	if _, err := db.Exec(`
+		INSERT INTO trusted_certificates (id, fingerprint, host, subject, issuer)
+		VALUES
+			('cert-1', 'fp-shared', 'imap.example.com', 'Subject', 'Issuer'),
+			('cert-2', 'fp-shared', 'smtp.example.com', 'Subject', 'Issuer')
+	`); err != nil {
+		t.Fatalf("same fingerprint should be allowed for different hosts: %v", err)
+	}
+
+	if _, err := db.Exec(`
+		INSERT INTO trusted_certificates (id, fingerprint, host, subject, issuer)
+		VALUES ('cert-3', 'fp-shared', 'imap.example.com', 'Subject', 'Issuer')
+	`); err == nil {
+		t.Fatal("expected duplicate host+fingerprint to be rejected")
+	}
+}
+
 // TestMigrationV32_LocalRecordIDsRewrittenToUUIDs verifies that migration 32
 // transforms "local-<email>" record IDs into canonical UUIDv4s while keeping
 // the contact_emails references intact. Simulates the upgrade path for a user
@@ -201,6 +221,10 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
 			t.Fatalf("drop contact_records.%s for re-migrate: %v", col, err)
 		}
+	}
+	// Same for v43's signature separator style on identities.
+	if _, err := db.Exec(`ALTER TABLE identities DROP COLUMN signature_separator_style`); err != nil {
+		t.Fatalf("drop identities.signature_separator_style for re-migrate: %v", err)
 	}
 
 	// Re-run migrations — migration 32 should rewrite the seeded local- id.
@@ -359,6 +383,10 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
 			t.Fatalf("drop contact_records.%s for re-migrate: %v", col, err)
 		}
+	}
+	// Same for v43's signature separator style on identities.
+	if _, err := db.Exec(`ALTER TABLE identities DROP COLUMN signature_separator_style`); err != nil {
+		t.Fatalf("drop identities.signature_separator_style for re-migrate: %v", err)
 	}
 
 	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,

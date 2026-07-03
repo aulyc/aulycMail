@@ -64,6 +64,94 @@ func TestAddOrUpdateWithRole_FlagsAndFilter(t *testing.T) {
 	}
 }
 
+func TestAccountScopedContactGrouping(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db.DB)
+
+	for _, c := range []struct {
+		email string
+		name  string
+		role  string
+	}{
+		{"sender@example.com", "Sender", RoleSender},
+		{"to@example.com", "To", RoleRecipient},
+		{"cc@example.com", "Cc", RoleCc},
+		{"bcc@example.com", "Bcc", RoleBcc},
+		{"other@example.com", "Other", RoleSender},
+	} {
+		if err := store.AddOrUpdateWithRole(c.email, c.name, c.role); err != nil {
+			t.Fatalf("collect %s: %v", c.email, err)
+		}
+	}
+
+	mustExec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := db.DB.Exec(query, args...); err != nil {
+			t.Fatalf("exec %q: %v", query, err)
+		}
+	}
+	mustExec(`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username) VALUES (?, ?, ?, 'imap.example.com', 'smtp.example.com', ?)`, "acc-a", "Account A", "a@example.com", "a")
+	mustExec(`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username) VALUES (?, ?, ?, 'imap.example.com', 'smtp.example.com', ?)`, "acc-b", "Account B", "b@example.com", "b")
+	mustExec(`INSERT INTO folders (id, account_id, name, path, folder_type) VALUES (?, ?, 'INBOX', 'INBOX', 'inbox')`, "inbox-a", "acc-a")
+	mustExec(`INSERT INTO folders (id, account_id, name, path, folder_type) VALUES (?, ?, 'Sent', 'Sent', 'sent')`, "sent-a", "acc-a")
+	mustExec(`INSERT INTO folders (id, account_id, name, path, folder_type) VALUES (?, ?, 'INBOX', 'INBOX', 'inbox')`, "inbox-b", "acc-b")
+	mustExec(`INSERT INTO messages (id, account_id, folder_id, uid, subject, from_email, from_name, date) VALUES (?, ?, ?, ?, 'from sender', ?, 'Sender', '2026-07-01T10:00:00Z')`, "msg-a-from", "acc-a", "inbox-a", 1, "sender@example.com")
+	mustExec(`INSERT INTO messages (id, account_id, folder_id, uid, subject, to_list, cc_list, bcc_list, date) VALUES (?, ?, ?, ?, 'sent recipients', ?, ?, ?, '2026-07-01T11:00:00Z')`,
+		"msg-a-sent", "acc-a", "sent-a", 2,
+		`[{"name":"To","email":"to@example.com"}]`,
+		`[{"name":"Cc","email":"cc@example.com"}]`,
+		`[{"name":"Bcc","email":"bcc@example.com"}]`,
+	)
+	mustExec(`INSERT INTO messages (id, account_id, folder_id, uid, subject, from_email, from_name, date) VALUES (?, ?, ?, ?, 'from other', ?, 'Other', '2026-07-01T12:00:00Z')`, "msg-b-from", "acc-b", "inbox-b", 3, "other@example.com")
+
+	count := func(accountID, role string) int {
+		t.Helper()
+		recs, err := store.ListRecords(RecordFilter{Source: "local", AccountID: accountID, Role: role})
+		if err != nil {
+			t.Fatalf("ListRecords(account=%q role=%q): %v", accountID, role, err)
+		}
+		return len(recs)
+	}
+
+	if got := count("acc-a", ""); got != 4 {
+		t.Fatalf("acc-a all count = %d, want 4", got)
+	}
+	if got := count("acc-a", RoleSender); got != 1 {
+		t.Fatalf("acc-a sender count = %d, want 1", got)
+	}
+	if got := count("acc-a", RoleRecipient); got != 1 {
+		t.Fatalf("acc-a recipient count = %d, want 1", got)
+	}
+	if got := count("acc-a", RoleCc); got != 1 {
+		t.Fatalf("acc-a cc count = %d, want 1", got)
+	}
+	if got := count("acc-a", RoleBcc); got != 1 {
+		t.Fatalf("acc-a bcc count = %d, want 1", got)
+	}
+	if got := count("acc-b", ""); got != 1 {
+		t.Fatalf("acc-b all count = %d, want 1", got)
+	}
+
+	groups, err := store.ListAccountAssociations()
+	if err != nil {
+		t.Fatalf("ListAccountAssociations: %v", err)
+	}
+	if len(groups) != 2 {
+		t.Fatalf("groups len = %d, want 2", len(groups))
+	}
+	if groups[0].AccountID != "acc-a" || groups[0].Count != 4 || groups[0].SenderCount != 1 || groups[0].RecipientCount != 1 || groups[0].CcCount != 1 || groups[0].BccCount != 1 {
+		t.Fatalf("acc-a group = %+v, want role counts all 1 and total 4", groups[0])
+	}
+
+	associated, err := store.ListAssociatedAccountsForEmails([]string{"sender@example.com"})
+	if err != nil {
+		t.Fatalf("ListAssociatedAccountsForEmails: %v", err)
+	}
+	if len(associated) != 1 || associated[0].AccountID != "acc-a" {
+		t.Fatalf("associated accounts = %+v, want acc-a only", associated)
+	}
+}
+
 func TestUpsert(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db.DB)

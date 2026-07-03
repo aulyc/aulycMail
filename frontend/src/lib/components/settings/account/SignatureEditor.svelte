@@ -586,8 +586,8 @@
         </button>
 
         {#if showColorPicker}
-          <div class="absolute top-full left-0 mt-1 p-2 bg-popover border border-border rounded-md shadow-lg z-50">
-            <div class="grid grid-cols-4 gap-1 mb-2">
+          <div class="absolute top-full left-0 mt-1 w-44 p-3 bg-popover border border-border rounded-md shadow-lg z-50">
+            <div class="grid grid-cols-6 gap-1.5 mb-3">
               {#each presetColors as color (color)}
                 <button
                   type="button"
@@ -603,13 +603,13 @@
                 type="color"
                 value={currentColor || '#000000'}
                 onchange={handleCustomColor}
-                class="w-6 h-6 rounded cursor-pointer"
+                class="w-8 h-8 rounded cursor-pointer shrink-0"
                 title={$_('editor.customColor')}
               />
               <button
                 type="button"
                 onclick={removeColor}
-                class="text-xs text-muted-foreground hover:text-foreground"
+                class="min-w-0 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded hover:bg-muted whitespace-nowrap"
               >
                 {$_('editor.reset')}
               </button>

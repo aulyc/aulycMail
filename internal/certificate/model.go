@@ -4,6 +4,7 @@ import "fmt"
 
 // CertificateInfo holds display-friendly certificate details
 type CertificateInfo struct {
+	Host        string   `json:"host,omitempty"`
 	Subject     string   `json:"subject"`
 	Issuer      string   `json:"issuer"`
 	Fingerprint string   `json:"fingerprint"`

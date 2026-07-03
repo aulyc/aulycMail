@@ -15,6 +15,12 @@ export type ComposeMode = 'new' | 'reply' | 'reply-all' | 'forward'
  */
 export const SIGNATURE_MARKER = '\u200B\u200B\u200B'
 
+export function getSignatureSeparator(identity: Identity): string {
+  const style = identity.signatureSeparatorStyle
+  if (style === '-----' || style === '*****') return style
+  return identity.signatureSeparator ? '-----' : ''
+}
+
 /**
  * Build signature HTML from identity settings
  */
@@ -32,9 +38,11 @@ export function buildSignatureHtml(identity: Identity): string {
 
   let html: string
 
+  const separator = getSignatureSeparator(identity)
+
   // Add separator line if enabled (with marker at the start)
-  if (identity.signatureSeparator) {
-    html = `<p>${SIGNATURE_MARKER}-- </p>`
+  if (separator) {
+    html = `<p>${SIGNATURE_MARKER}${separator}</p>`
   } else {
     // Inject marker into the first element of the signature
     // This ensures TipTap preserves it as text content
@@ -46,7 +54,7 @@ export function buildSignatureHtml(identity: Identity): string {
   }
 
   // If we added separator, append the rest of the signature
-  if (identity.signatureSeparator) {
+  if (separator) {
     html += sigHtml
   }
 

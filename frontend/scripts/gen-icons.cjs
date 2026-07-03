@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Scan the source for Iconify icon references and emit a minimal offline
 // collection containing ONLY the icons actually used. Run before build to keep
 // src/lib/iconify-subset.json in sync. Replaces full @iconify-json sets (~16MB)
