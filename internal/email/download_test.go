@@ -1,8 +1,6 @@
 package email
 
 import (
-	"bytes"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -79,12 +77,5 @@ func TestSaveAttachmentDefaultPathSanitizesFilename(t *testing.T) {
 	}
 	if filepath.Base(filepath.Dir(path)) != "msg" {
 		t.Fatalf("message directory = %q, want msg", filepath.Base(filepath.Dir(path)))
-	}
-}
-
-func TestReadAllBoundedRejectsOversizedContent(t *testing.T) {
-	_, err := readAllBounded(bytes.NewReader([]byte("abcd")), 3)
-	if !errors.Is(err, ErrAttachmentTooLarge) {
-		t.Fatalf("readAllBounded() error = %v, want ErrAttachmentTooLarge", err)
 	}
 }

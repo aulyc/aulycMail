@@ -7,7 +7,7 @@
 
 .PHONY: all build dev dev-race generate clean test lint lint-go lint-frontend \
         fmt frontend-deps frontend-update install uninstall \
-        install-darwin quit-running-darwin uninstall-darwin help
+        install-darwin quit-running-darwin launch-darwin uninstall-darwin help
 
 # Go module path
 MODULE := github.com/aulyc/aulycmail
@@ -193,6 +193,12 @@ install-darwin: quit-running-darwin build
 	@echo ""
 	@echo "Installation complete!"
 	@echo "aulycmail is now available in /Applications."
+	$(MAKE) launch-darwin
+
+# Launch the installed macOS app.
+launch-darwin:
+	@echo "Launching aulycmail..."
+	open "/Applications/aulycmail.app"
 
 # Uninstall aulycmail from macOS
 uninstall-darwin:
@@ -213,7 +219,7 @@ help:
 	@echo "  make generate     - Generate Wails TypeScript bindings"
 	@echo ""
 	@echo "Installation:"
-	@echo "  make install      - Build and install aulycmail to /Applications"
+	@echo "  make install      - Build, install, and launch aulycmail from /Applications"
 	@echo "  make uninstall    - Uninstall aulycmail from /Applications"
 	@echo ""
 	@echo "Code Quality:"

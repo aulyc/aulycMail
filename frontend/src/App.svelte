@@ -16,6 +16,7 @@
   import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
   import AboutDialog from './lib/components/settings/AboutDialog.svelte'
   import SearchOverlay from './lib/components/SearchOverlay.svelte'
+  import BackupViewerDialog from './lib/components/backup/BackupViewerDialog.svelte'
   import { activateContact as activateContactInView } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
   import { preloadContactAccountGroups } from '$extensions/contacts/frontend/stores/contactAccountGroups.svelte'
@@ -146,6 +147,7 @@
   let showAbout = $state(false)
   let showSyncLog = $state(false)
   let showSearchOverlay = $state(false)
+  let showBackupViewer = $state(false)
 
   // Certificate TOFU state (for background sync cert errors)
   let showCertDialog = $state(false)
@@ -1357,7 +1359,11 @@
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Main Content -->
   <div class="flex flex-1 min-h-0 overflow-hidden relative">
-    <ExtensionRail onOpenSettings={() => showSettings = true} onOpenLog={() => showSyncLog = true} />
+    <ExtensionRail
+      onOpenSettings={() => showSettings = true}
+      onOpenLog={() => showSyncLog = true}
+      onOpenBackupViewer={() => showBackupViewer = true}
+    />
 
     {#if getActiveExtension() === 'contacts'}
       <ContactsPane />
@@ -1492,6 +1498,7 @@
 <SettingsDialog bind:open={showSettings} onClose={() => { showSettings = false }} />
 <AboutDialog bind:open={showAbout} onClose={() => { showAbout = false }} />
 <SyncLogDialog bind:open={showSyncLog} onClose={() => { showSyncLog = false }} />
+<BackupViewerDialog bind:open={showBackupViewer} onClose={() => { showBackupViewer = false }} />
 
 <SearchOverlay
   bind:open={showSearchOverlay}

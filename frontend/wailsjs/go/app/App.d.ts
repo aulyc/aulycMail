@@ -114,6 +114,10 @@ export function GetBackupSettings():Promise<app.BackupSettings>;
 
 export function GetBackupStatus(arg1:string):Promise<app.BackupStatus>;
 
+export function GetBackupViewerCatalog(arg1:string):Promise<app.BackupViewerCatalog>;
+
+export function GetBackupViewerMessage(arg1:string,arg2:string):Promise<app.BackupViewerMessageDetail>;
+
 export function GetComposerFormat():Promise<string>;
 
 export function GetConfiguredOAuthProviders():Promise<Array<string>>;
@@ -282,6 +286,8 @@ export function OpenAttachment(arg1:string):Promise<void>;
 
 export function OpenBackupDirectory(arg1:string):Promise<void>;
 
+export function OpenBackupViewerDirectory(arg1:string):Promise<void>;
+
 export function OpenFile(arg1:string):Promise<void>;
 
 export function OpenFolder(arg1:string):Promise<void>;
@@ -327,6 +333,8 @@ export function SaveOAuthTokens(arg1:string,arg2:string,arg3:string,arg4:string,
 export function SavePendingOAuthTokens(arg1:string):Promise<void>;
 
 export function SaveUIState(arg1:appstate.UIState):Promise<void>;
+
+export function SearchBackupViewerMessages(arg1:string,arg2:string,arg3:string,arg4:number):Promise<Array<app.BackupViewerMessageSummary>>;
 
 export function SearchContacts(arg1:string,arg2:number):Promise<Array<contact.Contact>>;
 

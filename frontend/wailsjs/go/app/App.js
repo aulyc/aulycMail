@@ -198,6 +198,14 @@ export function GetBackupStatus(arg1) {
   return window['go']['app']['App']['GetBackupStatus'](arg1);
 }
 
+export function GetBackupViewerCatalog(arg1) {
+  return window['go']['app']['App']['GetBackupViewerCatalog'](arg1);
+}
+
+export function GetBackupViewerMessage(arg1, arg2) {
+  return window['go']['app']['App']['GetBackupViewerMessage'](arg1, arg2);
+}
+
 export function GetComposerFormat() {
   return window['go']['app']['App']['GetComposerFormat']();
 }
@@ -534,6 +542,10 @@ export function OpenBackupDirectory(arg1) {
   return window['go']['app']['App']['OpenBackupDirectory'](arg1);
 }
 
+export function OpenBackupViewerDirectory(arg1) {
+  return window['go']['app']['App']['OpenBackupViewerDirectory'](arg1);
+}
+
 export function OpenFile(arg1) {
   return window['go']['app']['App']['OpenFile'](arg1);
 }
@@ -624,6 +636,10 @@ export function SavePendingOAuthTokens(arg1) {
 
 export function SaveUIState(arg1) {
   return window['go']['app']['App']['SaveUIState'](arg1);
+}
+
+export function SearchBackupViewerMessages(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['SearchBackupViewerMessages'](arg1, arg2, arg3, arg4);
 }
 
 export function SearchContacts(arg1, arg2) {

@@ -13,9 +13,11 @@
     onOpenSettings?: () => void
     // Opens the sync/connection log dialog.
     onOpenLog?: () => void
+    // Opens the read-only backup viewer.
+    onOpenBackupViewer?: () => void
   }
 
-  const { onOpenSettings, onOpenLog }: Props = $props()
+  const { onOpenSettings, onOpenLog, onOpenBackupViewer }: Props = $props()
 
   // Mail is always present and always first; extensions follow in their
   // registered Order. The rail always renders now — it hosts the global
@@ -59,9 +61,20 @@
     />
   {/each}
 
-  <!-- Sync — pinned above the sync log and Settings. -->
+  <!-- Backup viewer — pinned above sync/log/settings. -->
   <button
     class="mt-auto relative flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+    type="button"
+    title={$_('backupViewer.open')}
+    aria-label={$_('backupViewer.open')}
+    onclick={() => onOpenBackupViewer?.()}
+  >
+    <Icon icon="mdi:archive-outline" width="22" height="22" />
+  </button>
+
+  <!-- Sync — pinned above the sync log and Settings. -->
+  <button
+    class="relative flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
     type="button"
     title={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
     aria-label={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}

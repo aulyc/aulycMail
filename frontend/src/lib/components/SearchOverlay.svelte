@@ -99,15 +99,26 @@
 
   async function centerSelectedScope(scopeID: string, scopeCount: number) {
     await tick()
+    await nextAnimationFrame()
+    await nextAnimationFrame()
     if (!open || scopeID !== selectedScopeId || scopeCount !== scopes.length) return
     const strip = scopeStripEl
     if (!strip) return
     const button = strip.querySelector<HTMLElement>(`[data-scope-index="${selectedScopeIndex}"]`)
     if (!button) return
 
-    const buttonCenter = button.offsetLeft + button.offsetWidth / 2
+    const stripRect = strip.getBoundingClientRect()
+    const buttonRect = button.getBoundingClientRect()
+    const buttonCenter = buttonRect.left - stripRect.left + strip.scrollLeft + buttonRect.width / 2
     const targetLeft = buttonCenter - strip.clientWidth / 2
-    strip.scrollTo({ left: Math.max(0, targetLeft), behavior: 'auto' })
+    const maxLeft = Math.max(0, strip.scrollWidth - strip.clientWidth)
+    strip.scrollTo({ left: Math.min(Math.max(0, targetLeft), maxLeft), behavior: 'auto' })
+  }
+
+  function nextAnimationFrame(): Promise<void> {
+    return new Promise((resolve) => {
+      requestAnimationFrame(() => resolve())
+    })
   }
 
   function runSearch() {
@@ -167,6 +178,7 @@
     }
     selectedScopeId = scopeID
     activeIndex = 0
+    void centerSelectedScope(scopeID, scopes.length)
     if (debounce) clearTimeout(debounce)
     runSearch()
     setTimeout(() => inputEl?.focus(), 0)

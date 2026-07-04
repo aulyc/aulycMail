@@ -205,9 +205,6 @@
   // Whether remote images are blocked in the composer's quoted content
   let composerImagesBlocked = $state(false)
 
-  // Max attachment size (100 MB) — server enforces its own limits for smaller caps
-  const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024
-
   // Confirmation dialogs state
   let showEmptySubjectDialog = $state(false)
   let showMissingAttachmentDialog = $state(false)
@@ -1186,11 +1183,6 @@
 
   // Handle a non-image File dropped on the editor (add as attachment)
   async function handleDroppedFile(file: File) {
-    if (file.size > MAX_ATTACHMENT_SIZE) {
-      addToast({ type: 'error', message: $_('composer.attachmentTooLarge') })
-      return
-    }
-
     try {
       const data = await readFileAsBase64(file)
       attachments = [...attachments, {
@@ -1246,10 +1238,6 @@
           continue
         }
         // Add as regular attachment
-        if (att.size > MAX_ATTACHMENT_SIZE) {
-          addToast({ type: 'error', message: $_('composer.attachmentTooLarge') })
-          continue
-        }
         attachments = [...attachments, {
           filename: att.filename,
           contentType: att.contentType,
@@ -1285,10 +1273,6 @@
       try {
         const newAttachments: typeof attachments = []
         for (const file of Array.from(fileList)) {
-          if (file.size > MAX_ATTACHMENT_SIZE) {
-            addToast({ type: 'error', message: $_('composer.attachmentTooLarge') })
-            continue
-          }
           const dataUrl = await readFileAsDataUrl(file)
           const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
           if (!matches) continue
@@ -1355,10 +1339,6 @@
     if (files && files.length > 0) {
       const newAttachments: ComposerAttachment[] = []
       for (const file of Array.from(files)) {
-        if (file.size > MAX_ATTACHMENT_SIZE) {
-          addToast({ type: 'error', message: $_('composer.attachmentTooLarge') })
-          continue
-        }
         try {
           const data = await readFileAsBase64(file)
           newAttachments.push({
@@ -1390,10 +1370,6 @@
           try {
             const att = await api.readFileAsAttachment(filePath)
             if (!att) continue
-            if (att.size > MAX_ATTACHMENT_SIZE) {
-              addToast({ type: 'error', message: $_('composer.attachmentTooLarge') })
-              continue
-            }
             attachments = [...attachments, {
               filename: att.filename,
               contentType: att.contentType,

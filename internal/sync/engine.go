@@ -5,7 +5,6 @@ import (
 	"context"
 	"io"
 
-	gomessage "github.com/emersion/go-message"
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/contact"
 	"github.com/aulyc/aulycmail/internal/email"
@@ -13,6 +12,7 @@ import (
 	imapPkg "github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
+	gomessage "github.com/emersion/go-message"
 	"github.com/rs/zerolog"
 )
 
@@ -38,10 +38,9 @@ const (
 	bodyBatchQueryLimit  = 200        // Query more candidates to allow byte-based batching
 )
 
-// Size limits for reading to prevent memory exhaustion
+// Size limits for MIME parsing and inline content storage.
 const (
 	maxPartSize          = 10 * 1024 * 1024 // 10MB max for a single MIME part
-	maxMessageSize       = 50 * 1024 * 1024 // 50MB max for entire raw message
 	maxInlineContentSize = 5 * 1024 * 1024  // 5MB max for inline image content (stored in DB)
 )
 

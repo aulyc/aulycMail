@@ -4,7 +4,6 @@ package email
 import (
 	"bytes"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -17,11 +16,6 @@ import (
 	msgcharset "github.com/emersion/go-message/charset"
 	"golang.org/x/text/encoding/htmlindex"
 )
-
-// MaxAttachmentContentSize bounds in-memory attachment extraction.
-const MaxAttachmentContentSize = 50 * 1024 * 1024
-
-var ErrAttachmentTooLarge = errors.New("attachment exceeds maximum size")
 
 // AttachmentDownloader handles downloading and saving attachments
 type AttachmentDownloader struct {
@@ -304,9 +298,6 @@ func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content [
 	if att == nil {
 		return "", fmt.Errorf("attachment is required")
 	}
-	if len(content) > MaxAttachmentContentSize {
-		return "", fmt.Errorf("%w: %d bytes exceeds %d", ErrAttachmentTooLarge, len(content), MaxAttachmentContentSize)
-	}
 
 	var savePath string
 
@@ -338,26 +329,11 @@ func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content [
 }
 
 func readAttachmentContent(r io.Reader) ([]byte, error) {
-	return readAllBounded(r, MaxAttachmentContentSize)
-}
-
-func readAllBounded(r io.Reader, maxBytes int) ([]byte, error) {
-	content, err := io.ReadAll(io.LimitReader(r, int64(maxBytes)+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(content) > maxBytes {
-		return nil, fmt.Errorf("%w: %d bytes exceeds %d", ErrAttachmentTooLarge, len(content), maxBytes)
-	}
-	return content, nil
+	return io.ReadAll(r)
 }
 
 func decodeAttachmentContent(content []byte, encoding string) ([]byte, error) {
-	decoded := decodeContent(content, encoding)
-	if len(decoded) > MaxAttachmentContentSize {
-		return nil, fmt.Errorf("%w: %d bytes exceeds %d", ErrAttachmentTooLarge, len(decoded), MaxAttachmentContentSize)
-	}
-	return decoded, nil
+	return decodeContent(content, encoding), nil
 }
 
 func attachmentMessagePrefix(messageID string) string {

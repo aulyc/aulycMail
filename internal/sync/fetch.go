@@ -7,10 +7,10 @@ import (
 	"io"
 	"time"
 
-	"github.com/emersion/go-imap/v2"
-	"github.com/emersion/go-imap/v2/imapclient"
 	imapPkg "github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/message"
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapclient"
 )
 
 // ProcessedBody holds the parsed body content and attachments for a message
@@ -27,11 +27,16 @@ type ProcessedBody struct {
 	// body" from "server-side truncation". ReportedSize comes from the
 	// IMAP RFC822.SIZE response item; ReceivedBytes is what we actually
 	// read from the BODY[] literal. A meaningful shortfall between the
-	// two (and below maxMessageSize, to exclude aulycmail's own cap) means
-	// the FETCH was likely truncated and we should NOT persist the
-	// failure — the next sync may succeed.
+	// two means the FETCH was likely truncated and we should NOT persist
+	// the failure — the next sync may succeed.
 	ReportedSize  int64
 	ReceivedBytes int64
+}
+
+// RawMessageStreamResult summarizes a raw message stream operation.
+type RawMessageStreamResult struct {
+	BytesWritten int64
+	ReportedSize int64
 }
 
 // FetchMessageBody fetches the body for a single message on-demand.
@@ -185,24 +190,17 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 				reportedSize = int64(data.Size)
 			case imapclient.FetchItemDataBodySection:
 				gotBodySection = true
-				// Read body from literal reader with size limit to prevent memory exhaustion
+				// Read the full BODY[] literal. Provider-side mailbox limits already
+				// constrain message size, and partial reads corrupt raw .eml data.
 				if data.Literal != nil {
-					lr := io.LimitReader(data.Literal, maxMessageSize)
 					var err error
-					rawBytes, err = io.ReadAll(lr)
+					rawBytes, err = io.ReadAll(data.Literal)
 					if err != nil {
 						e.log.Warn().
 							Err(err).
 							Uint32("uid", uint32(fetchedUID)).
 							Msg("Failed to read body literal, continuing with partial data")
 						// Keep whatever we got (may be partial)
-					}
-					// Log if we hit the size limit
-					if int64(len(rawBytes)) == maxMessageSize {
-						e.log.Warn().
-							Uint32("uid", uint32(fetchedUID)).
-							Int64("maxSize", maxMessageSize).
-							Msg("Message body truncated at size limit")
 					}
 				} else {
 					e.log.Warn().
@@ -305,18 +303,15 @@ const bodyTruncationThreshold = 0.8
 // skip the message.
 //
 // Decision table (all comparisons in bytes):
-//   reportedSize == 0          → charge   (no signal to defer on; treat as definitive)
-//   received    >= maxMsgSize  → charge   (aulycmail's own cap, not server truncation; next fetch hits same wall)
-//   received    <  reported*T  → DON'T    (clear shortfall; likely server-side truncation)
-//   otherwise                  → charge   (received is close enough to expected; the empty body is real)
+//
+//	reportedSize == 0          → charge   (no signal to defer on; treat as definitive)
+//	received    <  reported*T  → DON'T    (clear shortfall; likely server-side truncation)
+//	otherwise                  → charge   (received is close enough to expected; the empty body is real)
 //
 // Kept as a pure function (no Engine receiver) so it can be unit-tested
 // against synthetic inputs without standing up a full sync engine.
 func shouldChargeFailure(receivedBytes, reportedSize int64) bool {
 	if reportedSize <= 0 {
-		return true
-	}
-	if receivedBytes >= maxMessageSize {
 		return true
 	}
 	threshold := int64(float64(reportedSize) * bodyTruncationThreshold)
@@ -887,8 +882,7 @@ func (e *Engine) FetchRawMessage(ctx context.Context, accountID, folderID string
 
 		if data, ok := item.(imapclient.FetchItemDataBodySection); ok {
 			if data.Literal != nil {
-				lr := io.LimitReader(data.Literal, maxMessageSize)
-				rawBytes, err = io.ReadAll(lr)
+				rawBytes, err = io.ReadAll(data.Literal)
 				if err != nil {
 					fetchCmd.Close()
 					return nil, fmt.Errorf("failed to read message body: %w", err)
@@ -905,6 +899,86 @@ func (e *Engine) FetchRawMessage(ctx context.Context, accountID, folderID string
 	}
 
 	return rawBytes, nil
+}
+
+// StreamRawMessage streams the full raw RFC822 content of a message from the
+// IMAP server to dst without applying a client-side size cap. This is intended
+// for backup/export paths where truncating the MIME payload would corrupt the
+// resulting .eml file.
+func (e *Engine) StreamRawMessage(ctx context.Context, accountID, folderID string, uid uint32, dst io.Writer) (*RawMessageStreamResult, error) {
+	f, err := e.folderStore.Get(folderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get folder: %w", err)
+	}
+	if f == nil {
+		return nil, fmt.Errorf("folder not found: %s", folderID)
+	}
+
+	conn, err := e.pool.GetConnection(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connection: %w", err)
+	}
+	defer e.pool.Release(conn)
+
+	if _, err := conn.Client().SelectMailbox(ctx, f.Path); err != nil {
+		return nil, fmt.Errorf("failed to select mailbox: %w", err)
+	}
+
+	uidSet := imap.UIDSet{}
+	uidSet.AddNum(imap.UID(uid))
+
+	fetchOptions := &imap.FetchOptions{
+		RFC822Size: true,
+		BodySection: []*imap.FetchItemBodySection{
+			{
+				Specifier: imap.PartSpecifierNone,
+				Peek:      true,
+			},
+		},
+	}
+	fetchCmd := conn.Client().RawClient().Fetch(uidSet, fetchOptions)
+
+	msg := fetchCmd.Next()
+	if msg == nil {
+		fetchCmd.Close()
+		return nil, fmt.Errorf("message not found: UID %d", uid)
+	}
+
+	result := &RawMessageStreamResult{}
+	var gotBodySection bool
+	var copyErr error
+
+	for {
+		item := msg.Next()
+		if item == nil {
+			break
+		}
+
+		switch data := item.(type) {
+		case imapclient.FetchItemDataRFC822Size:
+			result.ReportedSize = data.Size
+		case imapclient.FetchItemDataBodySection:
+			if data.Literal == nil {
+				continue
+			}
+			gotBodySection = true
+			result.BytesWritten, copyErr = io.Copy(dst, data.Literal)
+		}
+	}
+
+	fetchCmd.Close()
+
+	if copyErr != nil {
+		return result, fmt.Errorf("failed to stream message body: %w", copyErr)
+	}
+	if !gotBodySection || result.BytesWritten == 0 {
+		return result, fmt.Errorf("message body not found: UID %d", uid)
+	}
+	if result.ReportedSize > 0 && result.BytesWritten != result.ReportedSize {
+		return result, fmt.Errorf("message size mismatch: server reported %d bytes, wrote %d bytes", result.ReportedSize, result.BytesWritten)
+	}
+
+	return result, nil
 }
 
 // buildMessageFromStreamedData constructs a Message from streamed IMAP data.
@@ -958,4 +1032,3 @@ func (e *Engine) buildMessageFromStreamedData(accountID, folderID string, uid im
 
 	return m
 }
-

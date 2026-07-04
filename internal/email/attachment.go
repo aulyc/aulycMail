@@ -167,9 +167,6 @@ func (e *AttachmentExtractor) extractFromTNEF(messageID string, reader io.Reader
 
 	// Extract attachments
 	for _, att := range tnefData.Attachments {
-		if len(att.Data) > MaxAttachmentContentSize {
-			continue
-		}
 		filename := att.Title
 		if filename == "" {
 			filename = "attachment"

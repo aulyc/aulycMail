@@ -6,9 +6,7 @@ import "testing"
 // body-parse failure (body_failed=1, message permanently skipped) and
 // deferring to a future sync cycle when the response looks truncated.
 //
-// All sizes in bytes. maxMessageSize is the production constant — picking
-// inputs around it directly verifies the "aulycmail-side cap is not a server
-// truncation" branch.
+// All sizes are in bytes.
 func TestShouldChargeFailure(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -20,12 +18,6 @@ func TestShouldChargeFailure(t *testing.T) {
 			name:         "no reported size: charge (no signal to defer on)",
 			received:     5_000,
 			reported:     0,
-			wantedCharge: true,
-		},
-		{
-			name:         "received hit aulycmail's cap: charge (intentional truncation, retry won't help)",
-			received:     maxMessageSize,
-			reported:     maxMessageSize + 50_000_000,
 			wantedCharge: true,
 		},
 		{

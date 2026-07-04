@@ -357,6 +357,153 @@ export namespace app {
 	        this.lastRunResult = source["lastRunResult"];
 	    }
 	}
+	export class BackupViewerAccount {
+	    accountEmail: string;
+	    messageCount: number;
+
+	    static createFrom(source: any = {}) {
+	        return new BackupViewerAccount(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accountEmail = source["accountEmail"];
+	        this.messageCount = source["messageCount"];
+	    }
+	}
+	export class BackupViewerAttachment {
+	    filename: string;
+	    contentType: string;
+	    size: number;
+	    inline: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new BackupViewerAttachment(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.filename = source["filename"];
+	        this.contentType = source["contentType"];
+	        this.size = source["size"];
+	        this.inline = source["inline"];
+	    }
+	}
+	export class BackupViewerMessageSummary {
+	    key: string;
+	    accountEmail: string;
+	    folderPath: string;
+	    subject: string;
+	    date: string;
+	    size: number;
+
+	    static createFrom(source: any = {}) {
+	        return new BackupViewerMessageSummary(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.accountEmail = source["accountEmail"];
+	        this.folderPath = source["folderPath"];
+	        this.subject = source["subject"];
+	        this.date = source["date"];
+	        this.size = source["size"];
+	    }
+	}
+	export class BackupViewerCatalog {
+	    directory: string;
+	    accounts: BackupViewerAccount[];
+	    messages: BackupViewerMessageSummary[];
+	    messageCount: number;
+
+	    static createFrom(source: any = {}) {
+	        return new BackupViewerCatalog(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.directory = source["directory"];
+	        this.accounts = this.convertValues(source["accounts"], BackupViewerAccount);
+	        this.messages = this.convertValues(source["messages"], BackupViewerMessageSummary);
+	        this.messageCount = source["messageCount"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class BackupViewerMessageDetail {
+	    key: string;
+	    accountEmail: string;
+	    folderPath: string;
+	    subject: string;
+	    date: string;
+	    from: string[];
+	    to: string[];
+	    cc: string[];
+	    bcc: string[];
+	    bodyHTML: string;
+	    bodyText: string;
+	    hasHTML: boolean;
+	    size: number;
+	    attachments: BackupViewerAttachment[];
+
+	    static createFrom(source: any = {}) {
+	        return new BackupViewerMessageDetail(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.key = source["key"];
+	        this.accountEmail = source["accountEmail"];
+	        this.folderPath = source["folderPath"];
+	        this.subject = source["subject"];
+	        this.date = source["date"];
+	        this.from = source["from"];
+	        this.to = source["to"];
+	        this.cc = source["cc"];
+	        this.bcc = source["bcc"];
+	        this.bodyHTML = source["bodyHTML"];
+	        this.bodyText = source["bodyText"];
+	        this.hasHTML = source["hasHTML"];
+	        this.size = source["size"];
+	        this.attachments = this.convertValues(source["attachments"], BackupViewerAttachment);
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
 	export class ComposerAttachment {
 	    filename: string;
 	    contentType: string;

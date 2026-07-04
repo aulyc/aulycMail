@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -387,26 +388,15 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error)
 			continue
 		}
 
-		raw, err := a.syncEngine.FetchRawMessage(a.ctx, row.AccountID, row.FolderID, row.UID)
-		if err != nil {
-			result.Failed++
-			failures = append(failures, backupFailureFromRow(row, err))
-			emit(BackupProgress{
-				Phase:        "running",
-				AccountEmail: row.AccountEmail,
-				FolderPath:   row.FolderPath,
-				Current:      i + 1,
-				Total:        len(rows),
-				Exported:     result.Exported,
-				Skipped:      result.Skipped,
-				Failed:       result.Failed,
-				Message:      err.Error(),
-			})
-			continue
-		}
-
 		relPath := backupMessageRelativePath(row)
-		if err := writeBackupFile(directory, relPath, raw); err != nil {
+		written, err := writeBackupFileFromStream(directory, relPath, func(w io.Writer) (int64, error) {
+			streamResult, err := a.syncEngine.StreamRawMessage(a.ctx, row.AccountID, row.FolderID, row.UID, w)
+			if err != nil {
+				return 0, err
+			}
+			return streamResult.BytesWritten, nil
+		})
+		if err != nil {
 			result.Failed++
 			failures = append(failures, backupFailureFromRow(row, err))
 			emit(BackupProgress{
@@ -434,7 +424,7 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error)
 			Subject:      row.Subject,
 			Date:         row.DateRaw,
 			EMLPath:      relPath,
-			Size:         row.Size,
+			Size:         backupFileSizeInt(written),
 			ExportedAt:   time.Now().UTC().Format(time.RFC3339),
 		}
 		result.Exported++
@@ -749,6 +739,46 @@ func writeBackupFile(baseDir, relPath string, content []byte) error {
 		return fmt.Errorf("failed to create backup folder: %w", err)
 	}
 	return writeFileAtomic(path, content, 0600)
+}
+
+func writeBackupFileFromStream(baseDir, relPath string, write func(io.Writer) (int64, error)) (int64, error) {
+	path := filepath.Join(baseDir, filepath.FromSlash(relPath))
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return 0, fmt.Errorf("failed to create backup folder: %w", err)
+	}
+
+	tmp := path + ".tmp"
+	file, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return 0, fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	written, writeErr := write(file)
+	closeErr := file.Close()
+	if writeErr != nil {
+		_ = os.Remove(tmp)
+		return written, fmt.Errorf("failed to stream backup file: %w", writeErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmp)
+		return written, fmt.Errorf("failed to close temp file: %w", closeErr)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return written, fmt.Errorf("failed to replace file: %w", err)
+	}
+	return written, nil
+}
+
+func backupFileSizeInt(size int64) int {
+	if size <= 0 {
+		return 0
+	}
+	maxInt := int64(^uint(0) >> 1)
+	if size > maxInt {
+		return int(maxInt)
+	}
+	return int(size)
 }
 
 func writeFileAtomic(path string, content []byte, perm os.FileMode) error {

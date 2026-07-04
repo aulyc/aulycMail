@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte'
   import Icon from '@iconify/svelte'
-  import * as Select from '$lib/components/ui/select'
   import { Button } from '$lib/components/ui/button'
   import { Label } from '$lib/components/ui/label'
   import { accountStore } from '$lib/stores/accounts.svelte'
@@ -35,26 +34,36 @@
   let directory = $state('')
   let scope = $state(backupScopeAll)
   let selectedAccountIds = $state<string[]>([])
+  let scopeMenuOpen = $state(false)
+  let scopeMenuEl = $state<HTMLDivElement | null>(null)
   let status = $state<app.BackupStatus | null>(null)
   let progress = $state<BackupProgress | null>(null)
   let unsubscribeProgress: (() => void) | undefined
 
   const regularAccounts = $derived(accountStore.accounts.filter(acc => !acc.account.sharedMailboxParentId))
   const regularAccountIds = $derived(regularAccounts.map(acc => acc.account.id))
-  const selectedAccountSet = $derived(new Set(selectedAccountIds))
-  const selectedAccountsCount = $derived(
+  const selectedBackupAccountIds = $derived(
     scope === backupScopeAll
-      ? regularAccounts.length
-      : selectedAccountIds.filter(id => regularAccountIds.includes(id)).length,
+      ? regularAccountIds
+      : selectedAccountIds.filter(id => regularAccountIds.includes(id)),
   )
+  const selectedAccountSet = $derived(new Set(selectedBackupAccountIds))
+  const selectedAccountsCount = $derived(selectedBackupAccountIds.length)
+  const allMailboxesSelected = $derived(
+    regularAccounts.length > 0 && selectedAccountsCount === regularAccounts.length,
+  )
+  const scopeLabel = $derived.by(() => {
+    if (scope === backupScopeAll || allMailboxesSelected) return $_('settingsBackup.scopeAll')
+    if (selectedAccountsCount === 0) return $_('settingsBackup.scopeSelected')
+    if (selectedAccountsCount === 1) {
+      const id = selectedBackupAccountIds[0]
+      return regularAccounts.find(acc => acc.account.id === id)?.account.email ?? $_('settingsBackup.selectedMailboxes', { values: { count: selectedAccountsCount } })
+    }
+    return $_('settingsBackup.selectedMailboxes', { values: { count: selectedAccountsCount } })
+  })
 
-  const scopeOptions = $derived([
-    { value: backupScopeAll, label: $_('settingsBackup.scopeAll') },
-    { value: backupScopeSelected, label: $_('settingsBackup.scopeSelected') },
-  ])
-
-  function getScopeLabel(value: string): string {
-    return scopeOptions.find(opt => opt.value === value)?.label ?? value
+  function sameIds(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((id, index) => id === b[index])
   }
 
   function getModeLabel(mode: string | undefined): string {
@@ -122,10 +131,18 @@
   $effect(() => {
     const validAccountIds = new Set(regularAccountIds)
     const filtered = selectedAccountIds.filter(id => validAccountIds.has(id))
-    if (filtered.length !== selectedAccountIds.length) {
-      selectedAccountIds = filtered
+    const normalized = scope === backupScopeAll ? regularAccountIds : filtered
+    if (!sameIds(normalized, selectedAccountIds)) {
+      selectedAccountIds = normalized
     }
   })
+
+  function handleWindowPointerDown(event: PointerEvent) {
+    if (!scopeMenuOpen) return
+    const target = event.target
+    if (target instanceof Node && scopeMenuEl?.contains(target)) return
+    scopeMenuOpen = false
+  }
 
   async function handleChooseDirectory() {
     try {
@@ -154,15 +171,11 @@
     }
   }
 
-  async function handleScopeChange(value: string | undefined) {
-    if (!value) return
-    scope = value === backupScopeSelected ? backupScopeSelected : backupScopeAll
-    if (scope === backupScopeSelected && selectedAccountIds.length === 0) {
-      selectedAccountIds = regularAccounts.map(acc => acc.account.id)
-    }
+  async function selectAllAccounts() {
+    scope = backupScopeAll
+    selectedAccountIds = regularAccountIds
     try {
       await saveBackupSettings()
-      addToast({ type: 'success', message: $_('settingsBackup.settingsSaved') })
     } catch (err) {
       console.error('Failed to save backup scope:', err)
       addToast({ type: 'error', message: $_('settingsBackup.saveFailed') })
@@ -170,16 +183,15 @@
   }
 
   async function toggleAccount(accountId: string) {
-    const next = new Set(scope === backupScopeAll ? regularAccountIds : selectedAccountIds)
+    const next = new Set(selectedBackupAccountIds)
     if (next.has(accountId)) {
       next.delete(accountId)
     } else {
       next.add(accountId)
     }
-    selectedAccountIds = regularAccountIds.filter(id => next.has(id))
-    if (scope !== backupScopeSelected) {
-      scope = backupScopeSelected
-    }
+    const nextIds = regularAccountIds.filter(id => next.has(id))
+    selectedAccountIds = nextIds
+    scope = nextIds.length === regularAccounts.length ? backupScopeAll : backupScopeSelected
     try {
       await saveBackupSettings()
     } catch (err) {
@@ -222,6 +234,7 @@
   }
 
   onMount(() => {
+    window.addEventListener('pointerdown', handleWindowPointerDown, true)
     unsubscribeProgress = EventsOn('backup:progress', (data: BackupProgress) => {
       progress = data
     })
@@ -229,6 +242,7 @@
   })
 
   onDestroy(() => {
+    window.removeEventListener('pointerdown', handleWindowPointerDown, true)
     unsubscribeProgress?.()
   })
 </script>
@@ -271,42 +285,62 @@
       <div class="min-w-0">
         <Label>{$_('settingsBackup.scope')}</Label>
       </div>
-      <Select.Root value={scope} onValueChange={handleScopeChange}>
-        <Select.Trigger class="w-72 shrink-0">
-          <Select.Value>{getScopeLabel(scope)}</Select.Value>
-        </Select.Trigger>
-        <Select.Content>
-          {#each scopeOptions as opt (opt.value)}
-            <Select.Item value={opt.value} label={opt.label} />
-          {/each}
-        </Select.Content>
-      </Select.Root>
-    </div>
-
-    <div class="flex items-start justify-between gap-4">
-      <div class="min-w-0 pt-2">
-        <Label>{$_('settingsBackup.mailboxes')}</Label>
-      </div>
-      <div class="w-72 shrink-0 space-y-2">
-        {#if regularAccounts.length === 0}
-          <div class="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
-            {$_('settingsBackup.noAccounts')}
-          </div>
-        {:else}
-          {#each regularAccounts as item (item.account.id)}
-            {@const account = item.account}
-            {@const selected = scope === backupScopeAll || selectedAccountSet.has(account.id)}
+      <div
+        bind:this={scopeMenuEl}
+        class="relative w-72 shrink-0"
+      >
+        <button
+          type="button"
+          class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-left text-sm text-foreground ring-offset-background transition-colors hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          onclick={() => scopeMenuOpen = !scopeMenuOpen}
+          onkeydown={(event) => {
+            if (event.key === 'Escape') scopeMenuOpen = false
+          }}
+          disabled={running || saving || regularAccounts.length === 0}
+          aria-haspopup="listbox"
+          aria-expanded={scopeMenuOpen}
+        >
+          <span class="min-w-0 truncate">{regularAccounts.length === 0 ? $_('settingsBackup.noAccounts') : scopeLabel}</span>
+          <Icon icon="mdi:chevron-down" class="h-4 w-4 shrink-0 opacity-50" />
+        </button>
+        {#if scopeMenuOpen}
+          <div
+            class="absolute right-0 z-50 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+            role="listbox"
+            aria-multiselectable="true"
+            tabindex="-1"
+            onkeydown={(event) => {
+              if (event.key === 'Escape') {
+                event.stopPropagation()
+                scopeMenuOpen = false
+              }
+            }}
+          >
             <button
               type="button"
-              class="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors {selected ? 'border-primary/60 bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'}"
-              onclick={() => toggleAccount(account.id)}
-              disabled={running || saving}
-              aria-pressed={selected}
+              class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+              onclick={selectAllAccounts}
+              role="option"
+              aria-selected={allMailboxesSelected}
             >
-              <Icon icon={selected ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline'} class="h-4 w-4 shrink-0 text-primary" />
-              <span class="min-w-0 flex-1 truncate">{account.email}</span>
+              <Icon icon={allMailboxesSelected ? 'mdi:check' : 'mdi:checkbox-blank-outline'} class="h-4 w-4 shrink-0 text-primary" />
+              <span class="min-w-0 flex-1 truncate">{$_('settingsBackup.scopeAll')}</span>
             </button>
-          {/each}
+            {#each regularAccounts as item (item.account.id)}
+              {@const account = item.account}
+              {@const selected = selectedAccountSet.has(account.id)}
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+                onclick={() => toggleAccount(account.id)}
+                role="option"
+                aria-selected={selected}
+              >
+                <Icon icon={selected ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline'} class="h-4 w-4 shrink-0 text-primary" />
+                <span class="min-w-0 flex-1 truncate">{account.email}</span>
+              </button>
+            {/each}
+          </div>
         {/if}
       </div>
     </div>
