@@ -277,6 +277,86 @@ export namespace app {
 	        this.license = source["license"];
 	    }
 	}
+	export class BackupRunOptions {
+	    directory: string;
+	    scope: string;
+	    selectedAccountIds: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new BackupRunOptions(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.directory = source["directory"];
+	        this.scope = source["scope"];
+	        this.selectedAccountIds = source["selectedAccountIds"];
+	    }
+	}
+	export class BackupRunResult {
+	    directory: string;
+	    mode: string;
+	    total: number;
+	    exported: number;
+	    skipped: number;
+	    failed: number;
+	    reportPath?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new BackupRunResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.directory = source["directory"];
+	        this.mode = source["mode"];
+	        this.total = source["total"];
+	        this.exported = source["exported"];
+	        this.skipped = source["skipped"];
+	        this.failed = source["failed"];
+	        this.reportPath = source["reportPath"];
+	    }
+	}
+	export class BackupSettings {
+	    directory: string;
+	    scope: string;
+	    selectedAccountIds: string[];
+
+	    static createFrom(source: any = {}) {
+	        return new BackupSettings(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.directory = source["directory"];
+	        this.scope = source["scope"];
+	        this.selectedAccountIds = source["selectedAccountIds"];
+	    }
+	}
+	export class BackupStatus {
+	    directory: string;
+	    mode: string;
+	    hasIndex: boolean;
+	    messageCount: number;
+	    lastRunAt?: string;
+	    lastRunMode?: string;
+	    lastRunResult?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new BackupStatus(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.directory = source["directory"];
+	        this.mode = source["mode"];
+	        this.hasIndex = source["hasIndex"];
+	        this.messageCount = source["messageCount"];
+	        this.lastRunAt = source["lastRunAt"];
+	        this.lastRunMode = source["lastRunMode"];
+	        this.lastRunResult = source["lastRunResult"];
+	    }
+	}
 	export class ComposerAttachment {
 	    filename: string;
 	    contentType: string;

@@ -38,6 +38,8 @@ export function CancelFolderSync(arg1:string,arg2:string):Promise<void>;
 
 export function CancelOAuthFlow():Promise<void>;
 
+export function ChooseBackupDirectory():Promise<string>;
+
 export function ClearOAuthCreds(arg1:string):Promise<void>;
 
 export function CloseWindow():Promise<void>;
@@ -107,6 +109,10 @@ export function GetAttachments(arg1:string):Promise<Array<message.Attachment>>;
 export function GetAutoDetectedFolders(arg1:string):Promise<Record<string, string>>;
 
 export function GetAutostart():Promise<boolean>;
+
+export function GetBackupSettings():Promise<app.BackupSettings>;
+
+export function GetBackupStatus(arg1:string):Promise<app.BackupStatus>;
 
 export function GetComposerFormat():Promise<string>;
 
@@ -274,6 +280,8 @@ export function NotifyStartupComplete():Promise<void>;
 
 export function OpenAttachment(arg1:string):Promise<void>;
 
+export function OpenBackupDirectory(arg1:string):Promise<void>;
+
 export function OpenFile(arg1:string):Promise<void>;
 
 export function OpenFolder(arg1:string):Promise<void>;
@@ -305,6 +313,8 @@ export function RemoveImageAllowlist(arg1:number):Promise<void>;
 export function RemoveTrustedCertificate(arg1:string):Promise<void>;
 
 export function ReorderAccounts(arg1:Array<string>):Promise<void>;
+
+export function RunEmailBackup(arg1:app.BackupRunOptions):Promise<app.BackupRunResult>;
 
 export function SaveAllAttachments(arg1:string):Promise<string>;
 
@@ -339,6 +349,8 @@ export function SetAccountEnabled(arg1:string,arg2:boolean):Promise<void>;
 export function SetAlwaysLoadImages(arg1:boolean):Promise<void>;
 
 export function SetAutostart(arg1:boolean):Promise<void>;
+
+export function SetBackupSettings(arg1:app.BackupSettings):Promise<void>;
 
 export function SetComposerFormat(arg1:string):Promise<void>;
 

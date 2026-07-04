@@ -34,6 +34,9 @@ const (
 	KeyShowViewerCircles         = "show_viewer_circles"
 	KeyLastSeenVersion           = "last_seen_version"      // for "What's new in this version" launch dialog
 	KeyOAuthWarningDisabled      = "oauth_warning_disabled" // user toggled "Don't show again" on the missing-OAuth-creds launch warning
+	KeyBackupDirectory           = "backup_directory"
+	KeyBackupScope               = "backup_scope"
+	KeyBackupSelectedAccountIDs  = "backup_selected_account_ids"
 )
 
 // Extension enable/disable keys. Format: extension_<name>_enabled.

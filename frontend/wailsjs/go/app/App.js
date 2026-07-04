@@ -46,6 +46,10 @@ export function CancelOAuthFlow() {
   return window['go']['app']['App']['CancelOAuthFlow']();
 }
 
+export function ChooseBackupDirectory() {
+  return window['go']['app']['App']['ChooseBackupDirectory']();
+}
+
 export function ClearOAuthCreds(arg1) {
   return window['go']['app']['App']['ClearOAuthCreds'](arg1);
 }
@@ -184,6 +188,14 @@ export function GetAutoDetectedFolders(arg1) {
 
 export function GetAutostart() {
   return window['go']['app']['App']['GetAutostart']();
+}
+
+export function GetBackupSettings() {
+  return window['go']['app']['App']['GetBackupSettings']();
+}
+
+export function GetBackupStatus(arg1) {
+  return window['go']['app']['App']['GetBackupStatus'](arg1);
 }
 
 export function GetComposerFormat() {
@@ -518,6 +530,10 @@ export function OpenAttachment(arg1) {
   return window['go']['app']['App']['OpenAttachment'](arg1);
 }
 
+export function OpenBackupDirectory(arg1) {
+  return window['go']['app']['App']['OpenBackupDirectory'](arg1);
+}
+
 export function OpenFile(arg1) {
   return window['go']['app']['App']['OpenFile'](arg1);
 }
@@ -580,6 +596,10 @@ export function RemoveTrustedCertificate(arg1) {
 
 export function ReorderAccounts(arg1) {
   return window['go']['app']['App']['ReorderAccounts'](arg1);
+}
+
+export function RunEmailBackup(arg1) {
+  return window['go']['app']['App']['RunEmailBackup'](arg1);
 }
 
 export function SaveAllAttachments(arg1) {
@@ -648,6 +668,10 @@ export function SetAlwaysLoadImages(arg1) {
 
 export function SetAutostart(arg1) {
   return window['go']['app']['App']['SetAutostart'](arg1);
+}
+
+export function SetBackupSettings(arg1) {
+  return window['go']['app']['App']['SetBackupSettings'](arg1);
 }
 
 export function SetComposerFormat(arg1) {
