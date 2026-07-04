@@ -2,6 +2,7 @@
   import { tick } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
+  import * as Select from '$lib/components/ui/select'
   // @ts-ignore - wailsjs path
   import {
     ChooseBackupDirectory,
@@ -35,7 +36,6 @@
   let loadingCatalog = $state(false)
   let loadingDetail = $state(false)
   let errorMessage = $state('')
-  let mainScopeStripEl = $state<HTMLDivElement | null>(null)
 
   let searchOpen = $state(false)
   let searchQuery = $state('')
@@ -57,7 +57,7 @@
       count: account.messageCount,
     })),
   ])
-  const selectedScopeIndex = $derived(Math.max(0, accountScopes.findIndex((scope) => scope.id === selectedAccountEmail)))
+  const selectedScope = $derived(accountScopes.find((scope) => scope.id === selectedAccountEmail) ?? accountScopes[0])
   const searchScopeIndex = $derived(Math.max(0, accountScopes.findIndex((scope) => scope.id === searchScopeEmail)))
   const visibleMessages = $derived.by(() => {
     const source = catalog?.messages ?? []
@@ -71,11 +71,6 @@
     } else {
       closeSearch()
     }
-  })
-
-  $effect(() => {
-    if (!open) return
-    void centerScope(mainScopeStripEl, selectedScopeIndex)
   })
 
   $effect(() => {
@@ -157,7 +152,15 @@
   async function selectScope(scopeID: string) {
     selectedAccountEmail = scopeID
     await selectFirstVisibleMessage()
-    void centerScope(mainScopeStripEl, selectedScopeIndex)
+  }
+
+  function clearDirectory() {
+    directory = ''
+    catalog = null
+    selectedAccountEmail = ''
+    selectedMessageKey = ''
+    detail = null
+    errorMessage = ''
   }
 
   async function selectFirstVisibleMessage() {
@@ -351,6 +354,12 @@
     }
     return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`
   }
+
+  function formatScopeLabel(scope: Scope | undefined): string {
+    if (!scope) return $_('backupViewer.scopeAll')
+    if (typeof scope.count !== 'number') return scope.label
+    return `${scope.label} ${scope.count}`
+  }
 </script>
 
 {#if open}
@@ -374,21 +383,46 @@
       </header>
 
       <section class="border-b border-border px-5 py-4">
-        <div class="grid grid-cols-[120px_minmax(0,1fr)_auto_auto_auto_auto] items-center gap-3">
-          <label class="text-sm font-semibold" for="backup-viewer-directory">{$_('backupViewer.directory')}</label>
-          <input
-            id="backup-viewer-directory"
-            value={directory}
-            readonly
-            placeholder={$_('backupViewer.directoryPlaceholder')}
-            class="h-10 min-w-0 rounded-md border border-border bg-background px-3 text-sm text-foreground outline-none"
-          />
-          <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold hover:bg-muted" onclick={chooseDirectory}>
-            <Icon icon="mdi:folder-outline" width="18" height="18" />
-            {$_('backupViewer.chooseDirectory')}
-          </button>
+        <div class="flex items-center gap-3">
+          <div class="relative min-w-0 flex-1">
+            <input
+              id="backup-viewer-directory"
+              value={directory}
+              readonly
+              placeholder={$_('backupViewer.directoryPlaceholder')}
+              class="h-10 w-full min-w-0 rounded-md border border-border bg-background py-0 pl-3 pr-11 text-sm text-foreground outline-none"
+            />
+            <button
+              type="button"
+              class="absolute right-1.5 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded border border-border text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              aria-label={$_('backupViewer.chooseDirectory')}
+              title={$_('backupViewer.chooseDirectory')}
+              onclick={chooseDirectory}
+            >
+              <Icon icon="mdi:folder-outline" width="17" height="17" />
+            </button>
+          </div>
+          <Select.Root
+            value={selectedAccountEmail}
+            onValueChange={(value) => void selectScope(value)}
+            disabled={!catalog?.messageCount}
+          >
+            <Select.Trigger class="h-10 w-[230px] shrink-0">
+              <Select.Value placeholder={$_('backupViewer.scopeAll')}>
+                {formatScopeLabel(selectedScope)}
+              </Select.Value>
+            </Select.Trigger>
+            <Select.Content>
+              {#each accountScopes as scope (scope.id || 'all')}
+                <Select.Item value={scope.id} label={formatScopeLabel(scope)} />
+              {/each}
+            </Select.Content>
+          </Select.Root>
           <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-50" disabled={!directory} onclick={openDirectory}>
             {$_('backupViewer.openDirectory')}
+          </button>
+          <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-50" disabled={!directory} onclick={clearDirectory}>
+            {$_('backupViewer.clearDirectory')}
           </button>
           <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-50" disabled={!directory || loadingCatalog} onclick={refreshCatalog}>
             <Icon icon="mdi:refresh" width="18" height="18" class={loadingCatalog ? 'animate-spin' : ''} />
@@ -402,33 +436,6 @@
         {#if errorMessage}
           <p class="mt-3 text-sm text-destructive">{errorMessage}</p>
         {/if}
-      </section>
-
-      <section class="border-b border-border px-5 py-3">
-        <div
-          bind:this={mainScopeStripEl}
-          class="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          <span class="shrink-0 basis-1/2" aria-hidden="true"></span>
-          {#each accountScopes as scope, index (scope.id || 'all')}
-            <button
-              type="button"
-              data-scope-index={index}
-              aria-pressed={selectedAccountEmail === scope.id}
-              class="max-w-[260px] shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold transition-colors truncate
-                {selectedAccountEmail === scope.id
-                  ? 'border-primary/75 bg-primary/15 text-primary'
-                  : 'border-border/70 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground'}"
-              onclick={() => selectScope(scope.id)}
-            >
-              <span>{scope.label}</span>
-              {#if typeof scope.count === 'number'}
-                <span class="ml-2 text-muted-foreground">{scope.count}</span>
-              {/if}
-            </button>
-          {/each}
-          <span class="shrink-0 basis-1/2" aria-hidden="true"></span>
-        </div>
       </section>
 
       <div class="grid min-h-0 flex-1 overflow-hidden grid-cols-[38%_1fr]">
