@@ -5,6 +5,7 @@
   // active rail. Selecting a result navigates to it via the parent's callbacks.
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
+  import SearchScopeCarousel from '$lib/components/search/SearchScopeCarousel.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { formatRelativeDateTime } from '$lib/utils/date'
   // @ts-ignore - wailsjs path
@@ -41,15 +42,6 @@
     label: string
   }
 
-  interface SearchScopeSlot {
-    scope: SearchScope
-    sourceIndex: number
-    offset: number
-    key: string
-  }
-
-  const SEARCH_SCOPE_SIDE_SLOT_COUNT = 10
-
   let { open = $bindable(false), mode, onClose, onSelectMail, onSelectContact }: Props = $props()
 
   let query = $state('')
@@ -77,10 +69,6 @@
         label: item.account.email || item.account.name || item.account.id,
       })),
   ])
-  const selectedScopeIndex = $derived(Math.max(0, scopes.findIndex((scope) => scope.id === selectedScopeId)))
-  const selectedScope = $derived(scopes[selectedScopeIndex])
-  const leftScopeSlots = $derived.by(() => buildScopeSideSlots(-1))
-  const rightScopeSlots = $derived.by(() => buildScopeSideSlots(1))
 
   // Reset + focus whenever the overlay opens.
   $effect(() => {
@@ -171,32 +159,6 @@
     selectScope(scopes[nextIndex].id)
   }
 
-  function wrapIndex(index: number, count: number): number {
-    return ((index % count) + count) % count
-  }
-
-  function buildScopeSideSlots(direction: -1 | 1): SearchScopeSlot[] {
-    const count = scopes.length
-    if (count <= 1) return []
-    const slots: SearchScopeSlot[] = []
-    let step = 1
-    while (slots.length < SEARCH_SCOPE_SIDE_SLOT_COUNT && step <= SEARCH_SCOPE_SIDE_SLOT_COUNT * count) {
-      const offset = direction * step
-      const sourceIndex = wrapIndex(selectedScopeIndex + offset, count)
-      if (sourceIndex !== selectedScopeIndex) {
-        const scope = scopes[sourceIndex]
-        slots.push({
-          scope,
-          sourceIndex,
-          offset,
-          key: `${direction}:${step}:${sourceIndex}:${scope.id || 'all'}`,
-        })
-      }
-      step += 1
-    }
-    return direction === -1 ? slots.reverse() : slots
-  }
-
   function selectIndex(i: number) {
     if (mode === 'mail') {
       const r = mailResults[i]
@@ -257,48 +219,7 @@
     >
       <!-- Search scope tags -->
       <div class="mb-3 overflow-hidden">
-        <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 overflow-hidden">
-          <div class="flex min-w-0 justify-end gap-2 overflow-hidden">
-            {#each leftScopeSlots as item (item.key)}
-              <button
-                type="button"
-                tabindex="-1"
-                aria-pressed="false"
-                class="max-w-[220px] shrink-0 truncate rounded-md border border-border/70 bg-transparent px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-border hover:bg-muted/20 hover:text-foreground"
-                onmousedown={(e) => e.preventDefault()}
-                onclick={() => selectScope(item.scope.id)}
-              >
-                {item.scope.label}
-              </button>
-            {/each}
-          </div>
-          {#if selectedScope}
-            <button
-              type="button"
-              tabindex="-1"
-              aria-pressed="true"
-              class="max-w-[220px] shrink-0 truncate rounded-md border border-primary/75 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm backdrop-blur-sm transition-colors"
-              onmousedown={(e) => e.preventDefault()}
-              onclick={() => selectScope(selectedScope.id)}
-            >
-              {selectedScope.label}
-            </button>
-          {/if}
-          <div class="flex min-w-0 justify-start gap-2 overflow-hidden">
-            {#each rightScopeSlots as item (item.key)}
-              <button
-                type="button"
-                tabindex="-1"
-                aria-pressed="false"
-                class="max-w-[220px] shrink-0 truncate rounded-md border border-border/70 bg-transparent px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-border hover:bg-muted/20 hover:text-foreground"
-                onmousedown={(e) => e.preventDefault()}
-                onclick={() => selectScope(item.scope.id)}
-              >
-                {item.scope.label}
-              </button>
-            {/each}
-          </div>
-        </div>
+        <SearchScopeCarousel scopes={scopes} selectedId={selectedScopeId} onSelect={selectScope} />
       </div>
 
       <div class="bg-popover border border-border rounded-xl shadow-2xl overflow-hidden">
