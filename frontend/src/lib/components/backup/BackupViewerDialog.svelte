@@ -453,7 +453,7 @@
         </button>
       </header>
 
-      <div class="flex h-14 shrink-0 items-center gap-2 overflow-x-auto border-b border-border px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div class="relative z-20 flex h-14 shrink-0 items-center gap-2 overflow-visible border-b border-border px-4">
         <div class="w-[340px] shrink-0">
           <BackupDirectoryPicker
             bind:menuOpen={directoryMenuOpen}
