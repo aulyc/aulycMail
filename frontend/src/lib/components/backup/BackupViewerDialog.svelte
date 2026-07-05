@@ -35,11 +35,10 @@
     count?: number
   }
 
-  interface SearchScopeItem {
+  interface SearchScopeSlot {
     scope: Scope
     sourceIndex: number
-    loopIndex: number
-    isCenterCopy: boolean
+    offset: number
     key: string
   }
 
@@ -68,7 +67,6 @@
   let searchActiveIndex = $state(0)
   let searchScopeEmail = $state('')
   let searchInputEl = $state<HTMLInputElement | null>(null)
-  let searchScopeStripEl = $state<HTMLDivElement | null>(null)
   let searchDebounce: ReturnType<typeof setTimeout> | null = null
   let searchSeq = 0
   let composing = false
@@ -84,20 +82,20 @@
   const selectedScope = $derived(accountScopes.find((scope) => scope.id === selectedAccountEmail) ?? accountScopes[0])
   const detailHeaderTitle = $derived(detail ? (detail.subject || $_('backupViewer.unknownSubject')) : '')
   const searchScopeIndex = $derived(Math.max(0, accountScopes.findIndex((scope) => scope.id === searchScopeEmail)))
-  const searchScopeLoopCenterIndex = $derived(accountScopes.length > 1 ? accountScopes.length + searchScopeIndex : searchScopeIndex)
-  const searchScopeItems = $derived.by((): SearchScopeItem[] => {
-    if (accountScopes.length === 0) return []
-    const cycleCount = accountScopes.length > 1 ? 3 : 1
-    const centerCycle = accountScopes.length > 1 ? 1 : 0
-    return Array.from({ length: cycleCount }).flatMap((_, cycle) =>
-      accountScopes.map((scope, index) => ({
+  const searchScopeSlots = $derived.by((): SearchScopeSlot[] => {
+    const count = accountScopes.length
+    if (count === 0) return []
+    const offsets = count === 1 ? [0] : count === 2 ? [-1, 0, 1] : [-2, -1, 0, 1, 2]
+    return offsets.map((offset) => {
+      const sourceIndex = wrapIndex(searchScopeIndex + offset, count)
+      const scope = accountScopes[sourceIndex]
+      return {
         scope,
-        sourceIndex: index,
-        loopIndex: cycle * accountScopes.length + index,
-        isCenterCopy: cycle === centerCycle,
-        key: `${cycle}:${index}:${scope.id || 'all'}`,
-      }))
-    )
+        sourceIndex,
+        offset,
+        key: `${offset}:${sourceIndex}:${scope.id || 'all'}`,
+      }
+    })
   })
   const darkFilterStyle = $derived.by(() => {
     void getThemeMode()
@@ -119,11 +117,6 @@
     } else {
       resetViewerContent()
     }
-  })
-
-  $effect(() => {
-    if (!searchOpen) return
-    void centerScope(searchScopeStripEl, searchScopeLoopCenterIndex)
   })
 
   $effect(() => {
@@ -426,6 +419,10 @@
     selectSearchScope(accountScopes[nextIndex].id)
   }
 
+  function wrapIndex(index: number, count: number): number {
+    return ((index % count) + count) % count
+  }
+
   async function selectSearchResult(index: number) {
     const message = searchResults[index]
     if (!message) return
@@ -461,24 +458,6 @@
       event.stopPropagation()
       searchInputEl?.select()
     }
-  }
-
-  async function centerScope(strip: HTMLDivElement | null, loopIndex: number) {
-    await tick()
-    await nextAnimationFrame()
-    if (!strip) return
-    const button = strip.querySelector<HTMLElement>(`[data-scope-loop-index="${loopIndex}"]`)
-    if (!button) return
-    const stripRect = strip.getBoundingClientRect()
-    const buttonRect = button.getBoundingClientRect()
-    const buttonCenter = buttonRect.left - stripRect.left + strip.scrollLeft + buttonRect.width / 2
-    const targetLeft = buttonCenter - strip.clientWidth / 2
-    const maxLeft = Math.max(0, strip.scrollWidth - strip.clientWidth)
-    strip.scrollTo({ left: Math.min(Math.max(0, targetLeft), maxLeft), behavior: 'auto' })
-  }
-
-  function nextAnimationFrame(): Promise<void> {
-    return new Promise((resolve) => requestAnimationFrame(() => resolve()))
   }
 
   function parseViewerDate(value: string): Date | null {
@@ -814,16 +793,14 @@
       >
         <div class="mb-3 overflow-hidden">
           <div
-            bind:this={searchScopeStripEl}
-            class="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            class="flex items-center justify-center gap-2 overflow-hidden"
           >
-            {#each searchScopeItems as item (item.key)}
-              {@const isSelectedScope = item.isCenterCopy && item.sourceIndex === searchScopeIndex}
+            {#each searchScopeSlots as item (item.key)}
+              {@const isSelectedScope = item.offset === 0}
               <button
                 type="button"
                 tabindex="-1"
                 aria-pressed={isSelectedScope}
-                data-scope-loop-index={item.loopIndex}
                 class="max-w-[240px] shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors truncate
                   {isSelectedScope
                     ? 'border-primary/75 bg-primary/15 text-primary'
