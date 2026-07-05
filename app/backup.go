@@ -88,18 +88,19 @@ type backupIndex struct {
 }
 
 type backupIndexMessage struct {
-	AccountID    string `json:"accountId"`
-	AccountEmail string `json:"accountEmail"`
-	FolderID     string `json:"folderId"`
-	FolderPath   string `json:"folderPath"`
-	UIDValidity  uint32 `json:"uidValidity"`
-	UID          uint32 `json:"uid"`
-	MessageID    string `json:"messageId,omitempty"`
-	Subject      string `json:"subject,omitempty"`
-	Date         string `json:"date,omitempty"`
-	EMLPath      string `json:"emlPath"`
-	Size         int    `json:"size"`
-	ExportedAt   string `json:"exportedAt"`
+	AccountID      string `json:"accountId"`
+	AccountEmail   string `json:"accountEmail"`
+	FolderID       string `json:"folderId"`
+	FolderPath     string `json:"folderPath"`
+	UIDValidity    uint32 `json:"uidValidity"`
+	UID            uint32 `json:"uid"`
+	MessageID      string `json:"messageId,omitempty"`
+	Subject        string `json:"subject,omitempty"`
+	Date           string `json:"date,omitempty"`
+	EMLPath        string `json:"emlPath"`
+	Size           int    `json:"size"`
+	HasAttachments *bool  `json:"hasAttachments,omitempty"`
+	ExportedAt     string `json:"exportedAt"`
 }
 
 type backupIndexRun struct {
@@ -127,19 +128,20 @@ type backupReport struct {
 }
 
 type backupMessageRow struct {
-	ID           string
-	AccountID    string
-	AccountEmail string
-	FolderID     string
-	FolderPath   string
-	FolderName   string
-	UIDValidity  uint32
-	UID          uint32
-	MessageID    string
-	Subject      string
-	Date         time.Time
-	DateRaw      string
-	Size         int
+	ID             string
+	AccountID      string
+	AccountEmail   string
+	FolderID       string
+	FolderPath     string
+	FolderName     string
+	UIDValidity    uint32
+	UID            uint32
+	MessageID      string
+	Subject        string
+	Date           time.Time
+	DateRaw        string
+	Size           int
+	HasAttachments bool
 }
 
 // GetBackupSettings returns the persisted backup settings.
@@ -374,6 +376,8 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error)
 		key := backupMessageKey(row)
 		existing, indexed := idx.Messages[key]
 		if indexed && backupFileExists(directory, existing.EMLPath) {
+			existing.HasAttachments = boolPtr(row.HasAttachments)
+			idx.Messages[key] = existing
 			result.Skipped++
 			emit(BackupProgress{
 				Phase:        "running",
@@ -414,18 +418,19 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error)
 		}
 
 		idx.Messages[key] = backupIndexMessage{
-			AccountID:    row.AccountID,
-			AccountEmail: row.AccountEmail,
-			FolderID:     row.FolderID,
-			FolderPath:   row.FolderPath,
-			UIDValidity:  row.UIDValidity,
-			UID:          row.UID,
-			MessageID:    row.MessageID,
-			Subject:      row.Subject,
-			Date:         row.DateRaw,
-			EMLPath:      relPath,
-			Size:         backupFileSizeInt(written),
-			ExportedAt:   time.Now().UTC().Format(time.RFC3339),
+			AccountID:      row.AccountID,
+			AccountEmail:   row.AccountEmail,
+			FolderID:       row.FolderID,
+			FolderPath:     row.FolderPath,
+			UIDValidity:    row.UIDValidity,
+			UID:            row.UID,
+			MessageID:      row.MessageID,
+			Subject:        row.Subject,
+			Date:           row.DateRaw,
+			EMLPath:        relPath,
+			Size:           backupFileSizeInt(written),
+			HasAttachments: boolPtr(row.HasAttachments),
+			ExportedAt:     time.Now().UTC().Format(time.RFC3339),
 		}
 		result.Exported++
 		emit(BackupProgress{
@@ -530,7 +535,8 @@ func (a *App) listBackupMessages(accountIDs []string) ([]backupMessageRow, error
 			COALESCE(m.message_id, ''),
 			COALESCE(m.subject, ''),
 			COALESCE(m.date, ''),
-			COALESCE(m.size, 0)
+			COALESCE(m.size, 0),
+			COALESCE(m.has_attachments, 0)
 		FROM messages m
 		INNER JOIN accounts a ON a.id = m.account_id
 		INNER JOIN folders f ON f.id = m.folder_id
@@ -549,6 +555,7 @@ func (a *App) listBackupMessages(accountIDs []string) ([]backupMessageRow, error
 		var row backupMessageRow
 		var uid, uidValidity int64
 		var size int64
+		var hasAttachments bool
 		var dateRaw sql.NullString
 		if err := rows.Scan(
 			&row.ID,
@@ -563,12 +570,14 @@ func (a *App) listBackupMessages(accountIDs []string) ([]backupMessageRow, error
 			&row.Subject,
 			&dateRaw,
 			&size,
+			&hasAttachments,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan backup message: %w", err)
 		}
 		row.UID = uint32(uid)
 		row.UIDValidity = uint32(uidValidity)
 		row.Size = int(size)
+		row.HasAttachments = hasAttachments
 		if dateRaw.Valid {
 			row.DateRaw = dateRaw.String
 			row.Date = parseBackupTime(dateRaw.String)
@@ -771,6 +780,10 @@ func backupFileSizeInt(size int64) int {
 		return int(maxInt)
 	}
 	return int(size)
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func writeFileAtomic(path string, content []byte, perm os.FileMode) error {

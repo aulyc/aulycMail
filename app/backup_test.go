@@ -67,19 +67,21 @@ func TestUniqueNonEmptyStrings(t *testing.T) {
 
 func TestBackupIndexRoundTrip(t *testing.T) {
 	dir := t.TempDir()
+	hasAttachments := true
 	idx := &backupIndex{
 		Version:   backupIndexVersion,
 		CreatedAt: "2026-07-04T00:00:00Z",
 		UpdatedAt: "2026-07-04T00:00:00Z",
 		Messages: map[string]backupIndexMessage{
 			"account:folder:1:2": {
-				AccountID:    "account",
-				AccountEmail: "user@example.com",
-				FolderID:     "folder",
-				FolderPath:   "INBOX",
-				UIDValidity:  1,
-				UID:          2,
-				EMLPath:      "eml/user@example.com/INBOX/message.eml",
+				AccountID:      "account",
+				AccountEmail:   "user@example.com",
+				FolderID:       "folder",
+				FolderPath:     "INBOX",
+				UIDValidity:    1,
+				UID:            2,
+				EMLPath:        "eml/user@example.com/INBOX/message.eml",
+				HasAttachments: &hasAttachments,
 			},
 		},
 	}
@@ -103,6 +105,9 @@ func TestBackupIndexRoundTrip(t *testing.T) {
 	}
 	if got.Messages["account:folder:1:2"].EMLPath != "eml/user@example.com/INBOX/message.eml" {
 		t.Fatalf("message index was not preserved: %#v", got.Messages)
+	}
+	if got.Messages["account:folder:1:2"].HasAttachments == nil || !*got.Messages["account:folder:1:2"].HasAttachments {
+		t.Fatalf("attachment flag was not preserved: %#v", got.Messages["account:folder:1:2"].HasAttachments)
 	}
 }
 
@@ -185,47 +190,20 @@ func TestParseBackupViewerEMLExtractsBodyAndAttachments(t *testing.T) {
 }
 
 func TestBackupViewerMessagesIncludesAttachmentCount(t *testing.T) {
-	dir := t.TempDir()
-	relPath := "eml/user@example.com/INBOX/message.eml"
-	absPath := filepath.Join(dir, filepath.FromSlash(relPath))
-	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
-		t.Fatalf("create backup dir: %v", err)
-	}
-	raw := strings.Join([]string{
-		"From: Alice <alice@example.com>",
-		"To: Bob <bob@example.com>",
-		"Subject: With attachment",
-		"Date: Sat, 04 Jul 2026 12:00:00 +0800",
-		"Content-Type: multipart/mixed; boundary=mixed",
-		"",
-		"--mixed",
-		"Content-Type: text/plain; charset=utf-8",
-		"",
-		"body",
-		"--mixed",
-		"Content-Type: application/pdf; name=\"report.pdf\"",
-		"Content-Disposition: attachment; filename=\"report.pdf\"",
-		"",
-		"PDFDATA",
-		"--mixed--",
-		"",
-	}, "\r\n")
-	if err := os.WriteFile(absPath, []byte(raw), 0o644); err != nil {
-		t.Fatalf("write backup eml: %v", err)
-	}
-
+	hasAttachments := true
 	idx := &backupIndex{Messages: map[string]backupIndexMessage{
 		"k": {
-			AccountEmail: "user@example.com",
-			FolderPath:   "INBOX",
-			Subject:      "With attachment",
-			Date:         "Sat, 04 Jul 2026 12:00:00 +0800",
-			EMLPath:      relPath,
-			Size:         len(raw),
+			AccountEmail:   "user@example.com",
+			FolderPath:     "INBOX",
+			Subject:        "With attachment",
+			Date:           "Sat, 04 Jul 2026 12:00:00 +0800",
+			EMLPath:        "missing/message.eml",
+			Size:           1024,
+			HasAttachments: &hasAttachments,
 		},
 	}}
 
-	messages := backupViewerMessages(dir, idx, "", "", 0)
+	messages := backupViewerMessages(idx, "", "", 0)
 	if len(messages) != 1 {
 		t.Fatalf("expected one message, got %d", len(messages))
 	}

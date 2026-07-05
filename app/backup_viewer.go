@@ -107,9 +107,10 @@ func (a *App) GetBackupViewerCatalog(directory string) (*BackupViewerCatalog, er
 		return catalog, nil
 	}
 
+	a.hydrateBackupViewerAttachmentFlags(idx)
 	catalog.MessageCount = len(idx.Messages)
 	catalog.Accounts = backupViewerAccounts(idx)
-	catalog.Messages = backupViewerMessages(cleanDir, idx, "", "", 0)
+	catalog.Messages = backupViewerMessages(idx, "", "", 0)
 	return catalog, nil
 }
 
@@ -133,7 +134,8 @@ func (a *App) SearchBackupViewerMessages(directory, accountEmail, query string, 
 	if !found {
 		return []BackupViewerMessageSummary{}, nil
 	}
-	return backupViewerMessages(cleanDir, idx, accountEmail, query, limit), nil
+	a.hydrateBackupViewerAttachmentFlags(idx)
+	return backupViewerMessages(idx, accountEmail, query, limit), nil
 }
 
 // GetBackupViewerMessage opens one indexed EML file and returns a sanitized detail view.
@@ -295,7 +297,55 @@ func backupViewerAccounts(idx *backupIndex) []BackupViewerAccount {
 	return accounts
 }
 
-func backupViewerMessages(directory string, idx *backupIndex, accountEmail, query string, limit int) []BackupViewerMessageSummary {
+func (a *App) hydrateBackupViewerAttachmentFlags(idx *backupIndex) {
+	if a == nil || a.db == nil || idx == nil || len(idx.Messages) == 0 {
+		return
+	}
+	hasMissing := false
+	for _, msg := range idx.Messages {
+		if msg.HasAttachments == nil {
+			hasMissing = true
+			break
+		}
+	}
+	if !hasMissing {
+		return
+	}
+
+	rows, err := a.db.Query(`
+		SELECT
+			m.account_id,
+			m.folder_id,
+			COALESCE(f.uid_validity, 0),
+			m.uid,
+			COALESCE(m.has_attachments, 0)
+		FROM messages m
+		INNER JOIN folders f ON f.id = m.folder_id
+	`)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var row backupMessageRow
+		var uid, uidValidity int64
+		var hasAttachments bool
+		if err := rows.Scan(&row.AccountID, &row.FolderID, &uidValidity, &uid, &hasAttachments); err != nil {
+			return
+		}
+		row.UIDValidity = uint32(uidValidity)
+		row.UID = uint32(uid)
+		entry, ok := idx.Messages[backupMessageKey(row)]
+		if !ok || entry.HasAttachments != nil {
+			continue
+		}
+		entry.HasAttachments = boolPtr(hasAttachments)
+		idx.Messages[backupMessageKey(row)] = entry
+	}
+}
+
+func backupViewerMessages(idx *backupIndex, accountEmail, query string, limit int) []BackupViewerMessageSummary {
 	accountEmail = strings.TrimSpace(strings.ToLower(accountEmail))
 	query = strings.TrimSpace(strings.ToLower(query))
 	if limit <= 0 && query != "" {
@@ -311,12 +361,13 @@ func backupViewerMessages(directory string, idx *backupIndex, accountEmail, quer
 			continue
 		}
 		summary := BackupViewerMessageSummary{
-			Key:          key,
-			AccountEmail: msg.AccountEmail,
-			FolderPath:   msg.FolderPath,
-			Subject:      msg.Subject,
-			Date:         msg.Date,
-			Size:         msg.Size,
+			Key:             key,
+			AccountEmail:    msg.AccountEmail,
+			FolderPath:      msg.FolderPath,
+			Subject:         msg.Subject,
+			Date:            msg.Date,
+			Size:            msg.Size,
+			AttachmentCount: backupViewerIndexedAttachmentCount(msg),
 		}
 		if query != "" && !backupViewerSummaryMatches(summary, query) {
 			continue
@@ -335,11 +386,6 @@ func backupViewerMessages(directory string, idx *backupIndex, accountEmail, quer
 	if limit > 0 && len(messages) > limit {
 		messages = messages[:limit]
 	}
-	for i := range messages {
-		if entry, ok := idx.Messages[messages[i].Key]; ok {
-			messages[i].AttachmentCount = backupViewerAttachmentCount(directory, entry)
-		}
-	}
 	return messages
 }
 
@@ -353,52 +399,8 @@ func backupViewerSummaryMatches(msg BackupViewerMessageSummary, query string) bo
 	return false
 }
 
-func backupViewerAttachmentCount(directory string, entry backupIndexMessage) int {
-	emlPath, err := backupIndexedFilePath(directory, entry.EMLPath)
-	if err != nil {
-		return 0
-	}
-	file, err := os.Open(emlPath)
-	if err != nil {
-		return 0
-	}
-	defer file.Close()
-
-	entity, err := gomessage.Read(file)
-	if err != nil {
-		return 0
-	}
-	return countBackupViewerEntityAttachments(entity)
-}
-
-func countBackupViewerEntityAttachments(entity *gomessage.Entity) int {
-	if entity == nil {
-		return 0
-	}
-	if mr := entity.MultipartReader(); mr != nil {
-		count := 0
-		for {
-			part, err := mr.NextPart()
-			if err == io.EOF {
-				break
-			}
-			if err != nil {
-				continue
-			}
-			count += countBackupViewerEntityAttachments(part)
-		}
-		return count
-	}
-
-	contentType, contentParams, _ := mime.ParseMediaType(entity.Header.Get("Content-Type"))
-	if contentType == "" {
-		contentType = "text/plain"
-	}
-	contentType = strings.ToLower(contentType)
-	disposition, dispositionParams, _ := mime.ParseMediaType(entity.Header.Get("Content-Disposition"))
-	disposition = strings.ToLower(disposition)
-	filename := backupViewerPartFilename(contentParams, dispositionParams)
-	if filename != "" || disposition == "attachment" || (!strings.HasPrefix(contentType, "text/") && contentType != "") {
+func backupViewerIndexedAttachmentCount(entry backupIndexMessage) int {
+	if entry.HasAttachments != nil && *entry.HasAttachments {
 		return 1
 	}
 	return 0

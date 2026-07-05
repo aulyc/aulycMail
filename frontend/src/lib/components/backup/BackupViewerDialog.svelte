@@ -48,6 +48,7 @@
   let errorMessage = $state('')
   let darkFilterEnabled = $state(false)
   let savingAttachmentIndexes = $state<Set<number>>(new Set())
+  let attachmentCountsByKey = $state<Record<string, number>>({})
 
   let searchOpen = $state(false)
   let searchQuery = $state('')
@@ -143,6 +144,7 @@
     loadingDetail = false
     errorMessage = ''
     savingAttachmentIndexes = new Set()
+    attachmentCountsByKey = {}
   }
 
   async function loadCatalog(dir: string, options: { fromHistory?: boolean; remember?: boolean } = {}) {
@@ -235,7 +237,9 @@
     selectedMessageKey = key
     loadingDetail = true
     try {
-      detail = await GetBackupViewerMessage(directory, key)
+      const loadedDetail = await GetBackupViewerMessage(directory, key)
+      detail = loadedDetail
+      updateMessageAttachmentCount(key, loadedDetail?.attachments?.length ?? 0)
     } catch (err) {
       console.error('Failed to load backup message:', err)
       detail = null
@@ -243,6 +247,16 @@
     } finally {
       loadingDetail = false
     }
+  }
+
+  function updateMessageAttachmentCount(key: string, count: number) {
+    if (!key) return
+    const attachmentCount = Math.max(0, count)
+    attachmentCountsByKey = { ...attachmentCountsByKey, [key]: attachmentCount }
+  }
+
+  function messageAttachmentCount(message: app.BackupViewerMessageSummary): number {
+    return attachmentCountsByKey[message.key] ?? message.attachmentCount ?? 0
   }
 
   function closeDialog() {
@@ -473,12 +487,12 @@
           onValueChange={(value) => void selectScope(value)}
           disabled={!catalog?.messageCount}
         >
-          <Select.Trigger class="h-10 w-[192px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
+          <Select.Trigger class="h-10 w-[220px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
             <Select.Value placeholder={$_('backupViewer.scopeAll')}>
               {selectedScope?.label ?? $_('backupViewer.scopeAll')}
             </Select.Value>
           </Select.Trigger>
-          <Select.Content class="z-[130]">
+          <Select.Content class="z-[130] min-w-[220px]">
             {#each accountScopes as scope (scope.id || 'all')}
               <Select.Item value={scope.id} label={formatScopeLabel(scope)} />
             {/each}
@@ -560,7 +574,7 @@
                   <span class="min-w-0 flex-1">
                     <span class="flex items-baseline gap-2">
                       <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{message.subject || $_('backupViewer.unknownSubject')}</span>
-                      {#if message.attachmentCount > 0}
+                      {#if messageAttachmentCount(message) > 0}
                         <span class="shrink-0 text-muted-foreground" title={$_('backupViewer.attachments')}>
                           <Icon icon="mdi:paperclip" class="h-3.5 w-3.5" />
                         </span>
@@ -751,7 +765,7 @@
                   <span class="min-w-0 flex-1">
                     <span class="flex min-w-0 items-baseline gap-2">
                       <span class="min-w-0 flex-1 truncate text-sm text-foreground">{result.subject || $_('backupViewer.unknownSubject')}</span>
-                      {#if result.attachmentCount > 0}
+                      {#if messageAttachmentCount(result) > 0}
                         <span class="shrink-0 text-muted-foreground" title={$_('backupViewer.attachments')}>
                           <Icon icon="mdi:paperclip" class="h-3.5 w-3.5" />
                         </span>
