@@ -42,7 +42,7 @@
   let opening = $state(false)
 
   const label = $derived(directory || placeholder || $_('backupViewer.directoryPlaceholder'))
-  const canOpen = $derived(Boolean(directory?.trim()) && !disabled && !openDisabled && !opening)
+  const canOpen = $derived(Boolean(directory?.trim()) && !disabled && !openDisabled)
 
   onMount(() => {
     history = loadBackupDirectoryHistory()
@@ -111,7 +111,7 @@
     event.preventDefault()
     event.stopPropagation()
     const path = directory.trim()
-    if (!path || !canOpen) return
+    if (!path || !canOpen || opening) return
     opening = true
     try {
       await onOpenDirectory?.(path)
@@ -143,7 +143,7 @@
     disabled={!canOpen}
     onclick={openDirectory}
   >
-    <Icon icon={opening ? 'mdi:loading' : 'mdi:folder-open-outline'} width="18" height="18" class={opening ? 'animate-spin' : ''} />
+    <Icon icon="mdi:folder-open-outline" width="18" height="18" />
   </button>
 
   {#if menuOpen}
