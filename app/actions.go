@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"time"
 
-	goImap "github.com/emersion/go-imap/v2"
 	"github.com/aulyc/aulycmail/internal/folder"
 	"github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/aulyc/aulycmail/internal/undo"
+	goImap "github.com/emersion/go-imap/v2"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -214,11 +214,6 @@ func (a *App) setStarredStatus(messageIDs []string, isStarred bool) error {
 	if err := a.messageStore.UpdateFlagsBatch(messageIDs, nil, isStarredPtr); err != nil {
 		return fmt.Errorf("failed to update local flags: %w", err)
 	}
-
-	wailsRuntime.EventsEmit(a.ctx, "messages:starredChanged", map[string]interface{}{
-		"messageIds": messageIDs,
-		"isStarred":  isStarred,
-	})
 
 	// Sync to IMAP in background with retry
 	go func() {

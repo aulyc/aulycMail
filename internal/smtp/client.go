@@ -320,15 +320,6 @@ func (c *Client) SendMail(from string, to []string, msg []byte) error {
 	return nil
 }
 
-// Reset resets the SMTP session, allowing a new message to be sent
-func (c *Client) Reset() error {
-	if c.client == nil {
-		return fmt.Errorf("not connected")
-	}
-
-	return c.client.Reset()
-}
-
 // loginAuth implements smtp.Auth for the LOGIN mechanism
 type loginAuth struct {
 	username string

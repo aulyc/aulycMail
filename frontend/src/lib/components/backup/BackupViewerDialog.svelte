@@ -3,17 +3,26 @@
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
   import * as Select from '$lib/components/ui/select'
+  import BackupDirectoryPicker from '$lib/components/backup/BackupDirectoryPicker.svelte'
   // @ts-ignore - wailsjs path
   import {
-    ChooseBackupDirectory,
     GetBackupSettings,
     GetBackupViewerCatalog,
     GetBackupViewerMessage,
     OpenBackupViewerDirectory,
+    SaveBackupViewerAttachmentAs,
     SearchBackupViewerMessages,
   } from '../../../../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import type { app } from '../../../../wailsjs/go/models'
+  import { toasts } from '$lib/stores/toast'
+  import { getThemeMode } from '$lib/stores/settings.svelte'
+  import { buildDarkMailFilterStyles } from '$lib/utils/dark-mail'
+  import { formatFileSize } from '$lib/utils/fileSize'
+  import {
+    rememberBackupDirectory,
+    removeBackupDirectory,
+  } from '$lib/utils/backup-directory-history'
 
   interface Props {
     open?: boolean
@@ -29,6 +38,7 @@
   let { open = $bindable(false), onClose }: Props = $props()
 
   let directory = $state('')
+  let directoryMenuOpen = $state(false)
   let catalog = $state<app.BackupViewerCatalog | null>(null)
   let selectedAccountEmail = $state('')
   let selectedMessageKey = $state('')
@@ -36,6 +46,8 @@
   let loadingCatalog = $state(false)
   let loadingDetail = $state(false)
   let errorMessage = $state('')
+  let darkFilterEnabled = $state(false)
+  let savingAttachmentIndexes = $state<Set<number>>(new Set())
 
   let searchOpen = $state(false)
   let searchQuery = $state('')
@@ -58,7 +70,14 @@
     })),
   ])
   const selectedScope = $derived(accountScopes.find((scope) => scope.id === selectedAccountEmail) ?? accountScopes[0])
+  const detailHeaderTitle = $derived(detail ? (detail.subject || $_('backupViewer.unknownSubject')) : $_('backupViewer.messageDetail'))
   const searchScopeIndex = $derived(Math.max(0, accountScopes.findIndex((scope) => scope.id === searchScopeEmail)))
+  const darkFilterStyle = $derived.by(() => {
+    void getThemeMode()
+    if (!darkFilterEnabled) return ''
+    const styles = buildDarkMailFilterStyles()
+    return `background-color: ${styles.surfaceBackground}; --backup-viewer-content-filter: ${styles.contentFilter}; --backup-viewer-media-filter: ${styles.mediaFilter};`
+  })
   const visibleMessages = $derived.by(() => {
     const source = catalog?.messages ?? []
     if (!selectedAccountEmail) return source
@@ -69,7 +88,7 @@
     if (open) {
       void initialize()
     } else {
-      closeSearch()
+      resetViewerContent()
     }
   })
 
@@ -78,33 +97,70 @@
     void centerScope(searchScopeStripEl, searchScopeIndex)
   })
 
+  $effect(() => {
+    if (!open) return
+    window.addEventListener('keydown', onDialogKeydown, { capture: true })
+    return () => window.removeEventListener('keydown', onDialogKeydown, { capture: true })
+  })
+
+  function onDialogKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return
+    event.preventDefault()
+    event.stopPropagation()
+    event.stopImmediatePropagation()
+    if (directoryMenuOpen) {
+      directoryMenuOpen = false
+      return
+    }
+    if (searchOpen) {
+      closeSearch()
+      return
+    }
+    closeDialog()
+  }
+
   async function initialize() {
-    errorMessage = ''
+    resetViewerContent()
     try {
       const settings = await GetBackupSettings()
-      directory = settings?.directory || directory
-      if (directory) {
-        await loadCatalog(directory)
-      } else {
-        catalog = null
-        selectedAccountEmail = ''
-        selectedMessageKey = ''
-        detail = null
+      if (settings?.directory) {
+        rememberBackupDirectory(settings.directory)
       }
     } catch (err) {
-      console.error('Failed to initialize backup viewer:', err)
-      errorMessage = $_('backupViewer.loadFailed')
+      console.warn('Failed to seed backup viewer directory history:', err)
     }
   }
 
-  async function loadCatalog(dir: string) {
+  function resetViewerContent() {
+    closeSearch()
+    directoryMenuOpen = false
+    directory = ''
+    catalog = null
+    selectedAccountEmail = ''
+    selectedMessageKey = ''
+    detail = null
+    loadingCatalog = false
+    loadingDetail = false
+    errorMessage = ''
+    savingAttachmentIndexes = new Set()
+  }
+
+  async function loadCatalog(dir: string, options: { fromHistory?: boolean; remember?: boolean } = {}) {
     if (!dir.trim()) return
     loadingCatalog = true
     errorMessage = ''
+    catalog = null
+    detail = null
+    selectedMessageKey = ''
+    selectedAccountEmail = ''
+    directory = dir.trim()
     try {
       const result = await GetBackupViewerCatalog(dir)
       catalog = result
       directory = result?.directory || dir
+      if (options.remember) {
+        rememberBackupDirectory(directory)
+      }
       const availableScopes = new Set(['', ...((result?.accounts ?? []).map((account) => account.accountEmail))])
       if (!availableScopes.has(selectedAccountEmail)) {
         selectedAccountEmail = ''
@@ -112,25 +168,28 @@
       await selectFirstVisibleMessage()
     } catch (err) {
       console.error('Failed to load backup catalog:', err)
-      catalog = null
-      detail = null
-      selectedMessageKey = ''
-      errorMessage = $_('backupViewer.loadFailed')
+      const failedPath = dir.trim()
+      resetViewerContent()
+      if (options.fromHistory) {
+        removeBackupDirectory(failedPath)
+        const message = $_('backupViewer.historyPathMissing', { values: { path: failedPath } })
+        errorMessage = message
+        toasts.error(message)
+      } else {
+        errorMessage = $_('backupViewer.loadFailed')
+      }
     } finally {
       loadingCatalog = false
     }
   }
 
-  async function chooseDirectory() {
-    try {
-      const selected = await ChooseBackupDirectory()
-      if (!selected) return
-      directory = selected
-      selectedAccountEmail = ''
-      await loadCatalog(selected)
-    } catch (err) {
-      console.error('Failed to choose backup directory:', err)
-      errorMessage = $_('backupViewer.chooseDirectoryFailed')
+  function handleChooseDirectoryError() {
+    errorMessage = $_('backupViewer.chooseDirectoryFailed')
+  }
+
+  function handleRemoveDirectoryHistory(path: string) {
+    if (directory === path) {
+      clearDirectory()
     }
   }
 
@@ -155,12 +214,7 @@
   }
 
   function clearDirectory() {
-    directory = ''
-    catalog = null
-    selectedAccountEmail = ''
-    selectedMessageKey = ''
-    detail = null
-    errorMessage = ''
+    resetViewerContent()
   }
 
   async function selectFirstVisibleMessage() {
@@ -192,8 +246,27 @@
   }
 
   function closeDialog() {
+    resetViewerContent()
     open = false
     onClose?.()
+  }
+
+  async function saveBackupAttachment(attachment: app.BackupViewerAttachment, fallbackIndex: number) {
+    if (!directory.trim() || !detail?.key) return
+    const index = typeof attachment.index === 'number' ? attachment.index : fallbackIndex
+    savingAttachmentIndexes = new Set([...savingAttachmentIndexes, index])
+    try {
+      const path = await SaveBackupViewerAttachmentAs(directory, detail.key, index)
+      if (path) {
+        toasts.success($_('toast.attachmentSaved', { values: { filename: attachment.filename } }))
+      }
+    } catch (err) {
+      console.error('Failed to save backup attachment:', err)
+      errorMessage = $_('backupViewer.attachmentSaveFailed')
+      toasts.error($_('toast.failedToSaveAttachment', { values: { filename: attachment.filename } }))
+    } finally {
+      savingAttachmentIndexes = new Set([...savingAttachmentIndexes].filter((value) => value !== index))
+    }
   }
 
   function openSearch() {
@@ -329,30 +402,29 @@
     return new Promise((resolve) => requestAnimationFrame(() => resolve()))
   }
 
+  function parseViewerDate(value: string): Date | null {
+    if (!value) return null
+    const trimmed = value.trim()
+    const goTimeMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(?:\.\d+)?\s+([+-]\d{4})\s+\S+$/)
+    const normalized = goTimeMatch
+      ? `${goTimeMatch[1]}T${goTimeMatch[2]}${goTimeMatch[3].slice(0, 3)}:${goTimeMatch[3].slice(3)}`
+      : trimmed
+    const date = new Date(normalized)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
   function formatDate(value: string): string {
     if (!value) return ''
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return value
+    const date = parseViewerDate(value)
+    if (!date) return value
     return date.toLocaleString()
   }
 
   function formatShortDate(value: string): string {
     if (!value) return ''
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return value
-    return date.toLocaleDateString()
-  }
-
-  function formatSize(size: number): string {
-    if (!size || size < 0) return ''
-    const units = ['B', 'KB', 'MB', 'GB']
-    let value = size
-    let unit = 0
-    while (value >= 1024 && unit < units.length - 1) {
-      value /= 1024
-      unit += 1
-    }
-    return `${value >= 10 || unit === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unit]}`
+    const date = parseViewerDate(value)
+    if (!date) return value
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
   }
 
   function formatScopeLabel(scope: Scope | undefined): string {
@@ -382,66 +454,84 @@
         </button>
       </header>
 
-      <section class="border-b border-border px-5 py-4">
-        <div class="flex items-center gap-3">
-          <div class="relative min-w-0 flex-1">
-            <input
-              id="backup-viewer-directory"
-              value={directory}
-              readonly
-              placeholder={$_('backupViewer.directoryPlaceholder')}
-              class="h-10 w-full min-w-0 rounded-md border border-border bg-background py-0 pl-3 pr-11 text-sm text-foreground outline-none"
-            />
-            <button
-              type="button"
-              class="absolute right-1.5 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded border border-border text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              aria-label={$_('backupViewer.chooseDirectory')}
-              title={$_('backupViewer.chooseDirectory')}
-              onclick={chooseDirectory}
-            >
-              <Icon icon="mdi:folder-outline" width="17" height="17" />
-            </button>
-          </div>
-          <Select.Root
-            value={selectedAccountEmail}
-            onValueChange={(value) => void selectScope(value)}
-            disabled={!catalog?.messageCount}
-          >
-            <Select.Trigger class="h-10 w-[230px] shrink-0">
-              <Select.Value placeholder={$_('backupViewer.scopeAll')}>
-                {formatScopeLabel(selectedScope)}
-              </Select.Value>
-            </Select.Trigger>
-            <Select.Content>
-              {#each accountScopes as scope (scope.id || 'all')}
-                <Select.Item value={scope.id} label={formatScopeLabel(scope)} />
-              {/each}
-            </Select.Content>
-          </Select.Root>
-          <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-50" disabled={!directory} onclick={openDirectory}>
-            {$_('backupViewer.openDirectory')}
-          </button>
-          <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-50" disabled={!directory} onclick={clearDirectory}>
-            {$_('backupViewer.clearDirectory')}
-          </button>
-          <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md border border-border px-3 text-sm font-semibold hover:bg-muted disabled:opacity-50" disabled={!directory || loadingCatalog} onclick={refreshCatalog}>
-            <Icon icon="mdi:refresh" width="18" height="18" class={loadingCatalog ? 'animate-spin' : ''} />
-            {$_('backupViewer.refresh')}
-          </button>
-          <button type="button" class="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50" disabled={!catalog?.messageCount} onclick={openSearch}>
-            <Icon icon="mdi:magnify" width="18" height="18" />
-            {$_('backupViewer.search')}
-          </button>
-        </div>
-        {#if errorMessage}
-          <p class="mt-3 text-sm text-destructive">{errorMessage}</p>
-        {/if}
-      </section>
-
-      <div class="grid min-h-0 flex-1 overflow-hidden grid-cols-[38%_1fr]">
+      <div class="grid min-h-0 flex-1 overflow-hidden grid-cols-[45%_1fr]">
         <section class="flex min-h-0 flex-col border-r border-border">
+          <div class="shrink-0 border-b border-border px-4 py-3">
+            <BackupDirectoryPicker
+              bind:menuOpen={directoryMenuOpen}
+              {directory}
+              placeholder={$_('backupViewer.directoryPlaceholder')}
+              onChoose={(path) => loadCatalog(path, { remember: true })}
+              onChooseError={handleChooseDirectoryError}
+              onSelectHistory={(path) => loadCatalog(path, { fromHistory: true, remember: true })}
+              onRemoveHistory={handleRemoveDirectoryHistory}
+              onOpenDirectory={() => openDirectory()}
+            />
+            {#if errorMessage}
+              <p class="mt-2 text-sm text-destructive">{errorMessage}</p>
+            {/if}
+          </div>
           <div class="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
-            <h3 class="text-sm font-semibold">{$_('backupViewer.mailList')}</h3>
+            <div class="flex min-w-0 items-center gap-1">
+              <Select.Root
+                value={selectedAccountEmail}
+                onValueChange={(value) => void selectScope(value)}
+                disabled={!catalog?.messageCount}
+              >
+                <Select.Trigger class="h-10 w-[176px] border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
+                  <Select.Value placeholder={$_('backupViewer.scopeAll')}>
+                    {selectedScope?.label ?? $_('backupViewer.scopeAll')}
+                  </Select.Value>
+                </Select.Trigger>
+                <Select.Content class="z-[130]">
+                  {#each accountScopes as scope (scope.id || 'all')}
+                    <Select.Item value={scope.id} label={formatScopeLabel(scope)} />
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+              <div class="flex shrink-0 items-center gap-0.5" role="toolbar" aria-label={$_('backupViewer.title')}>
+                <button
+                  type="button"
+                  class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!directory}
+                  title={$_('backupViewer.openDirectory')}
+                  aria-label={$_('backupViewer.openDirectory')}
+                  onclick={openDirectory}
+                >
+                  <Icon icon="mdi:folder-open-outline" class="h-5 w-5 text-muted-foreground" />
+                </button>
+                <button
+                  type="button"
+                  class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!directory}
+                  title={$_('backupViewer.clearDirectory')}
+                  aria-label={$_('backupViewer.clearDirectory')}
+                  onclick={clearDirectory}
+                >
+                  <Icon icon="mdi:folder-remove-outline" class="h-5 w-5 text-muted-foreground" />
+                </button>
+                <button
+                  type="button"
+                  class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!directory || loadingCatalog}
+                  title={$_('backupViewer.refresh')}
+                  aria-label={$_('backupViewer.refresh')}
+                  onclick={refreshCatalog}
+                >
+                  <Icon icon="mdi:refresh" class="h-5 w-5 text-muted-foreground {loadingCatalog ? 'animate-spin' : ''}" />
+                </button>
+                <button
+                  type="button"
+                  class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!catalog?.messageCount}
+                  title={$_('backupViewer.search')}
+                  aria-label={$_('backupViewer.search')}
+                  onclick={openSearch}
+                >
+                  <Icon icon="mdi:magnify" class="h-5 w-5 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
             <span class="text-xs text-muted-foreground">{visibleMessages.length}</span>
           </div>
           {#if loadingCatalog}
@@ -484,11 +574,23 @@
         </section>
 
         <section class="flex min-h-0 flex-col overflow-hidden">
-          <div class="flex h-11 shrink-0 items-center justify-between border-b border-border px-5">
-            <h3 class="text-sm font-semibold">{$_('backupViewer.messageDetail')}</h3>
-            {#if detail?.size}
-              <span class="text-xs text-muted-foreground">{formatSize(detail.size)}</span>
-            {/if}
+          <div class="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border px-5">
+            <h3 class="min-w-0 flex-1 truncate text-sm font-semibold" title={detailHeaderTitle}>{detailHeaderTitle}</h3>
+            <div class="flex shrink-0 items-center gap-2">
+              {#if detail?.size}
+                <span class="text-xs text-muted-foreground">{formatFileSize(detail.size)}</span>
+              {/if}
+              <button
+                type="button"
+                class="rounded-md p-1.5 transition-colors hover:bg-muted"
+                aria-pressed={darkFilterEnabled}
+                aria-label={$_('backupViewer.darkFilter')}
+                title={$_('backupViewer.darkFilter')}
+                onclick={() => darkFilterEnabled = !darkFilterEnabled}
+              >
+                <Icon icon={darkFilterEnabled ? 'mdi:white-balance-sunny' : 'mdi:weather-night'} class="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
           </div>
           {#if loadingDetail}
             <div class="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
@@ -502,7 +604,6 @@
             </div>
           {:else}
             <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-thin">
-              <h2 class="mb-3 text-xl font-semibold">{detail.subject || $_('backupViewer.unknownSubject')}</h2>
               <div class="mb-5 space-y-1 rounded-md border border-border bg-muted/20 p-3 text-sm">
                 <div class="grid grid-cols-[88px_1fr] gap-2">
                   <span class="text-muted-foreground">{$_('backupViewer.from')}</span>
@@ -534,15 +635,17 @@
                 </div>
               </div>
 
-              <div class="backup-viewer-body rounded-md border border-border bg-background p-4">
-                {#if detail.hasHTML}
-                  <!-- eslint-disable-next-line svelte/no-at-html-tags -- backup viewer HTML is sanitized in Go before it reaches the UI -->
-                  {@html detail.bodyHTML}
-                {:else if detail.bodyText}
-                  <pre class="whitespace-pre-wrap break-words font-sans text-sm leading-6 text-foreground">{detail.bodyText}</pre>
-                {:else}
-                  <p class="text-sm text-muted-foreground">{$_('backupViewer.noBody')}</p>
-                {/if}
+              <div class="backup-viewer-body rounded-md border border-border bg-background p-4" style={darkFilterStyle}>
+                <div class="backup-viewer-mail-content {darkFilterEnabled ? 'backup-viewer-dark-filter' : ''}">
+                  {#if detail.hasHTML}
+                    <!-- eslint-disable-next-line svelte/no-at-html-tags -- backup viewer HTML is sanitized in Go before it reaches the UI -->
+                    {@html detail.bodyHTML}
+                  {:else if detail.bodyText}
+                    <pre class="whitespace-pre-wrap break-words font-sans text-sm leading-6">{detail.bodyText}</pre>
+                  {:else}
+                    <p class="text-sm text-muted-foreground">{$_('backupViewer.noBody')}</p>
+                  {/if}
+                </div>
               </div>
 
               {#if detail.attachments?.length}
@@ -550,12 +653,25 @@
                   <h3 class="mb-2 text-sm font-semibold">{$_('backupViewer.attachments')}</h3>
                   <div class="space-y-2">
                     {#each detail.attachments as attachment, index (attachment.filename + '-' + index)}
-                      <div class="flex items-center gap-3 rounded-md border border-border bg-muted/20 px-3 py-2">
-                        <Icon icon="mdi:paperclip" class="h-4 w-4 text-muted-foreground" />
+                      {@const attachmentIndex = typeof attachment.index === 'number' ? attachment.index : index}
+                      {@const isSavingAttachment = savingAttachmentIndexes.has(attachmentIndex)}
+                      <button
+                        type="button"
+                        class="flex w-full items-center gap-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-left transition hover:bg-muted/40 disabled:cursor-wait disabled:opacity-70"
+                        disabled={isSavingAttachment}
+                        title={$_('attachment.download')}
+                        onclick={() => saveBackupAttachment(attachment, index)}
+                      >
+                        {#if isSavingAttachment}
+                          <Icon icon="mdi:loading" class="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                        {:else}
+                          <Icon icon="mdi:paperclip" class="h-4 w-4 shrink-0 text-muted-foreground" />
+                        {/if}
                         <span class="min-w-0 flex-1 truncate text-sm">{attachment.filename}</span>
                         <span class="text-xs text-muted-foreground">{attachment.contentType}</span>
-                        <span class="text-xs text-muted-foreground">{formatSize(attachment.size)}</span>
-                      </div>
+                        <span class="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</span>
+                        <Icon icon="mdi:download" class="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
                     {/each}
                   </div>
                 </div>
@@ -658,6 +774,10 @@
     line-height: 1.6;
   }
 
+  :global(.backup-viewer-mail-content) {
+    min-height: 2rem;
+  }
+
   :global(.backup-viewer-body p) {
     margin: 0 0 0.75rem;
   }
@@ -670,5 +790,23 @@
   :global(.backup-viewer-body img) {
     max-width: 100%;
     height: auto;
+  }
+
+  :global(.backup-viewer-mail-content.backup-viewer-dark-filter) {
+    background: #fff;
+    color: #1a1a0a;
+    color-scheme: dark;
+    filter: var(--backup-viewer-content-filter);
+  }
+
+  :global(.backup-viewer-mail-content.backup-viewer-dark-filter a) {
+    color: #2563eb;
+  }
+
+  :global(.backup-viewer-mail-content.backup-viewer-dark-filter img:not([data-blocked-src])),
+  :global(.backup-viewer-mail-content.backup-viewer-dark-filter video),
+  :global(.backup-viewer-mail-content.backup-viewer-dark-filter iframe),
+  :global(.backup-viewer-mail-content.backup-viewer-dark-filter [data-no-invert]) {
+    filter: var(--backup-viewer-media-filter);
   }
 </style>

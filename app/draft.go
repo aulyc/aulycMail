@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	goImap "github.com/emersion/go-imap/v2"
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/draft"
 	"github.com/aulyc/aulycmail/internal/folder"
@@ -14,6 +13,7 @@ import (
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/aulyc/aulycmail/internal/smtp"
+	goImap "github.com/emersion/go-imap/v2"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -33,11 +33,10 @@ type draftBody struct {
 type syncStatusEmitter func(status draft.SyncStatus, imapUID uint32, syncError string)
 
 // ============================================================================
-// draftOps — shared draft logic used by both App and ComposerApp
+// draftOps — shared draft logic
 // ============================================================================
 
-// draftOps contains shared draft operation logic used by both App and ComposerApp.
-// This prevents divergence between in-window and detached composer draft handling.
+// draftOps contains shared draft operation logic for compose flows.
 type draftOps struct {
 	accountStore *account.Store
 	folderStore  *folder.Store

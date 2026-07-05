@@ -838,7 +838,7 @@ Three scoped surfaces. `KV` and `Secrets` are extension-isolated by `extensionID
 
 Pick Pattern A when only your extension has any business with the credential. Pick Pattern B when the credential's lifecycle is tied to a host-level concept (an account, a shared resource) and your extension is just a consumer.
 
-**`KV` — Phase 1 stub.** `storageCoreImpl.KV(extensionID)` returns a `stubKV` whose four methods return `ErrUnimplemented`. The interface is stable, but no consumer needs it today: every first-party extension that has settled storage needs either uses its own per-extension SQLite (Calendar's `meta` table for the display tz; Contacts via its existing schema) or uses `Secrets`/`HostSecrets` for credential material. KV gets wired (likely via a shared `ext_kv` table indexed on extensionID) when a real consumer arrives.
+**`KV` — Phase 1 stub.** `storageCoreImpl.KV(extensionID)` returns a `stubKV` whose four methods return `ErrUnimplemented`. The interface is stable, but no consumer needs it today: every first-party extension that has settled storage needs either uses its own per-extension SQLite (Calendar's `meta` table for the display tz; Contacts via its existing schema) or uses `Secrets`/`HostSecrets` for credential material. KV gets wired when a real consumer arrives.
 
 **`Secrets` (Pattern A) — wired.** `storageCoreImpl.Secrets(extensionID)` returns a `secretsCoreImpl` that delegates to `internal/credentials.Store`'s extension-scoped helpers, which run keyring-first with an AES-encrypted DB-table fallback when the OS keyring is unavailable. Extensions never import `internal/credentials` directly — the four methods cover the whole credential lifecycle:
 - `Set` — empty value short-circuits to `Delete`.
@@ -914,7 +914,7 @@ Use `errors.Is(err, coreapi.ErrXxx)` for sentinel matching. `ErrAdditionalConsen
 
 ## Per-extension storage
 
-Package: [`internal/extensions/`](../internal/extensions/) (files [`store.go`](../internal/extensions/store.go) and [`kv.go`](../internal/extensions/kv.go)).
+Package: [`internal/extensions/`](../internal/extensions/) (file [`store.go`](../internal/extensions/store.go)).
 
 ```go
 import "github.com/aulyc/aulycmail/internal/extensions"
@@ -931,15 +931,13 @@ func NewStore(dataDir string) (*extensions.Store, error) {
 
 1. Resolves the path to `<dataDir>/extensions/<name>/data.db` (creates parent dirs with 0700 perms)
 2. Opens the DB via the standard `database.Open` (inherits WAL, busy timeout, 0600 file perms, etc.)
-3. Creates the canonical `ext_kv` table BEFORE user migrations run, so KV is always available even with zero user tables
-4. Creates an extension-private `migrations` table and applies user migrations in version order, idempotently
+3. Creates an extension-private `migrations` table and applies user migrations in version order, idempotently
 
 **Reaching the SQL:**
 
 ```go
 db := store.DB()           // *sql.DB; for the extension's own tables only
 store.Path()               // on-disk file path
-kv := store.KV()           // coreapi.KVStore backed by ext_kv table
 ```
 
 **Migrations** start at version 1, increment monotonically. Each runs inside a transaction. Already-applied versions are skipped on every startup. Each extension's migration sequence is INDEPENDENT — no global migration namespace.
@@ -948,7 +946,7 @@ kv := store.KV()           // coreapi.KVStore backed by ext_kv table
 
 **Lifecycle:** Per the architecture doc, stores open EAGERLY at `App.Startup`, regardless of whether the extension is currently enabled. This keeps schemas valid across enable/disable cycles — users can disable, the migrations stay applied, re-enabling is instantaneous.
 
-**KV namespace:** [`internal/extensions/kv.go`](../internal/extensions/kv.go) implements `coreapi.KVStore` backed by the `ext_kv` table. Use it for sync tokens, view prefs, anything that doesn't warrant its own table. `Get` returns `("", nil)` for missing keys (no error). `Delete` is idempotent. `List(prefix)` returns sorted keys; `prefix=""` returns all.
+**KV namespace:** host-provided `coreapi.Storage.KV` is still a Phase 1 stub (see [§ Storage](#storage)). Store small extension config in your own migration-defined tables until a real KV consumer appears.
 
 ---
 
@@ -2165,7 +2163,7 @@ These are non-negotiable and apply equally to first-party and (hypothetical) thi
 
 Extensions interact with aulycmail exclusively through the `coreapi.Core` surfaces listed in [§ `coreapi` reference](#coreapi-reference). They:
 
-- DO NOT import any package from `internal/` outside `internal/extensions/` (and only the store/kv helpers there) and `internal/core/api/v1/`.
+- DO NOT import any package from `internal/` outside `internal/extensions/` (only the store helper there) and `internal/core/api/v1/`.
 - DO NOT call functions in `app/`, `internal/account/`, `internal/folder/`, `internal/message/`, `internal/draft/`, `internal/contact/`, `internal/carddav/`, `internal/imap/`, `internal/smtp/`, `internal/oauth2/`, `internal/credentials/`, etc., directly.
 - DO NOT query, read, or write any table in aulycmail's main database (`aulycmail.db`). The accounts/folders/messages/contacts/drafts tables are core-owned and off-limits.
 - DO NOT shell out, monkey-patch, or use `reflect`/build-tag tricks to do any of the above indirectly.
@@ -2174,7 +2172,7 @@ The Contacts extension *is allowed* to receive a `*database.DB` handle to aulycm
 
 **2. If the extension needs persistence, it brings its own database.**
 
-Per-extension SQLite is the only persistence path. Use [`internal/extensions.OpenStore`](../internal/extensions/store.go) (see [§ Per-extension storage](#per-extension-storage)). That opens `<dataDir>/extensions/<name>/data.db`, applies the extension's own migrations, and gives back a `*sql.DB` scoped to that file only. Tiny config (sync tokens, view prefs) can go in the auto-created `ext_kv` table via `coreapi.Storage.KV`.
+Per-extension SQLite is the only persistence path. Use [`internal/extensions.OpenStore`](../internal/extensions/store.go) (see [§ Per-extension storage](#per-extension-storage)). That opens `<dataDir>/extensions/<name>/data.db`, applies the extension's own migrations, and gives back a `*sql.DB` scoped to that file only. Tiny config (sync tokens, view prefs) should live in the extension's own migration-defined tables until host KV is implemented.
 
 If the extension wants to read or write data aulycmail itself owns (e.g., list messages, insert a contact, move a message), the only legitimate path is calling the relevant `coreapi` interface method — and only if that method already exists and is implemented. If it doesn't exist or returns `ErrUnimplemented`, see [§ Requesting a new extension API](#requesting-a-new-extension-api) below.
 

@@ -63,22 +63,11 @@ func (a *App) UpdateLocalFlags(messageIDs []string, isRead, isStarred *bool) err
 	if err != nil {
 		return err
 	}
-	// Emit a per-flag event so each listener sees the typed payload it
-	// expects. UpdateLocalFlags is called by undo commands; today each
-	// command flips exactly one flag (either read or starred), so in
-	// practice only one branch fires. The if/if (not if/else) shape
-	// covers a hypothetical future undo that combines both without
-	// changing this call site.
+	// Emit read-state events for the only flag payload the frontend listens to.
 	if isRead != nil {
 		wailsRuntime.EventsEmit(a.ctx, "messages:readChanged", map[string]interface{}{
 			"messageIds": messageIDs,
 			"isRead":     *isRead,
-		})
-	}
-	if isStarred != nil {
-		wailsRuntime.EventsEmit(a.ctx, "messages:starredChanged", map[string]interface{}{
-			"messageIds": messageIDs,
-			"isStarred":  *isStarred,
 		})
 	}
 	return nil

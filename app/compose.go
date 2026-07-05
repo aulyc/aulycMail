@@ -35,8 +35,7 @@ type ComposerAttachment struct {
 	Data        string `json:"data"` // Base64 encoded
 }
 
-// composeOps holds shared dependencies for compose-related operations
-// used by both App and ComposerApp.
+// composeOps holds shared dependencies for compose-related operations.
 type composeOps struct {
 	accountStore  *account.Store
 	folderStore   *folder.Store

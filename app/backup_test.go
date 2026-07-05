@@ -106,6 +106,14 @@ func TestBackupIndexRoundTrip(t *testing.T) {
 	}
 }
 
+func TestParseBackupTimeAcceptsGoTimeString(t *testing.T) {
+	got := parseBackupTime("2025-10-09 10:59:15 +0000 UTC")
+	want := time.Date(2025, 10, 9, 10, 59, 15, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("time mismatch\nwant: %s\n got: %s", want, got)
+	}
+}
+
 func TestBackupIndexedFilePathRejectsTraversal(t *testing.T) {
 	dir := t.TempDir()
 
@@ -167,6 +175,9 @@ func TestParseBackupViewerEMLExtractsBodyAndAttachments(t *testing.T) {
 	}
 	if len(detail.Attachments) != 1 || detail.Attachments[0].Filename != "report.pdf" {
 		t.Fatalf("attachment mismatch: %#v", detail.Attachments)
+	}
+	if detail.Attachments[0].Index != 0 {
+		t.Fatalf("attachment index mismatch: %d", detail.Attachments[0].Index)
 	}
 	if got := strings.Join(detail.To, ", "); got != "Bob <bob@example.com>" {
 		t.Fatalf("address mismatch: %q", got)

@@ -175,9 +175,8 @@ func (s *Store) searchUnified(query string, limit int) ([]*Contact, error) {
 }
 
 // mapSourceForLegacy maps the unified `source` column values onto the legacy
-// Contact.Source string. The frontend, MergeResults, and a couple of older
-// callers expect "aulycmail" for local contacts — preserving the mapping keeps
-// those callers unchanged.
+// Contact.Source string. Older callers expect "aulycmail" for local contacts;
+// preserving the mapping keeps those callers unchanged.
 func mapSourceForLegacy(source string) string {
 	if source == "local" {
 		return "aulycmail"
@@ -706,66 +705,6 @@ func (s *Store) Count() (int, error) {
 	var count int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM contact_emails`).Scan(&count)
 	return count, err
-}
-
-// MergeResults merges contacts from multiple sources and deduplicates by email.
-// Public function preserved for back-compat.
-//
-// Ranking: send count > recency > source priority.
-func MergeResults(sources ...[]*Contact) []*Contact {
-	byEmail := make(map[string]*Contact)
-	for _, contacts := range sources {
-		for _, c := range contacts {
-			email := strings.ToLower(c.Email)
-			existing, exists := byEmail[email]
-			if !exists {
-				byEmail[email] = c
-				continue
-			}
-			if c.SendCount > existing.SendCount {
-				byEmail[email] = c
-				continue
-			}
-			if c.SendCount == existing.SendCount && c.LastUsed.After(existing.LastUsed) {
-				byEmail[email] = c
-				continue
-			}
-			if c.SendCount == existing.SendCount && sourcePriority(c.Source) > sourcePriority(existing.Source) {
-				byEmail[email] = c
-			}
-		}
-	}
-	result := make([]*Contact, 0, len(byEmail))
-	for _, c := range byEmail {
-		result = append(result, c)
-	}
-	sort.Slice(result, func(i, j int) bool {
-		if result[i].SendCount != result[j].SendCount {
-			return result[i].SendCount > result[j].SendCount
-		}
-		if !result[i].LastUsed.Equal(result[j].LastUsed) {
-			return result[i].LastUsed.After(result[j].LastUsed)
-		}
-		return result[i].Email < result[j].Email
-	})
-	return result
-}
-
-// sourcePriority returns the priority of a contact source (higher is better).
-// "aulycmail" and "local" are equivalent (legacy / new naming for the same thing).
-func sourcePriority(source string) int {
-	switch source {
-	case "aulycmail", "local":
-		return 4
-	case "vcard":
-		return 3
-	case "carddav":
-		return 2
-	case "google":
-		return 1
-	default:
-		return 0
-	}
 }
 
 // ---------------------------------------------------------------------------

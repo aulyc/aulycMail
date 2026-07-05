@@ -10,6 +10,7 @@ package platform
 
 typedef struct {
 	const char* settings;
+	const char* backupViewer;
 	const char* about;
 	const char* quit;
 	const char* edit;
@@ -26,8 +27,8 @@ void installAppMenu(AulycMenuLabels labels);
 import "C"
 import "unsafe"
 
-// menuHandler is invoked when a custom App-menu item (Settings / About) is
-// chosen. Set via SetMenuHandler. Receives an action key ("settings"/"about").
+// menuHandler is invoked when a custom App-menu item is chosen. Set via
+// SetMenuHandler. Receives an action key ("settings"/"backupViewer"/"about").
 var menuHandler func(action string)
 
 //export goMenuAction
@@ -44,16 +45,16 @@ func goMenuAction(action *C.char) {
 
 // MenuLabels holds the localized strings for the custom application menu.
 type MenuLabels struct {
-	Settings, About, Quit, Edit, Undo, Redo, Cut, Copy, Paste, Delete string
+	Settings, BackupViewer, About, Quit, Edit, Undo, Redo, Cut, Copy, Paste, Delete string
 }
 
-// SetMenuHandler registers the function called when the Settings or About
-// App-menu item is chosen.
+// SetMenuHandler registers the function called when a custom App-menu item is
+// chosen.
 func SetMenuHandler(fn func(action string)) { menuHandler = fn }
 
 // InstallAppMenu replaces the application's main menu with a minimal one:
 //
-//	App menu : Settings, About, Quit
+//	App menu : Settings, Backup Viewer, About, Quit
 //	Edit menu: Undo, Redo, Cut, Copy, Paste, Delete (native selectors, so the
 //	           webview's copy/paste/undo actually work)
 //
@@ -61,6 +62,7 @@ func SetMenuHandler(fn func(action string)) { menuHandler = fn }
 // runs after Wails has installed its own default menu, replacing it.
 func InstallAppMenu(l MenuLabels) {
 	cs := C.CString(l.Settings)
+	cb := C.CString(l.BackupViewer)
 	ca := C.CString(l.About)
 	cq := C.CString(l.Quit)
 	ce := C.CString(l.Edit)
@@ -71,6 +73,7 @@ func InstallAppMenu(l MenuLabels) {
 	cv := C.CString(l.Paste)
 	cd := C.CString(l.Delete)
 	defer C.free(unsafe.Pointer(cs))
+	defer C.free(unsafe.Pointer(cb))
 	defer C.free(unsafe.Pointer(ca))
 	defer C.free(unsafe.Pointer(cq))
 	defer C.free(unsafe.Pointer(ce))
@@ -82,15 +85,16 @@ func InstallAppMenu(l MenuLabels) {
 	defer C.free(unsafe.Pointer(cd))
 
 	C.installAppMenu(C.AulycMenuLabels{
-		settings:   cs,
-		about:      ca,
-		quit:       cq,
-		edit:       ce,
-		undo:       cu,
-		redo:       cr,
-		cut:        cx,
-		copy:       cc,
-		paste:      cv,
-		deleteItem: cd,
+		settings:     cs,
+		backupViewer: cb,
+		about:        ca,
+		quit:         cq,
+		edit:         ce,
+		undo:         cu,
+		redo:         cr,
+		cut:          cx,
+		copy:         cc,
+		paste:        cv,
+		deleteItem:   cd,
 	})
 }

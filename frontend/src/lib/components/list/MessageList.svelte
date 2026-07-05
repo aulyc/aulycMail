@@ -192,8 +192,7 @@
         }
       }),
 
-      // Listen for message read-state changes. Star changes ride their own
-      // `messages:starredChanged` event and don't affect unread counts here.
+      // Listen for message read-state changes.
       EventsOn('messages:readChanged', (data: { messageIds: string[], isRead: boolean }) => {
         // Update conversations locally instead of reloading from DB
         let anyUpdated = false

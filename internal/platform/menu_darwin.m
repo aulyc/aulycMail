@@ -5,6 +5,7 @@ extern void goMenuAction(char* action);
 
 typedef struct {
     const char* settings;
+    const char* backupViewer;
     const char* about;
     const char* quit;
     const char* edit;
@@ -16,13 +17,14 @@ typedef struct {
     const char* deleteItem;
 } AulycMenuLabels;
 
-// Target for the custom App-menu items (Settings / About). Routes clicks into
-// Go via goMenuAction. Retained for the app's lifetime in a static.
+// Target for the custom App-menu items. Routes clicks into Go via goMenuAction.
+// Retained for the app's lifetime in a static.
 @interface AulycMenuTarget : NSObject
 @end
 
 @implementation AulycMenuTarget
 - (void)onSettings:(id)sender { (void)sender; goMenuAction("settings"); }
+- (void)onBackupViewer:(id)sender { (void)sender; goMenuAction("backupViewer"); }
 - (void)onAbout:(id)sender    { (void)sender; goMenuAction("about"); }
 // Routed through a custom selector (not the standard terminate:) so AppKit
 // doesn't decorate the item with the app icon. Still terminates for real, which
@@ -58,6 +60,7 @@ void installAppMenu(AulycMenuLabels labels) {
     // soon as this function returns, before the dispatched block runs. The block
     // copy (via dispatch_async) retains these captured NSStrings.
     NSString* settings = aulycStr(labels.settings);
+    NSString* backupViewer = aulycStr(labels.backupViewer);
     NSString* about    = aulycStr(labels.about);
     NSString* quit     = aulycStr(labels.quit);
     NSString* edit     = aulycStr(labels.edit);
@@ -84,6 +87,7 @@ void installAppMenu(AulycMenuLabels labels) {
         [appItem setSubmenu:appMenu];
 
         [appMenu addItem:aulycItem(settings, @selector(onSettings:), gMenuTarget, @",", NSEventModifierFlagCommand)];
+        [appMenu addItem:aulycItem(backupViewer, @selector(onBackupViewer:), gMenuTarget, @"", 0)];
         [appMenu addItem:aulycItem(about, @selector(onAbout:), gMenuTarget, @"", 0)];
         [appMenu addItem:[NSMenuItem separatorItem]];
         // Quit via a custom selector (onQuit: → [NSApp terminate:]) so AppKit

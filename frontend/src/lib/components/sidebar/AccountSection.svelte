@@ -47,6 +47,26 @@
   function selectFolder(f: folder.Folder) {
     onFolderSelect?.(acc.id, f.id, f.path, f.name, f.type)
   }
+
+  function sumAccountBadgeCounts(trees: folder.FolderTree[]): { unread: number; drafts: number } {
+    const totals = { unread: 0, drafts: 0 }
+    for (const tree of trees) {
+      if (tree.folder?.type === 'drafts') {
+        totals.drafts += tree.folder.totalCount || 0
+      } else {
+        totals.unread += tree.folder?.unreadCount || 0
+      }
+      if (tree.children?.length) {
+        const childTotals = sumAccountBadgeCounts(tree.children)
+        totals.unread += childTotals.unread
+        totals.drafts += childTotals.drafts
+      }
+    }
+    return totals
+  }
+
+  let accountBadgeCounts = $derived(sumAccountBadgeCounts(folders))
+  let accountBadgeTotal = $derived(accountBadgeCounts.unread + accountBadgeCounts.drafts)
 </script>
 
 <div class="mb-1">
@@ -70,6 +90,14 @@
       {:else if error}
         <span title={error}>
           <Icon icon="mdi:alert-circle" class="w-4 h-4 text-destructive" />
+        </span>
+      {:else if accountBadgeTotal > 0}
+        <span
+          class="px-1.5 py-0.5 text-xs font-medium rounded-full {accountBadgeCounts.unread > 0
+            ? 'bg-primary text-primary-foreground'
+            : 'bg-muted text-muted-foreground'}"
+        >
+          {accountBadgeTotal}
         </span>
       {/if}
     </button>

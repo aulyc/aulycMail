@@ -241,10 +241,10 @@ type App struct {
 	eventBus         *eventBusCoreImpl
 	eventBusInitOnce goSync.Once
 
-	// Shared draft operations (used by both App and ComposerApp)
+	// Shared draft operations
 	draftOps draftOps
 
-	// Shared compose operations (used by both App and ComposerApp)
+	// Shared compose operations
 	composeOps composeOps
 
 	// Undo system
@@ -506,11 +506,13 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Replace the default macOS menu with a minimal App + Edit menu. Done after
 	// the settings store exists, since menuLabels() reads the language setting.
-	// The custom App-menu items (Settings / About) emit events the frontend handles.
+	// The custom App-menu items emit events the frontend handles.
 	platform.SetMenuHandler(func(action string) {
 		switch action {
 		case "settings":
 			wailsRuntime.EventsEmit(a.ctx, "menu:openSettings")
+		case "backupViewer":
+			wailsRuntime.EventsEmit(a.ctx, "menu:openBackupViewer")
 		case "about":
 			wailsRuntime.EventsEmit(a.ctx, "menu:openAbout")
 		}
@@ -527,7 +529,7 @@ func (a *App) Startup(ctx context.Context) {
 	poolConfig := imap.DefaultPoolConfig()
 	a.imapPool = imap.NewPool(poolConfig, a.getIMAPCredentials)
 
-	// Initialize shared draft operations (used by both App and ComposerApp)
+	// Initialize shared draft operations
 	a.draftOps = draftOps{
 		accountStore: a.accountStore,
 		folderStore:  a.folderStore,
@@ -608,7 +610,7 @@ func (a *App) Startup(ctx context.Context) {
 	// OAuth2 manager was constructed earlier (before the Auth Broker, which
 	// captures it). See the earlier guarded init above for the rationale.
 
-	// Initialize shared compose operations (used by both App and ComposerApp)
+	// Initialize shared compose operations
 	a.composeOps = composeOps{
 		accountStore:  a.accountStore,
 		folderStore:   a.folderStore,
@@ -952,13 +954,13 @@ func (a *App) menuLabels() platform.MenuLabels {
 	}
 	if zh {
 		return platform.MenuLabels{
-			Settings: "设置", About: "关于", Quit: "退出",
+			Settings: "设置", BackupViewer: "备份查看器", About: "关于", Quit: "退出",
 			Edit: "编辑", Undo: "撤销", Redo: "重做",
 			Cut: "剪切", Copy: "复制", Paste: "粘贴", Delete: "删除",
 		}
 	}
 	return platform.MenuLabels{
-		Settings: "Settings", About: "About", Quit: "Quit",
+		Settings: "Settings", BackupViewer: "Backup Viewer", About: "About", Quit: "Quit",
 		Edit: "Edit", Undo: "Undo", Redo: "Redo",
 		Cut: "Cut", Copy: "Copy", Paste: "Paste", Delete: "Delete",
 	}

@@ -100,8 +100,7 @@
   >
     <span class="min-w-0 truncate">
       {#if syncStatus.accountName}
-        <span class="text-foreground">{syncStatus.accountName}</span>
-        {' '}
+        <span class="mr-1 text-foreground">{syncStatus.accountName}</span>
       {/if}
       {syncStatus.label}
     </span>

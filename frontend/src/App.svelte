@@ -258,6 +258,7 @@
 
     // Native macOS App-menu items route here.
     EventsOn('menu:openSettings', () => { showSettings = true })
+    EventsOn('menu:openBackupViewer', () => { showBackupViewer = true })
     EventsOn('menu:openAbout', () => { showAbout = true })
 
     // Notification clicks (from Go), the Contacts related-mail list (via
@@ -1349,7 +1350,6 @@
     <ExtensionRail
       onOpenSettings={() => showSettings = true}
       onOpenLog={() => showSyncLog = true}
-      onOpenBackupViewer={() => showBackupViewer = true}
     />
 
     {#if getActiveExtension() === 'contacts'}

@@ -20,6 +20,7 @@ import (
 	"github.com/aulyc/aulycmail/internal/settings"
 	gomessage "github.com/emersion/go-message"
 	msgcharset "github.com/emersion/go-message/charset"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 	"golang.org/x/text/encoding/htmlindex"
 )
 
@@ -69,6 +70,7 @@ type BackupViewerMessageDetail struct {
 
 // BackupViewerAttachment describes an attachment embedded in the EML backup.
 type BackupViewerAttachment struct {
+	Index       int    `json:"index"`
 	Filename    string `json:"filename"`
 	ContentType string `json:"contentType"`
 	Size        int    `json:"size"`
@@ -135,29 +137,7 @@ func (a *App) SearchBackupViewerMessages(directory, accountEmail, query string, 
 
 // GetBackupViewerMessage opens one indexed EML file and returns a sanitized detail view.
 func (a *App) GetBackupViewerMessage(directory, key string) (*BackupViewerMessageDetail, error) {
-	directory = strings.TrimSpace(directory)
-	if directory == "" {
-		directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
-	}
-	if directory == "" {
-		return nil, errors.New("backup directory is not set")
-	}
-	cleanDir, err := normalizeExistingDirectory(directory)
-	if err != nil {
-		return nil, err
-	}
-	idx, found, err := loadBackupIndex(cleanDir)
-	if err != nil {
-		return nil, err
-	}
-	if !found {
-		return nil, errors.New("backup index not found")
-	}
-	entry, ok := idx.Messages[key]
-	if !ok {
-		return nil, errors.New("backup message not found")
-	}
-	emlPath, err := backupIndexedFilePath(cleanDir, entry.EMLPath)
+	emlPath, entry, err := a.backupViewerIndexedMessagePath(directory, key)
 	if err != nil {
 		return nil, err
 	}
@@ -172,6 +152,98 @@ func (a *App) GetBackupViewerMessage(directory, key string) (*BackupViewerMessag
 		return nil, err
 	}
 	return detail, nil
+}
+
+// SaveBackupViewerAttachmentAs saves one attachment from an indexed backup EML
+// to a user-selected path. The backup index controls which EML can be read; the
+// client only selects the parsed attachment index.
+func (a *App) SaveBackupViewerAttachmentAs(directory, key string, attachmentIndex int) (string, error) {
+	if attachmentIndex < 0 {
+		return "", errors.New("backup attachment index is invalid")
+	}
+	emlPath, entry, err := a.backupViewerIndexedMessagePath(directory, key)
+	if err != nil {
+		return "", err
+	}
+	raw, err := os.ReadFile(emlPath)
+	if err != nil {
+		return "", err
+	}
+
+	detail, err := parseBackupViewerEML(key, entry, bytes.NewReader(raw))
+	if err != nil {
+		return "", err
+	}
+	if attachmentIndex >= len(detail.Attachments) {
+		return "", errors.New("backup attachment not found")
+	}
+	attachment := detail.Attachments[attachmentIndex]
+
+	content, err := email.NewAttachmentDownloader(a.paths.AttachmentsPath()).ExtractAttachmentContent(raw, attachment.Filename)
+	if err != nil {
+		return "", fmt.Errorf("failed to extract backup attachment: %w", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = ""
+	}
+	defaultDir := filepath.Join(homeDir, "Downloads")
+	defaultFilename := email.DefaultAttachmentFilename(attachment.Filename)
+
+	var savePath string
+	if platform.IsFlatpak() {
+		savePath, err = platform.PortalSaveFile("Save Attachment", defaultFilename, defaultDir)
+		if err != nil {
+			return "", fmt.Errorf("failed to show save dialog: %w", err)
+		}
+	} else {
+		savePath, err = wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+			DefaultDirectory: defaultDir,
+			DefaultFilename:  defaultFilename,
+			Title:            "Save Attachment",
+		})
+		if err != nil {
+			return "", fmt.Errorf("failed to show save dialog: %w", err)
+		}
+	}
+	if savePath == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(savePath, content, 0600); err != nil {
+		return "", fmt.Errorf("failed to save backup attachment: %w", err)
+	}
+	return savePath, nil
+}
+
+func (a *App) backupViewerIndexedMessagePath(directory, key string) (string, backupIndexMessage, error) {
+	directory = strings.TrimSpace(directory)
+	if directory == "" {
+		directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
+	}
+	if directory == "" {
+		return "", backupIndexMessage{}, errors.New("backup directory is not set")
+	}
+	cleanDir, err := normalizeExistingDirectory(directory)
+	if err != nil {
+		return "", backupIndexMessage{}, err
+	}
+	idx, found, err := loadBackupIndex(cleanDir)
+	if err != nil {
+		return "", backupIndexMessage{}, err
+	}
+	if !found {
+		return "", backupIndexMessage{}, errors.New("backup index not found")
+	}
+	entry, ok := idx.Messages[key]
+	if !ok {
+		return "", backupIndexMessage{}, errors.New("backup message not found")
+	}
+	emlPath, err := backupIndexedFilePath(cleanDir, entry.EMLPath)
+	if err != nil {
+		return "", backupIndexMessage{}, err
+	}
+	return emlPath, entry, nil
 }
 
 // OpenBackupViewerDirectory opens the viewer's selected backup directory.
@@ -387,7 +459,9 @@ func parseBackupViewerEntity(entity *gomessage.Entity, parsed *backupViewerParse
 		if filename == "" {
 			filename = backupViewerAttachmentFallbackName(contentType)
 		}
+		index := len(parsed.attachments)
 		parsed.attachments = append(parsed.attachments, BackupViewerAttachment{
+			Index:       index,
 			Filename:    filename,
 			ContentType: contentType,
 			Size:        len(raw),

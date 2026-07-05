@@ -3,7 +3,6 @@ package email
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"mime"
@@ -54,86 +53,6 @@ func (d *AttachmentDownloader) ExtractAttachmentContent(raw []byte, targetFilena
 	}
 
 	return nil, fmt.Errorf("attachment not found: %s", targetFilename)
-}
-
-// InlineAttachmentResult holds content-id to data URL mapping
-type InlineAttachmentResult struct {
-	ContentID   string
-	ContentType string
-	Content     []byte
-}
-
-// ExtractInlineAttachments extracts all inline attachments from raw email bytes
-// Returns a map of content-id to base64 data URL
-func (d *AttachmentDownloader) ExtractInlineAttachments(raw []byte) (map[string]string, error) {
-	reader := bytes.NewReader(raw)
-
-	entity, err := gomessage.Read(reader)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse message: %w", err)
-	}
-
-	result := make(map[string]string)
-
-	if mr := entity.MultipartReader(); mr != nil {
-		d.findInlineAttachmentsInMultipart(mr, result)
-	}
-
-	return result, nil
-}
-
-// findInlineAttachmentsInMultipart searches for inline attachments and builds data URLs
-func (d *AttachmentDownloader) findInlineAttachmentsInMultipart(mr gomessage.MultipartReader, result map[string]string) {
-	for {
-		part, err := mr.NextPart()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			continue
-		}
-
-		// Handle nested multipart
-		if nestedMr := part.MultipartReader(); nestedMr != nil {
-			d.findInlineAttachmentsInMultipart(nestedMr, result)
-			continue
-		}
-
-		// Check for Content-ID header (indicates inline attachment)
-		contentID := strings.Trim(part.Header.Get("Content-ID"), "<>")
-		if contentID == "" {
-			continue
-		}
-
-		// Get content type
-		contentType, _, _ := mime.ParseMediaType(part.Header.Get("Content-Type"))
-		if contentType == "" {
-			contentType = "application/octet-stream"
-		}
-
-		// Read content
-		content, err := readAttachmentContent(part.Body)
-		if err != nil {
-			continue
-		}
-
-		// Decode content if transfer-encoded
-		transferEncoding := strings.ToLower(part.Header.Get("Content-Transfer-Encoding"))
-		decodedContent, err := decodeAttachmentContent(content, transferEncoding)
-		if err != nil {
-			continue
-		}
-
-		// Build data URL
-		dataURL := buildDataURL(contentType, decodedContent)
-		result[contentID] = dataURL
-	}
-}
-
-// buildDataURL creates a data URL from content type and binary content
-func buildDataURL(contentType string, content []byte) string {
-	encoded := base64.StdEncoding.EncodeToString(content)
-	return fmt.Sprintf("data:%s;base64,%s", contentType, encoded)
 }
 
 // findAttachmentInMultipart searches for an attachment by filename in a multipart message

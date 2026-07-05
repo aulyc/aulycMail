@@ -1,6 +1,7 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
-  import { formatFileSize, getFileIcon } from './composerUtils'
+  import { getFileIcon } from './composerUtils'
+  import { formatFileSize } from '$lib/utils/fileSize'
   import { _ } from '$lib/i18n'
 
   interface Attachment {

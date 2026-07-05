@@ -372,6 +372,7 @@ export namespace app {
 	    }
 	}
 	export class BackupViewerAttachment {
+	    index: number;
 	    filename: string;
 	    contentType: string;
 	    size: number;
@@ -383,6 +384,7 @@ export namespace app {
 
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.index = source["index"];
 	        this.filename = source["filename"];
 	        this.contentType = source["contentType"];
 	        this.size = source["size"];

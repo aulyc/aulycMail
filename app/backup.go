@@ -733,14 +733,6 @@ func splitFolderPath(path string) []string {
 	return parts
 }
 
-func writeBackupFile(baseDir, relPath string, content []byte) error {
-	path := filepath.Join(baseDir, filepath.FromSlash(relPath))
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return fmt.Errorf("failed to create backup folder: %w", err)
-	}
-	return writeFileAtomic(path, content, 0600)
-}
-
 func writeBackupFileFromStream(baseDir, relPath string, write func(io.Writer) (int64, error)) (int64, error) {
 	path := filepath.Join(baseDir, filepath.FromSlash(relPath))
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
@@ -831,8 +823,10 @@ func parseBackupTime(raw string) time.Time {
 		time.RFC3339,
 		"2006-01-02 15:04:05.999999999-07:00",
 		"2006-01-02 15:04:05.999999999Z07:00",
+		"2006-01-02 15:04:05.999999999 -0700 MST",
 		"2006-01-02 15:04:05-07:00",
 		"2006-01-02 15:04:05Z07:00",
+		"2006-01-02 15:04:05 -0700 MST",
 		"2006-01-02 15:04:05",
 		time.RFC1123Z,
 		time.RFC1123,

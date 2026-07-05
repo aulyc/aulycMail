@@ -5,6 +5,7 @@
   import { message as messageModels } from '../../../../wailsjs/go/models'
   import { toasts } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
+  import { formatFileSize } from '$lib/utils/fileSize'
 
   interface Props {
     messageId: string
@@ -110,13 +111,6 @@
     return 'mdi:file'
   }
 
-  function formatSize(bytes: number): string {
-    if (bytes === 0) return '0 B'
-    const k = 1024
-    const sizes = ['B', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-  }
 </script>
 
 {#if loading}
@@ -137,7 +131,7 @@
             {att.filename}
           </div>
           <div class="text-xs text-muted-foreground">
-            {formatSize(att.size)}
+            {formatFileSize(att.size)}
             {#if att.isInline}
               <span class="ml-2 text-primary">{$_('attachment.inline')}</span>
             {/if}

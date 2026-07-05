@@ -1,8 +1,7 @@
 // Package extensions provides infrastructure for aulycmail's first-party
 // extension system. The per-extension Store opens an isolated SQLite file
-// per extension under <dataDir>/extensions/<name>/data.db and exposes a
-// scoped KV namespace alongside whatever extension-specific tables the
-// extension itself defines via migrations.
+// per extension under <dataDir>/extensions/<name>/data.db and applies whatever
+// extension-specific tables the extension itself defines via migrations.
 //
 // Extensions never query each other's tables. Cross-extension data access
 // flows through Go interfaces in internal/core/api/v1.
@@ -28,8 +27,7 @@ type Migration struct {
 }
 
 // Store wraps an extension's isolated SQLite database. It exposes raw *sql.DB
-// access for the extension's own tables and a KV() namespace for small
-// key-value config that doesn't warrant a dedicated table.
+// access for the extension's own tables.
 type Store struct {
 	db   *database.DB
 	name string
@@ -37,11 +35,9 @@ type Store struct {
 }
 
 // OpenStore opens (or creates) the per-extension SQLite file at
-// <dataDir>/extensions/<name>/data.db, applies the provided migrations
-// idempotently, and ensures the canonical ext_kv table exists for the
-// Store's KV namespace. The store is opened whether or not the extension
-// is currently enabled, so the schema stays valid across enable/disable
-// cycles (per EXTENSION_ARCHITECTURE.md).
+// <dataDir>/extensions/<name>/data.db and applies the provided migrations
+// idempotently. The store is opened whether or not the extension is currently
+// enabled, so the schema stays valid across enable/disable cycles.
 func OpenStore(dataDir, name string, migrations []Migration) (*Store, error) {
 	if name == "" {
 		return nil, fmt.Errorf("extensions: empty extension name")
@@ -57,11 +53,6 @@ func OpenStore(dataDir, name string, migrations []Migration) (*Store, error) {
 		db:   db,
 		name: name,
 		log:  logging.WithComponent("extensions").With().Str("extension", name).Logger(),
-	}
-
-	if err := s.ensureKVTable(); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("extensions: ensure kv table for %s: %w", name, err)
 	}
 
 	if err := s.applyMigrations(migrations); err != nil {
@@ -88,20 +79,6 @@ func (s *Store) Path() string {
 // Close closes the underlying database connection.
 func (s *Store) Close() error {
 	return s.db.Close()
-}
-
-// ensureKVTable creates the canonical KV table if it does not already exist.
-// The table is created BEFORE user migrations run so KV is always available,
-// even for an extension with zero user-defined tables.
-func (s *Store) ensureKVTable() error {
-	_, err := s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS ext_kv (
-			key        TEXT PRIMARY KEY,
-			value      TEXT NOT NULL,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)
-	`)
-	return err
 }
 
 // applyMigrations applies pending migrations in version order, recording each

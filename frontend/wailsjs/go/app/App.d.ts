@@ -326,6 +326,8 @@ export function SaveAllAttachments(arg1:string):Promise<string>;
 
 export function SaveAttachmentAs(arg1:string):Promise<string>;
 
+export function SaveBackupViewerAttachmentAs(arg1:string,arg2:string,arg3:number):Promise<string>;
+
 export function SaveDraft(arg1:string,arg2:smtp.ComposeMessage,arg3:string):Promise<app.DraftResult>;
 
 export function SaveOAuthTokens(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number):Promise<void>;
