@@ -3,12 +3,11 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import * as Tabs from '$lib/components/ui/tabs'
   import { Button } from '$lib/components/ui/button'
-  import AccountForm, { type OAuthCredentials } from './AccountForm.svelte'
+  import AccountForm from './AccountForm.svelte'
   import AccountGeneralTab from './account/AccountGeneralTab.svelte'
   import AccountIdentityTab from './account/AccountIdentityTab.svelte'
   import AccountServerTab from './account/AccountServerTab.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
-  import { oauthStore } from '$lib/stores/oauth.svelte'
   import { addToast } from '$lib/stores/toast'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
@@ -73,8 +72,6 @@
   let starredFolderPath = $state('')
 
   let saving = $state(false)
-  let reauthorizing = $state(false)
-  let reauthorizeSuccess = $state(false)
   let errors = $state<Record<string, string>>({})
   let initialized = $state(false)
 
@@ -248,20 +245,8 @@
   }
 
   // Handlers for new account wizard (delegated to AccountForm)
-  async function handleSubmit(config: account.AccountConfig, oauthCredentials?: OAuthCredentials) {
-    let result: account.Account
-
-    if (config.authType === 'oauth2' && oauthCredentials) {
-      result = await accountStore.addOAuthAccount(
-        oauthCredentials.provider,
-        config.email,
-        config.name,
-        config.displayName,
-        config.color
-      )
-    } else {
-      result = await accountStore.addAccount(config)
-    }
+  async function handleSubmit(config: account.AccountConfig) {
+    const result = await accountStore.addAccount(config)
 
     onSuccess?.(result)
     open = false
@@ -269,60 +254,18 @@
   }
 
   async function handleTestConnection(config: account.AccountConfig) {
-    if (config.authType === 'oauth2') {
-      return
-    }
     await accountStore.testConnection(config)
   }
 
   function handleCancel() {
     open = false
     onClose?.()
-    oauthStore.cancelFlow()
   }
 
   function handleOpenChange(isOpen: boolean) {
     open = isOpen
     if (!isOpen) {
       onClose?.()
-      oauthStore.cancelFlow()
-    }
-  }
-
-  async function handleReauthorize() {
-    if (!editAccount) return
-
-    // Capture account details before async operations (editAccount could become stale)
-    const accountId = editAccount.id
-    const accountName = editAccount.name
-
-    reauthorizing = true
-    reauthorizeSuccess = false
-    try {
-      await oauthStore.reauthorize(accountId)
-      reauthorizeSuccess = true
-      addToast({
-        type: 'success',
-        message: $_('toast.reauthorized', { values: { name: accountName } }),
-        duration: 5000,
-      })
-      // Trigger a sync to verify the new token works
-      await accountStore.syncAccount(accountId)
-      addToast({
-        type: 'success',
-        message: $_('toast.syncCompleted', { values: { name: accountName } }),
-        duration: 3000,
-      })
-    } catch (err) {
-      console.error('Failed to re-authorize:', err)
-      reauthorizeSuccess = false
-      addToast({
-        type: 'error',
-        message: $_('toast.failedToReauthorize'),
-        duration: 8000,
-      })
-    } finally {
-      reauthorizing = false
     }
   }
 </script>
@@ -367,10 +310,7 @@
               bind:syncPeriodDays
               bind:syncInterval
               bind:readReceiptRequestPolicy
-              {authType}
               {errors}
-              {reauthorizing}
-              {reauthorizeSuccess}
               onDisplayNameChange={(v) => displayName = v}
               onUsernameChange={(v) => username = v}
               onPasswordChange={(v) => password = v}
@@ -379,7 +319,6 @@
               onSyncPeriodChange={(v) => syncPeriodDays = v}
               onSyncIntervalChange={(v) => syncInterval = v}
               onReadReceiptPolicyChange={(v) => readReceiptRequestPolicy = v}
-              onReauthorize={handleReauthorize}
             />
           </Tabs.Content>
 

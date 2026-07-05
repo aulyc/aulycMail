@@ -12,14 +12,8 @@
     securityOptions,
     syncPeriodOptions,
     syncIntervalOptions,
-    isOAuthProvider,
-    allowsPasswordFallback,
-    getOAuthProviderType,
     type EmailProvider,
-    type OAuthProvider,
   } from '$lib/config/providers'
-  import { oauthStore } from '$lib/stores/oauth.svelte'
-  import { toasts } from '$lib/stores/toast'
   // @ts-ignore - wailsjs path
   import { account, certificate, app } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
@@ -29,19 +23,11 @@
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { _ } from '$lib/i18n'
 
-  // OAuth credentials to pass to parent
-  export interface OAuthCredentials {
-    provider: string
-    accessToken: string
-    refreshToken: string
-    expiresIn: number
-  }
-
   interface Props {
     /** Account to edit (null for new account) */
     editAccount?: account.Account | null
     /** Callback when form is submitted successfully */
-    onSubmit?: (config: account.AccountConfig, oauthCredentials?: OAuthCredentials) => Promise<void>
+    onSubmit?: (config: account.AccountConfig) => Promise<void>
     /** Callback when form is cancelled */
     onCancel?: () => void
     /** Callback for testing connection */
@@ -58,14 +44,6 @@
   // Form state
   let selectedProvider = $state<EmailProvider | null>(null)
   let showAdvanced = $state(false)
-
-  // OAuth state
-  let authMethod = $state<'password' | 'oauth2'>('password')
-  let oauthConfigured = $state<Record<OAuthProvider, boolean>>({
-    google: false,
-    microsoft: false,
-  })
-  let oauthInitialized = $state(false)
 
   // Form fields
   let displayName = $state('')
@@ -216,8 +194,6 @@
       // @ts-ignore - syncInterval from backend
       syncInterval = String(editAccount.syncInterval ?? 30)
       readReceiptRequestPolicy = editAccount.readReceiptRequestPolicy || 'never'
-      // @ts-ignore - authType from backend
-      authMethod = editAccount.authType === 'oauth2' ? 'oauth2' : 'password'
       // @ts-ignore - color from backend
       color = editAccount.color || ''
 
@@ -259,13 +235,11 @@
     }
   }
 
-  // Initialize OAuth configuration check
+  // One-time initialization on mount
+  let formInitialized = $state(false)
   $effect(() => {
-    if (!oauthInitialized) {
-      oauthInitialized = true
-      checkOAuthConfiguration()
-      // Initialize OAuth event listeners
-      oauthStore.initEvents()
+    if (!formInitialized) {
+      formInitialized = true
       // Load sendable identity groups for the Reply/Forward-with picker.
       // Used only when the user toggles "No outgoing server" on; cheap
       // single Wails call so load it up-front for snappier UI.
@@ -287,95 +261,6 @@
     }
   }
 
-  // Update authMethod when OAuth configuration finishes loading.
-  // If a user selects a provider before the async OAuth check completes,
-  // this corrects the auth method once we know OAuth is available.
-  // Does NOT depend on authMethod — otherwise clicking "App Password"
-  // gets immediately reverted back to oauth2.
-  $effect(() => {
-    const _ = oauthConfigured
-    if (!editAccount && selectedProvider && canUseOAuth(selectedProvider)) {
-      authMethod = 'oauth2'
-    }
-  })
-
-  // Check which OAuth providers are configured
-  async function checkOAuthConfiguration() {
-    try {
-      const [googleConfigured, microsoftConfigured] = await Promise.all([
-        oauthStore.isProviderConfigured('google'),
-        oauthStore.isProviderConfigured('microsoft'),
-      ])
-      oauthConfigured = {
-        google: googleConfigured,
-        microsoft: microsoftConfigured,
-      }
-    } catch (err) {
-      console.error('Failed to check OAuth configuration:', err)
-    }
-  }
-
-  // Check if the selected provider supports OAuth and it's configured
-  function canUseOAuth(provider: EmailProvider | null): boolean {
-    if (!provider) return false
-    if (!isOAuthProvider(provider)) return false
-    const oauthType = getOAuthProviderType(provider)
-    if (!oauthType) return false
-    return oauthConfigured[oauthType] ?? false
-  }
-
-  // Start OAuth flow for the selected provider
-  async function startOAuthFlow() {
-    if (!selectedProvider) return
-    const oauthType = getOAuthProviderType(selectedProvider)
-    if (!oauthType) return
-
-    try {
-      await oauthStore.startFlow(oauthType)
-    } catch (err) {
-      console.error('Failed to start OAuth flow:', err)
-    }
-  }
-
-  // Cancel OAuth flow
-  function cancelOAuthFlow() {
-    oauthStore.cancelFlow()
-  }
-
-  // Copy-link fallback for OAuth waiting state — used when the browser fails
-  // to open and the user needs to paste the URL manually.
-  let oauthLinkCopied = $state(false)
-  let oauthCopiedResetTimer: ReturnType<typeof setTimeout> | null = null
-  async function handleCopyOAuthLink() {
-    if (!oauthStore.authURL) return
-    try {
-      await navigator.clipboard.writeText(oauthStore.authURL)
-      oauthLinkCopied = true
-      if (oauthCopiedResetTimer) clearTimeout(oauthCopiedResetTimer)
-      oauthCopiedResetTimer = setTimeout(() => { oauthLinkCopied = false }, 1500)
-    } catch {
-      toasts.error($_('viewer.failedToCopy'))
-    }
-  }
-
-  // Get OAuth button text based on provider
-  function getOAuthButtonText(provider: EmailProvider | null): string {
-    if (!provider) return $_('account.signIn')
-    const oauthType = getOAuthProviderType(provider)
-    if (oauthType === 'google') return $_('account.signInWith', { values: { provider: 'Google' } })
-    if (oauthType === 'microsoft') return $_('account.signInWith', { values: { provider: 'Microsoft' } })
-    return $_('account.signIn')
-  }
-
-  // Get OAuth button icon based on provider
-  function getOAuthButtonIcon(provider: EmailProvider | null): string {
-    if (!provider) return 'mdi:login'
-    const oauthType = getOAuthProviderType(provider)
-    if (oauthType === 'google') return 'logos:google-icon'
-    if (oauthType === 'microsoft') return 'logos:microsoft-icon'
-    return 'mdi:login'
-  }
-
   // Auto-fill settings when provider is selected
   function selectProvider(provider: EmailProvider) {
     selectedProvider = provider
@@ -385,13 +270,6 @@
     smtpHost = provider.smtp.host
     smtpPort = provider.smtp.port
     smtpSecurity = provider.smtp.security
-
-    // Set auth method based on provider and configuration
-    if (canUseOAuth(provider)) {
-      authMethod = 'oauth2'
-    } else {
-      authMethod = 'password'
-    }
 
     // Show advanced for custom provider
     showAdvanced = provider.id === 'custom'
@@ -424,7 +302,7 @@
       color,
       email,
       username: username || email,
-      password: authMethod === 'oauth2' ? '' : password,
+      password,
       imapHost,
       imapPort,
       imapSecurity,
@@ -435,7 +313,7 @@
       smtpUsername,
       smtpPassword,
       replyForwardIdentityId: replyForwardIdentityID,
-      authType: authMethod,
+      authType: 'password',
       syncPeriodDays: Number(syncPeriodDays),
       syncInterval: Number(syncInterval),
       readReceiptRequestPolicy,
@@ -458,14 +336,9 @@
     if (!email.trim()) errors.email = $_('account.emailRequired')
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = $_('account.invalidEmail')
 
-    // Password is only required for password auth on new accounts
-    if (authMethod === 'password' && !password && !editAccount) {
+    // Password is only required on new accounts (blank keeps the stored one when editing)
+    if (!password && !editAccount) {
       errors.password = $_('account.passwordRequired')
-    }
-
-    // For OAuth, check that the flow completed successfully
-    if (authMethod === 'oauth2' && !editAccount && !oauthStore.isFlowSuccess) {
-      errors.oauth = $_('account.pleaseCompleteSignIn')
     }
 
     if (!imapHost.trim()) errors.imapHost = $_('account.imapHostRequired')
@@ -539,25 +412,7 @@
     testResult = null
 
     try {
-      // Build OAuth credentials if using OAuth
-      let oauthCredentials: OAuthCredentials | undefined
-      if (authMethod === 'oauth2' && oauthStore.isFlowSuccess && oauthStore.flowResult) {
-        // Note: The actual tokens are stored in the backend during the OAuth flow
-        // We just pass the metadata so the parent can complete the account setup
-        oauthCredentials = {
-          provider: oauthStore.flowResult.provider,
-          accessToken: '', // Tokens are handled by backend
-          refreshToken: '', // Tokens are handled by backend
-          expiresIn: oauthStore.flowResult.expiresIn,
-        }
-      }
-
-      await onSubmit?.(buildConfig(), oauthCredentials)
-
-      // Reset OAuth state on success
-      if (authMethod === 'oauth2') {
-        oauthStore.reset()
-      }
+      await onSubmit?.(buildConfig())
     } catch (err) {
       console.error('Account save failed:', err)
       testResult = {
@@ -636,197 +491,22 @@
           />
         </div>
 
-        <!-- Authentication Section -->
-        <div class="space-y-3">
-          {#if canUseOAuth(selectedProvider) && !editAccount}
-            <!-- OAuth Provider - Show Sign In Button -->
-            <div class="space-y-3">
-              <Label>{$_('account.authentication')}</Label>
-
-              {#if allowsPasswordFallback(selectedProvider!)}
-                <!-- Provider allows both OAuth and password -->
-                <div class="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={authMethod === 'oauth2' ? 'default' : 'outline'}
-                    size="sm"
-                    onclick={() => authMethod = 'oauth2'}
-                    class="flex-1"
-                  >
-                    <Icon icon={getOAuthButtonIcon(selectedProvider)} class="w-4 h-4 mr-2" />
-                    OAuth
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={authMethod === 'password' ? 'default' : 'outline'}
-                    size="sm"
-                    onclick={() => authMethod = 'password'}
-                    class="flex-1"
-                  >
-                    <Icon icon="mdi:key" class="w-4 h-4 mr-2" />
-                    {$_('account.appPassword')}
-                  </Button>
-                </div>
-              {/if}
-
-              {#if authMethod === 'oauth2'}
-                <!-- OAuth Flow UI -->
-                <div class="rounded-lg border border-border p-4 space-y-3">
-                  {#if oauthStore.flowState === 'idle' || oauthStore.flowState === 'cancelled'}
-                    <!-- Initial state - show sign in button -->
-                    <Button
-                      type="button"
-                      variant="outline"
-                      class="w-full h-12"
-                      onclick={startOAuthFlow}
-                    >
-                      <Icon icon={getOAuthButtonIcon(selectedProvider)} class="w-5 h-5 mr-3" />
-                      {getOAuthButtonText(selectedProvider)}
-                    </Button>
-                    <p class="text-xs text-muted-foreground text-center">
-                      {$_('account.redirectToSignIn')}
-                    </p>
-                  {:else if oauthStore.flowState === 'pending'}
-                    <!-- Waiting for OAuth callback -->
-                    <div class="flex flex-col items-center gap-3 py-2">
-                      <Icon icon="mdi:loading" class="w-8 h-8 animate-spin text-primary" />
-                      <div class="text-center">
-                        <p class="text-sm font-medium">{$_('account.waitingForAuth')}</p>
-                        <p class="text-xs text-muted-foreground mt-1">
-                          {$_('account.completeSignIn')}
-                        </p>
-                      </div>
-                      {#if oauthStore.authURL}
-                        <button
-                          type="button"
-                          class="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1.5 transition-colors"
-                          onclick={handleCopyOAuthLink}
-                        >
-                          {oauthLinkCopied ? $_('account.linkCopied') : $_('viewer.copyLink')}
-                          <Icon icon={oauthLinkCopied ? 'mdi:check' : 'mdi:content-copy'} class="w-3.5 h-3.5" />
-                        </button>
-                      {/if}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onclick={cancelOAuthFlow}
-                      >
-                        {$_('common.cancel')}
-                      </Button>
-                    </div>
-                  {:else if oauthStore.flowState === 'success'}
-                    <!-- OAuth completed successfully -->
-                    <div class="flex items-center gap-3 py-2">
-                      <div class="flex-shrink-0 w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                        <Icon icon="mdi:check" class="w-5 h-5 text-green-500" />
-                      </div>
-                      <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-green-600 dark:text-green-400">
-                          {$_('account.connectedSuccessfully')}
-                        </p>
-                        <p class="text-xs text-muted-foreground truncate">
-                          {oauthStore.flowResult?.email}
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onclick={() => {
-                          oauthStore.reset()
-                        }}
-                      >
-                        <Icon icon="mdi:refresh" class="w-4 h-4" />
-                      </Button>
-                    </div>
-                  {:else if oauthStore.flowState === 'error'}
-                    <!-- OAuth failed -->
-                    <div class="space-y-3">
-                      <div class="flex items-start gap-3">
-                        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
-                          <Icon icon="mdi:alert" class="w-5 h-5 text-destructive" />
-                        </div>
-                        <div class="flex-1">
-                          <p class="text-sm font-medium text-destructive">
-                            {$_('account.authFailed')}
-                          </p>
-                          <p class="text-xs text-muted-foreground mt-1">
-                            {$_('account.authFailed')}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        class="w-full"
-                        onclick={startOAuthFlow}
-                      >
-                        {$_('account.tryAgain')}
-                      </Button>
-                    </div>
-                  {/if}
-                </div>
-                {#if errors.oauth}
-                  <p class="text-sm text-destructive">{errors.oauth}</p>
-                {/if}
-              {:else}
-                <!-- Password field for app password -->
-                <div>
-                  <div class="flex items-center justify-between gap-4">
-                    <Label for="password">{$_('account.appPassword')}</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder={$_('account.enterAppPassword')}
-                      bind:value={password}
-                      class="w-64 shrink-0 {errors.password ? 'border-destructive' : ''}"
-                    />
-                  </div>
-                  {#if errors.password}
-                    <p class="text-sm text-destructive mt-1">{errors.password}</p>
-                  {/if}
-                </div>
-              {/if}
-            </div>
-          {:else if editAccount && editAccount.authType === 'oauth2'}
-            <!-- Editing an OAuth account -->
-            <div class="space-y-2">
-              <Label>{$_('account.authentication')}</Label>
-              <div class="rounded-lg border border-border p-4">
-                <div class="flex items-center gap-3">
-                  <div class="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Icon icon={getOAuthButtonIcon(selectedProvider)} class="w-5 h-5" />
-                  </div>
-                  <div class="flex-1">
-                    <p class="text-sm font-medium">{$_('account.oauthConnected')}</p>
-                    <p class="text-xs text-muted-foreground">
-                      {$_('account.signInAgainHelp')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          {:else}
-            <!-- Standard password field -->
-            <div>
-              <div class="flex items-center justify-between gap-4">
-                <Label for="password">
-                  {selectedProvider?.notes?.includes('App Password') ? $_('account.appPassword') : $_('account.password')}
-                </Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder={editAccount ? $_('account.leaveEmptyToKeep') : $_('account.password')}
-                  bind:value={password}
-                  class="w-64 shrink-0 {errors.password ? 'border-destructive' : ''}"
-                />
-              </div>
-              {#if errors.password}
-                <p class="text-sm text-destructive mt-1">{errors.password}</p>
-              {/if}
-            </div>
+        <!-- Password field -->
+        <div>
+          <div class="flex items-center justify-between gap-4">
+            <Label for="password">
+              {selectedProvider?.notes?.includes('App Password') ? $_('account.appPassword') : $_('account.password')}
+            </Label>
+            <Input
+              id="password"
+              type="password"
+              placeholder={editAccount ? $_('account.leaveEmptyToKeep') : $_('account.password')}
+              bind:value={password}
+              class="w-64 shrink-0 {errors.password ? 'border-destructive' : ''}"
+            />
+          </div>
+          {#if errors.password}
+            <p class="text-sm text-destructive mt-1">{errors.password}</p>
           {/if}
         </div>
       </div>

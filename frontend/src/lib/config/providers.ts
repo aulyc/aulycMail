@@ -7,19 +7,11 @@ import gmxIcon from '$lib/icons/providers/gmx.svg?url'
 import mailcomIcon from '$lib/icons/providers/mailcom.svg?url'
 
 type SecurityType = 'none' | 'tls' | 'starttls'
-type AuthMethod = 'password' | 'oauth2'
-export type OAuthProvider = 'google' | 'microsoft'
 
 interface ServerConfig {
   host: string
   port: number
   security: SecurityType
-}
-
-interface OAuthConfig {
-  provider: OAuthProvider
-  // OAuth can also fall back to password (app password) for Gmail
-  allowPasswordFallback?: boolean
 }
 
 export interface EmailProvider {
@@ -33,9 +25,6 @@ export interface EmailProvider {
   notes?: string // e.g., "Requires App Password"
   notesKey?: string
   usernameIsEmail?: boolean // defaults to true
-  // OAuth configuration
-  authMethod?: AuthMethod // defaults to 'password'
-  oauth?: OAuthConfig
 }
 
 export const providers: EmailProvider[] = [
@@ -46,11 +35,9 @@ export const providers: EmailProvider[] = [
     domains: ['gmail.com', 'googlemail.com'],
     imap: { host: 'imap.gmail.com', port: 993, security: 'tls' },
     smtp: { host: 'smtp.gmail.com', port: 465, security: 'tls' },
-    notes: 'Sign in with Google or use App Password',
+    notes: 'Requires App Password (enable 2-Step Verification first)',
     notesKey: 'account.notesGoogle',
     usernameIsEmail: true,
-    authMethod: 'oauth2',
-    oauth: { provider: 'google', allowPasswordFallback: true },
   },
   {
     id: 'outlook',
@@ -60,8 +47,6 @@ export const providers: EmailProvider[] = [
     imap: { host: 'outlook.office365.com', port: 993, security: 'tls' },
     smtp: { host: 'smtp.office365.com', port: 465, security: 'tls' },
     usernameIsEmail: true,
-    authMethod: 'oauth2',
-    oauth: { provider: 'microsoft', allowPasswordFallback: false },
   },
   {
     id: 'yahoo',
@@ -184,27 +169,6 @@ export function detectProvider(email: string): EmailProvider | null {
  */
 export function getCustomProvider(): EmailProvider {
   return providers.find((p) => p.id === 'custom')!
-}
-
-/**
- * Check if a provider supports OAuth
- */
-export function isOAuthProvider(provider: EmailProvider): boolean {
-  return provider.authMethod === 'oauth2' && !!provider.oauth
-}
-
-/**
- * Check if a provider allows password fallback (for OAuth providers)
- */
-export function allowsPasswordFallback(provider: EmailProvider): boolean {
-  return provider.oauth?.allowPasswordFallback ?? false
-}
-
-/**
- * Get the OAuth provider type for an email provider
- */
-export function getOAuthProviderType(provider: EmailProvider): OAuthProvider | null {
-  return provider.oauth?.provider ?? null
 }
 
 /**

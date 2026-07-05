@@ -1,9 +1,7 @@
 <script lang="ts">
-  import Icon from '@iconify/svelte'
   import { Input } from '$lib/components/ui/input'
   import { Label } from '$lib/components/ui/label'
   import * as Select from '$lib/components/ui/select'
-  import { Button } from '$lib/components/ui/button'
   import {
     syncPeriodOptions,
     syncIntervalOptions,
@@ -26,14 +24,8 @@
     syncPeriodDays: string
     syncInterval: string
     readReceiptRequestPolicy: string
-    /** Auth type from account */
-    authType: string
     /** Validation errors */
     errors: Record<string, string>
-    /** Whether re-authorization is in progress */
-    reauthorizing?: boolean
-    /** Whether re-authorization succeeded */
-    reauthorizeSuccess?: boolean
     /** Callbacks */
     onDisplayNameChange: (value: string) => void
     onUsernameChange: (value: string) => void
@@ -43,7 +35,6 @@
     onSyncPeriodChange: (value: string) => void
     onSyncIntervalChange: (value: string) => void
     onReadReceiptPolicyChange: (value: string) => void
-    onReauthorize?: () => void
   }
 
   let {
@@ -58,10 +49,7 @@
     syncPeriodDays = $bindable(),
     syncInterval = $bindable(),
     readReceiptRequestPolicy = $bindable(),
-    authType,
     errors,
-    reauthorizing = false,
-    reauthorizeSuccess = false,
     onDisplayNameChange,
     onUsernameChange,
     onPasswordChange,
@@ -70,7 +58,6 @@
     onSyncPeriodChange,
     onSyncIntervalChange,
     onReadReceiptPolicyChange,
-    onReauthorize,
   }: Props = $props()
 
   const selectTriggerClass = 'w-64 shrink-0'
@@ -152,56 +139,25 @@
     />
   </div>
 
-  {#if authType === 'oauth2'}
-    <!-- OAuth account -->
+  <!-- Password -->
+  <div>
     <div class="flex items-center justify-between gap-4">
       <div class="min-w-0">
-        <Label>{$_('account.authentication')}</Label>
+        <Label for="password">{$_('account.password')}</Label>
       </div>
-      <div class="flex items-center gap-2 shrink-0">
-        {#if reauthorizeSuccess}
-          <span class="text-xs text-green-500 flex items-center gap-1">
-            <Icon icon="mdi:check-circle" class="w-4 h-4" />
-            {$_('account.oauthReauthorized')}
-          </span>
-        {:else}
-          <span class="text-xs text-muted-foreground flex items-center gap-1">
-            <Icon icon="mdi:shield-check" class="w-4 h-4 text-primary" />
-            {$_('account.oauthConnected')}
-          </span>
-          <Button variant="outline" size="sm" onclick={onReauthorize} disabled={reauthorizing}>
-            {#if reauthorizing}
-              <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-              {$_('account.authorizing')}
-            {:else}
-              <Icon icon="mdi:refresh" class="w-4 h-4 mr-2" />
-              {$_('account.reauthorize')}
-            {/if}
-          </Button>
-        {/if}
-      </div>
+      <Input
+        id="password"
+        type="password"
+        placeholder={$_('account.leaveEmptyToKeep')}
+        bind:value={password}
+        oninput={(e) => onPasswordChange((e.target as HTMLInputElement).value)}
+        class="w-64 shrink-0 {errors.password ? 'border-destructive' : ''}"
+      />
     </div>
-  {:else}
-    <!-- Password account -->
-    <div>
-      <div class="flex items-center justify-between gap-4">
-        <div class="min-w-0">
-          <Label for="password">{$_('account.password')}</Label>
-        </div>
-        <Input
-          id="password"
-          type="password"
-          placeholder={$_('account.leaveEmptyToKeep')}
-          bind:value={password}
-          oninput={(e) => onPasswordChange((e.target as HTMLInputElement).value)}
-          class="w-64 shrink-0 {errors.password ? 'border-destructive' : ''}"
-        />
-      </div>
-      {#if errors.password}
-        <p class="text-sm text-destructive mt-1">{errors.password}</p>
-      {/if}
-    </div>
-  {/if}
+    {#if errors.password}
+      <p class="text-sm text-destructive mt-1">{errors.password}</p>
+    {/if}
+  </div>
 
   <!-- Mail sending -->
   <div class="flex items-center justify-between gap-4">

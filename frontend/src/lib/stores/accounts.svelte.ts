@@ -10,7 +10,6 @@ import {
   TestConnection,
   TestAccountConnection,
   GetAccountConnOK,
-  CompleteOAuthAccountSetup,
   ReorderAccounts,
 } from '../../../wailsjs/go/app/App'
 import { account, app, folder } from '../../../wailsjs/go/models'
@@ -411,34 +410,6 @@ class AccountStore {
    */
   async addAccount(config: account.AccountConfig): Promise<account.Account> {
     const newAccount = await AddAccount(config)
-
-    // Add to local state
-    this.accounts.push({
-      account: newAccount,
-      folders: [],
-      loading: false,
-      syncing: false,
-      error: null,
-      lastSync: null,
-    })
-
-    // Start sync in background (don't await - let dialog close immediately)
-    this.syncAccount(newAccount.id).catch(err => {
-      console.error('Initial sync failed:', err)
-    })
-
-    return newAccount
-  }
-
-  /**
-   * Add a new OAuth account
-   * This uses CompleteOAuthAccountSetup which creates the account AND saves the OAuth tokens
-   * that were stored temporarily during the OAuth flow.
-   */
-  async addOAuthAccount(provider: string, email: string, accountName: string, displayName: string, color: string): Promise<account.Account> {
-    // CompleteOAuthAccountSetup creates the account with correct IMAP/SMTP settings
-    // and saves the OAuth tokens from pendingOAuthTokens
-    const newAccount = await CompleteOAuthAccountSetup(provider, email, accountName, displayName, color)
 
     // Add to local state
     this.accounts.push({
