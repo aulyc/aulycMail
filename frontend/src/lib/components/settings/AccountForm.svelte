@@ -15,30 +15,32 @@
     type EmailProvider,
   } from '$lib/config/providers'
   // @ts-ignore - wailsjs path
-  import { account, certificate, app } from '../../../../wailsjs/go/models'
+  import { account, certificate, app, folder } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
-  import { GetAccountFoldersForMapping, GetAutoDetectedFolders, GetIdentities, AcceptCertificate, GetAllAccountIdentities } from '../../../../wailsjs/go/app/App'
+  import { GetAccountFoldersForMapping, GetAutoDetectedFolders, GetIdentities, AcceptCertificate, GetAllAccountIdentities, GetTrustedCertificates, RemoveTrustedCertificate, GetFolders, SubscribeFolder, UnsubscribeFolder, SubscribeAllFolders } from '../../../../wailsjs/go/app/App'
   import CertificateDialog from './CertificateDialog.svelte'
   import ConnectionTestDialog from './ConnectionTestDialog.svelte'
+  import AccountIdentityTab from './account/AccountIdentityTab.svelte'
+  import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { _ } from '$lib/i18n'
 
   interface Props {
     /** Account to edit (null for new account) */
     editAccount?: account.Account | null
+    /** True when a new account was created and the dialog stayed open */
+    createdInDialog?: boolean
     /** Callback when form is submitted successfully */
     onSubmit?: (config: account.AccountConfig) => Promise<void>
     /** Callback when form is cancelled */
     onCancel?: () => void
-    /** Callback for testing connection */
-    onTestConnection?: (config: account.AccountConfig) => Promise<void>
   }
 
   let {
     editAccount = null,
+    createdInDialog = false,
     onSubmit,
     onCancel,
-    onTestConnection: _onTestConnection,
   }: Props = $props()
 
   // Form state
@@ -73,7 +75,10 @@
   const isGenericProvider = $derived(selectedProvider?.id === 'custom' || selectedProvider?.id === 'generic')
   let syncPeriodDays = $state<string>('180')
   let syncInterval = $state<string>('30') // Default: 30 minutes
+  let syncAllFolders = $state(false)
+  let syncFoldersEnabled = $state(false)
   let readReceiptRequestPolicy = $state<string>('never')
+  let displayNameLoaded = $state(false)
 
   // Read receipt request policy options
   const readReceiptRequestOptions = $derived([
@@ -138,6 +143,27 @@
   let allMailFolderPath = $state('')
   let starredFolderPath = $state('')
 
+  // Folder sync subscription state
+  let showFolderSync = $state(false)
+  let loadingSyncFolders = $state(false)
+  let syncFolders = $state<folder.Folder[]>([])
+  const coreFolderTypes = ['inbox', 'drafts', 'sent']
+
+  // Trusted certificates state
+  let showTrustedCerts = $state(false)
+  let loadingCerts = $state(false)
+  let trustedCerts = $state<certificate.CertificateInfo[]>([])
+  let confirmRemoveFingerprint = $state<string | null>(null)
+  let showRemoveConfirm = $state(false)
+
+  // SMTP authentication is hardcoded to "same as incoming server": there is
+  // no separate-SMTP-credentials UI anymore. Force the hidden values empty so
+  // updates drop any legacy separate SMTP keyring entry.
+  $effect(() => {
+    if (smtpUsername !== '') smtpUsername = ''
+    if (smtpPassword !== '') smtpPassword = ''
+  })
+
   // Load folders for mapping UI
   async function loadFoldersForMapping() {
     if (!editAccount || availableFolders.length > 0) return
@@ -169,6 +195,106 @@
     }
   }
 
+  async function loadSyncFolders() {
+    if (!editAccount || syncFolders.length > 0) return
+    loadingSyncFolders = true
+    try {
+      syncFolders = await GetFolders(editAccount.id)
+    } catch (err) {
+      console.error('Failed to load folders for sync:', err)
+    } finally {
+      loadingSyncFolders = false
+    }
+  }
+
+  function handleFolderSyncToggle() {
+    showFolderSync = !showFolderSync
+    if (showFolderSync) {
+      loadSyncFolders()
+    }
+  }
+
+  async function handleSyncAllToggle(checked: boolean) {
+    syncAllFolders = checked
+    if (!checked || !editAccount) return
+    try {
+      await SubscribeAllFolders(editAccount.id)
+      syncFolders = await GetFolders(editAccount.id)
+    } catch (err) {
+      console.error('Failed to subscribe to all folders:', err)
+    }
+  }
+
+  async function handleFolderSubscriptionToggle(f: folder.Folder, subscribed: boolean) {
+    if (!editAccount) return
+    const action = subscribed ? SubscribeFolder : UnsubscribeFolder
+    try {
+      await action(editAccount.id, f.id)
+      syncFolders = syncFolders.map(sf =>
+        sf.id === f.id ? { ...sf, subscribed } as folder.Folder : sf
+      )
+    } catch (err) {
+      console.error('Failed to update folder subscription:', err)
+    }
+  }
+
+  function handleTrustedCertsToggle() {
+    showTrustedCerts = !showTrustedCerts
+    if (showTrustedCerts) {
+      loadTrustedCerts()
+    }
+  }
+
+  async function loadTrustedCerts() {
+    if (!editAccount) return
+    loadingCerts = true
+    try {
+      const hosts = [imapHost, smtpHost].filter(h => h)
+      const result = await GetTrustedCertificates(hosts)
+      trustedCerts = result || []
+    } catch (err) {
+      console.error('Failed to load trusted certificates:', err)
+      trustedCerts = []
+    } finally {
+      loadingCerts = false
+    }
+  }
+
+  function handleRemoveCert(fingerprint: string) {
+    confirmRemoveFingerprint = fingerprint
+    showRemoveConfirm = true
+  }
+
+  async function confirmRemoveCert() {
+    if (!confirmRemoveFingerprint) return
+    try {
+      await RemoveTrustedCertificate(confirmRemoveFingerprint)
+      trustedCerts = trustedCerts.filter(c => c.fingerprint !== confirmRemoveFingerprint)
+    } catch (err) {
+      console.error('Failed to remove certificate:', err)
+    }
+    showRemoveConfirm = false
+    confirmRemoveFingerprint = null
+  }
+
+  function formatFingerprint(fp: string): string {
+    if (!fp) return ''
+    const parts: string[] = []
+    for (let i = 0; i < fp.length && i < 16; i += 2) {
+      parts.push(fp.substring(i, i + 2).toUpperCase())
+    }
+    return parts.join(':') + '...'
+  }
+
+  function formatCertDate(iso: string): string {
+    if (!iso) return 'N/A'
+    try {
+      return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+    } catch {
+      return iso
+    }
+  }
+
   // New account: skip the provider picker grid — open directly into the
   // manual ("Other / Manual") form. Server fields start blank for manual entry.
   $effect(() => {
@@ -184,18 +310,26 @@
       initialized = true
       email = editAccount.email
       username = editAccount.username
+      password = ''
       imapHost = editAccount.imapHost
       imapPort = editAccount.imapPort
       imapSecurity = editAccount.imapSecurity
       smtpHost = editAccount.smtpHost
       smtpPort = editAccount.smtpPort
       smtpSecurity = editAccount.smtpSecurity
+      noOutgoingServer = editAccount.noOutgoingServer || false
+      smtpUsername = editAccount.smtpUsername || ''
+      smtpPassword = ''
+      replyForwardIdentityID = editAccount.replyForwardIdentityId || ''
       syncPeriodDays = String(editAccount.syncPeriodDays)
       // @ts-ignore - syncInterval from backend
       syncInterval = String(editAccount.syncInterval ?? 30)
+      syncAllFolders = editAccount.syncAllFolders || false
+      syncFoldersEnabled = editAccount.syncFoldersEnabled || false
       readReceiptRequestPolicy = editAccount.readReceiptRequestPolicy || 'never'
       // @ts-ignore - color from backend
       color = editAccount.color || ''
+      displayNameLoaded = false
 
       // Initialize folder mappings (will be populated when section is expanded)
       // @ts-ignore - wailsjs binding will have these fields after regeneration
@@ -215,7 +349,7 @@
 
       // Try to detect provider
       selectedProvider = detectProvider(email) ?? getCustomProvider()
-      showAdvanced = selectedProvider.id === 'custom'
+      showAdvanced = true
 
       // Load display name from the default identity
       loadDisplayName(editAccount.id)
@@ -232,6 +366,8 @@
       }
     } catch (err) {
       console.error('Failed to load display name:', err)
+    } finally {
+      displayNameLoaded = true
     }
   }
 
@@ -316,6 +452,8 @@
       authType: 'password',
       syncPeriodDays: Number(syncPeriodDays),
       syncInterval: Number(syncInterval),
+      syncAllFolders,
+      syncFoldersEnabled,
       readReceiptRequestPolicy,
       // Folder mappings
       sentFolderPath,
@@ -360,7 +498,9 @@
     testResult = null
 
     try {
-      const result = await accountStore.testConnection(buildConfig())
+      const result = editAccount && !password
+        ? await accountStore.testAccountConnection(editAccount.id)
+        : await accountStore.testConnection(buildConfig())
       if (result.success) {
         testResult = { success: true, message: $_('account.connectionSuccessful') }
       } else if (result.certificateRequired && result.certificate) {
@@ -415,6 +555,7 @@
       await onSubmit?.(buildConfig())
     } catch (err) {
       console.error('Account save failed:', err)
+      showTestConnDialog = true
       testResult = {
         success: false,
         message: $_('account.saveFailed'),
@@ -469,7 +610,8 @@
               type="email"
               placeholder="you@example.com"
               bind:value={email}
-              class="w-64 shrink-0 {errors.email ? 'border-destructive' : ''}"
+              disabled={!!editAccount}
+              class="w-64 shrink-0 {editAccount ? 'bg-muted' : ''} {errors.email ? 'border-destructive' : ''}"
             />
           </div>
           {#if errors.email}
@@ -509,6 +651,31 @@
             <p class="text-sm text-destructive mt-1">{errors.password}</p>
           {/if}
         </div>
+      </div>
+
+      <!-- Sender addresses. Requires a persisted account because aliases are
+           stored separately from AccountConfig and need accountId. -->
+      <div class="pt-2 border-t border-border">
+        {#if editAccount}
+          <AccountIdentityTab
+            accountId={editAccount.id}
+            {editAccount}
+            defaultDisplayName={displayName}
+            {displayNameLoaded}
+            onDefaultDisplayNameChange={(v) => displayName = v}
+          />
+        {:else}
+          <div class="flex items-center justify-between gap-4 opacity-60">
+            <div class="min-w-0">
+              <Label>{$_('identity.emailAddresses')}</Label>
+              <p class="text-xs text-muted-foreground">{$_('account.saveAccountFirst')}</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" disabled>
+              <Icon icon="mdi:email-multiple-outline" class="w-4 h-4 mr-1" />
+              {$_('identity.addEmailAddress')}
+            </Button>
+          </div>
+        {/if}
       </div>
 
       <!-- Advanced Settings Toggle — label (styled like a field label) on the
@@ -909,6 +1076,142 @@
               </div>
             {/if}
           </div>
+
+          <!-- Folder Sync Subscriptions -->
+          <div class="space-y-2">
+            <button
+              type="button"
+              class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              onclick={handleFolderSyncToggle}
+              disabled={!editAccount}
+            >
+              <Icon
+                icon={showFolderSync ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                class="w-4 h-4"
+              />
+              <Icon icon="mdi:folder-sync-outline" class="w-4 h-4" />
+              {$_('account.folderSync')}
+              {#if !editAccount}
+                <span class="text-xs text-muted-foreground">{$_('account.saveAccountFirst')}</span>
+              {/if}
+            </button>
+
+            {#if showFolderSync && editAccount}
+              <div class="space-y-4 pl-6 pt-2 border-l border-border ml-2">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-3">
+                    <Label>{$_('account.manageFolderSync')}</Label>
+                    <Switch
+                      bind:checked={syncFoldersEnabled}
+                      onCheckedChange={(v) => { syncFoldersEnabled = v; if (v) loadSyncFolders() }}
+                    />
+                  </div>
+                  <p class="text-xs text-muted-foreground">
+                    {$_('account.manageFolderSyncHelp')}
+                  </p>
+                </div>
+
+                {#if syncFoldersEnabled}
+                  <div class="flex items-center gap-3">
+                    <Label>{$_('account.syncAllFolders')}</Label>
+                    <Switch
+                      bind:checked={syncAllFolders}
+                      onCheckedChange={handleSyncAllToggle}
+                    />
+                  </div>
+
+                  {#if !syncAllFolders}
+                    {#if loadingSyncFolders}
+                      <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
+                        {$_('account.loadingFolders')}
+                      </div>
+                    {:else}
+                      <div class="space-y-1 max-h-48 overflow-y-auto">
+                        {#each syncFolders as f (f.id)}
+                          {@const isCore = coreFolderTypes.includes(f.type)}
+                          <label class="flex items-center gap-2 cursor-pointer py-0.5 {isCore ? 'opacity-60' : ''}">
+                            <input
+                              type="checkbox"
+                              checked={isCore || f.subscribed}
+                              disabled={isCore}
+                              onchange={(e) => handleFolderSubscriptionToggle(f, (e.target as HTMLInputElement).checked)}
+                              class="rounded border-border"
+                            />
+                            <span class="text-sm truncate">{f.path}</span>
+                            {#if isCore}
+                              <span class="text-xs text-muted-foreground">({$_('account.alwaysSynced')})</span>
+                            {/if}
+                          </label>
+                        {/each}
+                      </div>
+                    {/if}
+                  {/if}
+                {/if}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Trusted Certificates -->
+          <div class="space-y-2">
+            <button
+              type="button"
+              class="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              onclick={handleTrustedCertsToggle}
+              disabled={!editAccount}
+            >
+              <Icon
+                icon={showTrustedCerts ? 'mdi:chevron-down' : 'mdi:chevron-right'}
+                class="w-4 h-4"
+              />
+              <Icon icon="mdi:shield-lock-outline" class="w-4 h-4" />
+              {$_('account.trustedCertificates')}
+              {#if !editAccount}
+                <span class="text-xs text-muted-foreground">{$_('account.saveAccountFirst')}</span>
+              {/if}
+            </button>
+
+            {#if showTrustedCerts && editAccount}
+              <div class="space-y-3 pl-6 pt-2 border-l border-border ml-2">
+                {#if loadingCerts}
+                  <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
+                    {$_('account.loadingCerts')}
+                  </div>
+                {:else if trustedCerts.length === 0}
+                  <p class="text-sm text-muted-foreground">
+                    {$_('account.noTrustedCerts')}
+                  </p>
+                {:else}
+                  <div class="space-y-3">
+                    {#each trustedCerts as cert, index (`${cert.host ?? ''}:${cert.fingerprint}:${index}`)}
+                      <div class="flex items-start justify-between gap-3 rounded-lg border bg-muted/30 p-3">
+                        <div class="space-y-1 min-w-0">
+                          <div class="flex items-center gap-2">
+                            <Icon icon="mdi:shield-check-outline" class="w-4 h-4 text-muted-foreground shrink-0" />
+                            <span class="text-sm font-medium truncate">{cert.subject}</span>
+                          </div>
+                          <div class="text-xs text-muted-foreground space-y-0.5 pl-6">
+                            <p>{$_('account.certFingerprint')} <span class="font-mono">{formatFingerprint(cert.fingerprint)}</span></p>
+                            <p>{$_('account.certExpires')} {formatCertDate(cert.notAfter)}</p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          class="shrink-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onclick={() => handleRemoveCert(cert.fingerprint)}
+                        >
+                          {$_('common.remove')}
+                        </Button>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+            {/if}
+          </div>
         </div>
       {/if}
     </div>
@@ -931,7 +1234,7 @@
 
         <div class="flex gap-2">
           <Button type="button" variant="ghost" onclick={onCancel} disabled={submitting}>
-            {$_('common.cancel')}
+            {createdInDialog ? $_('common.close') : $_('common.cancel')}
           </Button>
           <Button type="submit" disabled={submitting || testing}>
             {#if submitting}
@@ -954,3 +1257,11 @@
 
 <!-- Connection test result popup (same one Settings → Accounts uses) -->
 <ConnectionTestDialog bind:open={showTestConnDialog} {testing} result={testResult} />
+
+<ConfirmDialog
+  bind:open={showRemoveConfirm}
+  title={$_('account.removeTrustedCert')}
+  description={$_('account.removeTrustedCertDescription')}
+  confirmLabel={$_('common.remove')}
+  onConfirm={confirmRemoveCert}
+/>

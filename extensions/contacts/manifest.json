@@ -8,15 +8,6 @@
   "capabilities": [
     "contacts.read",
     "contacts.write",
-    "ui.rail-tab",
-    "ui.account-setup-hook",
-    "ui.settings-tab"
-  ],
-  "oauth": {
-    "first_party_uses_core_for_scopes": [
-      "https://www.googleapis.com/auth/contacts.readonly",
-      "Contacts.Read",
-      "Contacts.ReadBasic"
-    ]
-  }
+    "ui.rail-tab"
+  ]
 }

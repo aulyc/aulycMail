@@ -13,7 +13,7 @@ aulycmail is an open-source desktop email client. The official aulycmail website
 - Connect to email accounts via IMAP/SMTP
 - Send and receive emails
 - Manage email folders and organization
-- Sync contacts from CardDAV, Google, and Microsoft services
+- Maintain local contacts for autocomplete
 - Connect Gmail and Outlook via IMAP/SMTP using provider-supported passwords
 
 aulycmail is a local application that runs on your computer. We do not provide any cloud services, email hosting, or server infrastructure.
@@ -92,9 +92,6 @@ You agree to indemnify, defend, and hold harmless the developers, contributors, 
 aulycmail integrates with third-party services including:
 
 - Email providers (via IMAP/SMTP)
-- Google APIs
-- Microsoft APIs
-- CardDAV servers
 
 Your use of these services is subject to their respective terms of service and privacy policies. We are not responsible for the availability, accuracy, or practices of these third-party services.
 

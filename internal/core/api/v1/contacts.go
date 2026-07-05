@@ -70,14 +70,11 @@ type ContactPhoto struct {
 //     reserved for the sent-mail collection process to assign; users adding
 //     via the Add dialog get kind='manual' regardless of which local sub-view
 //     they came from.
-//   - <CardDAV source UUID>           → Phase 2b.2.c (Track B) creates a new
-//     vCard via WebDAV PUT to the addressbook identified by AddressbookID
-//     (or the source's first writable addressbook when AddressbookID is "").
-//   - Future provider routing         → returns ErrUnimplemented; filled in by
-//     2b.3 (Google People / MS Graph).
+//   - anything else                   → returns ErrUnimplemented. Remote
+//     contact sources are not implemented.
 //
-// AddressbookID applies only when SourceID is a CardDAV source UUID. Empty
-// AddressbookID means "the source's first writable addressbook."
+// AddressbookID is retained for old API shape compatibility. It is ignored by
+// the local-only implementation.
 //
 // Rich-field support: when any of the optional rich fields below is set,
 // the create dispatchers route through recordFromCreateInput which mirrors
@@ -114,9 +111,9 @@ type ContactCreateInput struct {
 	Photo      *ContactPhoto    `json:"photo,omitempty"`
 }
 
-// Addressbook is the API-surface descriptor for a CardDAV addressbook hosted
-// by a contact source. Listed via Contacts.ListAddressbooks so the Add Contact
-// UI can pick a target addressbook when a source has more than one.
+// Addressbook is the API-surface descriptor for a remote addressbook. Remote
+// contact sources are currently unimplemented, so ListAddressbooks returns no
+// rows in the host surface.
 type Addressbook struct {
 	ID       string `json:"id"`
 	SourceID string `json:"sourceId"`
@@ -124,76 +121,52 @@ type Addressbook struct {
 	Path     string `json:"path,omitempty"` // server-relative path; mainly diagnostic
 }
 
-// ContactSource is the API-surface descriptor for a configured contact source
-// (CardDAV server, or an OAuth-linked Google/Microsoft account). Listed via
-// Contacts.ListSources so the extension's UI can display sources, gate
-// edits/deletes on the per-source `Writable` flag, and route Add Contact
-// creates by source id.
+// ContactSource is the API-surface descriptor for a configured remote contact
+// source. Remote sources are currently unimplemented; the type is retained so
+// older extension-facing contracts remain source-compatible.
 //
 // Intentionally narrower than the host's internal Source type: only fields
-// the extension UI actually consumes are exposed here. Last-sync timestamps,
-// error messages, and OAuth account linkage details remain internal — the
-// extension queries higher-level Wails methods (or surfaces ContactSource
-// rows in a list-only role) rather than reading those fields directly.
+// an extension UI would need are exposed here. Last-sync timestamps and error
+// details stay internal.
 type ContactSource struct {
 	ID       string `json:"id"`
 	Name     string `json:"name"`
-	Type     string `json:"type"` // "carddav" | "google" | "microsoft"
+	Type     string `json:"type"` // reserved legacy value: "carddav"
 	Writable bool   `json:"writable"`
-	// AccountID is the email account this source is linked to, when the source
-	// was created via LinkAccountSource. Standalone CardDAV / contacts-only
-	// OAuth sources have AccountID == "" (no linked email account).
-	//
-	// Surfaced so consent flows (Phase 2b.3) can find the source corresponding
-	// to a given account after running incremental consent, without exposing
-	// the host's full Source struct.
+	// AccountID is retained for old API shape compatibility. Current sources do
+	// not link to email accounts because remote contact sources are disabled.
 	AccountID string `json:"accountId,omitempty"`
 }
 
 // Contacts is the read/write/subscribe surface for contacts.
 //
-// All methods scoped to data the extension manages — local contact store +
-// per-source mirror tables. Write methods dispatch by source under the hood:
-// local (sent-recipient) contacts mutate through the host's contact.Store;
-// CardDAV writes hit the server's WebDAV endpoint; Google / Microsoft writes
-// go through their per-extension OAuth slot (granted via the write-access
-// account picker flow).
+// Current implementations operate on the local contact store only. Remote
+// source methods are inert compatibility stubs unless a future remote-sync
+// implementation reintroduces them.
 type Contacts interface {
 	SearchContacts(query string, limit int) ([]Contact, error)
 	GetContact(emailOrID string) (*Contact, error)
 	ListContacts(filter ContactFilter) ([]Contact, error)
 	ListAddressbooks(sourceID string) ([]Addressbook, error)
 
-	// ListSources returns all configured contact sources (CardDAV servers
-	// and any OAuth-linked Google/Microsoft accounts). The extension's UI
-	// consumes this for the sidebar listing, the Add Contact source picker,
-	// and the per-source writable gate on Edit/Delete.
+	// ListSources returns configured remote contact sources. Current host
+	// implementations return an empty list because only local contacts exist.
 	ListSources() ([]ContactSource, error)
 
-	// LinkAccountSource creates a new contact source backed by an existing
-	// email account's OAuth tokens. Returns the new source's id. syncInterval
-	// is in minutes; 60 is the conventional default. Errors with
-	// ErrAccountNotFound when the account doesn't exist.
+	// LinkAccountSource is retained for old API shape compatibility. Current
+	// host implementations return ErrUnimplemented.
 	LinkAccountSource(accountID, name string, syncInterval int) (string, error)
 
-	// SyncSource triggers an immediate sync against the given source.
-	// Returns when the sync finishes; per-source failures are reported
-	// via the returned error. Used by the contacts extension's sidebar
-	// footer Ctrl+Shift+S handler.
+	// SyncSource triggers an immediate sync against the given remote source.
+	// Current host implementations are no-ops because no remote sources exist.
 	SyncSource(sourceID string) error
 
-	// SyncAllSources triggers an immediate sync against every configured
-	// contact source. Per-source failures don't abort the loop; the
-	// returned error wraps any individual failures. Used by the contacts
-	// extension's Ctrl+Shift+A shortcut.
+	// SyncAllSources triggers an immediate sync against every configured remote
+	// source. Current host implementations are no-ops.
 	SyncAllSources() error
 
-	// SetSourceWritable flips the writable flag on a contact source. Used
-	// by the incremental-consent flow (Phase 2b.3) after the user grants
-	// write scopes for an OAuth source. CardDAV sources also use it via
-	// the "Enable write access" toggle in the source-settings dialog (where
-	// it's a pure flag flip — no consent needed because basic-auth grants
-	// full access).
+	// SetSourceWritable flips the writable flag on a remote contact source.
+	// Current host implementations are no-ops.
 	SetSourceWritable(sourceID string, writable bool) error
 
 	CreateContact(input ContactCreateInput) (id string, err error)

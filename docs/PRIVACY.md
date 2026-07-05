@@ -31,50 +31,18 @@ aulycmail stores the following information locally on your computer:
 ### Account Credentials
 - Email account configurations (server addresses, ports)
 - Mail account passwords or app-specific passwords (stored in your system's secure keyring)
-- OAuth tokens for contact sync or extension authorization, when configured
 
 ### Contacts
-- Contact information synchronized from CardDAV, Google, or Microsoft accounts
-- Used solely for email address autocomplete
+- Contacts you add manually
+- Addresses collected locally from mail you have sent
+- Used solely for email address autocomplete and the Contacts view
 
 ### Application Settings
 - Your preferences and settings
 - Window size and position
 - Theme preferences
 
-**All of this data is stored in your local application data directory and never leaves your device except when communicating directly with your email providers.**
-
-## Google API Services
-
-aulycmail uses Google APIs to provide contact integration when you configure Google contacts. Our use of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
-
-### Google API Scopes Used
-
-- **Google People API** - To access your contacts for email autocomplete
-
-### Limited Use Disclosure
-
-aulycmail's use and transfer of information received from Google APIs to any other app will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
-
-Specifically:
-- aulycmail only uses Google data to provide email functionality to you
-- aulycmail does not transfer Google data to third parties
-- aulycmail does not use Google data for advertising
-- aulycmail does not use Google data to train AI/ML models
-- Human access to Google data is limited to debugging with user consent
-
-## Microsoft API Services
-
-aulycmail uses Microsoft Graph APIs to provide Outlook/Microsoft 365 integration.
-
-### Microsoft API Scopes Used
-
-- **Mail.ReadWrite** - To read, send, and manage your emails
-- **Contacts.Read** - To access your contacts for email autocomplete
-- **User.Read** - To access your basic profile information
-- **offline_access** - To maintain your session
-
-All Microsoft data is stored locally and used solely for email functionality.
+**All of this data is stored in your local application data directory and never leaves your device except when communicating directly with your email providers via IMAP/SMTP.**
 
 ## Data Security
 
@@ -90,9 +58,6 @@ Your data security depends on:
 aulycmail only connects to services you explicitly configure:
 
 - Your email provider (via IMAP/SMTP)
-- Google APIs (if you use Gmail)
-- Microsoft APIs (if you use Outlook/Microsoft 365)
-- CardDAV servers (if you configure contact sync)
 
 We do not integrate with any advertising networks, analytics services, or other third-party data collectors.
 

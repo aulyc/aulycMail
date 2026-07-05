@@ -1,20 +1,12 @@
 <script lang="ts">
-  import Icon from '@iconify/svelte'
   import * as Dialog from '$lib/components/ui/dialog'
-  import * as Tabs from '$lib/components/ui/tabs'
-  import { Button } from '$lib/components/ui/button'
   import AccountForm from './AccountForm.svelte'
-  import AccountGeneralTab from './account/AccountGeneralTab.svelte'
-  import AccountIdentityTab from './account/AccountIdentityTab.svelte'
-  import AccountServerTab from './account/AccountServerTab.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { addToast } from '$lib/stores/toast'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
   // @ts-ignore - wailsjs path
-  import { account, app } from '../../../../wailsjs/go/models'
-  // @ts-ignore - wailsjs path
-  import { GetIdentities, GetAllAccountIdentities } from '../../../../wailsjs/go/app/App'
+  import { account } from '../../../../wailsjs/go/models'
 
   interface Props {
     /** Whether the dialog is open */
@@ -34,98 +26,14 @@
     onSuccess,
   }: Props = $props()
 
-  // Tab state (for edit mode)
-  let activeTab = $state('general')
+  let createdAccount = $state<account.Account | null>(null)
+  const activeAccount = $derived(createdAccount ?? editAccount)
 
-  // Form state (for edit mode)
-  let displayName = $state('')
-  let color = $state('')
-  let email = $state('')
-  let username = $state('')
-  let password = $state('')
-  let imapHost = $state('')
-  let imapPort = $state(993)
-  let imapSecurity = $state('tls')
-  let smtpHost = $state('')
-  let smtpPort = $state(465)
-  let smtpSecurity = $state('tls')
-  let noOutgoingServer = $state(false)
-  let smtpUsername = $state('')
-  let smtpPassword = $state('')
-  let replyForwardIdentityID = $state('')
-  let allIdentityGroups = $state<app.AccountIdentityGroup[]>([])
-  let syncPeriodDays = $state('180')
-  let syncInterval = $state('30')
-  let syncAllFolders = $state(false)
-  let syncFoldersEnabled = $state(false)
-  let readReceiptRequestPolicy = $state('never')
-  let authType = $state('password')
-  let displayNameLoaded = $state(false)
-
-  // Folder mappings
-  let sentFolderPath = $state('')
-  let draftsFolderPath = $state('')
-  let trashFolderPath = $state('')
-  let spamFolderPath = $state('')
-  let archiveFolderPath = $state('')
-  let allMailFolderPath = $state('')
-  let starredFolderPath = $state('')
-
-  let saving = $state(false)
-  let errors = $state<Record<string, string>>({})
-  let initialized = $state(false)
-
-  // Initialize form when editing
-  $effect(() => {
-    if (open && editAccount && !initialized) {
-      initialized = true
-      activeTab = 'general'
-
-      // Load account values
-      email = editAccount.email
-      username = editAccount.username
-      imapHost = editAccount.imapHost
-      imapPort = editAccount.imapPort
-      imapSecurity = editAccount.imapSecurity
-      smtpHost = editAccount.smtpHost
-      smtpPort = editAccount.smtpPort
-      smtpSecurity = editAccount.smtpSecurity
-      noOutgoingServer = editAccount.noOutgoingServer || false
-      smtpUsername = editAccount.smtpUsername || ''
-      smtpPassword = ''  // never echo a stored password back; blank means "keep existing"
-      replyForwardIdentityID = editAccount.replyForwardIdentityId || ''
-      loadAllIdentityGroups()
-      syncPeriodDays = String(editAccount.syncPeriodDays)
-      syncInterval = String(editAccount.syncInterval ?? 30)
-      syncAllFolders = editAccount.syncAllFolders || false
-      syncFoldersEnabled = editAccount.syncFoldersEnabled || false
-      readReceiptRequestPolicy = editAccount.readReceiptRequestPolicy || 'never'
-      authType = editAccount.authType || 'password'
-      color = editAccount.color || ''
-      displayNameLoaded = false
-
-      // Folder mappings
-      sentFolderPath = editAccount.sentFolderPath || ''
-      draftsFolderPath = editAccount.draftsFolderPath || ''
-      trashFolderPath = editAccount.trashFolderPath || ''
-      spamFolderPath = editAccount.spamFolderPath || ''
-      archiveFolderPath = editAccount.archiveFolderPath || ''
-      allMailFolderPath = editAccount.allMailFolderPath || ''
-      starredFolderPath = editAccount.starredFolderPath || ''
-
-      // Load display name from the default identity
-      loadDisplayName(editAccount.id)
-    }
-  })
-
-  // Reset when dialog closes
+  // Reset create-in-dialog state when the dialog closes. If a new account was
+  // created, it remains in the store; this only resets the next dialog opening.
   $effect(() => {
     if (!open) {
-      initialized = false
-      errors = {}
-      password = ''
-      smtpPassword = ''
-      allIdentityGroups = []
+      createdAccount = null
     }
   })
 
@@ -139,91 +47,12 @@
     }
   })
 
-  async function loadDisplayName(accountId: string) {
-    try {
-      const identities = await GetIdentities(accountId)
-      const defaultIdentity = identities?.find((id: any) => id.isDefault) || identities?.[0]
-      if (defaultIdentity) {
-        displayName = defaultIdentity.name || ''
+  async function handleSubmit(config: account.AccountConfig) {
+    if (activeAccount) {
+      const result = await accountStore.updateAccount(activeAccount.id, config)
+      if (createdAccount?.id === result.id) {
+        createdAccount = result
       }
-    } catch (err) {
-      console.error('Failed to load display name:', err)
-    } finally {
-      displayNameLoaded = true
-    }
-  }
-
-  async function loadAllIdentityGroups() {
-    try {
-      allIdentityGroups = (await GetAllAccountIdentities()) || []
-    } catch (err) {
-      console.error('Failed to load identity groups for Reply/Forward-with picker:', err)
-      allIdentityGroups = []
-    }
-  }
-
-  // Sendable identity-group candidates for the Reply/Forward-with picker:
-  // exclude the account being edited (its own identities can't reply on
-  // its behalf when it's marked no-outgoing) and any other no-outgoing
-  // accounts (their identities aren't sendable either).
-  const availableIdentityGroups = $derived(
-    allIdentityGroups.filter(g => g.account?.id !== editAccount?.id && !g.account?.noOutgoingServer)
-  )
-
-  function validate(): boolean {
-    errors = {}
-
-    if (!displayName.trim()) errors.displayName = $_('account.displayNameRequired')
-    if (!imapHost.trim()) errors.imapHost = $_('account.imapHostRequired')
-    if (imapPort < 1 || imapPort > 65535) errors.imapPort = $_('account.invalidPort')
-    if (!noOutgoingServer) {
-      if (!smtpHost.trim()) errors.smtpHost = $_('account.smtpHostRequired')
-      if (smtpPort < 1 || smtpPort > 65535) errors.smtpPort = $_('account.invalidPort')
-    }
-
-    return Object.keys(errors).length === 0
-  }
-
-  async function handleSaveEdit() {
-    if (!validate() || !editAccount) return
-
-    saving = true
-    try {
-      const config = new account.AccountConfig({
-        // Account name is no longer user-editable; the sidebar label is just
-        // the email address. Keep name in sync with the email.
-        name: email,
-        displayName,
-        color,
-        email,
-        username: username || email,
-        password: password, // Empty = keep current
-        imapHost,
-        imapPort,
-        imapSecurity,
-        smtpHost,
-        smtpPort,
-        smtpSecurity,
-        noOutgoingServer,
-        smtpUsername,
-        smtpPassword, // Empty = keep current (when SMTPUsername unchanged) or skip (when toggle is on)
-        replyForwardIdentityId: replyForwardIdentityID,
-        authType,
-        syncPeriodDays: Number(syncPeriodDays),
-        syncInterval: Number(syncInterval),
-        syncAllFolders,
-        syncFoldersEnabled,
-        readReceiptRequestPolicy,
-        sentFolderPath,
-        draftsFolderPath,
-        trashFolderPath,
-        spamFolderPath,
-        archiveFolderPath,
-        allMailFolderPath,
-        starredFolderPath,
-      })
-
-      const result = await accountStore.updateAccount(editAccount.id, config)
 
       addToast({
         type: 'success',
@@ -233,28 +62,16 @@
       onSuccess?.(result)
       open = false
       onClose?.()
-    } catch (err) {
-      console.error('Failed to save account:', err)
-      addToast({
-        type: 'error',
-        message: $_('toast.failedToSaveAccount'),
-      })
-    } finally {
-      saving = false
+      return
     }
-  }
 
-  // Handlers for new account wizard (delegated to AccountForm)
-  async function handleSubmit(config: account.AccountConfig) {
     const result = await accountStore.addAccount(config)
-
+    createdAccount = result
     onSuccess?.(result)
-    open = false
-    onClose?.()
-  }
-
-  async function handleTestConnection(config: account.AccountConfig) {
-    await accountStore.testConnection(config)
+    addToast({
+      type: 'success',
+      message: $_('toast.accountCreated'),
+    })
   }
 
   function handleCancel() {
@@ -274,145 +91,17 @@
   <Dialog.Content class="max-w-xl max-h-[90vh] overflow-hidden flex flex-col" preventCloseAutoFocus onInteractOutside={(e) => e.preventDefault()}>
     <Dialog.Header>
       <Dialog.Title>
-        {editAccount?.sharedMailboxParentId ? $_('account.editSharedMailboxTitle') : editAccount ? $_('account.editTitle') : $_('account.addTitle')}
+        {activeAccount?.sharedMailboxParentId ? $_('account.editSharedMailboxTitle') : activeAccount ? $_('account.editTitle') : $_('account.addTitle')}
       </Dialog.Title>
     </Dialog.Header>
 
-    {#if editAccount}
-      <!-- Edit Mode: Tabbed Interface -->
-      <Tabs.Root bind:value={activeTab} class="flex-1 flex flex-col overflow-hidden">
-        <Tabs.List class="grid w-full grid-cols-3">
-          <Tabs.Trigger value="general" class="flex items-center gap-2">
-            <Icon icon="mdi:cog" class="w-4 h-4" />
-            {$_('account.general')}
-          </Tabs.Trigger>
-          <Tabs.Trigger value="identity" class="flex items-center gap-2">
-            <Icon icon="mdi:account-multiple" class="w-4 h-4" />
-            {$_('account.identity')}
-          </Tabs.Trigger>
-          <Tabs.Trigger value="server" class="flex items-center gap-2">
-            <Icon icon="mdi:server" class="w-4 h-4" />
-            {$_('account.server')}
-          </Tabs.Trigger>
-        </Tabs.List>
-
-        <div class="overflow-y-auto mt-4 pt-1.5 pl-1 pr-3 h-[460px] max-h-[calc(90vh-220px)]">
-          <Tabs.Content value="general" class="mt-0">
-            <AccountGeneralTab
-              {editAccount}
-              bind:displayName
-              bind:email
-              bind:username
-              bind:password
-              bind:noOutgoingServer
-              bind:replyForwardIdentityID
-              {availableIdentityGroups}
-              bind:syncPeriodDays
-              bind:syncInterval
-              bind:readReceiptRequestPolicy
-              {errors}
-              onDisplayNameChange={(v) => displayName = v}
-              onUsernameChange={(v) => username = v}
-              onPasswordChange={(v) => password = v}
-              onNoOutgoingServerChange={(v) => noOutgoingServer = v}
-              onReplyForwardIdentityIDChange={(v) => replyForwardIdentityID = v}
-              onSyncPeriodChange={(v) => syncPeriodDays = v}
-              onSyncIntervalChange={(v) => syncInterval = v}
-              onReadReceiptPolicyChange={(v) => readReceiptRequestPolicy = v}
-            />
-          </Tabs.Content>
-
-          <Tabs.Content value="identity" class="mt-0">
-            <AccountIdentityTab
-              accountId={editAccount.id}
-              {editAccount}
-              defaultDisplayName={displayName}
-              {displayNameLoaded}
-              onDefaultDisplayNameChange={(v) => displayName = v}
-            />
-          </Tabs.Content>
-
-          <Tabs.Content value="server" class="mt-0">
-            <AccountServerTab
-              {editAccount}
-              bind:imapHost
-              bind:imapPort
-              bind:imapSecurity
-              bind:smtpHost
-              bind:smtpPort
-              bind:smtpSecurity
-              bind:noOutgoingServer
-              bind:smtpUsername
-              bind:smtpPassword
-              bind:sentFolderPath
-              bind:draftsFolderPath
-              bind:trashFolderPath
-              bind:spamFolderPath
-              bind:archiveFolderPath
-              bind:allMailFolderPath
-              bind:starredFolderPath
-              {errors}
-              onImapHostChange={(v) => imapHost = v}
-              onImapPortChange={(v) => imapPort = v}
-              onImapSecurityChange={(v) => imapSecurity = v}
-              onSmtpHostChange={(v) => smtpHost = v}
-              onSmtpPortChange={(v) => smtpPort = v}
-              onSmtpSecurityChange={(v) => smtpSecurity = v}
-              onSmtpUsernameChange={(v) => smtpUsername = v}
-              onSmtpPasswordChange={(v) => smtpPassword = v}
-              bind:syncAllFolders
-              onSyncAllFoldersChange={(v) => syncAllFolders = v}
-              bind:syncFoldersEnabled
-              onSyncFoldersEnabledChange={(v) => syncFoldersEnabled = v}
-              onFolderMappingChange={(type, v) => {
-                switch (type) {
-                  case 'sent': sentFolderPath = v; break
-                  case 'drafts': draftsFolderPath = v; break
-                  case 'trash': trashFolderPath = v; break
-                  case 'spam': spamFolderPath = v; break
-                  case 'archive': archiveFolderPath = v; break
-                  case 'all': allMailFolderPath = v; break
-                  case 'starred': starredFolderPath = v; break
-                }
-              }}
-            />
-          </Tabs.Content>
-        </div>
-
-        <!-- Actions for General/Server tabs (not Identity - it has its own save) -->
-        {#if activeTab === 'identity' || activeTab === 'security'}
-          <div class="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
-            <Button variant="ghost" onclick={handleCancel}>
-              {$_('common.close')}
-            </Button>
-          </div>
-        {:else}
-          <div class="flex items-center justify-end gap-2 pt-4 border-t border-border mt-4">
-            <Button variant="ghost" onclick={handleCancel} disabled={saving}>
-              {$_('common.cancel')}
-            </Button>
-            <Button onclick={handleSaveEdit} disabled={saving}>
-              {#if saving}
-                <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-              {/if}
-              {$_('common.saveChanges')}
-            </Button>
-          </div>
-        {/if}
-      </Tabs.Root>
-    {:else}
-      <!-- New Account Mode. AccountForm is a fixed-height flex column that
-           scrolls its fields internally and pins its actions footer, so the
-           dialog height stays constant whether or not Advanced Settings is
-           expanded. -->
-      <div>
-        <AccountForm
-          {editAccount}
-          onSubmit={handleSubmit}
-          onTestConnection={handleTestConnection}
-          onCancel={handleCancel}
-        />
-      </div>
+    {#if open}
+      <AccountForm
+        editAccount={activeAccount}
+        createdInDialog={createdAccount !== null}
+        onSubmit={handleSubmit}
+        onCancel={handleCancel}
+      />
     {/if}
   </Dialog.Content>
 </Dialog.Root>

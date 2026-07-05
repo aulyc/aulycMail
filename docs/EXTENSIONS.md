@@ -15,20 +15,17 @@ This doc is the contract every aulycmail extension uses to interact with the hos
 3. [Manifest + lifecycle](#manifest--lifecycle)
 4. [`coreapi` reference](#coreapi-reference)
 5. [Per-extension storage](#per-extension-storage)
-6. [Auth Broker](#auth-broker)
-7. [OAuth client configurations](#oauth-client-configurations)
-8. [UI registration](#ui-registration)
-9. [Account-setup hook contract](#account-setup-hook-contract)
-10. [Lifecycle](#lifecycle)
-11. [Settings keys](#settings-keys)
-12. [Wails-bound surface](#wails-bound-surface)
-13. [Testing conventions](#testing-conventions)
-14. [Frontend conventions](#frontend-conventions)
-15. [Extension UI Kit](#extension-ui-kit)
-16. [Write capability](#write-capability)
-17. [Contributing a new extension](#contributing-a-new-extension)
-18. [Distribution model](#distribution-model)
-19. [Not yet implemented](#not-yet-implemented)
+6. [UI registration](#ui-registration)
+7. [Lifecycle](#lifecycle)
+8. [Settings keys](#settings-keys)
+9. [Wails-bound surface](#wails-bound-surface)
+10. [Testing conventions](#testing-conventions)
+11. [Frontend conventions](#frontend-conventions)
+12. [Extension UI Kit](#extension-ui-kit)
+13. [Write capability](#write-capability)
+14. [Contributing a new extension](#contributing-a-new-extension)
+15. [Distribution model](#distribution-model)
+16. [Not yet implemented](#not-yet-implemented)
 
 ---
 
@@ -38,7 +35,7 @@ aulycmail's extension system lets first-party extensions ship inside the same bi
 
 1. **Built-in, disabled by default.** Extensions compile into the binary but do nothing until enabled. Minimalists never see them.
 2. **Per-extension SQLite isolation for new extensions.** New extensions own their own database file under `<dataDir>/extensions/<name>/data.db`. The current Contacts extension is a first-party special case that uses host-owned contact tables because mail autocomplete already depends on that data.
-3. **Shared infrastructure stays shared.** One Wails process, one OAuth manager, one credential store, one IPC bus, one notification system. The extension system adds an additional **Auth Broker** layer so extensions never see access tokens or refresh tokens.
+3. **Shared infrastructure stays shared.** One Wails process, one credential store, one IPC bus, one notification system.
 4. **Inline + detach pattern.** Every extension works inside the main window. Workflows can optionally pop out to a separate window via IPC (identical to the existing detached composer; not yet exercised by any extension in v0.3.x).
 5. **Strict zero overhead when disabled.** Each extension contributes ONE `Bridge` struct allocation (~80 bytes) at App construction. Extension-specific stores and API wrappers are **lazy-initialized via `sync.Once` on the first enabled method call** — disabled extensions never open extension-specific storage, never construct stores, never allocate beyond the bridge stub. The only baseline cost is binary size + 80 bytes per bridge.
 
@@ -60,11 +57,9 @@ Full architectural rationale lives in [`context/EXTENSION_ARCHITECTURE.md`](../c
 │  │  internal/message/     │    │     manifest.json            │    │
 │  │  internal/draft/       │    │     manifest.go              │    │
 │  │  internal/contact/     │    │     backend/                 │    │
-│  │  internal/carddav/     │    │       register.go, api.go..  │    │
-│  │  internal/imap/        │    │     frontend/                │    │
+│  │  internal/imap/        │    │       register.go, api.go..  │    │
 │  │  internal/smtp/        │    │       components/, stores/   │    │
-│  │  internal/oauth2/      │    │   (future: calendar/)        │    │
-│  │  internal/credentials/ │    │                              │    │
+│  │  internal/credentials/ │    │   (future: calendar/)        │    │
 │  │  internal/settings/    │    │  internal/extensions/        │    │
 │  │  internal/kit/davutil  │    │   ui/, auth/, mail/, ...     │    │
 │  │  ...                   │    │   (host scaffolding)         │    │
@@ -80,7 +75,7 @@ Full architectural rationale lives in [`context/EXTENSION_ARCHITECTURE.md`](../c
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-**The rule**: `extensions/<name>/` for things users toggle on/off. `internal/extensions/` for host scaffolding that always runs (UI registry, Auth Broker, Mail/Composer wrappers, per-extension Store wiring).
+**The rule**: `extensions/<name>/` for things users toggle on/off. `internal/extensions/` for host scaffolding that always runs (UI registry, Mail/Composer wrappers, per-extension Store wiring).
 
 **Where to put each piece of code:**
 
@@ -91,14 +86,11 @@ Full architectural rationale lives in [`context/EXTENSION_ARCHITECTURE.md`](../c
 | Extension's manifest metadata | `extensions/<name>/manifest.json` + `manifest.go` (root, embeds JSON) |
 | Extension's Svelte components | `extensions/<name>/frontend/components/` |
 | Extension's Svelte stores | `extensions/<name>/frontend/stores/` |
-| Extension's account-setup hook panel | `extensions/<name>/frontend/hooks/` |
 | Extension's host-side wiring (one embed field + one constructor call) | `app/extension_<name>.go` — see below |
 | A type or interface ALL extensions might consume | `internal/core/api/v1/` |
 | Shared host-side scaffolding (registry, broker, wrappers) | `internal/extensions/` |
 | **Generic backend utility extensions are allowed to import** | `internal/kit/<area>/` |
 | Host-owned UI used by the rail/dialog (not extension-specific) | `frontend/src/lib/components/rail/`, etc. |
-
-**`internal/kit/` — shared extension-facing building blocks.** Backend analog of the frontend `lib/components/kit/`. Modules under `internal/kit/*` are generic, extension-agnostic (no extension-specific naming or behavior) and may be imported directly from extension code — they're carved out from the otherwise blanket "extensions can't import `internal/*`" rule. Today's only member is [`internal/kit/davutil`](../internal/kit/davutil), which holds the `XMLFixTransport` and the `NewHTTPClient(timeout)` builder both `internal/carddav` and the calendar extension use to normalize WebDAV ETag / lastmodified server quirks. Add a new `internal/kit/<area>/` when two consumers need the same primitive and one of them is an extension.
 
 **The Bridge pattern + the `app/` minimum**: Wails v2 binds methods on structs in the `Bind` list at `wails.Run` time, generating frontend bindings via Go reflection. Because Go's reflection enumerates methods on **embedded** types via standard method promotion, the host (App) can embed a `*Bridge` struct from each extension's package; the Bridge's methods then appear in the generated `App.d.ts` as if they were on App. The actual method definitions live in `extensions/<name>/backend/bridge.go`. The only host-side file (`app/extension_<name>.go`) is reduced to about 10 lines: importing the extension's package, declaring the embedded field on App, and one constructor call that wires the bridge's host-provided dependencies during Startup.
 
@@ -125,23 +117,14 @@ This shape is **subprocess-ready**: if community-extension demand emerges and a 
   "id": "contacts",
   "name": "Contacts",
   "version": "0.1.0",
-  "description": "Browse and edit contacts from your accounts (CardDAV, Google, Microsoft). Local-contact editing in v0.3.x; provider write capability rolling out incrementally.",
+  "description": "Browse and edit the local contacts used by mail autocomplete.",
   "author": "aulycmail",
   "minaulycmailVersion": "0.3.0",
   "capabilities": [
     "contacts.read",
     "contacts.write",
-    "ui.rail-tab",
-    "ui.account-setup-hook",
-    "ui.settings-tab"
-  ],
-  "oauth": {
-    "first_party_uses_core_for_scopes": [
-      "https://www.googleapis.com/auth/contacts.readonly",
-      "Contacts.Read",
-      "Contacts.ReadBasic"
-    ]
-  }
+    "ui.rail-tab"
+  ]
 }
 ```
 
@@ -154,7 +137,6 @@ This shape is **subprocess-ready**: if community-extension demand emerges and a 
 | `author` | Display name only. No URL. |
 | `minaulycmailVersion` | Semver. Future host versions will refuse to load an extension whose minaulycmailVersion is higher than the running build. |
 | `capabilities` | Coarse capability strings the extension declares. See [coreapi.Capability](../internal/core/api/v1/manifest.go) for the known set (e.g., `contacts.read`, `contacts.write`, `ui.rail-tab`, `ui.settings-tab`). Unknown strings are treated as opaque so the set can grow without breaking older hosts. |
-| `oauth.first_party_uses_core_for_scopes` | Optional. Lists OAuth scopes that should route through aulycmail core's mail OAuth (reusing the user's existing consent) instead of the extension's own client config. See [§ Manifest OAuth routing](#manifest-oauth-routing--first_party_uses_core_for_scopes). First-party only. |
 
 ### Loading the manifest into Go
 
@@ -195,7 +177,7 @@ type Extension interface {
 }
 ```
 
-**`Register` is called once per process at startup, regardless of whether the extension is currently enabled.** This matches the architecture-doc rule that descriptive UI registrations (rail tab, account-setup hook) persist across enable/disable cycles. Active behaviors (sync schedulers, background work) are gated separately by `IsExtensionEnabled` checks; they are NOT skipped at Register time.
+**`Register` is called once per process at startup, regardless of whether the extension is currently enabled.** This matches the architecture-doc rule that descriptive UI registrations (rail tab) persist across enable/disable cycles. Active behaviors (sync schedulers, background work) are gated separately by `IsExtensionEnabled` checks; they are NOT skipped at Register time.
 
 The returned `Unregister` removes everything Register wired. Called by the host on process shutdown.
 
@@ -238,7 +220,7 @@ type ContactsBridgeDeps struct {
     Paths         *platform.Paths      // for the extension's SQLite dir
     DB            *database.DB         // shared writable DB handle for local contacts
     Emitter       EventEmitter         // for runtime.EventsEmit (kept generic — no Wails import in extensions/)
-    Core          coreapi.Core         // host coreapi handle — used for Contacts().ListSources()/LinkAccountSource() (source management) AND Storage().HostSecrets() (read-only access to core-managed CardDAV passwords, per Pattern B in the Storage section below)
+    Core          coreapi.Core         // host coreapi handle (storage, events, cross-extension surfaces)
 }
 
 // Type-name rule: each extension MUST name its Bridge struct `<Name>Bridge`
@@ -331,8 +313,7 @@ Calendar is not present in the current source tree. This section is a future-des
 ```
 extensions/calendar/
 ├── manifest.go            // wraps embedded manifest.json
-├── manifest.json          // capabilities + reserved OAuth slots
-├── creds.go               // ldflag-injected GoogleClientID/Secret etc. (Phase 2)
+├── manifest.json          // capabilities
 ├── register.go            // RegisterRailTab + RegisterSettingsTab
 └── backend/
     ├── bridge.go          // CalendarBridge + Calendar_* Wails methods
@@ -347,17 +328,13 @@ extensions/calendar/
     └── xmlfix.go          // inline-duplicated XML normalizer for buggy CalDAV servers
 ```
 
-**Manifest** ([`extensions/calendar/manifest.json`](../extensions/calendar/manifest.json)) declares two capabilities and reserves Phase 2 OAuth slots so a future Google/Microsoft Calendar build doesn't need a schema change:
+**Manifest** ([`extensions/calendar/manifest.json`](../extensions/calendar/manifest.json)) declares two capabilities:
 
 ```json
 {
   "id": "calendar",
   "name": "Calendar",
-  "capabilities": ["ui.rail-tab", "ui.settings-tab"],
-  "oauth_slots": [
-    { "id": "google-calendar", "provider": "google", "scopes": ["https://www.googleapis.com/auth/calendar"] },
-    { "id": "microsoft-calendar", "provider": "microsoft", "scopes": ["Calendars.ReadWrite"] }
-  ]
+  "capabilities": ["ui.rail-tab", "ui.settings-tab"]
 }
 ```
 
@@ -423,7 +400,7 @@ func (a *App) initCalendarExtension() {
         SettingsStore: a.settingsStore,
         Paths:         a.paths,
         Core:          newCoreImpl(a, "calendar"),
-        // ... + the EventEmitter closure + OAuth provider registrations ...
+        // ... + the EventEmitter closure ...
     })
 }
 ```
@@ -449,7 +426,6 @@ This is the complete list of APIs your extension is allowed to consume. Anything
 | `core.Mail()` | ⚠️ | `ListMessages`, `GetMessage`, `ListFolders`, `GetSpecialFolder` | Mutators (`MoveMessage`, `Archive`, `Trash`, `SetFlags`, `AppendMessage`) and `SubscribeToMailEvents` return `ErrUnimplemented`. |
 | `core.Composer()` | ⚠️ | `OpenComposer` (mailto URL form) | `Attachments` and `ReplyTo` in `ComposeRequest` return `ErrUnimplemented`. |
 | `core.Contacts()` | ✅ | `ListSources`, `LinkAccountSource`, `ListAddressbooks`, `SetSourceWritable`, `SearchContacts`; `ContactSource.AccountID` field surfaced | Source-management surface used by the Contacts extension itself + the first read-side cross-extension method (`SearchContacts`). `SearchContacts` was wired in v0.3.0 to back the Calendar extension's attendee-picker autocomplete — see [§ Cross-extension consumption (Search example)](#cross-extension-consumption-search-example) below. Remaining contact CRUD methods (`GetContact`/`ListContacts`/`Create`/`Update`/`Delete`/`ListAddressbooks`) still return `ErrUnimplemented` — no cross-extension consumer queries those yet, and routing them through coreImpl would force the Contacts extension to initialize even when disabled. They get wired in when a real consumer arrives. |
-| `core.Auth()` | ✅ | `HTTPClient(accountID, scopes)` — bearer + transparent refresh; `StartIncrementalConsent(req StartIncrementalConsentRequest)` — synchronous OAuth consent flow that persists tokens against either an account or a standalone contacts source (see [§ Write-access grant flow](#write-access-grant-flow-account-picker-model)) | `IMAPClient` and `SMTPClient` return `ErrUnimplemented`. |
 | `core.UI()` | ⚠️ | `RegisterRailTab`, `OpenURL` | `RegisterSettingsTab`, `RegisterContextMenuItem`, `RegisterInboxView` accept registrations but no consumer reads them yet. `OpenURL` opens URLs in the system browser via the host's hardened resolver (protocol allowlist, Linux portal-first). |
 | `core.Storage()` | ⚠️ | `Secrets(extensionID)` — keyring-first with AES-encrypted DB fallback | `KV(extensionID)` still returns `stubKV` (all methods `ErrUnimplemented`) — wires up when a real consumer arrives. Per-extension SQLite (your own `*sql.DB`) is the parallel persistence path — see [§ Per-extension storage](#per-extension-storage). |
 | `core.Notifications()` | ✅ | `Show(NotifyRequest)` — dispatches to the host's platform notifier; click routing supports `open-extension` (raises window + emits Wails `extension:open`) | Calendar's VALARM scheduler is the first concrete consumer. |
@@ -538,7 +514,6 @@ type Core interface {
     Mail() Mail
     Composer() Composer
     Contacts() Contacts
-    Auth() Auth
     Notifications() Notifications
     UI() UI
     Storage() Storage
@@ -551,7 +526,7 @@ type Core interface {
 }
 ```
 
-Extensions call `core.Mail().ListMessages(...)`, `core.Auth().HTTPClient(...)`, etc. For Phase 1 first-party extensions, all capabilities are implicitly granted; surfaces an extension isn't using simply aren't called.
+Extensions call `core.Mail().ListMessages(...)`, `core.Contacts().SearchContacts(...)`, etc. For Phase 1 first-party extensions, all capabilities are implicitly granted; surfaces an extension isn't using simply aren't called.
 
 ### `Mail`
 
@@ -609,14 +584,12 @@ type Contacts interface {
 
     // Source management (host-implemented in app/coreimpl.go; available to
     // cross-extension consumers + used by the Contacts extension's bridge to
-    // drive the sidebar source list + account-setup hook).
+    // drive the sidebar source list).
     ListSources() ([]ContactSource, error)
     LinkAccountSource(accountID, name string, syncInterval int) (string, error)
 
-    // SetSourceWritable flips a contact source's writable flag. Used by the
-    // Phase 2b.3 incremental-consent flow to enable write access after a
-    // user grants the OAuth write scope; CardDAV sources also use it as a
-    // pure flag flip via the extension settings UI.
+    // SetSourceWritable flips a contact source's writable flag. With remote
+    // sources removed this is a no-op; kept for interface stability.
     SetSourceWritable(sourceID string, writable bool) error
 
     // Events (Phase 3+, when a core event bus exists)
@@ -624,13 +597,12 @@ type Contacts interface {
 }
 
 // ContactSource is the API-surface descriptor for a configured contact
-// source. AccountID (added in Phase 2b.3) carries the linked email account
-// id, when the source was created via LinkAccountSource. Standalone CardDAV
-// / contacts-only OAuth sources have AccountID == "".
+// source. Remote source types are legacy/reserved — the host currently
+// reports no sources.
 type ContactSource struct {
     ID        string `json:"id"`
     Name      string `json:"name"`
-    Type      string `json:"type"`              // "carddav" | "google" | "microsoft"
+    Type      string `json:"type"`              // reserved legacy value: "carddav"
     Writable  bool   `json:"writable"`
     AccountID string `json:"accountId,omitempty"`
 }
@@ -655,81 +627,25 @@ type ContactPatch struct {
 }
 ```
 
-**Split implementation** — two backends sit behind this interface depending on the method:
+**Implementation (local-only)** — contact CRUD (`Search`/`Get`/`List`/`Create`/`Update`/`Delete`) is implemented in [`extensions/contacts/backend/api.go`](../extensions/contacts/backend/api.go) against the host-owned local `contact.Store` (the same tables mail autocomplete reads). There are no remote contact sources: the earlier CardDAV / Google / Microsoft write paths were removed together with OAuth support (recover from git history if remote sync is ever revived).
 
-- **Contact CRUD** (`Search`/`Get`/`List`/`ListAddressbooks`/`Create`/`Update`/`Delete`): implemented in [`extensions/contacts/backend/api.go`](../extensions/contacts/backend/api.go) and exposed via the Contacts extension's Bridge. `Search`/`Get`/`List` wrap `contact.Store` + `carddav.Store`. `Create`/`Update`/`Delete` source-dispatch by `carddav.Source.Type`:
-  - **Local** (`SourceID == "local"` / `"local:manual"`) → `contact.Store` directly.
-  - **CardDAV** → `extensions/contacts/backend/api.go writeCardDAVRecord` / `deleteCardDAVRecord` (server PUT/DELETE with basic-auth + `If-None-Match: *` on create).
-  - **Google** → [`extensions/contacts/backend/google_api.go`](../extensions/contacts/backend/google_api.go) (Phase 2b.3 Track B). Uses the People API via [`extensions/contacts/backend/google_write.go`](../extensions/contacts/backend/google_write.go); `recordToGooglePerson` mapping in [`extensions/contacts/backend/google_convert.go`](../extensions/contacts/backend/google_convert.go). ETag stored per-record in the extension's SQLite (`oauth_record_state` table) and stamped at `metadata.sources[0].etag` on PATCH. 412/`failedPrecondition` becomes `*coreapi.ErrConflict` → `contacts:conflict` Wails event.
-  - **Microsoft** → [`extensions/contacts/backend/microsoft_api.go`](../extensions/contacts/backend/microsoft_api.go) (Phase 2b.3 Track C). Uses Graph via [`extensions/contacts/backend/microsoft_write.go`](../extensions/contacts/backend/microsoft_write.go); `recordToMicrosoftContact` in [`extensions/contacts/backend/microsoft_convert.go`](../extensions/contacts/backend/microsoft_convert.go). Effectively last-writer-wins (Graph contacts don't strictly enforce `If-Match`); etag stored for telemetry only. Multi-URL records collapse to `businessHomePage` (single field on Graph) with a log warn — documented lossy mapping.
-  - `SubscribeToContactEvents` returns `ErrUnimplemented` until a core event bus exists.
-- **Source management** (`ListSources`/`LinkAccountSource`/`SetSourceWritable`): implemented in [`app/coreimpl.go`](../app/coreimpl.go) `contactsCoreImpl`, wrapping `app.carddavStore.ListSources()` + the existing `App.LinkAccountContactSource` + `carddavStore.SetSourceWritable`. These live host-side because `contact_sources` is a host-owned table (mail's autocomplete also reads it). The Contacts extension's bridge proxies through `b.deps.Core.Contacts().*`.
-- The `Get`/`List`/`Create`/`Update`/`Delete` methods on `app/coreimpl.go contactsCoreImpl` are intentionally `ErrUnimplemented`: routing them through coreImpl would force the Contacts extension's stores to initialize even when disabled, breaking the lightweight invariant. They get filled in when a cross-extension consumer actually needs them.
-- **`SearchContacts` IS wired** (v0.3.0) — delegates to `App.SearchContacts`, the same backend mail's composer hits via the `Contacts_SearchContacts` bridge method. The host-level search doesn't touch the Contacts extension's own state (it queries the shared `contact.Store` + `contact_sources`-derived OAuth providers directly), so it's lightweight-safe. First cross-extension consumer: the Calendar extension's `Calendar_SearchContacts` bridge wrapper (see [§ Cross-extension consumption](#cross-extension-consumption-search-example)).
-
-**Addressbook synthetic IDs (Phase 2b.3)**:
-
-`ListAddressbooks` returns synthetic IDs for OAuth sources so the Add Contact dialog can target a specific group/folder without exposing remote ids directly to the UI:
-
-| Source type | Addressbook ID format | Maps to |
-|---|---|---|
-| CardDAV | `<addressbook UUID>` | Row in `carddav_source_addressbooks` (local mirror table). |
-| Google — My Contacts | `google-mycontacts:<sourceID>` | Default destination; no `ModifyGroupMembership` call. |
-| Google — specific group | `google-group:<contactGroupResourceName>` | POST + then `POST .../{groupResourceName}/members:modify` to add the new contact. |
-| Microsoft — default folder | `ms-default:<sourceID>` | POST `/me/contacts`. |
-| Microsoft — specific folder | `ms-folder:<folderID>` | POST `/me/contactFolders/{folderID}/contacts`. |
-
-`parseAddressbookGroupID` / `parseAddressbookFolderID` (in `google_convert.go` / `microsoft_convert.go`) parse these back to remote IDs at write time.
+- **Source management** (`ListSources`/`LinkAccountSource`/`SetSourceWritable`/`SyncSource`): host-side stubs in [`app/coreimpl.go`](../app/coreimpl.go) — `ListSources` returns no sources, the rest are no-ops or `ErrUnimplemented`. The interface surface is kept stable so a future remote-source implementation slots back in.
+- The `Get`/`List`/`Create`/`Update`/`Delete` methods on `contactsCoreImpl` are intentionally `ErrUnimplemented`: routing them through coreImpl would force the Contacts extension's stores to initialize even when disabled, breaking the lightweight invariant. They get filled in when a cross-extension consumer actually needs them.
+- **`SearchContacts` IS wired** (v0.3.0) — delegates to `App.SearchContacts`, the same backend mail's composer hits via the `Contacts_SearchContacts` bridge method. Lightweight-safe: it queries the shared `contact.Store` directly.
+- `SubscribeToContactEvents` returns `ErrUnimplemented` until a core event bus exists.
 
 **`ContactFilter.SourceID` conventions:**
 
 | Value | Behavior |
 |---|---|
-| `""` (empty) | Merged listing — when `Query` is set, calls `contact.Store.Search` (local + vCard + CardDAV merged + ranked). When `Query` is empty, falls back to local-only list. |
+| `""` (empty) | Merged listing — when `Query` is set, calls `contact.Store.Search`; when empty, local-only list. |
 | `"local"` | All local contacts (manual + collected). |
 | `"local:manual"` | User-added local contacts (Add Contact UI). Also the canonical target for `CreateContact` when SourceID is "" or "local". |
 | `"local:collected"` | Auto-collected from sent-mail recipients. Read-only as a *create target* (the `collected` kind is reserved for the email-collection process to assign); `UpdateContact`/`DeleteContact` work fine. |
-| `<carddav source UUID>` | Contacts from a specific CardDAV source. Reads use `carddav.Store.ListRecordIDsForSource`; writes PUT/DELETE the source's WebDAV. |
 
-**`GetContact` / `UpdateContact` / `DeleteContact` argument:** if the id contains `@`, treated as an email and routed to the local store; otherwise treated as a record UUID (works for both local and CardDAV records). `GetContact` calls `enrichCardDAVSourceID` to rewrite the literal `"carddav"` string from `fromRecord` into the actual sidebar source UUID, so the frontend's writability gate finds the source row. As of Phase 2b.3, Write methods on Google AND Microsoft sources are fully wired (CardDAV since 2b.2). `GetContact` returns `(nil, nil)` when not found — never an error for missing. `ContactPatch` with all-nil pointers is a no-op success.
+Legacy CardDAV record rows (`carddav_record_state` visibility rules in `contact.Store`) are still honored when reading old databases, but no code creates or syncs them anymore.
 
-### `Auth`
-
-[`internal/core/api/v1/auth.go`](../internal/core/api/v1/auth.go)
-
-```go
-type Auth interface {
-    HTTPClient(accountID string, scopes []AuthScope) (*http.Client, error)
-    IMAPClient(accountID string, requiredCaps []string) (IMAPClient, error)
-    SMTPClient(accountID string) (SMTPClient, error)
-
-    // StartIncrementalConsent runs an interactive OAuth consent flow
-    // (synchronous; opens browser, blocks on callback, persists tokens
-    // against either an account or a standalone contacts source).
-    // Returns nil on grant or a wrapped error on user-cancel / callback
-    // failure / wrong-account mismatch. Used by extensions whose write
-    // paths hit ErrAdditionalConsentRequired from HTTPClient — they call
-    // this to upgrade the user's grant before retrying the write.
-    //
-    // Exactly one of req.AccountID or req.SourceID must be set:
-    //   - AccountID: tokens persist via SetOAuthTokensForClientConfig.
-    //   - SourceID:  tokens persist via SetContactSourceOAuthTokens.
-    // req.ExpectedEmail enforces a post-callback email match (also
-    // forwarded as login_hint so the IdP pre-selects the right account).
-    StartIncrementalConsent(req StartIncrementalConsentRequest) error
-}
-
-type StartIncrementalConsentRequest struct {
-    ClientConfigID ClientConfigID
-    Scopes         []AuthScope
-    AccountID      string // mutually exclusive with SourceID
-    SourceID       string
-    ExpectedEmail  string
-    LoginHint      string
-}
-```
-
-Extensions get pre-configured HTTP clients with bearer token injection and transparent refresh-on-401. They never see access tokens, refresh tokens, or passwords. Full details in [§ Auth Broker](#auth-broker). Write-grant details in [§ Write-access grant flow](#write-access-grant-flow-account-picker-model).
+**`GetContact` / `UpdateContact` / `DeleteContact` argument:** if the id contains `@`, treated as an email; otherwise treated as a record UUID. `GetContact` returns `(nil, nil)` when not found — never an error for missing. `ContactPatch` with all-nil pointers is a no-op success.
 
 ### `Notifications`
 
@@ -829,12 +745,12 @@ Three scoped surfaces. `KV` and `Secrets` are extension-isolated by `extensionID
 
 | Pattern | API | Owner | Example |
 |---|---|---|---|
-| **A — extension-owned** | `Secrets(extensionID)` | extension reads + writes | Calendar's CalDAV passwords (only the calendar extension can add/edit/delete them) |
-| **B — core-owned, extension-readable** | `HostSecrets()` | core writes; extension reads | Contacts' CardDAV passwords (core's account-settings UI manages them; contacts reads to PUT vCards) |
+| **A — extension-owned** | `Secrets(extensionID)` | extension reads + writes | e.g. a future extension's own server passwords |
+| **B — core-owned, extension-readable** | `HostSecrets()` | core writes; extension reads | e.g. a credential whose lifecycle belongs to a host-level concept (an account) that an extension only consumes |
 
 Pick Pattern A when only your extension has any business with the credential. Pick Pattern B when the credential's lifecycle is tied to a host-level concept (an account, a shared resource) and your extension is just a consumer.
 
-**`KV` — Phase 1 stub.** `storageCoreImpl.KV(extensionID)` returns a `stubKV` whose four methods return `ErrUnimplemented`. The interface is stable, but no consumer needs it today: every first-party extension that has settled storage needs either uses its own per-extension SQLite (Calendar's `meta` table for the display tz; Contacts via its existing schema) or uses `Secrets`/`HostSecrets` for credential material. KV gets wired when a real consumer arrives.
+**`KV` — Phase 1 stub.** `storageCoreImpl.KV(extensionID)` returns a `stubKV` whose four methods return `ErrUnimplemented`. The interface is stable, but no consumer needs it today: the Contacts extension uses the host-owned contact tables via its existing schema. KV gets wired when a real consumer arrives.
 
 **`Secrets` (Pattern A) — wired.** `storageCoreImpl.Secrets(extensionID)` returns a `secretsCoreImpl` that delegates to `internal/credentials.Store`'s extension-scoped helpers, which run keyring-first with an AES-encrypted DB-table fallback when the OS keyring is unavailable. Extensions never import `internal/credentials` directly — the four methods cover the whole credential lifecycle:
 - `Set` — empty value short-circuits to `Delete`.
@@ -842,15 +758,9 @@ Pick Pattern A when only your extension has any business with the credential. Pi
 - `Delete` — idempotent.
 - `DeleteAll` — used during uninstall to clean up all of an extension's secrets at once.
 
-Used today by the Calendar extension for CalDAV passwords (`extensions/calendar/backend/bridge.go`'s `b.deps.Core.Storage().Secrets("calendar")`).
+No shipped extension stores secrets today; the surface is wired and tested, ready for the first consumer.
 
-**`HostSecrets` (Pattern B) — wired.** `storageCoreImpl.HostSecrets()` returns a `hostSecretsCoreImpl` that routes by the key's class prefix to the matching host-side `credentials.Store` helper. Read-only by design: the host owns add/update/delete; the extension just consumes the value at request time. Add new prefixes in `app/coreimpl.go::hostSecretsCoreImpl.Get` when a future Pattern B consumer emerges.
-
-Key format: `"<class>:<id>"`. Today only `"carddav:<sourceID>"` is supported; the contacts extension uses it like:
-
-```go
-password, err := a.core.Storage().HostSecrets().Get("carddav:" + source.ID)
-```
+**`HostSecrets` (Pattern B) — interface wired, no key classes registered.** `storageCoreImpl.HostSecrets()` returns a `hostSecretsCoreImpl` whose `Get` currently reports not-found for every key. The previous remote-contact credential class was removed with remote contact sources. Read-only by design: the host owns add/update/delete; the extension just consumes the value at request time. Add key-class prefixes in `app/coreimpl.go::hostSecretsCoreImpl.Get` when a Pattern B consumer emerges.
 
 Per-extension SQLite is the parallel persistence path for domain data — see [§ Per-extension storage](#per-extension-storage).
 
@@ -902,9 +812,8 @@ Aside from `system:*`, extensions publish their own namespaced events (e.g. Cale
 | `ErrCapabilityDenied` | Method called on a capability not granted (Phase 1: never happens for first-party — all-or-nothing) |
 | `ErrAccountNotFound` | API call references an account that doesn't exist |
 | `ErrUnimplemented` | Method scaffolded but not implemented in this release |
-| `*ErrAdditionalConsentRequired{ AccountID, ClientConfigID, MissingScopes }` | Auth Broker needs additional OAuth scopes; host handles consent, extension retries |
 
-Use `errors.Is(err, coreapi.ErrXxx)` for sentinel matching. `ErrAdditionalConsentRequired` is a typed error (not a sentinel) — type-assert to read `MissingScopes`.
+Use `errors.Is(err, coreapi.ErrXxx)` for sentinel matching.
 
 ---
 
@@ -928,131 +837,6 @@ open databases, start goroutines, or allocate background resources.
 **KV namespace:** host-provided `coreapi.Storage.KV` is still a Phase 1 stub
 (see [§ Storage](#storage)). Store small extension config in your own
 migration-defined tables until a real KV consumer appears.
-
----
-
-## Auth Broker
-
-Package: [`internal/extensions/auth/`](../internal/extensions/auth/) (files [`broker.go`](../internal/extensions/auth/broker.go), [`transport.go`](../internal/extensions/auth/transport.go), [`scope.go`](../internal/extensions/auth/scope.go)).
-
-The Auth Broker is the ONLY way an extension reaches external services that use OAuth. Extensions never see OAuth access tokens or refresh tokens — token refresh is transparent. Multi-client-config routing handles the "Mail uses project A, Calendar/Contacts use project B" reality without forcing users to re-authenticate the unrelated service.
-
-For host-managed *basic-auth passwords* (today: CardDAV passwords whose lifecycle lives in core's account settings), extensions consume the documented Pattern B surface — `core.Storage().HostSecrets().Get("carddav:<sourceID>")` — rather than the Auth Broker. That's the *only* mechanism by which an extension may read a host-managed password, and it's read-only.
-
-### `HTTPClient`
-
-```go
-client, err := core.Auth().HTTPClient(accountID, []coreapi.AuthScope{
-    {Resource: "https://www.googleapis.com/auth/calendar.readonly",
-     Reason:   "Read your calendar to sync events"},
-})
-if err != nil {
-    var needConsent *coreapi.ErrAdditionalConsentRequired
-    if errors.As(err, &needConsent) {
-        // Don't try to fix this — the HOST is responsible for triggering
-        // consent. Return ErrAdditionalConsentRequired up the call chain;
-        // the host's Wails layer will surface the consent UI and the user
-        // retries the action.
-        return err
-    }
-    return fmt.Errorf("auth broker: %w", err)
-}
-
-// Use the client normally — bearer token + refresh-on-401 are transparent.
-resp, err := client.Get("https://www.googleapis.com/calendar/v3/users/me/calendarList")
-```
-
-### Routing logic
-
-`core.Auth().HTTPClient(...)` calls into [`internal/extensions/auth/broker.go HTTPClientForExtension`](../internal/extensions/auth/broker.go), which reads the calling extension's manifest to decide where each scope routes:
-
-1. Broker reads the account's existing Mail tokens to discover its provider (`google`, `microsoft`).
-2. Broker classifies each requested scope using the extension's manifest:
-   - Scopes listed in `manifest.oauth.first_party_uses_core_for_scopes` route to aulycmail core's **mail** client config (`<provider>-mail`) — reuses existing mail consent; no new prompt.
-   - Scopes NOT listed route to the **extension's own** client config (`<provider>-<extensionID>`, e.g., `google-contacts`).
-3. **Mixed-scope calls are rejected.** Some-to-core + some-to-own in a single call returns an error; the extension must split into two HTTPClient calls.
-4. Broker checks whether the account has tokens under the resolved `ClientConfigID` covering the requested scopes.
-5. **Covered**: returns `*http.Client` whose Transport injects bearer + refreshes on 401.
-6. **Not covered**: returns `*coreapi.ErrAdditionalConsentRequired{ AccountID, ClientConfigID, MissingScopes }`. The host runs the incremental-consent flow ([§ Incremental consent flow](#incremental-consent-flow)) and the extension retries.
-
-### Token refresh
-
-[`internal/extensions/auth/transport.go bearerRefreshTransport`](../internal/extensions/auth/transport.go) handles refresh. It serializes refreshes per `(accountID, clientConfigID)` so N concurrent expired-token requests cause exactly one refresh.
-
-### IMAP / SMTP
-
-```go
-imapClient, err := core.Auth().IMAPClient(accountID, []string{"SIEVE"})
-smtpClient, err := core.Auth().SMTPClient(accountID)
-```
-
-Phase 1: both return `coreapi.ErrUnimplemented`. Phase 2+ wires them when a real consumer needs IMAP-via-broker (Sieve script management, custom X-* commands) or SMTP-via-broker (delayed-send queues).
-
----
-
-## OAuth client configurations
-
-Package: [`internal/oauth2/clientconfig.go`](../internal/oauth2/clientconfig.go).
-
-Each first-party extension owns its own OAuth client (Google Cloud project / Azure AD registration). This is INTENTIONAL: it sets the precedent for future community extensions (no first-party shortcut to grandfather in), avoids re-verification cascade when Mail's project doesn't need to change, and the UX cost (one Google consent click per account + per extension) is acceptable because the browser is already signed in.
-
-### Registry
-
-```go
-type ClientCredentials struct {
-    ClientID     string
-    ClientSecret string
-}
-
-// Known ids:
-//   "google-mail"          — aulycmail core's Mail-scoped Google project
-//   "microsoft-mail"       — aulycmail core's Mail-scoped Azure AD registration
-//   "google-<extensionID>" — per-extension Google project (e.g., "google-contacts")
-//   "microsoft-<extensionID>" — per-extension Azure AD registration (e.g., "microsoft-contacts")
-func ClientConfigForID(id string) (ClientCredentials, bool)
-```
-
-Resolution order:
-
-1. User override from `credentials.Store` (Settings UI override) via `oauth2.UserOverrideLookup`
-2. Registered `CredentialsProvider` chain — aulycmail core's mail slots, then each extension's own slots (registered at startup from each extension's `OAuthClients()` return value)
-3. `(zero, false)` → the consent flow surfaces "no creds configured" pointing the user at the extension's settings dialog
-
-> **Don't use `oauth2.GetProvider(clientConfigID)` to test "is this slot configured?"** It silently inherits the mail-side ldflag creds when the extension slot is empty, producing a misleading "configured" answer. Use `oauth2.ClientConfigForID(clientConfigID)` — that's the canonical resolver and only returns truthy when there are real per-slot creds. See [§ Incremental consent flow](#incremental-consent-flow) for the correctness rule.
-
-### Provider lookup
-
-```go
-provider, err := oauth2.GetProviderForClientConfig("google-contacts")
-// provider.ClientID, provider.ClientSecret are populated from the extension's slot
-// (via ClientConfigForID's resolution chain).
-// provider.Scopes are the default Google scopes (override per-extension as needed).
-```
-
-### Provisioning a new client config
-
-When you ship a new first-party extension that needs its own OAuth project:
-
-1. Create a Google Cloud project (or Azure AD app registration) with the scopes your extension needs.
-2. Define ldflag-injected vars in `extensions/<name>/creds.go` (e.g., `GoogleClientID`, `GoogleClientSecret`, `MicrosoftClientID`). See [`extensions/contacts/creds.go`](../extensions/contacts/creds.go) for the canonical pattern.
-3. Return them from the extension's `OAuthClients()` as `[]coreapi.OAuthProviderRegistration` keyed by `<provider>-<extensionID>`. The host iterates this list at startup and registers each entry into the global `ClientConfigForID` resolver chain.
-4. Inject the actual values at build time: typically a per-extension `.env` file (`extensions/<name>/.env`) consumed by the Makefile via `-ldflags '-X github.com/aulyc/aulycmail/extensions/<name>.GoogleClientID=...'`.
-5. Optionally also expose an "aulycmail - {Google,Microsoft}" option in the extension slot's dropdown (see [§ User-supplied OAuth credentials](#user-supplied-oauth-credentials-override-ui)) so users on builds with shipped credentials can opt into them without pasting anything. The option only appears when the corresponding shipped creds were injected at build time. Choosing it clears any user-typed creds on the slot; the resolver then falls through to the shipped values via the provider chain.
-
-Once the extension's slot is populated, `ClientConfigForID("<provider>-<extensionID>")` returns configured credentials and the Auth Broker routes the extension's scope requests to that client. Empty entries are safe — extensions can declare all their slots unconditionally and rely on build-time injection to fill in only the ones with credentials.
-
-aulycmail core's mail credentials follow a separate path: they're loaded from the `aulycmail-creds` shim binary (or build-time ldflags) at startup. See [`internal/oauth2/config.go`](../internal/oauth2/config.go). Extension credentials do NOT use the shim — they live in their own extension package.
-
-### Mapping legacy provider names
-
-[`oauth2.ClientConfigIDForProvider(name)`](../internal/oauth2/clientconfig.go) maps legacy provider strings (stored in `oauth_tokens.provider` column) to their default Mail client config:
-
-| Provider name | Maps to |
-|---|---|
-| `google`, `google-contacts` | `google-mail` |
-| `microsoft`, `microsoft-contacts` | `microsoft-mail` |
-
-Used internally for back-compat queries; extension code rarely needs this directly.
 
 ---
 
@@ -1154,9 +938,8 @@ Extension-relevant subset. Many other `App.*` methods exist for mail-side concer
 |---|---|
 | `App.ListEnabledExtensions() ([]string, error)` | All currently-enabled extension names (iterates `settings.AllExtensionKeys`). The frontend rail renders when `len() >= 1` (one enabled extension + always-on Mail = two rail items to switch between). |
 | `App.ListExtensionRailTabs() ([]v1.RailTabRequest, error)` | Rail tabs for currently-enabled extensions only. Source: [`app/extension_ui.go`](../app/extension_ui.go). |
-| `App.CancelOAuthFlow()` | Cancel any in-progress OAuth flow (account add, write-access grant, etc.). Stops the OAuth manager's callback server; in-flight backend code returns with a cancellation error. |
 
-Earlier revisions also bound per-extension enable/disable toggles (`IsExtensionEnabled`/`SetExtensionEnabled`/`ListExtensions`), a frontend log bridge (`LogFrontend`), and the OAuth credential override editor (`GetOAuthCredsStatus`/`SetOAuthCreds`/`ClearOAuthCreds`). No frontend UI ever consumed them, so the bindings were removed; reintroduce them together with their UI if those features ship. The write-access surface (`SetContactSourceWritable`, `ListAuthContextsForProvider`) described in [§ Write-access grant flow](#write-access-grant-flow-account-picker-model) is design-stage and not yet implemented.
+Earlier revisions also bound per-extension enable/disable toggles (`IsExtensionEnabled`/`SetExtensionEnabled`/`ListExtensions`), a frontend log bridge (`LogFrontend`), OAuth flow/credential methods, and an account-setup-hook listing. No frontend UI ever consumed them, so the bindings were removed; reintroduce them together with their UI if those features ship.
 
 ### Extension bridge methods (`<Extension>_` prefix, defined on the embedded `*Bridge`)
 
@@ -1178,12 +961,10 @@ Currently bound by the Contacts extension's bridge (all gate on `extension_conta
 |---|---|
 | `App.Contacts_ListContactsForBrowse(query, sourceID string, limit, offset int) ([]v1.Contact, error)` | Browse listing — wraps `extcontacts.API.ListContacts`. Returns `nil` when Contacts is disabled. |
 | `App.Contacts_GetContactDetail(emailOrID string) (*v1.Contact, error)` | Single-contact detail load. |
-| `App.Contacts_CreateContact(input v1.ContactCreateInput) (string, error)` | Create new contact. Dispatches by `input.SourceID`: `local:manual` → local store; CardDAV UUID → server PUT to the addressbook; Google source → People API; Microsoft source → Graph API. |
-| `App.Contacts_UpdateContact(id string, patch v1.ContactPatch) error` | Multi-field patch update. Backend dispatches by source type (local / CardDAV / Google / Microsoft). |
-| `App.Contacts_DeleteLocalContact(idOrEmail string) error` | Delete contact. Method name is historical — handles all source types (local cascade + CardDAV / Google / Microsoft server DELETE), not just local. |
-| `App.Contacts_ListAddressbooks(sourceID string) ([]v1.Addressbook, error)` | Addressbooks for a source — CardDAV addressbooks; Google contactGroups (as `google-group:*` synthetic IDs) + a `google-mycontacts:*` default; Microsoft contactFolders (as `ms-folder:*`) + a `ms-default:*` default. See [§ Contacts](#contacts) for the synthetic-ID table. |
-| `App.Contacts_ListSources() ([]v1.ContactSource, error)` | All configured contact sources. Routes through `coreapi.Contacts.ListSources` (host-owned, not bridge-API). |
-| `App.Contacts_LinkAccountSource(accountID, name string, syncInterval int) (string, error)` | Creates a contact source backed by an existing OAuth account. Routes through `coreapi.Contacts.LinkAccountSource`. |
+| `App.Contacts_CreateContact(input v1.ContactCreateInput) (string, error)` | Create new contact in the local store (`local:manual`). |
+| `App.Contacts_UpdateContact(id string, patch v1.ContactPatch) error` | Multi-field patch update against the local store. |
+| `App.Contacts_DeleteLocalContact(idOrEmail string) error` | Delete a local contact (cascading cleanup). |
+| `App.Contacts_GetContactAccountGroups() ([]v1.ContactAccountGroup, error)` | Sidebar grouping data for the contacts pane. |
 
 ### Frontend logger
 
@@ -1214,13 +995,7 @@ When you ADD a method to an interface in `coreapi`, update `stubCore` in the sam
 
 ### Real-store integration tests
 
-[`internal/extensions/auth/broker_test.go`](../internal/extensions/auth/broker_test.go): opens a real SQLite via `t.TempDir()` + `database.Open`, exercises the API, and asserts on results. No mocking of the credentials store or DB.
-
-### Auth broker test pattern
-
-The broker test ([`internal/extensions/auth/broker_test.go`](../internal/extensions/auth/broker_test.go)) sets up a temp DB + real `credentials.Store` + real `oauth2.Manager` (which doesn't fire its OAuth flow without a UI). Then it inserts test tokens directly via `credStore.SetOAuthTokens`. Useful for: scope coverage check, `ErrAdditionalConsentRequired` path, 401 refresh (when the test server is wired).
-
-When you write an extension that uses the broker, mirror this pattern.
+Use a real SQLite via `t.TempDir()` + `database.Open` when testing storage-backed extension code. No mocking of the credentials store or DB.
 
 ### Don't mock; use the real store
 
@@ -1235,12 +1010,10 @@ aulycmail's testing style is integration-flavored: a real SQLite at `t.TempDir()
 | Area | Path |
 |---|---|
 | Extension rail (host UI) | [`frontend/src/lib/components/rail/`](../frontend/src/lib/components/rail) |
-| Settings → Extensions tab (host UI) | [`frontend/src/lib/components/settings/ExtensionsTab.svelte`](../frontend/src/lib/components/settings/ExtensionsTab.svelte) |
 | Contacts extension components | [`extensions/contacts/frontend/components/`](../extensions/contacts/frontend/components) |
 | Contacts extension stores | [`extensions/contacts/frontend/stores/`](../extensions/contacts/frontend/stores) |
-| Contacts account-setup hook panel | [`extensions/contacts/frontend/hooks/`](../extensions/contacts/frontend/hooks) |
 | Contacts extension i18n | [`extensions/contacts/frontend/i18n/`](../extensions/contacts/frontend/i18n) |
-| New extensions | `extensions/<name>/frontend/{components,stores,hooks,i18n}/` |
+| New extensions | `extensions/<name>/frontend/{components,stores,i18n}/` |
 
 Extension-specific UI lives under `extensions/<name>/frontend/`, NOT under `frontend/src/lib/components/`. Only host-owned UI (rail, settings dialog wiring) stays in `frontend/src/`. Keep new files under ~300 LOC.
 
@@ -1870,139 +1643,21 @@ When a future extension needs a primitive that doesn't exist yet (e.g., Calendar
 
 ## Write capability
 
-Phase 2b introduces write capability to extensions. Reads continue through aulycmail core's existing data paths (mail OAuth + per-source CardDAV creds); writes go through a parallel per-extension OAuth path.
-
-### Per-extension OAuth client configs
-
-Each first-party extension that needs OAuth writes owns its OWN client config slot, with its own credentials, injected at build time from the extension's package — aulycmail core compiles in only `*-mail`.
-
-```
-google-mail            ← aulycmail core (mail + contacts READ via existing grant)
-microsoft-mail         ← aulycmail core
-google-contacts        ← Contacts extension (WRITE only)
-microsoft-contacts     ← Contacts extension
-google-calendar        ← Calendar extension (READ + WRITE; future)
-microsoft-calendar     ← Calendar extension (future)
-```
-
-Each extension's package contains:
-- `extensions/<name>/manifest.json` — declares the extension
-- `extensions/<name>/manifest.go` — embeds the manifest JSON
-
-**No per-extension OAuth credentials live in extension packages.** All slot resolution is centralized in [`internal/oauth2/core_provider.go`](../internal/oauth2/core_provider.go), backed by three build-time ldflags variable pairs in `internal/oauth2/config.go`:
-
-| Variable | Slots backed | Surfaced in picker as | Notes |
-|---|---|---|---|
-| `GoogleClientID` / `GoogleClientSecret` | `google-mail` | "aulycmail - Google" | Mail's Google-verified project. Also routable for scopes that an extension manifest lists in `first_party_uses_core_for_scopes` (today: contacts.readonly). |
-| `GoogleTestingClientID` / `GoogleTestingClientSecret` | `google-contacts`, `google-calendar` | "aulycmail - Google (Testing)" | **Single shared un-Google-verified test project** that backs every first-party extension needing broader Google scopes (contacts.readwrite, full Calendar). When the mail project eventually gets verified for those scopes, the default in the picker UI switches to "aulycmail - Google" and this slot becomes a fallback. |
-| `MicrosoftClientID` | `microsoft-mail`, `microsoft-contacts`, `microsoft-calendar` | "aulycmail - Microsoft" | One Azure AD app registration covers all three surfaces. Microsoft Graph doesn't gate scopes behind verification, so adding `Contacts.ReadWrite` / `Calendars.ReadWrite` to the existing mail registration is free. |
-
-ldflags injection happens via the root `Makefile`'s LDFLAGS rules from the root `.env` / `.env.local`. Extension packages stay focused on domain logic — no `creds.go`, no `OAuthClients()`, no per-extension env file. If a slot's underlying variable is empty, the slot resolves to `(zero, false)` and the picker UI omits the corresponding option.
-
-### Manifest OAuth routing — `first_party_uses_core_for_scopes`
-
-When an extension calls `core.Auth().HTTPClient(accountID, scopes)`, the Auth Broker reads the calling extension's manifest to decide whether each scope:
-
-- **Routes to aulycmail core's mail OAuth** (`<provider>-mail`) — listed in `manifest.oauth.first_party_uses_core_for_scopes`. Reuses the user's existing mail consent; no new OAuth prompt. Only viable for scopes the user's mail OAuth already covers.
-- **Routes to the extension's own creds** (`<provider>-<extensionID>`) — NOT listed. If the account lacks those scopes under the extension's config, broker returns `*coreapi.ErrAdditionalConsentRequired`; the host runs an incremental-consent flow.
-
-```jsonc
-// Contacts: READ piggybacks on mail OAuth, WRITE uses own creds
-{
-  "id": "contacts",
-  "oauth": {
-    "first_party_uses_core_for_scopes": [
-      "https://www.googleapis.com/auth/contacts.readonly",
-      "Contacts.Read"
-    ]
-  }
-}
-
-// Calendar: nothing overlaps with mail OAuth — everything uses own creds
-{
-  "id": "calendar",
-  "oauth": {
-    "first_party_uses_core_for_scopes": []
-  }
-}
-```
-
-Mixed-scope calls (some routing to core, some to extension) are REJECTED — the extension must split into two HTTPClient calls.
-
-**THE GATE**: `first_party_uses_core_for_scopes` is honored ONLY for first-party extensions. If a community-extension intake ever opens, community extensions declaring this field will fail manifest validation upstream. Handing community extensions the user's mail OAuth tokens would be a privilege-escalation vector — capped at the manifest boundary.
-
-### User-supplied OAuth credentials (override UI)
-
-> **Status: storage layer only.** The backend override storage and resolution chain below are live. The editor UI (`OAuthCredsSlotEditor`, the settings disclosures) and its App bindings (`GetOAuthCredsStatus`/`GetOAuthCredsChoices`/`SetOAuthCreds`/`SetOAuthCredsChoice`/`ClearOAuthCreds`) were never consumed by any shipped UI and have been removed; reintroduce them together when the editor ships.
-
-The design: users can paste their own Client ID + Secret per slot via aulycmail's settings — core `*-mail` slots under Settings → Accounts, per-extension slots in that extension's settings dialog. A shared slot-editor primitive shows an enumerated set of choices:
-
-- **`custom`** — user-supplied Client ID + Secret. Always available. Selecting reveals the edit form; saving writes to the `user_oauth_clients` table.
-- **`aulycmail-shipped`** — the slot's own built-in client (compiled in via the extension's `.env` ldflags). Only listed when the slot's shipped creds are populated. Label is per-slot:
-  - `google-contacts` / `google-calendar` → **"aulycmail testing"** (un-Google-verified).
-  - `microsoft-*` slots → **"aulycmail - Microsoft"** (backed by mail's client after the core consolidation).
-  - `<provider>-mail` → **"aulycmail - Google"** / **"aulycmail - Microsoft"** (mail's own settings UI).
-- **`aulycmail-mail`** — reuse the core `<provider>-mail` slot's client for this extension. Only listed when the extension's manifest declares the provider's scopes in `first_party_uses_core_for_scopes` AND the mail slot has shipped creds. Today only Google contacts qualifies (mail's verified client carries `contacts.readonly`).
-
-Resolution order in `oauth2.ClientConfigForID(configID)`:
-1. User override (`oauth2.UserOverrideLookup`) — Settings UI `custom` choice.
-2. User-set slot alias (`oauth2.SlotAliasLookup`) — Settings UI `aulycmail-mail` choice. Recursive lookup on the target slot id, capped at one hop.
-3. Registered `CredentialsProvider` chain (aulycmail core's, then each extension's).
-4. `(zero, false)` → triggers `ErrAdditionalConsentRequired` or "no creds available" UX.
-
-Storage: encrypted via `credentials.Store` (OS keyring primary, encrypted DB fallback). Custom Client IDs/Secrets live in `user_oauth_clients` ([`internal/credentials/oauth_user_creds.go`](../internal/credentials/oauth_user_creds.go)); slot aliases live in `user_oauth_slot_aliases` ([`internal/credentials/oauth_slot_alias.go`](../internal/credentials/oauth_slot_alias.go)).
+Extensions can mutate the data they own. Today that means local contact writes (create / edit / delete through the local store); remote contact sources and their auth plumbing were removed together with OAuth support — recover from git history if a remote write path is ever revived.
 
 ### Per-extension settings dialog
 
 > **Status: designed, not yet implemented.** `coreapi.UI.RegisterSettingsTab` exists as an interface method, but no extension registers a tab yet and the host dispatcher component has not been built.
 
-Extensions register their settings dialog via `core.UI().RegisterSettingsTab(...)`. A host dispatcher component (`ExtensionSettingsDialog.svelte`) opens the matching dialog (static dispatch by extension ID — same pattern as account-setup hooks).
+Extensions register their settings dialog via `core.UI().RegisterSettingsTab(...)`. A host dispatcher component (`ExtensionSettingsDialog.svelte`) opens the matching dialog (static dispatch by extension ID).
 
 Two entry paths:
 1. **Explicit Edit button** in Settings → Extensions → row (when the extension is enabled)
-2. **Extension-driven auto-open** via `openExtensionSettings(extensionId)` — the extension's frontend code can open its own settings dialog when needed (e.g., on pane mount when the extension detects it's missing OAuth creds for write capability)
-
-### Write-access grant flow (account-picker model)
-
-> **Status: designed, not yet implemented.** None of the pieces below exist in code yet (`WriteAccessAccountPicker.svelte`, `App.ListAuthContextsForProvider`, `App.SetContactSourceWritable`, `Contacts_EnableWriteAccess`). This section is the design spec for when write access ships.
-
-When the user wants to enable writes on a Google or Microsoft contacts source, the UI is explicit: a dialog asks which existing aulycmail auth identity to attach the new write grant to. No silent retries on access-denied; no inline "consent required" dialogs popping up mid-write.
-
-**Frontend.** `WriteAccessAccountPicker.svelte` is the canonical UI. It's a generic dialog that takes `provider` (`'google'` or `'microsoft'`), `sourceID`, and `sourceName`. On open it fetches `App.ListAuthContextsForProvider(provider)` to populate the radio list. The list is the union of:
-
-- Mail accounts of that provider (from the host's account store)
-- Standalone contacts sources of that provider (from `carddavStore.ListSources()` where `AccountID IS NULL`)
-
-There is **no "Add another account"** entry. All identities must come from aulycmail's core setup paths (Mail → add account, OR Contacts → add source). If the list is empty, the dialog shows a hint pointing the user to those paths.
-
-On Continue, the dialog calls the extension's `<Extension>_EnableWriteAccess(sourceID, authContextKind, authContextIdentifier, expectedEmail)` bridge method.
-
-**Backend.** The extension's bridge method (`Contacts_EnableWriteAccess`, to live in `extensions/contacts/backend/bridge.go`) does:
-
-1. Derive the slot's `clientConfigID` and the write scope from the source's provider (e.g. `google-contacts` + `https://www.googleapis.com/auth/contacts`).
-2. Build a `coreapi.StartIncrementalConsentRequest`. Set exactly one of `AccountID` (when `authContextKind == "mail"`) or `SourceID` (when `"standalone-contacts"`). Set `ExpectedEmail` to the picked identity's email. Pass through to `core.Auth().StartIncrementalConsent(req)`.
-3. On `nil` return, call `core.Contacts().SetSourceWritable(sourceID, true)`.
-
-The host's `StartIncrementalConsent` implementation:
-- Opens the browser, blocks until callback fires (or `App.CancelOAuthFlow` is called).
-- Passes `login_hint=<ExpectedEmail>` so the IdP account picker pre-selects the right account.
-- Validates the granted email matches `ExpectedEmail`. Mismatch → discard tokens, return error.
-- Persists tokens via `SetOAuthTokensForClientConfig(AccountID, slot, …)` (for mail contexts) or `SetContactSourceOAuthTokens(SourceID, …)` (for standalone contexts).
-
-**Slot-creds detection.** Before calling `EnableWriteAccess`, the picker doesn't probe slot state — the extension does that inside its bridge method. Use `oauth2.ClientConfigForID(clientConfigID)`; it walks the user-override + registered-provider chain and returns truthy only when there are real per-slot creds. Do NOT use `oauth2.GetProvider(clientConfigID)` for this check: it silently inherits the mail-side ldflag-injected creds when the extension's slot is empty, which produces a misleading "configured" answer.
-
-```go
-slotCreds, slotOK := oauth2.ClientConfigForID(string(clientConfigID))
-if !slotOK || slotCreds.ClientID == "" {
-    return fmt.Errorf("no OAuth credentials configured for %q — set them up in Settings → Extensions → … → OAuth Credentials", clientConfigID)
-}
-```
-
-**Why not retry-on-write?** Retry-with-consent worked for the prototype but conflated *which* identity owned the write with *whether* scopes were missing. Users with multiple Google accounts ended up granting writes to the wrong one. The picker model surfaces the identity decision up front and verifies it on the callback.
+2. **Extension-driven auto-open** via `openExtensionSettings(extensionId)` — the extension's frontend code can open its own settings dialog when needed (e.g., on pane mount when the extension detects missing configuration)
 
 ### Local-contact edit/delete
 
-For sent-recipient (local) contacts and CardDAV contacts alike, the Contacts extension supports multi-field edit (name, emails, phones, addresses, org, title, URLs, IMPPs, categories, birthday, note, photo) and delete via [`ContactEditDialog.svelte`](../extensions/contacts/frontend/components/ContactEditDialog.svelte).
+For local contacts (manually added and sent-recipient collected), the Contacts extension supports multi-field edit (name, emails, phones, addresses, org, title, URLs, IMPPs, categories, birthday, note, photo) and delete via [`ContactEditDialog.svelte`](../extensions/contacts/frontend/components/ContactEditDialog.svelte).
 
 **Flow** (read the table top-to-bottom — same SDK pattern future extensions follow):
 
@@ -2011,62 +1666,10 @@ For sent-recipient (local) contacts and CardDAV contacts alike, the Contacts ext
 | Frontend (`ContactEditDialog.svelte`) | Collects multi-field form state; calls `contactsView.updateContact(id, patch)` |
 | Frontend store ([`contactsView.svelte.ts`](../extensions/contacts/frontend/stores/contactsView.svelte.ts)) | Calls Wails-bound `App.Contacts_UpdateContact(id, patch)` (imported with alias `UpdateContact`) |
 | Bridge method ([`extensions/contacts/backend/bridge.go`](../extensions/contacts/backend/bridge.go)) | `Contacts_UpdateContact` gates on `gateEnabled()`, calls `ensureInit()`, then delegates to the lazy-initialized `b.api.UpdateContact(id, patch)` |
-| Extension API ([`extensions/contacts/backend/api.go`](../extensions/contacts/backend/api.go)) | `UpdateContact` calls `applyContactPatchToRecord(rec, patch)` to apply every non-nil patch field, then source-dispatches by source type: local → `contact.Store.UpsertRecord(rec)`; CardDAV → `writeCardDAVRecord(rec)` (PUT the full vCard); Google → `updateGoogleContact` in `google_api.go`; Microsoft → `updateMicrosoftContact` in `microsoft_api.go`. |
+| Extension API ([`extensions/contacts/backend/api.go`](../extensions/contacts/backend/api.go)) | `UpdateContact` calls `applyContactPatchToRecord(rec, patch)` to apply every non-nil patch field, then persists via `contact.Store.UpsertRecord(rec)`. |
 | Core store ([`internal/contact/store.go`](../internal/contact/store.go)) | `UpsertRecord` / `UpsertRecordTx` writes the record + all sub-tables (emails, phones, addresses, urls, impps, categories, photo). Sets `name_overridden=1` on every email when the Name field is patched, so auto-collection never clobbers a user edit. |
 
-**Why route through the extension API instead of calling the core store directly:** writes follow the same SDK pattern as reads. CardDAV writes shipped in 2b.2 (PUT/DELETE) and 2b.2.c (POST-new). Phase 2b.3 added Google + Microsoft branches inside `extcontactsbe.API.CreateContact` / `UpdateContact` / `DeleteContact` — the per-provider logic lives in [`extensions/contacts/backend/google_api.go`](../extensions/contacts/backend/google_api.go) and [`extensions/contacts/backend/microsoft_api.go`](../extensions/contacts/backend/microsoft_api.go). NO new Wails methods, NO new direct-store call sites. Future extensions (Calendar) declare their CRUD on their own `coreapi` interface and follow the same pattern.
-
-### Source-dispatch pattern (transferable to Calendar / future extensions)
-
-When an extension's API needs to mutate data that lives across multiple backends (local store, CardDAV-style WebDAV, OAuth APIs), the canonical aulycmail pattern is **source dispatch inside the extension's `coreapi` impl**:
-
-```go
-// extensions/<name>/backend/api.go
-func (a *API) UpdateThing(id string, patch coreapi.ThingPatch) error {
-    if id == "" {
-        return fmt.Errorf("…: id is required")
-    }
-    sourceType, err := a.resolveSourceType(id) // local | carddav | google | microsoft
-    if err != nil {
-        return err
-    }
-    switch sourceType {
-    case "local":
-        return a.localPath(id, patch)
-    case "carddav":
-        return a.carddavPath(id, patch)
-    case "google":
-        return a.googlePath(id, patch)
-    case "microsoft":
-        return a.microsoftPath(id, patch)
-    }
-    return coreapi.ErrUnimplemented
-}
-```
-
-aulycmail's house style avoids `if/else` chains. Use guard clauses for early returns and `switch` for branch dispatch — both for readability and because the no-else convention is enforced project-wide (see [§ The two hard rules](#the-two-hard-rules-for-any-new-extension)).
-
-Rules that hold across this pattern:
-
-- The extension API ONLY routes; it doesn't gate. Capability checks (`IsExtensionEnabled`, source `writable` flag) live in the host's Wails-bound methods.
-- Each provider branch starts as `ErrUnimplemented` and gets filled in when that provider's write path lands. This lets sub-phases ship independently.
-- Empty/nil patch is a no-op success — callers can issue a "touch" without sending fields. Useful for refresh-driven flows.
-- Patch types use pointer fields (`*string`, `*[]string`) so consumers can distinguish "leave unchanged" from "set to empty."
-- Source-dispatch keys (id format, source-table joins) are extension-specific. Contacts uses `@` → local / UUID → carddav. Calendar will use its own conventions.
-
-When Calendar lands, its `coreapi.Calendar` interface gains `CreateEvent`/`UpdateEvent`/`DeleteEvent` with `EventPatch`, dispatched by source the same way.
-
-### Source `writable` flag
-
-`contact_sources.writable` is a boolean tracking whether the user has write capability enabled on a given source. **New CardDAV sources default to `writable = true`** at creation time — adding a CardDAV source signals intent to use it. New OAuth-linked sources (Google/Microsoft) default to `writable = false`; the user opts in via the incremental-consent flow.
-
-**The canonical Enable/Disable lever lives in the extension's own settings dialog**, NOT in the core source-edit dialog. For Contacts that's Settings → Extensions → Contacts → "Write Access" section (see [`ContactsSettingsDialog.svelte`](../extensions/contacts/frontend/components/ContactsSettingsDialog.svelte)). The section lists every external source (CardDAV + OAuth) regardless of state; per-row button flips between Enable / Disable based on `source.writable`. CardDAV is a pure flag flip via `App.SetContactSourceWritable`; Google / Microsoft route through the incremental-consent flow (which itself flips writable on success via `coreapi.Contacts.SetSourceWritable`).
-
-**Optional contextual surface** — extensions can also surface a banner in their main pane for the discoverable enable case (see [`WriteAccessBanner.svelte`](../extensions/contacts/frontend/components/WriteAccessBanner.svelte)). The banner shows enable-only rows and auto-hides once a source is writable; its visibility tracks the sidebar selection so it stays contextual. The canonical Disable lever stays in the settings dialog.
-
-**Phase 2b.3 cleanup**: the writable toggle was REMOVED from the core source-edit dialog ([`ContactSourceDialog.svelte`](../frontend/src/lib/components/settings/ContactSourceDialog.svelte)) so the extension owns this UX. New extensions with writable external sources should follow the same pattern: own the Enable/Disable lever in your own settings dialog, don't add a toggle to host-side source-edit UIs.
-
----
+**Why route through the extension API instead of calling the core store directly:** writes follow the same SDK pattern as reads — frontend → bridge → extension API → core store, with no new Wails methods and no direct-store call sites. Future extensions declare their CRUD on their own `coreapi` interface and follow the same pattern.
 
 ## Contributing a new extension
 
@@ -2083,7 +1686,7 @@ These are non-negotiable and apply equally to first-party and (hypothetical) thi
 Extensions interact with aulycmail exclusively through the `coreapi.Core` surfaces listed in [§ `coreapi` reference](#coreapi-reference). They:
 
 - DO NOT import any package from `internal/` outside `internal/extensions/` (only the store helper there) and `internal/core/api/v1/`.
-- DO NOT call functions in `app/`, `internal/account/`, `internal/folder/`, `internal/message/`, `internal/draft/`, `internal/contact/`, `internal/carddav/`, `internal/imap/`, `internal/smtp/`, `internal/oauth2/`, `internal/credentials/`, etc., directly.
+- DO NOT call functions in `app/`, `internal/account/`, `internal/folder/`, `internal/message/`, `internal/draft/`, `internal/contact/`, `internal/imap/`, `internal/smtp/`, `internal/credentials/`, etc., directly.
 - DO NOT query, read, or write any table in aulycmail's main database (`aulycmail.db`). The accounts/folders/messages/contacts/drafts tables are core-owned and off-limits.
 - DO NOT shell out, monkey-patch, or use `reflect`/build-tag tricks to do any of the above indirectly.
 
@@ -2111,7 +1714,7 @@ Every extension MUST cost approximately zero when disabled. The reason this is n
 
 Concretely, "approximately zero when disabled" means:
 
-- **At process startup:** one `*Bridge` struct allocation (a few host-dependency fields) + one `*Extension` allocation (a manifest copy) + descriptive UI registrations (rail tab metadata, account-setup hook metadata). No SQLite open. No goroutines. No file handles. No HTTP clients.
+- **At process startup:** one `*Bridge` struct allocation (a few host-dependency fields) + one `*Extension` allocation (a manifest copy) + descriptive UI registrations (rail tab metadata). No SQLite open. No goroutines. No file handles. No HTTP clients.
 - **At first enabled Wails call:** `ensureInit()` fires under `sync.Once`. THIS is where the SQLite file opens, migrations run, stores construct, and background goroutines spin up.
 - **When the user disables a previously enabled extension:** new Wails calls return empty (`gateEnabled() == false`). Already-allocated state stays in memory until the next process restart. Users who want to fully reclaim memory restart aulycmail — this is an explicit trade-off the project accepts (see [§ Lifecycle](#lifecycle)).
 
@@ -2132,7 +1735,6 @@ extensions/<name>/
   frontend/
     components/                  # Svelte components rendered into RailTab / settings slots
     stores/                      # Svelte runes stores scoped to this extension's UI
-    hooks/                       # account-setup hook panel components (optional)
     i18n/
       index.ts                   # exports registerExtensionI18n() — calls svelte-i18n register() per locale
       locales/
@@ -2170,10 +1772,9 @@ Whether the extension is first-party or third-party (if an intake opens), the re
 5. **Prefix correctness.** Every bridge method is `<Name>_<Method>`. No exceptions.
 6. **No mail-code edits.** The mail UI components and the mail backend (`internal/imap/`, `internal/smtp/`, `internal/message/`, `frontend/src/lib/components/{list,viewer,composer,sidebar}/`, etc.) are off-limits to direct edits. The extension may **call into mail via `coreapi.Mail` / `coreapi.Composer` surfaces** — that's the whole point of those interfaces. What's forbidden is editing mail's own files. If you need a mail behavior that those interfaces don't expose today, see [§ Requesting a new extension API](#requesting-a-new-extension-api).
 7. **Per-extension SQLite isolation.** Extensions never read or write each other's tables; cross-extension data goes through `coreapi.Core.Extension(id)` typed handles. If your extension's bridge takes another extension's `*Store` as a dependency, it's wrong.
-8. **OAuth credentials are scoped per extension.** If the extension needs OAuth, it owns its own credential slot (`<provider>-<extension-id>`) and uses the Auth Broker; it doesn't reuse aulycmail core's mail slot unless the manifest declares `first_party_uses_core_for_scopes` (see [§ OAuth client configurations](#oauth-client-configurations)) — and that field is honored only for first-party extensions.
-9. **Frontend is independent.** No refactors to existing mail components to "share" code with the extension. Extension components stay self-contained under `extensions/<name>/frontend/`. The kit (`frontend/src/lib/components/kit/`) holds neutral primitives extensions can consume, but anything mail-specific stays mail-specific.
-10. **Extension owns its i18n.** New strings live under `extensions/<name>/frontend/i18n/locales/<code>.json` (own files, not mixed into core's `frontend/src/lib/i18n/locales/<code>.json`). At minimum `en.json` ships with the PR. Other locales are added later by translators in separate PRs; absence falls back to English at runtime. See [§ Extension i18n](#extension-i18n).
-11. **Documentation updated.** `docs/EXTENSIONS.md` § Wails-bound surface gains a row per new bridge method.
+8. **Frontend is independent.** No refactors to existing mail components to "share" code with the extension. Extension components stay self-contained under `extensions/<name>/frontend/`. The kit (`frontend/src/lib/components/kit/`) holds neutral primitives extensions can consume, but anything mail-specific stays mail-specific.
+9. **Extension owns its i18n.** New strings live under `extensions/<name>/frontend/i18n/locales/<code>.json` (own files, not mixed into core's `frontend/src/lib/i18n/locales/<code>.json`). At minimum `en.json` ships with the PR. Other locales are added later by translators in separate PRs; absence falls back to English at runtime. See [§ Extension i18n](#extension-i18n).
+10. **Documentation updated.** `docs/EXTENSIONS.md` § Wails-bound surface gains a row per new bridge method.
 
 The bridge architecture is what makes this checklist enforceable as a code review rather than a multi-week audit.
 
@@ -2205,13 +1806,12 @@ Why subprocess and not other options (in case it ever needs to happen):
 
 - **Go `plugin` package (.so loading)**: requires exact same Go version + same dependency tree as host; Linux/macOS only; no way to unload. Brittle in practice; almost no one ships this way.
 - **WASM**: Go-backend WASM (wazero) is still research-grade for this use case. Promising but immature.
-- **Embedded scripting (Lua, JS via goja)**: would force re-implementing CalDAV/CardDAV/heavy sync libs. aulycmail extensions do real work and need the real Go ecosystem.
-- **Subprocess + IPC**: used by VS Code (language servers), Docker (plugins), Hashicorp's `go-plugin`, Sourcegraph. Real process isolation = security. Capability enforcement at the IPC boundary actually means something (extension never sees raw tokens, can't bypass the Auth Broker via reflection).
+- **Embedded scripting (Lua, JS via goja)**: would force re-implementing heavy protocol/sync libs. aulycmail extensions do real work and need the real Go ecosystem.
+- **Subprocess + IPC**: used by VS Code (language servers), Docker (plugins), Hashicorp's `go-plugin`, Sourcegraph. Real process isolation = security. Capability enforcement at the IPC boundary actually means something (extension never sees raw credentials).
 
 The current API design is already subprocess-compatible. Nothing in `coreapi v1` references Go module paths, compiled-type names, or in-process pointers:
 
 - `coreapi v1` interfaces → become gRPC / IPC schema (Go interfaces translate cleanly to protobuf services)
-- `Auth Broker` → already designed as an opaque "tokens never leave the boundary" wall, perfect for IPC
 - Per-extension SQLite → extension owns its own file in either model
 - `RailTabRequest.Component: "ContactsPane"` → already a descriptive string, not a compiled type reference
 - `Extension.Register(core)` → works as function call (static) AND as subprocess spawn + IPC handshake
@@ -2222,7 +1822,7 @@ What stays in the host even if community extensions arrive: **the Svelte compone
 
 Today's static-linking + first-party model is **sufficient on its own**. aulycmail ships first-party extensions (Contacts today, others over time) and users get them as part of the binary. Nothing further needs to happen for the product to work.
 
-The optionality described above costs nothing right now — the bridge pattern, the `coreapi v1` shape, the per-extension SQLite isolation, the Auth Broker, the `<Extension>_` prefix rule are all things the project does anyway to keep first-party extensions tidy. They happen to also be what's required to extend the model later. So:
+The optionality described above costs nothing right now — the bridge pattern, the `coreapi v1` shape, the per-extension SQLite isolation, the `<Extension>_` prefix rule are all things the project does anyway to keep first-party extensions tidy. They happen to also be what's required to extend the model later. So:
 
 1. **No demand**: current model stays as-is, indefinitely. That's the default.
 2. **Modest demand (a handful of motivated contributors)**: open PR intake, vet by hand, merge becomes first-party.
@@ -2242,7 +1842,6 @@ Things extensions CANNOT do in v0.3.0. Items marked with a phase have a planned 
 - `SubscribeToMailEvents` — `ErrUnimplemented`. Needs a core event-bus wiring first.
 - `Contacts.SubscribeToContactEvents` — `ErrUnimplemented`. Same as above.
 - `Composer.OpenComposer` with `Attachments` or `ReplyTo` — `ErrUnimplemented`. Mailto-URL-only path. Phase 2+ when a consumer needs richer compose semantics.
-- `Auth.IMAPClient` / `Auth.SMTPClient` — `ErrUnimplemented`. Wires when a real consumer needs them (Sieve, delayed-send).
 - `Notifications.Show` — interface only. Phase 3+.
 - `UI.RegisterSettingsTab`, `RegisterContextMenuItem`, `RegisterInboxView` — registrations accepted but no consumer reads them yet.
 - `EventBus.Publish` / `Subscribe` — interface only.
@@ -2258,11 +1857,3 @@ Things extensions CANNOT do in v0.3.0. Items marked with a phase have a planned 
 - Per-extension capability gating — Phase 1 grants first-party extensions everything; explicit capability checks would land alongside any community-extension intake
 
 ---
-
-## Related documents
-
-- [`context/EXTENSION_ARCHITECTURE.md`](../context/EXTENSION_ARCHITECTURE.md) — design rationale (per-DB isolation, enable/disable, lifecycle, frontend slot pattern, OAuth scope migration strategy, Wails v2 constraints)
-- [`context/EXTENSION_API_PLAN.md`](../context/EXTENSION_API_PLAN.md) — detailed Cross-Extension API surface design with motivating use cases
-- [`context/CARDDAV_IMPLEMENTATION.md`](../context/CARDDAV_IMPLEMENTATION.md) — CardDAV implementation; pattern reference for the Contacts extension
-- [`context/DETACHABLE_COMPOSER_IMPLEMENTATION.md`](../context/DETACHABLE_COMPOSER_IMPLEMENTATION.md) — inline + detach pattern (extensions inherit this)
-- [`CLAUDE.md`](../CLAUDE.md) — overall codebase guide

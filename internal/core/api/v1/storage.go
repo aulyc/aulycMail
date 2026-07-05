@@ -12,7 +12,7 @@ type KVStore interface {
 }
 
 // Secrets is a per-extension secure key-value store for sensitive values
-// (passwords, OAuth refresh tokens, etc.). Implementation is keyring-first
+// (passwords, API keys, etc.). Implementation is keyring-first
 // with automatic fallback to an encrypted core table when the OS keyring is
 // unavailable. Extensions never see which storage path was used.
 //
@@ -39,24 +39,15 @@ type Secrets interface {
 }
 
 // HostSecrets exposes read-only access to credentials whose lifecycle the
-// host manages — i.e., credentials that the host (not the extension)
-// sets and updates. Use when an extension needs to read a password to
-// perform its domain operation but does NOT own the add/update/delete
-// flow for that credential.
-//
-// Concrete example: the contacts extension reads a CardDAV password that
-// core's account-settings UI set, so it can PUT a vCard to the server.
-// Core owns the credential lifecycle; the extension just consumes the
-// password at request time.
+// host manages — i.e., credentials that the host (not the extension) sets and
+// updates. No key classes are currently registered; the surface is reserved for
+// future host-owned credentials that an extension only consumes at request time.
 //
 // Extensions that own their credentials end-to-end (e.g., calendar's
 // CalDAV passwords) use Secrets — which is read+write and scoped to the
 // extension's own namespace. HostSecrets is read-only and routes by key
-// prefix to the matching host-side credStore helper.
-//
-// Key format: "<class>:<id>" — e.g., "carddav:<sourceID>". The host
-// implementation routes by the class prefix to the right credStore
-// method. New prefixes are added as future Pattern B consumers emerge.
+// prefix to the matching host-side credStore helper. New prefixes are added as
+// future Pattern B consumers emerge.
 type HostSecrets interface {
 	// Get returns the stored password for key, or "" if no entry exists.
 	// Empty string is the "not found" signal; non-nil error indicates

@@ -4,7 +4,6 @@ package v1
 // Extensions hold a reference to Core and access each surface as needed:
 //
 //	core.Mail().ListMessages(filter)
-//	core.Auth().HTTPClient(accountID, scopes)
 //	core.UI().RegisterRailTab(req)
 //
 // Extensions for which a capability is not granted will receive an
@@ -14,7 +13,6 @@ type Core interface {
 	Mail() Mail
 	Composer() Composer
 	Contacts() Contacts
-	Auth() Auth
 	Notifications() Notifications
 	UI() UI
 	Storage() Storage

@@ -198,12 +198,10 @@ type ContactIMPP struct {
 
 // ContactFilter is the input to Contacts.ListContacts.
 //
-// SourceID accepts these values (in addition to the empty-string default
-// which merges all sources):
+// SourceID accepts these values (in addition to the empty-string default):
 //   - "local"            → all local contacts (both manual and collected)
 //   - "local:manual"     → only user-added local contacts
 //   - "local:collected"  → only auto-collected (from sent-mail) local contacts
-//   - <CardDAV UUID>     → a specific CardDAV source
 type ContactFilter struct {
 	Query    string `json:"query,omitempty"`
 	SourceID string `json:"sourceId,omitempty"`

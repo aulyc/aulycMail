@@ -19,7 +19,6 @@
   import ListRow from '$lib/components/kit/ListRow.svelte'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
   import { contactsView, reloadContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
-  import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
   import { toasts } from '$lib/stores/toast'
   // Canonical list toolbar — owns hamburger placement, title styling, count
   // badge, search-mode swap. Extension just supplies label/count + per-extension
@@ -54,8 +53,6 @@
   // Delete-confirmation state for keyboard-triggered deletes. ContactDetail
   // has its own button-triggered confirm dialog; this one fires when the user
   // has the LIST focused and hits Delete/Backspace on the highlighted row.
-  // Mirrors ContactDetail's writability gate: local always writable; CardDAV
-  // gated on the source's writable flag.
   let showDeleteConfirm = $state(false)
   let pendingDelete = $state<v1.Contact | null>(null)
   let deleting = $state(false)
@@ -63,9 +60,6 @@
   function requestDelete(id: string) {
     const found = contactsView.contacts.find(c => c.id === id)
     if (!found) return
-    const writable =
-      found.sourceId === 'aulycmail' || contactSourcesStore.isSourceWritable(found.sourceId)
-    if (!writable) return
     pendingDelete = found
     showDeleteConfirm = true
   }
@@ -180,10 +174,8 @@
   })
 
   // Header label tracks the sidebar's selected category — mirrors mail's
-  // MessageList showing the active folder name. Local sub-sources reuse the
-  // sidebar i18n keys (so labels stay consistent). CardDAV sources resolve
-  // to the user-given source name; unknown ids fall back to the generic
-  // "Contacts" label so the header is never empty.
+  // MessageList showing the active folder name. Unknown ids fall back to the
+  // generic "Contacts" label so the header is never empty.
   const headerLabel = $derived.by(() => {
     const sel = contactsView.selectedSourceId
     if (sel === '') return $_('contacts.sidebar.all')
@@ -288,16 +280,11 @@
   bind:open={showDeleteConfirm}
   title={$_('contacts.delete.title')}
   description={pendingDelete
-    ? $_(
-        pendingDelete.sourceId === 'aulycmail'
-          ? 'contacts.delete.descriptionLocal'
-          : 'contacts.delete.descriptionCardDAV',
-        {
-          values: {
-            name: pendingDelete.name || (pendingDelete.emails && pendingDelete.emails[0]) || $_('contacts.common.unnamed'),
-          },
+    ? $_('contacts.delete.descriptionLocal', {
+        values: {
+          name: pendingDelete.name || (pendingDelete.emails && pendingDelete.emails[0]) || $_('contacts.common.unnamed'),
         },
-      )
+      })
     : ''}
   confirmLabel={$_('contacts.common.delete')}
   cancelLabel={$_('contacts.common.cancel')}

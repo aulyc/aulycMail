@@ -654,8 +654,9 @@ func (s *Store) List(limit int) ([]*Contact, error) {
 // filter. Valid kinds: "manual" (user-added), "collected" (auto-collected).
 // Public signature preserved.
 //
-// Returns local-source rows only (records with source='local'). CardDAV
-// records are queried via carddav.Store.
+// Returns local-source rows only (records with source='local'). Legacy
+// carddav records remain in the unified tables but are not returned by this
+// autocomplete-style API.
 func (s *Store) ListByKind(kind string, limit int) ([]*Contact, error) {
 	args := []any{}
 	query := `
@@ -1074,10 +1075,9 @@ func (s *Store) ListAssociatedAccountsForEmails(emails []string) ([]AccountAssoc
 	return out, nil
 }
 
-// DBOrTx is the minimal interface satisfied by both *sql.DB and *sql.Tx —
-// used by UpsertRecordTx so callers can compose record writes with their own
-// table ops in a shared transaction (e.g., carddav.Store writing
-// carddav_record_state alongside).
+// DBOrTx is the minimal interface satisfied by both *sql.DB and *sql.Tx. It
+// lets callers compose record writes with sidecar-table updates in a shared
+// transaction.
 type DBOrTx interface {
 	Exec(query string, args ...any) (sql.Result, error)
 	Query(query string, args ...any) (*sql.Rows, error)
@@ -1085,12 +1085,11 @@ type DBOrTx interface {
 }
 
 // UpsertRecord writes a full contact record (header + all sub-tables) in a
-// single transaction. Used by the CardDAV sync engine to land vCards with
-// their full multi-field shape.
+// single transaction.
 //
 // See UpsertRecordTx for the semantics — this wrapper just opens a tx,
-// delegates, and commits. Callers that want to compose with carddav_record_state
-// writes (or any other table) use UpsertRecordTx directly with their own tx.
+// delegates, and commits. Callers that want to compose with sidecar-table
+// writes use UpsertRecordTx directly with their own tx.
 func (s *Store) UpsertRecord(rec *Record) error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -1112,11 +1111,10 @@ func (s *Store) UpsertRecord(rec *Record) error {
 //   - Sub-tables (contact_emails, contact_phones, contact_addresses,
 //     contact_urls, contact_impps, contact_categories) are REPLACED wholesale:
 //     existing rows for this record are deleted, then re-inserted from the
-//     provided slices. Matches vCard semantics — the vCard is the source of
-//     truth; each sync overwrites sub-table contents.
+//     provided slices. This preserves the old vCard-friendly write shape even
+//     though current callers are local-only.
 //   - For contact_emails: send_count + last_used + name_overridden are
-//     PRESERVED across the replace when a matching email exists (so
-//     autocomplete metadata survives a CardDAV re-sync).
+//     PRESERVED across the replace when a matching email exists.
 //
 // Does NOT touch carddav_record_state — the caller handles that sidecar.
 // Works the same for source='local' contacts (no sidecar in that case).

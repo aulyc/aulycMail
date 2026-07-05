@@ -60,10 +60,8 @@ Companion docs:
   not at app startup.
 - **R12.** Extensions never read each other's tables. Cross-extension data
   access flows through `coreapi`.
-- **R13.** Each extension owns its OAuth client-config slots, declared in
-  `extensions/<name>/creds.go` as `coreapi.OAuthProviderRegistration`.
-  Slot IDs are `<provider>-<extensionID>` (e.g., `google-calendar`,
-  `microsoft-contacts`). Credentials are ldflag-injected at build time.
+- **R13.** *(Retired — OAuth support was removed; aulycmail is password-auth
+  only. Number reserved to keep rule references stable.)*
 - **R14.** Settings key for each extension is reserved in
   `internal/settings/store.go` as `KeyExtension<Name>Enabled =
   "extension_<name>_enabled"` and added to `AllExtensionKeys`. Default
@@ -90,9 +88,8 @@ Companion docs:
   (e.g., `Contacts_UpdateContact`, `Calendar_AddCalDAVSource`). Embedded
   method promotion happens in one flat namespace on `*App`; unprefixed
   names would collide silently.
-- **R20.** OAuth client config IDs follow `<provider>-<extensionID>` (no
-  underscores between provider and extension). Example:
-  `google-calendar`, NOT `google_calendar` or `googleCalendar`.
+- **R20.** *(Retired — OAuth support was removed. Number reserved to keep
+  rule references stable.)*
 - **R21.** Frontend Svelte components live in
   `extensions/<name>/frontend/components/`. Use the `$extensions/<name>/...`
   Vite/tsconfig path alias to import them. Use `$wailsjs` for generated
@@ -102,8 +99,7 @@ Companion docs:
 
 - **R22.** Each extension has exactly ONE host wiring file:
   `app/extension_<name>.go`. ~20-50 LOC. Constructs the Bridge with
-  `BridgeDeps`, registers OAuth providers via
-  `oauth2.RegisterCredentialsProvider`. Nothing else.
+  `BridgeDeps`. Nothing else.
 - **R23.** `*app.App` embeds the extension's `*<Name>Bridge` anonymously
   (so Wails method-promotion picks up the `<Extension>_*` methods). Plus
   one named field for the lifecycle handle (`a.<name>Ext`) iterated by

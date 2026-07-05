@@ -5,6 +5,7 @@ extern void goMenuAction(char* action);
 
 typedef struct {
     const char* settings;
+    const char* backupMail;
     const char* backupViewer;
     const char* about;
     const char* quit;
@@ -24,6 +25,7 @@ typedef struct {
 
 @implementation AulycMenuTarget
 - (void)onSettings:(id)sender { (void)sender; goMenuAction("settings"); }
+- (void)onBackupMail:(id)sender { (void)sender; goMenuAction("backupMail"); }
 - (void)onBackupViewer:(id)sender { (void)sender; goMenuAction("backupViewer"); }
 - (void)onAbout:(id)sender    { (void)sender; goMenuAction("about"); }
 // Routed through a custom selector (not the standard terminate:) so AppKit
@@ -60,6 +62,7 @@ void installAppMenu(AulycMenuLabels labels) {
     // soon as this function returns, before the dispatched block runs. The block
     // copy (via dispatch_async) retains these captured NSStrings.
     NSString* settings = aulycStr(labels.settings);
+    NSString* backupMail = aulycStr(labels.backupMail);
     NSString* backupViewer = aulycStr(labels.backupViewer);
     NSString* about    = aulycStr(labels.about);
     NSString* quit     = aulycStr(labels.quit);
@@ -87,6 +90,7 @@ void installAppMenu(AulycMenuLabels labels) {
         [appItem setSubmenu:appMenu];
 
         [appMenu addItem:aulycItem(settings, @selector(onSettings:), gMenuTarget, @",", NSEventModifierFlagCommand)];
+        [appMenu addItem:aulycItem(backupMail, @selector(onBackupMail:), gMenuTarget, @"", 0)];
         [appMenu addItem:aulycItem(backupViewer, @selector(onBackupViewer:), gMenuTarget, @"", 0)];
         [appMenu addItem:aulycItem(about, @selector(onAbout:), gMenuTarget, @"", 0)];
         [appMenu addItem:[NSMenuItem separatorItem]];

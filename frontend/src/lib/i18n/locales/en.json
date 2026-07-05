@@ -275,6 +275,7 @@
     "selectAddressbook": "Please select at least one addressbook",
     "linkAccountOrSignIn": "Please link an account or sign in",
     "accountSaved": "Account settings saved",
+    "accountCreated": "Account added. You can continue setting it up.",
     "failedToSaveAccount": "Failed to save account.",
     "syncCompleted": "{name} sync completed",
     "failedToDeleteIdentity": "Failed to delete sender alias.",
@@ -388,6 +389,7 @@
     "deleteAccount": "Delete account"
   },
   "settingsBackup": {
+    "title": "Back Up Mail",
     "directory": "Backup directory",
     "directoryPlaceholder": "Choose a backup directory",
     "chooseDirectory": "Choose",

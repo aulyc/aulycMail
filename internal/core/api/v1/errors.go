@@ -44,17 +44,3 @@ func (e *ErrConflict) Error() string {
 	}
 	return fmt.Sprintf("conflict on contact %s: %s", e.ContactID, e.Message)
 }
-
-// ErrAdditionalConsentRequired signals that the extension's request needs
-// additional OAuth consent from the user before it can succeed. The host (not
-// the extension) handles the consent flow and retries.
-type ErrAdditionalConsentRequired struct {
-	AccountID      string
-	ClientConfigID ClientConfigID
-	MissingScopes  []AuthScope
-}
-
-func (e *ErrAdditionalConsentRequired) Error() string {
-	return fmt.Sprintf("additional consent required for account %s under %s: %d scope(s) missing",
-		e.AccountID, e.ClientConfigID, len(e.MissingScopes))
-}

@@ -12,7 +12,7 @@
 # Go module path
 MODULE := github.com/aulyc/aulycmail
 
-# No OAuth credentials are injected — aulycmail is a password-auth mail client.
+# aulycmail is a password-auth mail client; no build-time credentials are injected.
 LDFLAGS :=
 
 # Wails build tags
@@ -246,4 +246,3 @@ help:
 	@echo "  make frontend-deps   - Install frontend dependencies"
 	@echo "  make frontend-update - Update frontend dependencies"
 	@echo ""
-	@echo "No build-time OAuth credentials are required for mail accounts."

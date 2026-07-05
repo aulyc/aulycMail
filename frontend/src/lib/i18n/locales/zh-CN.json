@@ -275,6 +275,7 @@
     "selectAddressbook": "请至少选择一个通讯录",
     "linkAccountOrSignIn": "请关联账户或登录",
     "accountSaved": "账户设置已保存",
+    "accountCreated": "账户已添加，您可以继续完善设置",
     "failedToSaveAccount": "保存账户失败。",
     "syncCompleted": "{name} 同步已完成",
     "failedToDeleteIdentity": "删除发件地址别名失败。",
@@ -388,6 +389,7 @@
     "deleteAccount": "删除账户"
   },
   "settingsBackup": {
+    "title": "备份邮件",
     "directory": "备份目录",
     "directoryPlaceholder": "请选择备份目录",
     "chooseDirectory": "选择目录",

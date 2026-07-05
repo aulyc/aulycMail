@@ -10,6 +10,7 @@ package platform
 
 typedef struct {
 	const char* settings;
+	const char* backupMail;
 	const char* backupViewer;
 	const char* about;
 	const char* quit;
@@ -28,7 +29,7 @@ import "C"
 import "unsafe"
 
 // menuHandler is invoked when a custom App-menu item is chosen. Set via
-// SetMenuHandler. Receives an action key ("settings"/"backupViewer"/"about").
+// SetMenuHandler. Receives an action key ("settings"/"backupMail"/"backupViewer"/"about").
 var menuHandler func(action string)
 
 //export goMenuAction
@@ -45,7 +46,7 @@ func goMenuAction(action *C.char) {
 
 // MenuLabels holds the localized strings for the custom application menu.
 type MenuLabels struct {
-	Settings, BackupViewer, About, Quit, Edit, Undo, Redo, Cut, Copy, Paste, Delete string
+	Settings, BackupMail, BackupViewer, About, Quit, Edit, Undo, Redo, Cut, Copy, Paste, Delete string
 }
 
 // SetMenuHandler registers the function called when a custom App-menu item is
@@ -54,7 +55,7 @@ func SetMenuHandler(fn func(action string)) { menuHandler = fn }
 
 // InstallAppMenu replaces the application's main menu with a minimal one:
 //
-//	App menu : Settings, Backup Viewer, About, Quit
+//	App menu : Settings, Back Up Mail, Backup Viewer, About, Quit
 //	Edit menu: Undo, Redo, Cut, Copy, Paste, Delete (native selectors, so the
 //	           webview's copy/paste/undo actually work)
 //
@@ -62,6 +63,7 @@ func SetMenuHandler(fn func(action string)) { menuHandler = fn }
 // runs after Wails has installed its own default menu, replacing it.
 func InstallAppMenu(l MenuLabels) {
 	cs := C.CString(l.Settings)
+	cbm := C.CString(l.BackupMail)
 	cb := C.CString(l.BackupViewer)
 	ca := C.CString(l.About)
 	cq := C.CString(l.Quit)
@@ -73,6 +75,7 @@ func InstallAppMenu(l MenuLabels) {
 	cv := C.CString(l.Paste)
 	cd := C.CString(l.Delete)
 	defer C.free(unsafe.Pointer(cs))
+	defer C.free(unsafe.Pointer(cbm))
 	defer C.free(unsafe.Pointer(cb))
 	defer C.free(unsafe.Pointer(ca))
 	defer C.free(unsafe.Pointer(cq))
@@ -86,6 +89,7 @@ func InstallAppMenu(l MenuLabels) {
 
 	C.installAppMenu(C.AulycMenuLabels{
 		settings:     cs,
+		backupMail:   cbm,
 		backupViewer: cb,
 		about:        ca,
 		quit:         cq,

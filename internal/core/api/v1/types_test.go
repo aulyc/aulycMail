@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"net/http"
 	"testing"
 )
 
@@ -14,7 +13,6 @@ type stubCore struct{}
 func (stubCore) Mail() Mail                   { return stubMail{} }
 func (stubCore) Composer() Composer           { return stubComposer{} }
 func (stubCore) Contacts() Contacts           { return stubContacts{} }
-func (stubCore) Auth() Auth                   { return stubAuth{} }
 func (stubCore) Notifications() Notifications { return stubNotifications{} }
 func (stubCore) UI() UI                       { return stubUI{} }
 func (stubCore) Storage() Storage             { return stubStorage{} }
@@ -82,15 +80,6 @@ func (stubContacts) SubscribeToContactEvents([]ContactEventType) (<-chan Contact
 	return nil, func() {}, ErrUnimplemented
 }
 
-type stubAuth struct{}
-
-func (stubAuth) HTTPClient(string, []AuthScope) (*http.Client, error) { return nil, ErrUnimplemented }
-func (stubAuth) IMAPClient(string, []string) (IMAPClient, error)      { return nil, ErrUnimplemented }
-func (stubAuth) SMTPClient(string) (SMTPClient, error)                { return nil, ErrUnimplemented }
-func (stubAuth) StartIncrementalConsent(StartIncrementalConsentRequest) error {
-	return ErrUnimplemented
-}
-
 type stubNotifications struct{}
 
 func (stubNotifications) Show(NotifyRequest) error { return ErrUnimplemented }
@@ -148,7 +137,6 @@ func TestCoreInterfaceShape(t *testing.T) {
 	_ = c.Mail()
 	_ = c.Composer()
 	_ = c.Contacts()
-	_ = c.Auth()
 	_ = c.Notifications()
 	_ = c.UI()
 	_ = c.Storage()

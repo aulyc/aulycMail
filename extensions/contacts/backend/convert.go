@@ -8,7 +8,7 @@ import (
 // fromLocal converts a core contact.Contact into the API-surface Contact.
 //
 // Core contacts are keyed by email, so we use the email itself as the ID. The
-// Source field (e.g. "aulycmail", "google", "vcard", "carddav") becomes SourceID
+// Source field (e.g. "aulycmail", "vcard", "carddav") becomes SourceID
 // for search results where the user hasn't picked a specific source. Used by
 // the autocomplete-style per-email row paths; multi-field fromRecord is the
 // path the Contacts pane uses for its list + detail views.
@@ -35,9 +35,8 @@ func fromLocal(c *contact.Contact) coreapi.Contact {
 //   - For local records: returns the legacy-mapped Source value ("aulycmail") so
 //     the ContactDetail.svelte gate `sourceId === 'aulycmail'` keeps working for
 //     Edit/Delete on local contacts.
-//   - For CardDAV records: returns the addressbook-or-source id from
-//     rec.SourceRef (when available). Phase 2b.2.b refines this so the
-//     sidebar-source UUID (rather than the addressbook-id) lands here.
+//   - For legacy CardDAV records: returns the addressbook-or-source id from
+//     rec.SourceRef when available.
 func fromRecord(rec *contact.Record) coreapi.Contact {
 	if rec == nil {
 		return coreapi.Contact{Emails: []string{}}
@@ -46,18 +45,18 @@ func fromRecord(rec *contact.Record) coreapi.Contact {
 	// `"emails": []` rather than `"emails": null`. Frontend `{#each contact.emails}`
 	// blocks iterate empty arrays fine; iterating null throws.
 	out := coreapi.Contact{
-		ID:        rec.ID,
-		Name:      rec.Fn,
-		Emails:    []string{},
-		Org:       rec.Org,
-		Title:     rec.Title,
-		Note:      rec.Note,
-		Bday:      rec.Bday,
-		Nickname:  rec.Nickname,
+		ID:             rec.ID,
+		Name:           rec.Fn,
+		Emails:         []string{},
+		Org:            rec.Org,
+		Title:          rec.Title,
+		Note:           rec.Note,
+		Bday:           rec.Bday,
+		Nickname:       rec.Nickname,
 		PhotoData:      rec.PhotoData,
 		PhotoMediaType: rec.PhotoMediaType,
 		PhotoURL:       rec.PhotoURL,
-		UpdatedAt: rec.UpdatedAt,
+		UpdatedAt:      rec.UpdatedAt,
 	}
 
 	// Source mapping: 'local' → 'aulycmail' (legacy compat for the detail-pane

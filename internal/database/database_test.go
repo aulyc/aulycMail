@@ -90,10 +90,9 @@ func TestCheckpoint(t *testing.T) {
 	}
 }
 
-// TestMigrationV29_OAuthCompositeKey verifies the Phase 1 extension-system
-// migration: oauth_tokens now uses composite PK (account_id, client_config_id)
-// so a single account can hold separate token rows for Mail vs extension-
-// scoped OAuth clients.
+// TestMigrationV29_OAuthCompositeKey verifies the legacy OAuth compatibility
+// migration: oauth_tokens uses composite PK (account_id, client_config_id) so
+// old databases with multiple token rows still migrate deterministically.
 func TestMigrationV29_OAuthCompositeKey(t *testing.T) {
 	db := openTestDB(t)
 
@@ -197,8 +196,8 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 			t.Fatalf("drop %s for re-migrate: %v", col, err)
 		}
 	}
-	// Drop v36's encrypted fallback columns on oauth_tokens for the same
-	// reason — re-running v36 ADDs them again.
+	// Drop v36's legacy oauth_tokens fallback columns for the same reason —
+	// re-running v36 ADDs them again.
 	for _, col := range []string{"encrypted_access_token", "encrypted_refresh_token"} {
 		if _, err := db.Exec(`ALTER TABLE oauth_tokens DROP COLUMN ` + col); err != nil {
 			t.Fatalf("drop oauth_tokens.%s for re-migrate: %v", col, err)
@@ -362,7 +361,7 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 			t.Fatalf("drop %s for re-migrate: %v", col, err)
 		}
 	}
-	// Same for v36's encrypted oauth_tokens fallback columns.
+	// Same for v36's legacy oauth_tokens fallback columns.
 	for _, col := range []string{"encrypted_access_token", "encrypted_refresh_token"} {
 		if _, err := db.Exec(`ALTER TABLE oauth_tokens DROP COLUMN ` + col); err != nil {
 			t.Fatalf("drop oauth_tokens.%s for re-migrate: %v", col, err)

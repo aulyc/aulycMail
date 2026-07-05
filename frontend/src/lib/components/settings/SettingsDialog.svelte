@@ -15,7 +15,6 @@
   import GeneralTab from './GeneralTab.svelte'
   import ImagesTab from './ImagesTab.svelte'
   import AccountsTab from './AccountsTab.svelte'
-  import BackupTab from './BackupTab.svelte'
 
   interface Props {
     /** Whether the dialog is open */
@@ -243,7 +242,7 @@
       </div>
     {:else}
       <Tabs.Root bind:value={activeTab} class="w-full">
-        <Tabs.List class="grid w-full grid-cols-4">
+        <Tabs.List class="grid w-full grid-cols-3">
           <Tabs.Trigger value="general" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:settings-2" width="16" height="16" /></span>
             {$_('settings.general')}
@@ -255,10 +254,6 @@
           <Tabs.Trigger value="accounts" class="flex items-center gap-2">
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:mails" width="16" height="16" /></span>
             {$_('settings.accounts')}
-          </Tabs.Trigger>
-          <Tabs.Trigger value="backup" class="flex items-center gap-2">
-            <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:archive" width="16" height="16" /></span>
-            {$_('settings.backup')}
           </Tabs.Trigger>
         </Tabs.List>
 
@@ -294,10 +289,6 @@
 
           <Tabs.Content value="accounts" class="mt-0">
             <AccountsTab />
-          </Tabs.Content>
-
-          <Tabs.Content value="backup" class="mt-0">
-            <BackupTab />
           </Tabs.Content>
         </div>
       </Tabs.Root>

@@ -327,10 +327,9 @@ var migrations = []Migration{
 	{
 		Version: 9,
 		SQL: `
-			-- OAuth token metadata table
-			-- Sensitive tokens (access_token, refresh_token) are stored in OS keyring
-			-- Only metadata (provider, expiry, scopes) is stored in DB
-			-- Fallback encrypted columns are used when keyring is unavailable
+			-- Legacy reserved: OAuth token metadata table. OAuth support was
+			-- removed (password auth only); table retained for schema
+			-- compatibility with existing databases.
 			CREATE TABLE oauth_tokens (
 				account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
 				provider TEXT NOT NULL,  -- 'google', 'microsoft'
@@ -482,12 +481,12 @@ var migrations = []Migration{
 	{
 		Version: 17,
 		SQL: `
-			-- Add account_id to contact_sources for linking OAuth contact sources to email accounts
-			-- NULL = standalone OAuth source, non-NULL = linked to email account's OAuth tokens
+			-- Legacy reserved: account linkage for removed remote contact sources.
+			-- OAuth support was removed; column retained for schema compatibility.
 			ALTER TABLE contact_sources ADD COLUMN account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE;
 
-			-- OAuth token metadata for standalone contact sources (not linked to email accounts)
-			-- Actual tokens stored in OS keyring, fallback to encrypted columns in contact_sources
+			-- Legacy reserved: OAuth metadata for standalone contact sources.
+			-- OAuth support was removed; table retained for schema compatibility.
 			CREATE TABLE contact_source_oauth (
 				source_id TEXT PRIMARY KEY REFERENCES contact_sources(id) ON DELETE CASCADE,
 				provider TEXT NOT NULL,  -- 'google', 'microsoft'
@@ -709,16 +708,14 @@ var migrations = []Migration{
 	{
 		Version: 29,
 		SQL: `
-			-- Extension system Phase 1: multi-config OAuth support.
+			-- Legacy reserved: multi-config OAuth token shape.
 			--
-			-- Each extension owns its own OAuth client configuration (Google Cloud
-			-- project / Azure AD app registration). The same account can now have
-			-- separate token rows under different client_config_ids — Mail tokens
-			-- under 'google-mail', Calendar tokens under 'google-extensions', etc.
+			-- OAuth support was removed, but old databases can still contain
+			-- oauth_tokens/contact_source_oauth rows. This migration keeps the
+			-- historical table shape stable so existing DBs continue to migrate.
 			--
-			-- For backward compatibility: existing rows are backfilled to
-			-- 'google-mail' / 'microsoft-mail' so all current accounts keep working
-			-- with no user-visible change.
+			-- For backward compatibility: existing rows are backfilled to the old
+			-- mail config ids before the composite primary key rebuild.
 
 			-- Step 1: Add column to oauth_tokens and backfill.
 			ALTER TABLE oauth_tokens ADD COLUMN client_config_id TEXT;
@@ -753,13 +750,11 @@ var migrations = []Migration{
 	{
 		Version: 30,
 		SQL: `
-			-- Phase 2b: write capability flag for contact sources.
+			-- Legacy reserved: write capability flag for contact sources.
 			--
 			-- contact_sources.writable: explicit per-source write capability flag.
-			-- CardDAV sources flip this on when the user opts in (no consent needed,
-			-- credentials already cover both directions). OAuth sources flip this on
-			-- only after the user completes incremental consent for write scopes
-			-- under the per-extension client_config_id (e.g., google-contacts).
+			-- Remote contact sources are currently unimplemented; the column is
+			-- retained so older DBs with contact_sources rows still migrate.
 			--
 			-- Note: contacts.name_overridden is added by contact.Store.ensureTable
 			-- (lazy schema) since the contacts table isn't part of the migration
@@ -827,7 +822,7 @@ var migrations = []Migration{
 
 			CREATE TABLE contact_records (
 				id            TEXT PRIMARY KEY,
-				source        TEXT NOT NULL,             -- 'local' | 'carddav' (future: 'google' | 'microsoft')
+				source        TEXT NOT NULL,             -- 'local' | 'carddav' (legacy remote records)
 				kind          TEXT,                      -- local: 'manual' | 'collected'; NULL for carddav
 				source_ref    TEXT,                      -- carddav: addressbook_id. local: NULL
 				fn            TEXT,                      -- vCard FN (display name)
@@ -1229,21 +1224,12 @@ var migrations = []Migration{
 	{
 		Version: 36,
 		SQL: `
-			-- Per-(account, client_config) encrypted fallback for OAuth tokens.
+			-- Legacy reserved: per-(account, client_config) encrypted fallback
+			-- columns for removed OAuth token support.
 			--
-			-- Before this migration, only the *-mail client_config slots had a
-			-- DB fallback when the OS keyring is unavailable — they reuse the
-			-- legacy encrypted_access_token / encrypted_refresh_token columns
-			-- on the accounts table (migration v9). Non-mail slots (the
-			-- extension slots: google-contacts, google-calendar,
-			-- microsoft-contacts, microsoft-calendar) had no fallback at all:
-			-- when the keyring failed, the StartIncrementalConsent flow
-			-- returned "keyring unavailable and no fallback for client config".
-			--
-			-- This migration extends the per-(account, client_config)
-			-- oauth_tokens row with its own encrypted columns so every slot —
-			-- mail or extension — gets the same keyring-first +
-			-- encrypted-DB-fallback behavior.
+			-- OAuth code no longer reads or writes oauth_tokens. The columns stay
+			-- in migrations so databases that already passed through v36 keep a
+			-- consistent schema version history.
 
 			ALTER TABLE oauth_tokens ADD COLUMN encrypted_access_token TEXT;
 			ALTER TABLE oauth_tokens ADD COLUMN encrypted_refresh_token TEXT;

@@ -23,8 +23,6 @@
       "localAll": "Local - All",
       "localManual": "Local - Contacts",
       "localCollected": "Local - Collected",
-      "sourcesHeading": "Sources",
-      "noSources": "No CardDAV sources configured.",
       "syncing": "Syncing contacts…",
       "idle": "Contacts",
       "settings": "Contact settings"
@@ -42,13 +40,6 @@
       "emptySearch": "No contacts match your search.",
       "empty": "No contacts."
     },
-    "writeAccessBanner": {
-      "title": "Read-only sources — write access not enabled",
-      "enableButton": "Enable write access",
-      "providerGoogle": "Google",
-      "providerMicrosoft": "Microsoft",
-      "providerCardDAV": "CardDAV"
-    },
     "detail": {
       "emptyState": "Select a contact to view details.",
       "edit": "Edit",
@@ -58,8 +49,6 @@
       "relatedMailEmpty": "No related mail",
       "openInMail": "Open in mail",
       "readonlyHint": "Read-only",
-      "cardDAVReadOnlyNote": "This source is read-only. To enable editing, open Settings → Contact Sources, edit this source, and turn on \"Enable write access\".",
-      "oauthReadOnlyNote": "Read-only — write capability for Google/Microsoft contacts is coming in a future release.",
       "labels": {
         "email": "Email",
         "associatedAccounts": "Associated mailboxes",
@@ -131,34 +120,12 @@
     },
     "delete": {
       "title": "Delete this contact?",
-      "descriptionLocal": "{name} will be removed from your local contacts. Mail you've already sent to this address is not affected.",
-      "descriptionCardDAV": "{name} will be removed from this address book on the server. This cannot be undone from aulycmail."
+      "descriptionLocal": "{name} will be removed from your local contacts. Mail you've already sent to this address is not affected."
     },
     "settings": {
       "title": "Contacts settings",
-      "description": "Configure OAuth credentials for the Contacts extension. Read access rides on your mail account's existing permission; these creds power WRITE operations (edit / create / delete) against Google or Microsoft sources.",
-      "oauthHeading": "OAuth Credentials",
-      "oauthDescription": "Each slot ships with aulycmail's verified credentials when available; switch to Custom to supply your own project's Client ID and Secret.",
-      "googleLabel": "Google Contacts",
-      "microsoftLabel": "Microsoft Contacts",
-      "writeAccessHeading": "Write Access",
-      "writeAccessDescription": "Enable or disable write permission on a contact source. CardDAV sources only need the toggle. Google and Microsoft also need a one-time OAuth consent to enable.",
-      "writeAccessRowSubtitle": "Read-only — write access not enabled",
-      "writeAccessRowSubtitleEnabled": "Write access enabled",
-      "enableWriteAccess": "Enable write access",
-      "disableWriteAccess": "Disable write access",
-      "writeAccessEnabled": "Write access enabled for {name}",
-      "writeAccessDisabled": "Write access disabled for {name}",
-      "writeAccessDisableFailed": "Failed to disable write access",
-      "writeAccessCanceled": "Write access not enabled",
+      "description": "Contacts are stored locally. Manual contacts and addresses collected from sent mail are available in the Contacts view.",
       "close": "Close"
-    },
-    "hook": {
-      "skip": "Skip",
-      "setUp": "Set up",
-      "done": "Done",
-      "successMessage": "Contacts sync set up for {name}",
-      "completeMessage": "Contacts sync is set up."
     },
     "toast": {
       "refreshed": "Refreshed contacts from {count} messages",
@@ -171,10 +138,7 @@
       "failedUpdate": "Failed to update contact.",
       "emailCopied": "Copied {email}",
       "emailCopyFailed": "Failed to copy email.",
-      "photoFailed": "Could not process that image. Try a different file.",
-      "syncSucceeded": "Contacts synced",
-      "syncAllSucceeded": "All contact sources synced",
-      "syncNoSource": "Select a CardDAV source in the sidebar first."
+      "photoFailed": "Could not process that image. Try a different file."
     }
   }
 }

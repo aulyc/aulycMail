@@ -160,10 +160,11 @@ func (b *ContactsBridge) emitConflict(err error) bool {
 // $wailsjs/go/app/App.
 // ============================================================================
 
-// Contacts_ListContactsForBrowse returns contacts filtered by sourceID:
-//   - ""                            → merged (local + carddav, search applied)
-//   - SourceIDLocal                 → core local contacts only
-//   - <carddav source UUID>         → contacts from a specific CardDAV source
+// Contacts_ListContactsForBrowse returns local contacts filtered by sourceID:
+//   - ""                            → all local contacts, search applied
+//   - SourceIDLocal                 → all local contacts
+//   - SourceIDLocalManual           → user-added local contacts
+//   - SourceIDLocalCollected        → auto-collected local contacts
 //
 // Gated on the extension being enabled — disabled returns nil so the
 // frontend can call this unconditionally without checking state.
@@ -195,7 +196,7 @@ func (b *ContactsBridge) Contacts_GetContactAccountGroups() ([]coreapi.ContactAc
 }
 
 // Contacts_GetContactDetail returns a single contact by email (if argument
-// contains '@') or by CardDAV UUID otherwise.
+// contains '@') or by local record UUID otherwise.
 func (b *ContactsBridge) Contacts_GetContactDetail(emailOrID string) (*coreapi.Contact, error) {
 	if !b.gateEnabled() {
 		return nil, nil
@@ -208,18 +209,13 @@ func (b *ContactsBridge) Contacts_GetContactDetail(emailOrID string) (*coreapi.C
 
 // Contacts_CreateContact creates a new contact and returns its id.
 //
-// Dispatch by input.SourceID (Track B / 2b.2.c):
+// Dispatch by input.SourceID:
 //   - "", "local", "local:manual" → local manual entry. Returns the normalized
 //     email as the id.
-//   - <CardDAV source UUID>        → PUTs a new vCard to the source's
-//     addressbook (input.AddressbookID, or the source's first enabled
-//     addressbook if empty). Returns the new record UUID.
 //   - "local:collected"            → rejected.
-//   - Google / Microsoft sources   → ErrUnimplemented (2b.3).
 //
 // The historical `Contacts_CreateLocalContact(email, name)` shape was renamed
-// here in Track B because the backend already dispatched by source; the bridge
-// just hadn't surfaced the full input shape yet.
+// here when the bridge started accepting the full input shape.
 func (b *ContactsBridge) Contacts_CreateContact(input coreapi.ContactCreateInput) (string, error) {
 	if !b.gateEnabled() {
 		return "", nil
@@ -230,10 +226,8 @@ func (b *ContactsBridge) Contacts_CreateContact(input coreapi.ContactCreateInput
 	return b.api.CreateContact(input)
 }
 
-// Contacts_UpdateContact applies a ContactPatch to a contact. Source
-// dispatch handled inside the API:
-//   - Local records → contact.Store.UpsertRecord (full-fidelity write)
-//   - CardDAV records → server PUT gated on the source's writable flag
+// Contacts_UpdateContact applies a ContactPatch to a local contact via
+// contact.Store.UpsertRecord.
 //
 // 412 conflicts surface as a contacts:conflict event the UI listens for;
 // the method returns nil on conflict (the user's edit was discarded but
@@ -252,11 +246,8 @@ func (b *ContactsBridge) Contacts_UpdateContact(idOrEmail string, patch coreapi.
 	return err
 }
 
-// Contacts_DeleteLocalContact removes a contact. Local records
-// cascade-delete in the unified store; CardDAV records DELETE on the
-// server (gated on writable) and then cascade locally. 412 conflicts
-// surface via the contacts:conflict event. Idempotent on local + 404
-// paths.
+// Contacts_DeleteLocalContact removes a contact from the local unified store.
+// It is idempotent on missing records.
 //
 // Note: there's a separate top-level `App.DeleteContact` from pre-
 // extension days for legacy callers. This one is gated to the extension's

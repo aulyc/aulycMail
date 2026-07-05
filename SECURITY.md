@@ -36,22 +36,12 @@ Please include the following information in your report:
 
 ## Security Best Practices for Users
 
-### OAuth Credentials
-
-If you are compiling aulycmail from source:
-
-1. **Never commit OAuth credentials** to version control
-2. Use the `.env.example` file as a template and create your own `.env` file
-3. Ensure `.env` is listed in `.gitignore` (it is by default)
-4. Rotate your OAuth credentials periodically
-5. Use separate OAuth applications for development and production
-
 ### Email Security
 
 - aulycmail stores emails locally on your device
 - Use strong passwords for your email accounts
 - Enable 2FA/MFA on your email accounts where possible
-- For Gmail/Google Workspace: Use App-Specific Passwords or OAuth
+- For Gmail/Google Workspace: Use App Passwords with IMAP enabled
 
 ### Data Storage
 
@@ -64,7 +54,6 @@ If you are compiling aulycmail from source:
 aulycmail includes the following security measures:
 
 - **HTML Sanitization**: All HTML email content is sanitized before display to prevent XSS attacks
-- **OAuth 2.0**: Secure authentication for Gmail and other OAuth-supporting providers
 - **Local Storage**: Emails are stored locally, not on third-party servers
 - **TLS/SSL**: All IMAP/SMTP connections use TLS encryption
 

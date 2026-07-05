@@ -355,8 +355,8 @@ class AccountStore {
   }
 
   /**
-   * Comprehensive sync of all accounts (folders + messages) and contacts.
-   * Syncs: folder list, Inbox/Drafts/Sent messages, CardDAV contacts.
+   * Comprehensive sync of all accounts.
+   * Syncs: folder list and Inbox/Drafts/Sent messages.
    */
   async syncAllComplete(): Promise<void> {
     // Mark all accounts as syncing

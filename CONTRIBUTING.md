@@ -181,13 +181,7 @@ cd frontend && npm test
    cd ..
    ```
 
-4. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your OAuth credentials (for Gmail/OAuth testing)
-   ```
-
-5. **Run in development mode**
+4. **Run in development mode**
    ```bash
    make dev
    ```

@@ -22,11 +22,10 @@ import type { v1 } from '$wailsjs/go/models'
 import { isResponsive, showViewer, hideSidebar } from '$lib/stores/layout.svelte'
 
 // Source ID values the sidebar can dispatch:
-//   ""                  → merged listing across all sources
+//   ""                  → all local contacts
 //   "local"             → all local contacts (manual + collected)
 //   "local:manual"      → user-added local contacts (Add Contact UI)
 //   "local:collected"   → auto-collected local contacts (sent-mail recipients)
-//   <uuid>              → a specific CardDAV source
 let selectedSourceId = $state<string>('')
 let searchQuery = $state<string>('')
 let selectedContactId = $state<string | null>(null)
@@ -125,11 +124,9 @@ export async function activateContact(id: string | null): Promise<void> {
 }
 
 
-// Update a contact (local or CardDAV) with a multi-field patch. The backend
-// dispatches by source — local writes via UpsertRecord, CardDAV PUTs to the
-// server. On 412 conflict the backend emits "contacts:conflict" via the
-// event listener wired in ContactsPane; this method's caller doesn't see the
-// conflict directly.
+// Update a local contact with a multi-field patch. On conflict the backend
+// emits "contacts:conflict" via the event listener wired in ContactsPane; this
+// method's caller doesn't see the conflict directly.
 export async function updateContact(id: string, patch: v1.ContactPatch): Promise<void> {
   await UpdateContact(id, patch)
   // Refresh the list + detail view so changes are visible immediately.
@@ -150,10 +147,8 @@ export async function deleteLocalContact(email: string): Promise<void> {
   await reloadContacts()
 }
 
-// Create a contact. Source dispatch happens in the backend (input.SourceID):
-//   - "local:manual" → local manual entry; returns the normalized email
-//   - <CardDAV UUID> → server-side PUT to input.AddressbookID (or the
-//     source's first enabled addressbook when empty); returns the record UUID
+// Create a local manual contact. The backend rejects collected/remote source
+// IDs; this UI always sends "local:manual".
 // Throws on conflict — caller (AddContactDialog) translates "already exists"
 // strings into a field-level error.
 //
@@ -163,4 +158,3 @@ export async function deleteLocalContact(email: string): Promise<void> {
 export async function createContact(input: v1.ContactCreateInput): Promise<string> {
   return await CreateContact(input)
 }
-

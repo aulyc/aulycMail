@@ -20,7 +20,6 @@ import (
 	"github.com/aulyc/aulycmail/internal/credentials"
 	"github.com/aulyc/aulycmail/internal/database"
 	"github.com/aulyc/aulycmail/internal/draft"
-	extauth "github.com/aulyc/aulycmail/internal/extensions/auth"
 	extcompose "github.com/aulyc/aulycmail/internal/extensions/compose"
 	extmail "github.com/aulyc/aulycmail/internal/extensions/mail"
 	extui "github.com/aulyc/aulycmail/internal/extensions/ui"
@@ -29,7 +28,6 @@ import (
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/aulyc/aulycmail/internal/notification"
-	"github.com/aulyc/aulycmail/internal/oauth2"
 	"github.com/aulyc/aulycmail/internal/platform"
 	"github.com/aulyc/aulycmail/internal/settings"
 	"github.com/aulyc/aulycmail/internal/sync"
@@ -225,7 +223,6 @@ type App struct {
 	// into App via its Bridge struct (declared at the top of this struct
 	// definition); the *Extension field below is the lightweight lifecycle
 	// handle the host's knownExtensions Register loop iterates.
-	authBroker      *extauth.Broker          // coreapi.Auth impl for extensions
 	mailAPI         *extmail.API             // coreapi.Mail impl wrapping core stores
 	composerAPI     *extcompose.API          // coreapi.Composer impl (currently unimplemented)
 	uiRegistry      *extui.Registry          // coreapi.UI impl: rail tabs, account-setup hooks, ...
@@ -249,9 +246,6 @@ type App struct {
 
 	// Undo system
 	undoStack *undo.Stack
-
-	// OAuth2 manager
-	oauth2Manager *oauth2.Manager
 
 	// Pending mailto: URL data (from command line)
 	PendingMailto *MailtoData
@@ -355,8 +349,8 @@ func StartupDialogInfoFor(err error) StartupDialogInfo {
 
 // Preflight performs the early-startup steps that must succeed BEFORE the
 // Wails window is shown: logging init, platform paths, directory creation,
-// database open + migration, credential store init, and OAuth override
-// wiring. Returns an error on any failure; main.go is responsible for
+// database open + migration, and credential store init.
+// Returns an error on any failure; main.go is responsible for
 // surfacing the failure to the user (via StartupDialogInfoFor + a native
 // dialog) and exiting before wails.Run is called.
 //
@@ -408,44 +402,6 @@ func (a *App) Preflight() error {
 		return fmt.Errorf("init credential store: %w", err)
 	}
 	a.credStore = credStore
-
-	// Wire user-supplied OAuth client credentials override into the oauth2
-	// resolver chain. When the user has saved their own client_id + secret
-	// for a given config id via Settings → OAuth Credentials, those values
-	// take priority over any shipped (build-time) defaults.
-	oauth2.UserOverrideLookup = func(configID string) (oauth2.ClientCredentials, bool) {
-		clientID, clientSecret, ok, err := credStore.GetUserClientCreds(configID)
-		if err != nil || !ok {
-			return oauth2.ClientCredentials{}, false
-		}
-		return oauth2.ClientCredentials{ClientID: clientID, ClientSecret: clientSecret}, true
-	}
-
-	// Wire user-picked slot aliases into the oauth2 resolver chain. When the
-	// user has chosen a non-default shipped option for a given config id
-	// (e.g., contacts settings → "aulycmail mail client" reroutes google-contacts
-	// onto google-mail), the resolver consults this hook after the user-
-	// override step and before the provider chain.
-	oauth2.SlotAliasLookup = func(configID string) (string, bool) {
-		target, ok, err := credStore.GetOAuthSlotAlias(configID)
-		if err != nil || !ok {
-			return "", false
-		}
-		return target, true
-	}
-
-	// Wire the user's explicit picker choice ("custom" / "aulycmail-shipped"
-	// / "aulycmail-mail") into the resolver. When recorded, this routes the
-	// resolver by choice rather than by row presence — so switching the
-	// picker between options no longer requires destroying stored values
-	// to make the new option take effect.
-	oauth2.ActiveChoiceLookup = func(configID string) (string, bool) {
-		choice, err := credStore.GetOAuthActiveChoice(configID)
-		if err != nil || choice == "" {
-			return "", false
-		}
-		return choice, true
-	}
 
 	return nil
 }
@@ -507,6 +463,8 @@ func (a *App) Startup(ctx context.Context) {
 		switch action {
 		case "settings":
 			wailsRuntime.EventsEmit(a.ctx, "menu:openSettings")
+		case "backupMail":
+			wailsRuntime.EventsEmit(a.ctx, "menu:openBackupMail")
 		case "backupViewer":
 			wailsRuntime.EventsEmit(a.ctx, "menu:openBackupViewer")
 		case "about":
@@ -563,19 +521,10 @@ func (a *App) Startup(ctx context.Context) {
 	// Start periodic WAL checkpoint routine to prevent WAL file from growing too large
 	go a.db.StartCheckpointRoutine(ctx)
 
-	// Initialize the OAuth2 manager BEFORE constructing the Auth Broker — the
-	// broker captures a.oauth2Manager into bearerRefreshTransport at construction
-	// time, so a later assignment would leave every extension's HTTP client with
-	// a nil oauthManager and SIGSEGV on the first 401-triggered token refresh.
-	if a.oauth2Manager == nil {
-		a.oauth2Manager = oauth2.NewManager()
-	}
-
 	// Extension system (Phase 1 infrastructure). Per the lightweight-by-default
 	// invariant, NO extension stores are opened here. Each extension's Bridge
 	// lazy-initializes its stores + per-extension SQLite + API on the first
 	// enabled method call. See extensions/<name>/backend/bridge.go.
-	a.authBroker = extauth.NewBroker(a.credStore, a.oauth2Manager)
 	a.mailAPI = extmail.NewAPI(a.messageStore, a.folderStore)
 	a.composerAPI = extcompose.NewAPI()
 	a.uiRegistry = extui.NewRegistry()
@@ -595,10 +544,8 @@ func (a *App) Startup(ctx context.Context) {
 	// directly. Bridge state is lazy — no stores open here.
 	a.initContactsExtension()
 
-	// Construct one Core per known extension. The Core's Auth surface is
-	// scoped to that extension's identity, so HTTPClient calls route via
-	// the extension's manifest-declared client config (or via mail OAuth
-	// for scopes listed in first_party_uses_core_for_scopes).
+	// Construct one Core per known extension, scoped to that extension's
+	// identity.
 	for _, ext := range a.knownExtensions {
 		extCore := newCoreForExtension(a, ext)
 		unreg, err := ext.Register(extCore)
@@ -611,9 +558,6 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize undo stack (max 50 commands, 30 second timeout)
 	a.undoStack = undo.NewStack(50, 30*time.Second)
-
-	// OAuth2 manager was constructed earlier (before the Auth Broker, which
-	// captures it). See the earlier guarded init above for the rationale.
 
 	// Initialize shared compose operations
 	a.composeOps = composeOps{
@@ -907,13 +851,13 @@ func (a *App) menuLabels() platform.MenuLabels {
 	}
 	if zh {
 		return platform.MenuLabels{
-			Settings: "设置", BackupViewer: "备份查看器", About: "关于", Quit: "退出",
+			Settings: "设置", BackupMail: "备份邮件", BackupViewer: "备份查看器", About: "关于", Quit: "退出",
 			Edit: "编辑", Undo: "撤销", Redo: "重做",
 			Cut: "剪切", Copy: "复制", Paste: "粘贴", Delete: "删除",
 		}
 	}
 	return platform.MenuLabels{
-		Settings: "Settings", BackupViewer: "Backup Viewer", About: "About", Quit: "Quit",
+		Settings: "Settings", BackupMail: "Back Up Mail", BackupViewer: "Backup Viewer", About: "About", Quit: "Quit",
 		Edit: "Edit", Undo: "Undo", Redo: "Redo",
 		Cut: "Cut", Copy: "Copy", Paste: "Paste", Delete: "Delete",
 	}

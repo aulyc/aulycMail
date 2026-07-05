@@ -5,7 +5,6 @@
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
   import Icon from '@iconify/svelte'
   import { contactsView, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
-  import { contactSourcesStore } from '$extensions/contacts/frontend/stores/contactSources.svelte'
   import { toasts } from '$lib/stores/toast'
   import { formatRelativeDate } from '$lib/utils/date'
   // @ts-ignore - wailsjs bindings
@@ -82,28 +81,6 @@
   let primaryEmail = $derived(contact && contact.emails && contact.emails.length > 0 ? contact.emails[0] : '')
   let associatedAccounts = $derived(contact?.associatedAccounts ?? [])
 
-  // Local records are always writable. CardDAV records are writable when the
-  // source's `writable` flag is enabled (Settings → source → "Enable write
-  // access"). Google / Microsoft sources gain write capability in 2b.3
-  // alongside the provider-specific write paths.
-  let isWritable = $derived(
-    contact?.sourceId === 'aulycmail' || contactSourcesStore.isSourceWritable(contact?.sourceId),
-  )
-
-  // Read-only hint discriminator. We want to surface WHY a contact has no
-  // Edit/Delete buttons:
-  //   - CardDAV non-writable → "Read-only — enable write access in Settings"
-  //   - OAuth (Google/Microsoft) → "Read-only — write capability coming in a
-  //     future release"
-  //   - Local → never read-only.
-  let readonlyKind = $derived.by<'none' | 'carddav' | 'oauth'>(() => {
-    if (!contact || isWritable) return 'none'
-    if (!contact.sourceId || contact.sourceId === 'aulycmail') return 'none'
-    const src = contactSourcesStore.sources.find(s => s.id === contact.sourceId)
-    if (src?.type === 'google' || src?.type === 'microsoft') return 'oauth'
-    return 'carddav'
-  })
-
   let showDeleteConfirm = $state(false)
   let deleting = $state(false)
 
@@ -149,33 +126,21 @@
       <h1 class="m-0 text-xl font-semibold text-foreground flex-1 min-w-0 truncate">
         {contact.name || $_('contacts.common.unnamed')}
       </h1>
-      {#if isWritable}
-        <div class="flex items-center gap-1 flex-shrink-0">
-          <Button variant="outline" size="sm" onclick={() => { if (contact) onEdit?.(contact) }}>
-            <Icon icon="mdi:pencil" class="w-4 h-4 mr-1" />
-            {$_('contacts.detail.edit')}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            class="text-destructive hover:text-destructive"
-            onclick={() => { showDeleteConfirm = true }}
-          >
-            <Icon icon="mdi:delete-outline" class="w-4 h-4 mr-1" />
-            {$_('contacts.common.delete')}
-          </Button>
-        </div>
-      {:else if readonlyKind !== 'none'}
-        <div
-          class="flex items-center gap-1.5 flex-shrink-0 text-xs text-muted-foreground"
-          title={readonlyKind === 'oauth'
-            ? $_('contacts.detail.oauthReadOnlyNote')
-            : $_('contacts.detail.cardDAVReadOnlyNote')}
+      <div class="flex items-center gap-1 flex-shrink-0">
+        <Button variant="outline" size="sm" onclick={() => { if (contact) onEdit?.(contact) }}>
+          <Icon icon="mdi:pencil" class="w-4 h-4 mr-1" />
+          {$_('contacts.detail.edit')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          class="text-destructive hover:text-destructive"
+          onclick={() => { showDeleteConfirm = true }}
         >
-          <Icon icon="mdi:lock-outline" class="w-4 h-4" />
-          <span>{$_('contacts.detail.readonlyHint')}</span>
-        </div>
-      {/if}
+          <Icon icon="mdi:delete-outline" class="w-4 h-4 mr-1" />
+          {$_('contacts.common.delete')}
+        </Button>
+      </div>
     {/if}
   {/snippet}
 
@@ -380,9 +345,7 @@
   bind:open={showDeleteConfirm}
   title={$_('contacts.delete.title')}
   description={contact
-    ? contact.sourceId === 'aulycmail'
-      ? $_('contacts.delete.descriptionLocal', { values: { name: contact.name || primaryEmail || $_('contacts.common.unnamed') } })
-      : $_('contacts.delete.descriptionCardDAV', { values: { name: contact.name || primaryEmail || $_('contacts.common.unnamed') } })
+    ? $_('contacts.delete.descriptionLocal', { values: { name: contact.name || primaryEmail || $_('contacts.common.unnamed') } })
     : ''}
   confirmLabel={$_('contacts.common.delete')}
   cancelLabel={$_('contacts.common.cancel')}

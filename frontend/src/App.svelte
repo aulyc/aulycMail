@@ -16,6 +16,7 @@
   import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
   import AboutDialog from './lib/components/settings/AboutDialog.svelte'
   import SearchOverlay from './lib/components/SearchOverlay.svelte'
+  import BackupDialog from './lib/components/backup/BackupDialog.svelte'
   import BackupViewerDialog from './lib/components/backup/BackupViewerDialog.svelte'
   import { activateContact as activateContactInView } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
@@ -147,6 +148,7 @@
   let showAbout = $state(false)
   let showSyncLog = $state(false)
   let showSearchOverlay = $state(false)
+  let showBackupMail = $state(false)
   let showBackupViewer = $state(false)
 
   // Certificate TOFU state (for background sync cert errors)
@@ -257,9 +259,30 @@
     syncLog.start()
 
     // Native macOS App-menu items route here.
-    EventsOn('menu:openSettings', () => { showSettings = true })
-    EventsOn('menu:openBackupViewer', () => { showBackupViewer = true })
-    EventsOn('menu:openAbout', () => { showAbout = true })
+    EventsOn('menu:openSettings', () => {
+      showAbout = false
+      showBackupMail = false
+      showBackupViewer = false
+      showSettings = true
+    })
+    EventsOn('menu:openBackupMail', () => {
+      showSettings = false
+      showAbout = false
+      showBackupViewer = false
+      showBackupMail = true
+    })
+    EventsOn('menu:openBackupViewer', () => {
+      showSettings = false
+      showAbout = false
+      showBackupMail = false
+      showBackupViewer = true
+    })
+    EventsOn('menu:openAbout', () => {
+      showSettings = false
+      showBackupMail = false
+      showBackupViewer = false
+      showAbout = true
+    })
 
     // Notification clicks (from Go), the Contacts related-mail list (via
     // EventsEmit), and the search overlay all route conversation-open through
@@ -1485,6 +1508,7 @@
 <SettingsDialog bind:open={showSettings} onClose={() => { showSettings = false }} />
 <AboutDialog bind:open={showAbout} onClose={() => { showAbout = false }} />
 <SyncLogDialog bind:open={showSyncLog} onClose={() => { showSyncLog = false }} />
+<BackupDialog bind:open={showBackupMail} onClose={() => { showBackupMail = false }} />
 <BackupViewerDialog bind:open={showBackupViewer} onClose={() => { showBackupViewer = false }} />
 
 <SearchOverlay

@@ -6,7 +6,7 @@ Date: 2026-07-01
 
 Reviewed and remediated the local Wails desktop mail client codebase with focus on:
 
-- Go backend: TLS certificate trust, OAuth/credential handling, URL opening, attachment saving, IMAP/SMTP/network clients, SQL construction.
+- Go backend: TLS certificate trust, credential handling, URL opening, attachment saving, IMAP/SMTP/network clients, SQL construction.
 - Svelte/Wails frontend: sanitized email rendering, iframe boundary, postMessage handling, browser URL opening, sensitive logging.
 - Repository controls: dependency/security environment flags and obvious dangerous constructs.
 
@@ -18,7 +18,7 @@ All seven findings from the initial review have been addressed in code and cover
 2. Fixed unsafe attachment filename handling for batch/default saves.
 3. Removed the email-viewer URL fallback that bypassed backend scheme checks.
 4. Added URL log redaction for backend and frontend email-link paths.
-5. Added timeouts to extension OAuth HTTP clients.
+5. Retired the extension OAuth HTTP-client path when OAuth support was removed.
 6. Added strict parent-side iframe message validation.
 7. Added bounded attachment extraction reads.
 
@@ -88,18 +88,18 @@ Tests:
 
 - `app/app_test.go` covers HTTPS query stripping, userinfo removal, mailto query stripping, disallowed scheme redaction, and relative URL redaction.
 
-### SBP-05 Medium: Extension OAuth HTTP clients now have timeouts
+### SBP-05 Medium: Extension OAuth HTTP clients retired
 
 Status: Fixed.
 
 Changes:
 
-- `internal/extensions/auth/broker.go:13` defines a 30-second timeout.
-- `internal/extensions/auth/broker.go:81` and `internal/extensions/auth/broker.go:184` apply the timeout to authenticated extension HTTP clients.
+- The extension OAuth broker was removed with the rest of OAuth support.
+- No extension-owned authenticated HTTP client is constructed by current code.
 
 Tests:
 
-- `go test ./internal/extensions/auth` passes.
+- Covered by the repository-wide Go test/build checks after OAuth removal.
 
 ### SBP-06 Medium: Email iframe message handling is schema-validated
 
@@ -137,7 +137,7 @@ Tests:
 
 Commands run successfully:
 
-- `GOCACHE=/tmp/aulycmail-go-build-cache go test ./app ./internal/certificate ./internal/email ./internal/database ./internal/extensions/auth`
+- `GOCACHE=/tmp/aulycmail-go-build-cache go test ./app ./internal/certificate ./internal/email ./internal/database`
 - `GOCACHE=/tmp/aulycmail-go-build-cache go test ./...`
 - `npm run check` in `frontend/`
 - `npm run build` in `frontend/`

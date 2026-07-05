@@ -107,8 +107,7 @@ func browseScopeFromSourceID(id string) browseScope {
 }
 
 // API implements the contacts surface over the single local contact.Store.
-// All remote sources (CardDAV / Google / Microsoft) were removed — this is a
-// local-only address book.
+// Remote contact sources were removed — this is a local-only address book.
 type API struct {
 	localStore *contact.Store
 }

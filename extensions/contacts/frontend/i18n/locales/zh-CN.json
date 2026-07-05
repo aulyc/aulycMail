@@ -23,8 +23,6 @@
       "localAll": "本地 - 全部",
       "localManual": "本地 - 联系人",
       "localCollected": "本地 - 已收集",
-      "sourcesHeading": "来源",
-      "noSources": "未配置 CardDAV 来源。",
       "syncing": "正在同步联系人…",
       "idle": "联系人",
       "settings": "联系人设置"
@@ -42,13 +40,6 @@
       "emptySearch": "没有符合搜索条件的联系人。",
       "empty": "没有联系人。"
     },
-    "writeAccessBanner": {
-      "title": "只读来源 — 未启用写入权限",
-      "enableButton": "启用写入权限",
-      "providerGoogle": "Google",
-      "providerMicrosoft": "Microsoft",
-      "providerCardDAV": "CardDAV"
-    },
     "detail": {
       "emptyState": "选择一个联系人以查看详细信息。",
       "edit": "编辑",
@@ -58,8 +49,6 @@
       "relatedMailEmpty": "没有往来邮件",
       "openInMail": "在邮件中打开",
       "readonlyHint": "只读",
-      "cardDAVReadOnlyNote": "此来源为只读。若要启用编辑，请打开 设置 → 联系人来源，编辑此来源，并开启“启用写入权限”。",
-      "oauthReadOnlyNote": "只读 — Google/Microsoft 联系人的写入功能将在未来版本中推出。",
       "labels": {
         "email": "电子邮件",
         "associatedAccounts": "关联邮箱",
@@ -131,34 +120,12 @@
     },
     "delete": {
       "title": "删除此联系人？",
-      "descriptionLocal": "{name} 将从您的本地联系人中移除。您已发送到此地址的邮件不受影响。",
-      "descriptionCardDAV": "{name} 将从服务器上的此通讯录中移除。此操作无法在 aulycmail 中撤销。"
+      "descriptionLocal": "{name} 将从您的本地联系人中移除。您已发送到此地址的邮件不受影响。"
     },
     "settings": {
       "title": "联系人设置",
-      "description": "为联系人扩展配置 OAuth 凭据。读取访问依托于您邮件账户的现有权限；这些凭据用于对 Google 或 Microsoft 来源执行写入操作（编辑/创建/删除）。",
-      "oauthHeading": "OAuth 凭据",
-      "oauthDescription": "在可用时，每个槽位都附带 aulycmail 已验证的凭据；切换到自定义以提供您自己项目的客户端 ID 和密钥。",
-      "googleLabel": "Google 联系人",
-      "microsoftLabel": "Microsoft 联系人",
-      "writeAccessHeading": "写入权限",
-      "writeAccessDescription": "启用或禁用联系人来源的写入权限。CardDAV 来源只需切换开关。Google 和 Microsoft 还需要一次性的 OAuth 授权才能启用。",
-      "writeAccessRowSubtitle": "只读 — 未启用写入权限",
-      "writeAccessRowSubtitleEnabled": "已启用写入权限",
-      "enableWriteAccess": "启用写入权限",
-      "disableWriteAccess": "禁用写入权限",
-      "writeAccessEnabled": "已为 {name} 启用写入权限",
-      "writeAccessDisabled": "已为 {name} 禁用写入权限",
-      "writeAccessDisableFailed": "禁用写入权限失败",
-      "writeAccessCanceled": "未启用写入权限",
+      "description": "联系人仅存储在本地。手动添加的联系人和从已发送邮件收集的地址会显示在联系人视图中。",
       "close": "关闭"
-    },
-    "hook": {
-      "skip": "跳过",
-      "setUp": "设置",
-      "done": "完成",
-      "successMessage": "已为 {name} 设置联系人同步",
-      "completeMessage": "联系人同步已设置。"
     },
     "toast": {
       "refreshed": "已从 {count} 封邮件刷新联系人",
@@ -171,10 +138,7 @@
       "failedUpdate": "更新联系人失败。",
       "emailCopied": "已复制 {email}",
       "emailCopyFailed": "复制电子邮件失败。",
-      "photoFailed": "无法处理该图片。请尝试其他文件。",
-      "syncSucceeded": "联系人已同步",
-      "syncAllSucceeded": "所有联系人来源已同步",
-      "syncNoSource": "请先在侧边栏中选择一个 CardDAV 来源。"
+      "photoFailed": "无法处理该图片。请尝试其他文件。"
     }
   }
 }

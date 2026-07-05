@@ -60,11 +60,9 @@ export type SlotConstraint =
   | { kind: 'info'; message: string }
   | { kind: 'none' }
 
-// Source type strings come from contactSourcesStore — match the backend's
-// carddav.SourceType values. Empty string means "no source picked yet"
-// (Add dialog before user picks) or "no constraints" (Local + everything
-// else permissive).
-export type SourceTypeID = '' | 'local' | 'carddav' | 'google' | 'microsoft'
+// Source type strings used by field constraint helpers. Empty string means
+// "no source picked yet" or "no constraints".
+export type SourceTypeID = '' | 'local'
 
 // FieldConstraints bundles the per-repeater constraints ContactFieldsForm
 // passes down. Same keys as the repeater components.
