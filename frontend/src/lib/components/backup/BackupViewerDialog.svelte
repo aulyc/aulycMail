@@ -621,7 +621,7 @@
                 {@const hasAttachments = messageAttachmentCount(message) > 0}
                 <button
                   type="button"
-                  class="relative flex w-full items-start gap-3 border-b border-border py-3 pl-4 text-left transition-colors {hasAttachments ? 'pr-6' : 'pr-4'} {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
+                  class="relative flex w-full items-start gap-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
                   onclick={() => selectMessage(message.key)}
                 >
                   <Icon icon="mdi:email-outline" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -633,7 +633,7 @@
                           <Icon icon="mdi:paperclip" class="h-4 w-4" />
                         </span>
                       {/if}
-                      <span class="shrink-0 text-xs text-muted-foreground">{formatShortDate(message.date)}</span>
+                      <span class="w-[96px] shrink-0 text-right text-xs tabular-nums text-muted-foreground">{formatShortDate(message.date)}</span>
                     </span>
                     <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                       <span class="truncate">{message.accountEmail}</span>
@@ -643,9 +643,7 @@
                       {/if}
                     </span>
                   </span>
-                  {#if hasAttachments}
-                    <span class="pointer-events-none absolute bottom-0 right-0 top-0 w-[5px] bg-amber-500" aria-hidden="true"></span>
-                  {/if}
+                  <span class="pointer-events-none absolute bottom-0 right-0 top-0 w-[5px] {hasAttachments ? 'bg-amber-500' : 'bg-transparent'}" aria-hidden="true"></span>
                 </button>
               {/each}
             </div>
