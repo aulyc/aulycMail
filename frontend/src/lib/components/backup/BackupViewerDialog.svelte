@@ -599,7 +599,7 @@
 
       <div class="grid min-h-0 flex-1 overflow-hidden grid-cols-[42%_1fr]">
         <section class="flex min-h-0 flex-col border-r border-border">
-          <div class="flex h-10 shrink-0 items-center border-b border-border bg-muted/20 px-4">
+          <div class="flex h-10 shrink-0 items-center bg-muted/20 px-4">
             <span class="min-w-0 truncate text-sm font-semibold text-foreground" title={scopeLabel(selectedScope)}>
               {scopeLabel(selectedScope)}
             </span>
