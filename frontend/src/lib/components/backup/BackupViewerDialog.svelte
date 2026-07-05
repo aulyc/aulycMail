@@ -441,10 +441,8 @@
     return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
   }
 
-  function formatScopeLabel(scope: Scope | undefined): string {
-    if (!scope) return $_('backupViewer.scopeAll')
-    if (typeof scope.count !== 'number') return scope.label
-    return `${scope.label} ${scope.count}`
+  function scopeLabel(scope: Scope | undefined): string {
+    return scope?.label ?? $_('backupViewer.scopeAll')
   }
 </script>
 
@@ -487,14 +485,26 @@
           onValueChange={(value) => void selectScope(value)}
           disabled={!catalog?.messageCount}
         >
-          <Select.Trigger class="h-10 w-[220px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
-            <Select.Value placeholder={$_('backupViewer.scopeAll')}>
-              {selectedScope?.label ?? $_('backupViewer.scopeAll')}
+          <Select.Trigger class="h-10 w-[300px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
+            <Select.Value class="min-w-0 flex-1" placeholder={$_('backupViewer.scopeAll')}>
+              <span class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+                <span class="truncate">{scopeLabel(selectedScope)}</span>
+                {#if typeof selectedScope?.count === 'number'}
+                  <span class="shrink-0 tabular-nums text-muted-foreground">{selectedScope.count}</span>
+                {/if}
+              </span>
             </Select.Value>
           </Select.Trigger>
-          <Select.Content class="z-[130] min-w-[220px]">
+          <Select.Content class="z-[130] w-[300px]">
             {#each accountScopes as scope (scope.id || 'all')}
-              <Select.Item value={scope.id} label={formatScopeLabel(scope)} />
+              <Select.Item value={scope.id} label={scope.label} class="pr-3">
+                <span class="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+                  <span class="truncate">{scope.label}</span>
+                  {#if typeof scope.count === 'number'}
+                    <span class="shrink-0 tabular-nums text-muted-foreground">{scope.count}</span>
+                  {/if}
+                </span>
+              </Select.Item>
             {/each}
           </Select.Content>
         </Select.Root>

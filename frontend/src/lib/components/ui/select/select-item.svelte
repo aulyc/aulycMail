@@ -2,12 +2,14 @@
   import { Select as SelectPrimitive } from 'bits-ui'
   import { cn } from '$lib/utils'
   import Icon from '@iconify/svelte'
+  import type { Snippet } from 'svelte'
 
   interface Props {
     value: string;
     label?: string;
     disabled?: boolean;
     class?: string;
+    children?: Snippet;
   }
 
   let {
@@ -15,6 +17,7 @@
     label,
     disabled = false,
     class: className,
+    children: itemContent,
   }: Props = $props()
 </script>
 
@@ -37,6 +40,10 @@
         <Icon icon="mdi:check" class="h-4 w-4" />
       {/if}
     </span>
-    {label || value}
+    {#if itemContent}
+      {@render itemContent()}
+    {:else}
+      {label || value}
+    {/if}
   {/snippet}
 </SelectPrimitive.Item>
