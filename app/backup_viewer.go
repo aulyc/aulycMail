@@ -42,12 +42,13 @@ type BackupViewerAccount struct {
 
 // BackupViewerMessageSummary is the list/search representation of a backed-up email.
 type BackupViewerMessageSummary struct {
-	Key          string `json:"key"`
-	AccountEmail string `json:"accountEmail"`
-	FolderPath   string `json:"folderPath"`
-	Subject      string `json:"subject"`
-	Date         string `json:"date"`
-	Size         int    `json:"size"`
+	Key             string `json:"key"`
+	AccountEmail    string `json:"accountEmail"`
+	FolderPath      string `json:"folderPath"`
+	Subject         string `json:"subject"`
+	Date            string `json:"date"`
+	Size            int    `json:"size"`
+	AttachmentCount int    `json:"attachmentCount"`
 }
 
 // BackupViewerMessageDetail is the parsed, sanitized representation of a backed-up email.
@@ -108,7 +109,7 @@ func (a *App) GetBackupViewerCatalog(directory string) (*BackupViewerCatalog, er
 
 	catalog.MessageCount = len(idx.Messages)
 	catalog.Accounts = backupViewerAccounts(idx)
-	catalog.Messages = backupViewerMessages(idx, "", "", 0)
+	catalog.Messages = backupViewerMessages(cleanDir, idx, "", "", 0)
 	return catalog, nil
 }
 
@@ -132,7 +133,7 @@ func (a *App) SearchBackupViewerMessages(directory, accountEmail, query string, 
 	if !found {
 		return []BackupViewerMessageSummary{}, nil
 	}
-	return backupViewerMessages(idx, accountEmail, query, limit), nil
+	return backupViewerMessages(cleanDir, idx, accountEmail, query, limit), nil
 }
 
 // GetBackupViewerMessage opens one indexed EML file and returns a sanitized detail view.
@@ -294,7 +295,7 @@ func backupViewerAccounts(idx *backupIndex) []BackupViewerAccount {
 	return accounts
 }
 
-func backupViewerMessages(idx *backupIndex, accountEmail, query string, limit int) []BackupViewerMessageSummary {
+func backupViewerMessages(directory string, idx *backupIndex, accountEmail, query string, limit int) []BackupViewerMessageSummary {
 	accountEmail = strings.TrimSpace(strings.ToLower(accountEmail))
 	query = strings.TrimSpace(strings.ToLower(query))
 	if limit <= 0 && query != "" {
@@ -334,6 +335,11 @@ func backupViewerMessages(idx *backupIndex, accountEmail, query string, limit in
 	if limit > 0 && len(messages) > limit {
 		messages = messages[:limit]
 	}
+	for i := range messages {
+		if entry, ok := idx.Messages[messages[i].Key]; ok {
+			messages[i].AttachmentCount = backupViewerAttachmentCount(directory, entry)
+		}
+	}
 	return messages
 }
 
@@ -345,6 +351,57 @@ func backupViewerSummaryMatches(msg BackupViewerMessageSummary, query string) bo
 		}
 	}
 	return false
+}
+
+func backupViewerAttachmentCount(directory string, entry backupIndexMessage) int {
+	emlPath, err := backupIndexedFilePath(directory, entry.EMLPath)
+	if err != nil {
+		return 0
+	}
+	file, err := os.Open(emlPath)
+	if err != nil {
+		return 0
+	}
+	defer file.Close()
+
+	entity, err := gomessage.Read(file)
+	if err != nil {
+		return 0
+	}
+	return countBackupViewerEntityAttachments(entity)
+}
+
+func countBackupViewerEntityAttachments(entity *gomessage.Entity) int {
+	if entity == nil {
+		return 0
+	}
+	if mr := entity.MultipartReader(); mr != nil {
+		count := 0
+		for {
+			part, err := mr.NextPart()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				continue
+			}
+			count += countBackupViewerEntityAttachments(part)
+		}
+		return count
+	}
+
+	contentType, contentParams, _ := mime.ParseMediaType(entity.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = "text/plain"
+	}
+	contentType = strings.ToLower(contentType)
+	disposition, dispositionParams, _ := mime.ParseMediaType(entity.Header.Get("Content-Disposition"))
+	disposition = strings.ToLower(disposition)
+	filename := backupViewerPartFilename(contentParams, dispositionParams)
+	if filename != "" || disposition == "attachment" || (!strings.HasPrefix(contentType, "text/") && contentType != "") {
+		return 1
+	}
+	return 0
 }
 
 func backupIndexedFilePath(directory, relativePath string) (string, error) {

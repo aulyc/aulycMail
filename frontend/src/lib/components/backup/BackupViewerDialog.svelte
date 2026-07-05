@@ -560,6 +560,11 @@
                   <span class="min-w-0 flex-1">
                     <span class="flex items-baseline gap-2">
                       <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{message.subject || $_('backupViewer.unknownSubject')}</span>
+                      {#if message.attachmentCount > 0}
+                        <span class="shrink-0 text-muted-foreground" title={$_('backupViewer.attachments')}>
+                          <Icon icon="mdi:paperclip" class="h-3.5 w-3.5" />
+                        </span>
+                      {/if}
                       <span class="shrink-0 text-xs text-muted-foreground">{formatShortDate(message.date)}</span>
                     </span>
                     <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
@@ -589,12 +594,11 @@
             </div>
           {:else}
             <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-thin">
-              <div class="mb-3 flex min-w-0 items-center gap-3 border-b border-border pb-3">
-                <h3 class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground" title={detailHeaderTitle}>{detailHeaderTitle}</h3>
-                <span class="shrink-0 text-xs text-muted-foreground">{formatFileSize(detail.size)}</span>
-              </div>
-
               <div class="mb-5 space-y-1 rounded-md border border-border bg-muted/20 p-3 text-sm">
+                <div class="grid grid-cols-[64px_1fr] gap-2">
+                  <span class="text-muted-foreground">{$_('backupViewer.subject')}</span>
+                  <span class="min-w-0 break-words font-semibold">{detailHeaderTitle}</span>
+                </div>
                 <div class="grid grid-cols-[64px_1fr] gap-2">
                   <span class="text-muted-foreground">{$_('backupViewer.from')}</span>
                   <span class="min-w-0 break-words">{detail.from?.join(', ') || '-'}</span>
@@ -623,23 +627,14 @@
                   <span class="text-muted-foreground">{$_('backupViewer.folder')}</span>
                   <span>{detail.accountEmail}{detail.folderPath ? ` / ${detail.folderPath}` : ''}</span>
                 </div>
-              </div>
-
-              <div class="backup-viewer-body rounded-md border border-border bg-background p-4" style={darkFilterStyle}>
-                <div class="backup-viewer-mail-content {darkFilterEnabled ? 'backup-viewer-dark-filter' : ''}">
-                  {#if detail.hasHTML}
-                    <!-- eslint-disable-next-line svelte/no-at-html-tags -- backup viewer HTML is sanitized in Go before it reaches the UI -->
-                    {@html detail.bodyHTML}
-                  {:else if detail.bodyText}
-                    <pre class="whitespace-pre-wrap break-words font-sans text-sm leading-6">{detail.bodyText}</pre>
-                  {:else}
-                    <p class="text-sm text-muted-foreground">{$_('backupViewer.noBody')}</p>
-                  {/if}
+                <div class="grid grid-cols-[64px_1fr] gap-2">
+                  <span class="text-muted-foreground">{$_('backupViewer.size')}</span>
+                  <span>{formatFileSize(detail.size)}</span>
                 </div>
               </div>
 
               {#if detail.attachments?.length}
-                <div class="mt-5">
+                <div class="mb-5">
                   <h3 class="mb-2 text-sm font-semibold">{$_('backupViewer.attachments')}</h3>
                   <div class="space-y-2">
                     {#each detail.attachments as attachment, index (attachment.filename + '-' + index)}
@@ -666,6 +661,19 @@
                   </div>
                 </div>
               {/if}
+
+              <div class="backup-viewer-body rounded-md border border-border bg-background p-4" style={darkFilterStyle}>
+                <div class="backup-viewer-mail-content {darkFilterEnabled ? 'backup-viewer-dark-filter' : ''}">
+                  {#if detail.hasHTML}
+                    <!-- eslint-disable-next-line svelte/no-at-html-tags -- backup viewer HTML is sanitized in Go before it reaches the UI -->
+                    {@html detail.bodyHTML}
+                  {:else if detail.bodyText}
+                    <pre class="whitespace-pre-wrap break-words font-sans text-sm leading-6">{detail.bodyText}</pre>
+                  {:else}
+                    <p class="text-sm text-muted-foreground">{$_('backupViewer.noBody')}</p>
+                  {/if}
+                </div>
+              </div>
             </div>
           {/if}
         </section>
@@ -743,6 +751,11 @@
                   <span class="min-w-0 flex-1">
                     <span class="flex min-w-0 items-baseline gap-2">
                       <span class="min-w-0 flex-1 truncate text-sm text-foreground">{result.subject || $_('backupViewer.unknownSubject')}</span>
+                      {#if result.attachmentCount > 0}
+                        <span class="shrink-0 text-muted-foreground" title={$_('backupViewer.attachments')}>
+                          <Icon icon="mdi:paperclip" class="h-3.5 w-3.5" />
+                        </span>
+                      {/if}
                       <span class="shrink-0 text-xs text-muted-foreground">{formatShortDate(result.date)}</span>
                     </span>
                     <span class="truncate text-xs text-muted-foreground">{result.accountEmail}{result.folderPath ? ` / ${result.folderPath}` : ''}</span>

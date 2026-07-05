@@ -397,6 +397,7 @@ export namespace app {
 	    subject: string;
 	    date: string;
 	    size: number;
+	    attachmentCount: number;
 
 	    static createFrom(source: any = {}) {
 	        return new BackupViewerMessageSummary(source);
@@ -410,6 +411,7 @@ export namespace app {
 	        this.subject = source["subject"];
 	        this.date = source["date"];
 	        this.size = source["size"];
+	        this.attachmentCount = source["attachmentCount"];
 	    }
 	}
 	export class BackupViewerCatalog {

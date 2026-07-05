@@ -184,6 +184,56 @@ func TestParseBackupViewerEMLExtractsBodyAndAttachments(t *testing.T) {
 	}
 }
 
+func TestBackupViewerMessagesIncludesAttachmentCount(t *testing.T) {
+	dir := t.TempDir()
+	relPath := "eml/user@example.com/INBOX/message.eml"
+	absPath := filepath.Join(dir, filepath.FromSlash(relPath))
+	if err := os.MkdirAll(filepath.Dir(absPath), 0o755); err != nil {
+		t.Fatalf("create backup dir: %v", err)
+	}
+	raw := strings.Join([]string{
+		"From: Alice <alice@example.com>",
+		"To: Bob <bob@example.com>",
+		"Subject: With attachment",
+		"Date: Sat, 04 Jul 2026 12:00:00 +0800",
+		"Content-Type: multipart/mixed; boundary=mixed",
+		"",
+		"--mixed",
+		"Content-Type: text/plain; charset=utf-8",
+		"",
+		"body",
+		"--mixed",
+		"Content-Type: application/pdf; name=\"report.pdf\"",
+		"Content-Disposition: attachment; filename=\"report.pdf\"",
+		"",
+		"PDFDATA",
+		"--mixed--",
+		"",
+	}, "\r\n")
+	if err := os.WriteFile(absPath, []byte(raw), 0o644); err != nil {
+		t.Fatalf("write backup eml: %v", err)
+	}
+
+	idx := &backupIndex{Messages: map[string]backupIndexMessage{
+		"k": {
+			AccountEmail: "user@example.com",
+			FolderPath:   "INBOX",
+			Subject:      "With attachment",
+			Date:         "Sat, 04 Jul 2026 12:00:00 +0800",
+			EMLPath:      relPath,
+			Size:         len(raw),
+		},
+	}}
+
+	messages := backupViewerMessages(dir, idx, "", "", 0)
+	if len(messages) != 1 {
+		t.Fatalf("expected one message, got %d", len(messages))
+	}
+	if messages[0].AttachmentCount != 1 {
+		t.Fatalf("attachment count mismatch: got %d", messages[0].AttachmentCount)
+	}
+}
+
 func TestWriteBackupFileFromStreamWritesContent(t *testing.T) {
 	dir := t.TempDir()
 	content := strings.Repeat("0123456789", 1024)
