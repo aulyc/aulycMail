@@ -36,25 +36,45 @@ static NSMenuItem* aulycStatusItem(NSString* title, SEL action, id target) {
     return item;
 }
 
-static NSImage* aulycStatusMailImage(void) {
-    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(18, 18)] autorelease];
+static NSImage* aulycFallbackStatusMailImage(void) {
+    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(20, 20)] autorelease];
     [image lockFocus];
 
     [[NSColor blackColor] setStroke];
-    NSBezierPath *outline = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(3.0, 5.0, 12.0, 8.5) xRadius:1.5 yRadius:1.5];
-    [outline setLineWidth:1.6];
+    NSBezierPath *outline = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(2.5, 5.0, 15.0, 10.0) xRadius:2.0 yRadius:2.0];
+    [outline setLineWidth:2.0];
     [outline stroke];
 
     NSBezierPath *flap = [NSBezierPath bezierPath];
-    [flap moveToPoint:NSMakePoint(3.5, 13.0)];
-    [flap lineToPoint:NSMakePoint(9.0, 8.5)];
-    [flap lineToPoint:NSMakePoint(14.5, 13.0)];
-    [flap setLineWidth:1.6];
+    [flap moveToPoint:NSMakePoint(3.2, 14.2)];
+    [flap lineToPoint:NSMakePoint(10.0, 9.0)];
+    [flap lineToPoint:NSMakePoint(16.8, 14.2)];
+    [flap setLineWidth:2.0];
     [flap stroke];
 
     [image unlockFocus];
     [image setTemplate:YES];
     return image;
+}
+
+static NSImage* aulycStatusAppIconImage(void) {
+    static NSImage *cachedImage = nil;
+    if (cachedImage != nil) {
+        return cachedImage;
+    }
+
+    NSString *path = [[NSBundle mainBundle] pathForResource:@"MenuBarIcon" ofType:@"png"];
+    if (path != nil) {
+        NSImage *image = [[[NSImage alloc] initWithContentsOfFile:path] autorelease];
+        if (image != nil) {
+            [image setSize:NSMakeSize(21, 21)];
+            [image setTemplate:YES];
+            cachedImage = [image retain];
+            return cachedImage;
+        }
+    }
+
+    return aulycFallbackStatusMailImage();
 }
 
 static void aulycApplyStatusItemAppearance(void) {
@@ -65,7 +85,8 @@ static void aulycApplyStatusItemAppearance(void) {
     if (button == nil) {
         return;
     }
-    button.image = aulycStatusMailImage();
+    button.image = aulycStatusAppIconImage();
+    button.imageScaling = NSImageScaleProportionallyUpOrDown;
     button.imagePosition = NSImageLeft;
     button.title = gStatusUnreadText ?: @"";
     button.font = [NSFont menuBarFontOfSize:0];
@@ -81,6 +102,7 @@ void aulycSetStatusItemVisible(int visible, AulycStatusItemLabels labels) {
         if (!visible) {
             if (gStatusItem != nil) {
                 [[NSStatusBar systemStatusBar] removeStatusItem:gStatusItem];
+                [gStatusItem release];
                 gStatusItem = nil;
             }
             return;
@@ -90,7 +112,7 @@ void aulycSetStatusItemVisible(int visible, AulycStatusItemLabels labels) {
             gStatusItemTarget = [[AulycStatusItemTarget alloc] init];
         }
         if (gStatusItem == nil) {
-            gStatusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+            gStatusItem = [[[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength] retain];
         }
 
         NSMenu *menu = [[[NSMenu alloc] init] autorelease];

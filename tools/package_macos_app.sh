@@ -18,6 +18,9 @@ rm -rf "$APP"
 mkdir -p "$MACOS" "$RESOURCES"
 cp "$BIN" "$MACOS/aulycmail"
 chmod 0755 "$MACOS/aulycmail"
+if [ -f "$ROOT/build/menubar-icon.png" ]; then
+  cp "$ROOT/build/menubar-icon.png" "$RESOURCES/MenuBarIcon.png"
+fi
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
