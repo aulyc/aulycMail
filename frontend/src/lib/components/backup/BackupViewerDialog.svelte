@@ -70,6 +70,7 @@
     })),
   ])
   const selectedScope = $derived(accountScopes.find((scope) => scope.id === selectedAccountEmail) ?? accountScopes[0])
+  const detailHeaderTitle = $derived(detail ? (detail.subject || $_('backupViewer.unknownSubject')) : '')
   const searchScopeIndex = $derived(Math.max(0, accountScopes.findIndex((scope) => scope.id === searchScopeEmail)))
   const darkFilterStyle = $derived.by(() => {
     void getThemeMode()
@@ -489,16 +490,6 @@
             type="button"
             class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!directory}
-            title={$_('backupViewer.openDirectory')}
-            aria-label={$_('backupViewer.openDirectory')}
-            onclick={openDirectory}
-          >
-            <Icon icon="mdi:folder-open-outline" class="h-5 w-5 text-muted-foreground" />
-          </button>
-          <button
-            type="button"
-            class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={!directory}
             title={$_('backupViewer.clearDirectory')}
             aria-label={$_('backupViewer.clearDirectory')}
             onclick={clearDirectory}
@@ -525,6 +516,16 @@
           >
             <Icon icon="mdi:magnify" class="h-5 w-5 text-muted-foreground" />
           </button>
+          <button
+            type="button"
+            class="rounded-md p-1.5 transition-colors hover:bg-muted"
+            aria-pressed={darkFilterEnabled}
+            aria-label={$_('backupViewer.darkFilter')}
+            title={$_('backupViewer.darkFilter')}
+            onclick={() => darkFilterEnabled = !darkFilterEnabled}
+          >
+            <Icon icon={darkFilterEnabled ? 'mdi:weather-night' : 'mdi:white-balance-sunny'} class="h-5 w-5 text-muted-foreground" />
+          </button>
         </div>
 
         {#if errorMessage}
@@ -532,19 +533,6 @@
         {/if}
 
         <span class="min-w-0 flex-1" aria-hidden="true"></span>
-        {#if detail?.size}
-          <span class="shrink-0 text-xs text-muted-foreground">{formatFileSize(detail.size)}</span>
-        {/if}
-        <button
-          type="button"
-          class="shrink-0 rounded-md p-1.5 transition-colors hover:bg-muted"
-          aria-pressed={darkFilterEnabled}
-          aria-label={$_('backupViewer.darkFilter')}
-          title={$_('backupViewer.darkFilter')}
-          onclick={() => darkFilterEnabled = !darkFilterEnabled}
-        >
-          <Icon icon={darkFilterEnabled ? 'mdi:white-balance-sunny' : 'mdi:weather-night'} class="h-5 w-5 text-muted-foreground" />
-        </button>
       </div>
 
       <div class="grid min-h-0 flex-1 overflow-hidden grid-cols-[42%_1fr]">
@@ -601,6 +589,11 @@
             </div>
           {:else}
             <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-thin">
+              <div class="mb-3 flex min-w-0 items-center gap-3 border-b border-border pb-3">
+                <h3 class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground" title={detailHeaderTitle}>{detailHeaderTitle}</h3>
+                <span class="shrink-0 text-xs text-muted-foreground">{formatFileSize(detail.size)}</span>
+              </div>
+
               <div class="mb-5 space-y-1 rounded-md border border-border bg-muted/20 p-3 text-sm">
                 <div class="grid grid-cols-[88px_1fr] gap-2">
                   <span class="text-muted-foreground">{$_('backupViewer.from')}</span>
@@ -766,6 +759,8 @@
 
 <style>
   :global(.backup-viewer-body) {
+    max-width: 100%;
+    overflow-x: auto;
     color: hsl(var(--foreground));
     font-size: 0.875rem;
     line-height: 1.6;
@@ -773,6 +768,8 @@
 
   :global(.backup-viewer-mail-content) {
     min-height: 2rem;
+    max-width: 100%;
+    overflow-wrap: anywhere;
   }
 
   :global(.backup-viewer-body p) {
@@ -787,6 +784,20 @@
   :global(.backup-viewer-body img) {
     max-width: 100%;
     height: auto;
+  }
+
+  :global(.backup-viewer-body table) {
+    width: auto !important;
+    max-width: 100% !important;
+    table-layout: auto;
+  }
+
+  :global(.backup-viewer-body th),
+  :global(.backup-viewer-body td) {
+    max-width: 100%;
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   :global(.backup-viewer-mail-content.backup-viewer-dark-filter) {
