@@ -454,86 +454,104 @@
         </button>
       </header>
 
-      <div class="grid min-h-0 flex-1 overflow-hidden grid-cols-[45%_1fr]">
+      <div class="flex h-14 shrink-0 items-center gap-2 overflow-x-auto border-b border-border px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div class="w-[340px] shrink-0">
+          <BackupDirectoryPicker
+            bind:menuOpen={directoryMenuOpen}
+            {directory}
+            placeholder={$_('backupViewer.directoryPlaceholder')}
+            onChoose={(path) => loadCatalog(path, { remember: true })}
+            onChooseError={handleChooseDirectoryError}
+            onSelectHistory={(path) => loadCatalog(path, { fromHistory: true, remember: true })}
+            onRemoveHistory={handleRemoveDirectoryHistory}
+            onOpenDirectory={() => openDirectory()}
+          />
+        </div>
+
+        <Select.Root
+          value={selectedAccountEmail}
+          onValueChange={(value) => void selectScope(value)}
+          disabled={!catalog?.messageCount}
+        >
+          <Select.Trigger class="h-10 w-[154px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
+            <Select.Value placeholder={$_('backupViewer.scopeAll')}>
+              {selectedScope?.label ?? $_('backupViewer.scopeAll')}
+            </Select.Value>
+          </Select.Trigger>
+          <Select.Content class="z-[130]">
+            {#each accountScopes as scope (scope.id || 'all')}
+              <Select.Item value={scope.id} label={formatScopeLabel(scope)} />
+            {/each}
+          </Select.Content>
+        </Select.Root>
+
+        <div class="flex shrink-0 items-center gap-0.5" role="toolbar" aria-label={$_('backupViewer.title')}>
+          <button
+            type="button"
+            class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!directory}
+            title={$_('backupViewer.openDirectory')}
+            aria-label={$_('backupViewer.openDirectory')}
+            onclick={openDirectory}
+          >
+            <Icon icon="mdi:folder-open-outline" class="h-5 w-5 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!directory}
+            title={$_('backupViewer.clearDirectory')}
+            aria-label={$_('backupViewer.clearDirectory')}
+            onclick={clearDirectory}
+          >
+            <Icon icon="mdi:folder-remove-outline" class="h-5 w-5 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!directory || loadingCatalog}
+            title={$_('backupViewer.refresh')}
+            aria-label={$_('backupViewer.refresh')}
+            onclick={refreshCatalog}
+          >
+            <Icon icon="mdi:refresh" class="h-5 w-5 text-muted-foreground {loadingCatalog ? 'animate-spin' : ''}" />
+          </button>
+          <button
+            type="button"
+            class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!catalog?.messageCount}
+            title={$_('backupViewer.search')}
+            aria-label={$_('backupViewer.search')}
+            onclick={openSearch}
+          >
+            <Icon icon="mdi:magnify" class="h-5 w-5 text-muted-foreground" />
+          </button>
+        </div>
+
+        <span class="w-8 shrink-0 text-right text-xs text-muted-foreground">{visibleMessages.length}</span>
+        {#if errorMessage}
+          <span class="max-w-[220px] shrink truncate text-sm text-destructive" title={errorMessage}>{errorMessage}</span>
+        {/if}
+
+        <span class="h-7 w-px shrink-0 bg-border" aria-hidden="true"></span>
+        <h3 class="min-w-[180px] flex-1 truncate text-sm font-semibold" title={detailHeaderTitle}>{detailHeaderTitle}</h3>
+        {#if detail?.size}
+          <span class="shrink-0 text-xs text-muted-foreground">{formatFileSize(detail.size)}</span>
+        {/if}
+        <button
+          type="button"
+          class="shrink-0 rounded-md p-1.5 transition-colors hover:bg-muted"
+          aria-pressed={darkFilterEnabled}
+          aria-label={$_('backupViewer.darkFilter')}
+          title={$_('backupViewer.darkFilter')}
+          onclick={() => darkFilterEnabled = !darkFilterEnabled}
+        >
+          <Icon icon={darkFilterEnabled ? 'mdi:white-balance-sunny' : 'mdi:weather-night'} class="h-5 w-5 text-muted-foreground" />
+        </button>
+      </div>
+
+      <div class="grid min-h-0 flex-1 overflow-hidden grid-cols-[42%_1fr]">
         <section class="flex min-h-0 flex-col border-r border-border">
-          <div class="shrink-0 border-b border-border px-4 py-3">
-            <BackupDirectoryPicker
-              bind:menuOpen={directoryMenuOpen}
-              {directory}
-              placeholder={$_('backupViewer.directoryPlaceholder')}
-              onChoose={(path) => loadCatalog(path, { remember: true })}
-              onChooseError={handleChooseDirectoryError}
-              onSelectHistory={(path) => loadCatalog(path, { fromHistory: true, remember: true })}
-              onRemoveHistory={handleRemoveDirectoryHistory}
-              onOpenDirectory={() => openDirectory()}
-            />
-            {#if errorMessage}
-              <p class="mt-2 text-sm text-destructive">{errorMessage}</p>
-            {/if}
-          </div>
-          <div class="flex h-11 shrink-0 items-center justify-between border-b border-border px-4">
-            <div class="flex min-w-0 items-center gap-1">
-              <Select.Root
-                value={selectedAccountEmail}
-                onValueChange={(value) => void selectScope(value)}
-                disabled={!catalog?.messageCount}
-              >
-                <Select.Trigger class="h-10 w-[176px] border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
-                  <Select.Value placeholder={$_('backupViewer.scopeAll')}>
-                    {selectedScope?.label ?? $_('backupViewer.scopeAll')}
-                  </Select.Value>
-                </Select.Trigger>
-                <Select.Content class="z-[130]">
-                  {#each accountScopes as scope (scope.id || 'all')}
-                    <Select.Item value={scope.id} label={formatScopeLabel(scope)} />
-                  {/each}
-                </Select.Content>
-              </Select.Root>
-              <div class="flex shrink-0 items-center gap-0.5" role="toolbar" aria-label={$_('backupViewer.title')}>
-                <button
-                  type="button"
-                  class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={!directory}
-                  title={$_('backupViewer.openDirectory')}
-                  aria-label={$_('backupViewer.openDirectory')}
-                  onclick={openDirectory}
-                >
-                  <Icon icon="mdi:folder-open-outline" class="h-5 w-5 text-muted-foreground" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={!directory}
-                  title={$_('backupViewer.clearDirectory')}
-                  aria-label={$_('backupViewer.clearDirectory')}
-                  onclick={clearDirectory}
-                >
-                  <Icon icon="mdi:folder-remove-outline" class="h-5 w-5 text-muted-foreground" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={!directory || loadingCatalog}
-                  title={$_('backupViewer.refresh')}
-                  aria-label={$_('backupViewer.refresh')}
-                  onclick={refreshCatalog}
-                >
-                  <Icon icon="mdi:refresh" class="h-5 w-5 text-muted-foreground {loadingCatalog ? 'animate-spin' : ''}" />
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-                  disabled={!catalog?.messageCount}
-                  title={$_('backupViewer.search')}
-                  aria-label={$_('backupViewer.search')}
-                  onclick={openSearch}
-                >
-                  <Icon icon="mdi:magnify" class="h-5 w-5 text-muted-foreground" />
-                </button>
-              </div>
-            </div>
-            <span class="text-xs text-muted-foreground">{visibleMessages.length}</span>
-          </div>
           {#if loadingCatalog}
             <div class="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
               <Icon icon="mdi:loading" class="mr-2 animate-spin" width="18" height="18" />
@@ -574,24 +592,6 @@
         </section>
 
         <section class="flex min-h-0 flex-col overflow-hidden">
-          <div class="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-border px-5">
-            <h3 class="min-w-0 flex-1 truncate text-sm font-semibold" title={detailHeaderTitle}>{detailHeaderTitle}</h3>
-            <div class="flex shrink-0 items-center gap-2">
-              {#if detail?.size}
-                <span class="text-xs text-muted-foreground">{formatFileSize(detail.size)}</span>
-              {/if}
-              <button
-                type="button"
-                class="rounded-md p-1.5 transition-colors hover:bg-muted"
-                aria-pressed={darkFilterEnabled}
-                aria-label={$_('backupViewer.darkFilter')}
-                title={$_('backupViewer.darkFilter')}
-                onclick={() => darkFilterEnabled = !darkFilterEnabled}
-              >
-                <Icon icon={darkFilterEnabled ? 'mdi:white-balance-sunny' : 'mdi:weather-night'} class="h-5 w-5 text-muted-foreground" />
-              </button>
-            </div>
-          </div>
           {#if loadingDetail}
             <div class="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
               <Icon icon="mdi:loading" class="mr-2 animate-spin" width="18" height="18" />
