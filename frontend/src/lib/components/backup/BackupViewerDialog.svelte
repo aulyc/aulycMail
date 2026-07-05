@@ -595,31 +595,31 @@
               </div>
 
               <div class="mb-5 space-y-1 rounded-md border border-border bg-muted/20 p-3 text-sm">
-                <div class="grid grid-cols-[88px_1fr] gap-2">
+                <div class="grid grid-cols-[64px_1fr] gap-2">
                   <span class="text-muted-foreground">{$_('backupViewer.from')}</span>
                   <span class="min-w-0 break-words">{detail.from?.join(', ') || '-'}</span>
                 </div>
-                <div class="grid grid-cols-[88px_1fr] gap-2">
+                <div class="grid grid-cols-[64px_1fr] gap-2">
                   <span class="text-muted-foreground">{$_('backupViewer.to')}</span>
                   <span class="min-w-0 break-words">{detail.to?.join(', ') || '-'}</span>
                 </div>
                 {#if detail.cc?.length}
-                  <div class="grid grid-cols-[88px_1fr] gap-2">
+                  <div class="grid grid-cols-[64px_1fr] gap-2">
                     <span class="text-muted-foreground">{$_('backupViewer.cc')}</span>
                     <span class="min-w-0 break-words">{detail.cc.join(', ')}</span>
                   </div>
                 {/if}
                 {#if detail.bcc?.length}
-                  <div class="grid grid-cols-[88px_1fr] gap-2">
+                  <div class="grid grid-cols-[64px_1fr] gap-2">
                     <span class="text-muted-foreground">{$_('backupViewer.bcc')}</span>
                     <span class="min-w-0 break-words">{detail.bcc.join(', ')}</span>
                   </div>
                 {/if}
-                <div class="grid grid-cols-[88px_1fr] gap-2">
+                <div class="grid grid-cols-[64px_1fr] gap-2">
                   <span class="text-muted-foreground">{$_('backupViewer.date')}</span>
                   <span>{formatDate(detail.date)}</span>
                 </div>
-                <div class="grid grid-cols-[88px_1fr] gap-2">
+                <div class="grid grid-cols-[64px_1fr] gap-2">
                   <span class="text-muted-foreground">{$_('backupViewer.folder')}</span>
                   <span>{detail.accountEmail}{detail.folderPath ? ` / ${detail.folderPath}` : ''}</span>
                 </div>
