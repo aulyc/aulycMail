@@ -75,111 +75,6 @@ func (a *App) AddAccount(config account.AccountConfig) (*account.Account, error)
 	return acc, nil
 }
 
-// AddMicrosoftSharedMailbox creates a shared mailbox account linked to a primary Microsoft OAuth account.
-// The shared mailbox reuses the primary account's OAuth tokens but authenticates IMAP/SMTP
-// with the shared mailbox email as the XOAUTH2 username.
-func (a *App) AddMicrosoftSharedMailbox(primaryAccountID, sharedEmail, displayName string) (*account.Account, error) {
-	log := logging.WithComponent("app")
-
-	if sharedEmail == "" {
-		return nil, fmt.Errorf("shared mailbox email is required")
-	}
-	if displayName == "" {
-		displayName = sharedEmail
-	}
-
-	primary, err := a.accountStore.Get(primaryAccountID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get primary account: %w", err)
-	}
-	if primary == nil {
-		return nil, fmt.Errorf("primary account not found")
-	}
-	if primary.AuthType != account.AuthOAuth2 {
-		return nil, fmt.Errorf("shared mailboxes require an OAuth account")
-	}
-
-	// Get the primary account's OAuth tokens
-	tokens, err := a.credStore.GetOAuthTokens(primaryAccountID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get OAuth tokens from primary account: %w", err)
-	}
-
-	// Validate IMAP access with shared mailbox email as XOAUTH2 username
-	clientConfig := imap.DefaultConfig()
-	clientConfig.Host = primary.IMAPHost
-	clientConfig.Port = primary.IMAPPort
-	clientConfig.Security = imap.SecurityType(primary.IMAPSecurity)
-	clientConfig.Username = sharedEmail
-	clientConfig.AuthType = imap.AuthTypeOAuth2
-	clientConfig.AccessToken = tokens.AccessToken
-
-	clientConfig.TLSConfig = certificate.BuildTLSConfig(primary.IMAPHost, a.certStore)
-
-	client := imap.NewClient(clientConfig)
-	if connectErr := client.Connect(); connectErr != nil {
-		return nil, fmt.Errorf("failed to connect to IMAP: %w", connectErr)
-	}
-	if loginErr := client.Login(); loginErr != nil {
-		client.Close()
-		return nil, fmt.Errorf("shared mailbox authentication failed — verify you have access to %s: %w", sharedEmail, loginErr)
-	}
-	client.Close()
-
-	// Create the shared mailbox account
-	config := account.AccountConfig{
-		Name:                  displayName,
-		DisplayName:           displayName,
-		Email:                 sharedEmail,
-		SharedMailboxParentID: primaryAccountID,
-		IMAPHost:              primary.IMAPHost,
-		IMAPPort:              primary.IMAPPort,
-		IMAPSecurity:          primary.IMAPSecurity,
-		SMTPHost:              primary.SMTPHost,
-		SMTPPort:              primary.SMTPPort,
-		SMTPSecurity:          primary.SMTPSecurity,
-		AuthType:              account.AuthOAuth2,
-		Username:              sharedEmail,
-		Color:                 primary.Color,
-		SyncPeriodDays:        primary.SyncPeriodDays,
-		SyncInterval:          primary.SyncInterval,
-	}
-
-	acc, err := a.accountStore.Create(&config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create shared mailbox account: %w", err)
-	}
-
-	// Copy OAuth tokens to the new account
-	if tokenErr := a.credStore.SetOAuthTokens(acc.ID, tokens); tokenErr != nil {
-		// Clean up the account if token storage fails
-		if delErr := a.accountStore.Delete(acc.ID); delErr != nil {
-			log := logging.WithComponent("app")
-			log.Warn().Err(delErr).Str("account_id", acc.ID).Msg("Failed to roll back shared mailbox after token storage failure")
-		}
-		return nil, fmt.Errorf("failed to store OAuth tokens for shared mailbox: %w", tokenErr)
-	}
-
-	a.updateDBConnectionPool()
-
-	if a.idleManager != nil && acc.Enabled {
-		a.idleManager.StartAccount(acc.ID, acc.Name)
-	}
-
-	log.Info().
-		Str("accountID", acc.ID).
-		Str("sharedEmail", sharedEmail).
-		Str("parentID", primaryAccountID).
-		Msg("Microsoft shared mailbox created")
-
-	return acc, nil
-}
-
-// GetMicrosoftSharedMailboxes returns all shared mailbox accounts linked to a parent account.
-func (a *App) GetMicrosoftSharedMailboxes(parentAccountID string) ([]*account.Account, error) {
-	return a.accountStore.ListBySharedMailboxParent(parentAccountID)
-}
-
 // UpdateAccount updates an existing account
 func (a *App) UpdateAccount(id string, config account.AccountConfig) (*account.Account, error) {
 	log := logging.WithComponent("app")
@@ -275,8 +170,8 @@ func (a *App) RemoveAccount(id string) error {
 	log := logging.WithComponent("app")
 
 	// Cascade: delete any shared mailboxes linked to this account
-	sharedMailboxes, _ := a.accountStore.ListBySharedMailboxParent(id)
-	for _, sm := range sharedMailboxes {
+	legacyChildren, _ := a.accountStore.ListBySharedMailboxParent(id)
+	for _, sm := range legacyChildren {
 		log.Info().Str("sharedID", sm.ID).Str("parentID", id).Msg("Cascade deleting shared mailbox")
 		if err := a.RemoveAccount(sm.ID); err != nil {
 			log.Warn().Err(err).Str("sharedID", sm.ID).Msg("Failed to cascade-delete shared mailbox")
@@ -375,30 +270,19 @@ func (a *App) SetDefaultIdentity(accountID, identityID string) error {
 
 // ConnectionTestResult holds the result of a connection test
 type ConnectionTestResult struct {
-	Success             bool                      `json:"success"`
-	Error               string                    `json:"error,omitempty"`
-	CertificateRequired bool                      `json:"certificateRequired"`
+	Success             bool                         `json:"success"`
+	Error               string                       `json:"error,omitempty"`
+	CertificateRequired bool                         `json:"certificateRequired"`
 	Certificate         *certificate.CertificateInfo `json:"certificate,omitempty"`
 }
 
-// TestConnection tests the IMAP/SMTP connection for an account config
-// For OAuth2 accounts, this only tests connectivity (no login) since the user
-// hasn't authenticated yet during account creation.
+// TestConnection tests the IMAP/SMTP connection for an account config.
 func (a *App) TestConnection(config account.AccountConfig) ConnectionTestResult {
 	log := logging.WithComponent("app")
 
 	// Validate config first
 	if err := config.Validate(); err != nil {
 		return ConnectionTestResult{Error: err.Error()}
-	}
-
-	// For OAuth2 accounts, skip login test during account creation
-	if config.AuthType == account.AuthOAuth2 {
-		log.Info().
-			Str("host", config.IMAPHost).
-			Str("authType", string(config.AuthType)).
-			Msg("Skipping connection test for OAuth2 account (will test after authorization)")
-		return ConnectionTestResult{Success: true}
 	}
 
 	// Create a temporary IMAP client to test connection

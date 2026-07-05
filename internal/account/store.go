@@ -210,6 +210,7 @@ func (s *Store) Get(id string) (*Account, error) {
 	account.SyncAllFolders = syncAllFolders == 1
 	account.SyncFoldersEnabled = syncFoldersEnabled == 1
 	account.NoOutgoingServer = noOutgoingServer == 1
+	account.AuthType = normalizeAuthType(account.AuthType)
 	account.SharedMailboxParentID = sharedMailboxParentID.String
 	// Map nullable strings to account fields
 	account.SentFolderPath = sentPath.String
@@ -268,6 +269,7 @@ func (s *Store) List() ([]*Account, error) {
 		account.SyncAllFolders = syncAllFolders == 1
 		account.SyncFoldersEnabled = syncFoldersEnabled == 1
 		account.NoOutgoingServer = noOutgoingServer == 1
+		account.AuthType = normalizeAuthType(account.AuthType)
 		account.SharedMailboxParentID = sharedMailboxParentID.String
 		account.SentFolderPath = sentPath.String
 		account.DraftsFolderPath = draftsPath.String
@@ -327,6 +329,7 @@ func (s *Store) ListBySharedMailboxParent(parentID string) ([]*Account, error) {
 		account.SyncAllFolders = syncAllFolders == 1
 		account.SyncFoldersEnabled = syncFoldersEnabled == 1
 		account.NoOutgoingServer = noOutgoingServer == 1
+		account.AuthType = normalizeAuthType(account.AuthType)
 		account.SharedMailboxParentID = sharedMailboxParentID.String
 		account.SentFolderPath = sentPath.String
 		account.DraftsFolderPath = draftsPath.String

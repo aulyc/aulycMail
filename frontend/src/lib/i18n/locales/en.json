@@ -658,17 +658,7 @@
     "signatureBadgePlain": "Plain text signature",
     "saveIdentityChanges": "Save",
     "saveFailed": "Failed to save sender alias.",
-    "addEmailAddressButton": "Add Alias",
-    "sharedMailboxes": "Shared Mailboxes",
-    "sharedMailboxesHelp": "Add Microsoft 365 shared mailboxes you have access to.",
-    "addSharedMailbox": "Add Shared Mailbox",
-    "noSharedMailboxes": "No shared mailboxes configured.",
-    "sharedMailboxEmail": "Shared mailbox email",
-    "sharedMailboxDisplayName": "Display name",
-    "sharedMailboxAdded": "Shared mailbox added successfully.",
-    "sharedMailboxRemoved": "Shared mailbox removed.",
-    "failedToAddSharedMailbox": "Failed to add shared mailbox",
-    "failedToDeleteSharedMailbox": "Failed to remove shared mailbox."
+    "addEmailAddressButton": "Add Alias"
   },
   "certificate": {
     "title": "Untrusted Certificate",

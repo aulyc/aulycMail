@@ -302,9 +302,9 @@
         </div>
       </Tabs.Root>
 
-      <!-- Actions - show Save/Cancel on editable tabs (General, Images) -->
-      {#if activeTab === 'general' || activeTab === 'images'}
-        <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
+      <!-- Actions - SettingsDialog owns the footer so every tab uses the same chrome. -->
+      <div class="flex items-center justify-end gap-2 border-t border-border pt-4">
+        {#if activeTab === 'general' || activeTab === 'images'}
           <Button variant="ghost" onclick={handleCancel} disabled={saving}>
             {$_('common.cancel')}
           </Button>
@@ -314,14 +314,12 @@
             {/if}
             {$_('common.save')}
           </Button>
-        </div>
-      {:else}
-        <div class="flex items-center justify-end gap-2 pt-4 border-t border-border">
+        {:else}
           <Button variant="ghost" onclick={handleCancel}>
             {$_('common.close')}
           </Button>
-        </div>
-      {/if}
+        {/if}
+      </div>
     {/if}
   </Dialog.Content>
 </Dialog.Root>

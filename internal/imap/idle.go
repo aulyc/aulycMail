@@ -350,26 +350,12 @@ func (ic *IdleConnection) ensureConnected(ctx context.Context) error {
 	}
 
 	// Login
-	authType := creds.AuthType
-	if authType == "" {
-		authType = AuthTypePassword
-	}
-
-	switch authType {
-	case AuthTypeOAuth2:
-		saslClient := NewXOAuth2Client(creds.Username, creds.AccessToken)
-		if err := client.Authenticate(saslClient); err != nil {
+	saslClient := sasl.NewPlainClient("", creds.Username, creds.Password)
+	if err := client.Authenticate(saslClient); err != nil {
+		// Fall back to LOGIN command
+		if err := client.Login(creds.Username, creds.Password).Wait(); err != nil {
 			client.Close()
-			return fmt.Errorf("OAuth2 authentication failed: %w", err)
-		}
-	default:
-		saslClient := sasl.NewPlainClient("", creds.Username, creds.Password)
-		if err := client.Authenticate(saslClient); err != nil {
-			// Fall back to LOGIN command
-			if err := client.Login(creds.Username, creds.Password).Wait(); err != nil {
-				client.Close()
-				return fmt.Errorf("authentication failed: %w", err)
-			}
+			return fmt.Errorf("authentication failed: %w", err)
 		}
 	}
 

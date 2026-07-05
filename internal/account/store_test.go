@@ -127,6 +127,28 @@ func TestAccountConfigValidate(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "legacy oauth2 auth normalizes to password",
+			modify: func(c *AccountConfig) {
+				c.AuthType = AuthType("oauth2")
+			},
+			checkFunc: func(t *testing.T, c *AccountConfig) {
+				if c.AuthType != AuthPassword {
+					t.Errorf("AuthType = %q, want %q", c.AuthType, AuthPassword)
+				}
+			},
+		},
+		{
+			name: "unknown auth normalizes to password",
+			modify: func(c *AccountConfig) {
+				c.AuthType = AuthType("token")
+			},
+			checkFunc: func(t *testing.T, c *AccountConfig) {
+				if c.AuthType != AuthPassword {
+					t.Errorf("AuthType = %q, want %q", c.AuthType, AuthPassword)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -253,6 +275,29 @@ func TestStoreCreate(t *testing.T) {
 	}
 }
 
+func TestStoreCreateNormalizesLegacyAuthType(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db)
+
+	cfg := validAccountConfig()
+	cfg.AuthType = AuthType("oauth2")
+	acct, err := store.Create(cfg)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if acct.AuthType != AuthPassword {
+		t.Fatalf("Create() AuthType = %q, want %q", acct.AuthType, AuthPassword)
+	}
+
+	var rawAuthType string
+	if err := db.QueryRow("SELECT auth_type FROM accounts WHERE id = ?", acct.ID).Scan(&rawAuthType); err != nil {
+		t.Fatalf("query raw auth_type: %v", err)
+	}
+	if rawAuthType != string(AuthPassword) {
+		t.Fatalf("raw auth_type = %q, want %q", rawAuthType, AuthPassword)
+	}
+}
+
 func TestStoreGet(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db)
@@ -284,6 +329,39 @@ func TestStoreGet(t *testing.T) {
 	}
 	if !got.Enabled {
 		t.Error("Enabled = false, want true")
+	}
+}
+
+func TestStoreGetNormalizesLegacyOAuth2AuthType(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db)
+
+	cfg := validAccountConfig()
+	created, err := store.Create(cfg)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if _, err := db.Exec("UPDATE accounts SET auth_type = ? WHERE id = ?", "oauth2", created.ID); err != nil {
+		t.Fatalf("seed legacy oauth2 auth_type: %v", err)
+	}
+
+	got, err := store.Get(created.ID)
+	if err != nil {
+		t.Fatalf("Get() error = %v", err)
+	}
+	if got.AuthType != AuthPassword {
+		t.Fatalf("Get() AuthType = %q, want %q", got.AuthType, AuthPassword)
+	}
+
+	accounts, err := store.List()
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(accounts) != 1 {
+		t.Fatalf("List() returned %d accounts, want 1", len(accounts))
+	}
+	if accounts[0].AuthType != AuthPassword {
+		t.Fatalf("List()[0].AuthType = %q, want %q", accounts[0].AuthType, AuthPassword)
 	}
 }
 
@@ -336,6 +414,34 @@ func TestStoreUpdate(t *testing.T) {
 	}
 	if got.Name != "Updated Account" {
 		t.Errorf("persisted Name = %q, want %q", got.Name, "Updated Account")
+	}
+}
+
+func TestStoreUpdateNormalizesLegacyAuthType(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db)
+
+	cfg := validAccountConfig()
+	created, err := store.Create(cfg)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+
+	cfg.AuthType = AuthType("oauth2")
+	updated, err := store.Update(created.ID, cfg)
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if updated.AuthType != AuthPassword {
+		t.Fatalf("Update() AuthType = %q, want %q", updated.AuthType, AuthPassword)
+	}
+
+	var rawAuthType string
+	if err := db.QueryRow("SELECT auth_type FROM accounts WHERE id = ?", created.ID).Scan(&rawAuthType); err != nil {
+		t.Fatalf("query raw auth_type: %v", err)
+	}
+	if rawAuthType != string(AuthPassword) {
+		t.Fatalf("raw auth_type = %q, want %q", rawAuthType, AuthPassword)
 	}
 }
 

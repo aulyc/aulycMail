@@ -30,8 +30,8 @@ aulycmail stores the following information locally on your computer:
 
 ### Account Credentials
 - Email account configurations (server addresses, ports)
-- Authentication tokens (OAuth tokens for Gmail, Outlook)
-- App-specific passwords (stored in your system's secure keyring)
+- Mail account passwords or app-specific passwords (stored in your system's secure keyring)
+- OAuth tokens for contact sync or extension authorization, when configured
 
 ### Contacts
 - Contact information synchronized from CardDAV, Google, or Microsoft accounts
@@ -46,11 +46,10 @@ aulycmail stores the following information locally on your computer:
 
 ## Google API Services
 
-aulycmail uses Google APIs to provide Gmail integration. Our use of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+aulycmail uses Google APIs to provide contact integration when you configure Google contacts. Our use of information received from Google APIs adheres to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
 
 ### Google API Scopes Used
 
-- **IMAP/SMTP Access** - To read, send, and manage your emails via standard IMAP/SMTP protocols (OAuth2 authenticated)
 - **Google People API** - To access your contacts for email autocomplete
 
 ### Limited Use Disclosure

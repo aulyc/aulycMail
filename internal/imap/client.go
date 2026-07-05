@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-sasl"
-	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 
@@ -54,6 +54,13 @@ const (
 	SecurityStartTLS SecurityType = "starttls"
 )
 
+// AuthType represents the authentication method.
+type AuthType string
+
+const (
+	AuthTypePassword AuthType = "password"
+)
+
 // ClientConfig holds the configuration for connecting to an IMAP server
 type ClientConfig struct {
 	Host     string
@@ -62,9 +69,7 @@ type ClientConfig struct {
 	Username string
 	Password string
 
-	// OAuth2 authentication
-	AuthType    AuthType // "password" or "oauth2" (defaults to "password")
-	AccessToken string   // OAuth2 access token (when AuthType is "oauth2")
+	AuthType AuthType // defaults to "password"
 
 	// Timeouts
 	ConnectTimeout time.Duration
@@ -223,7 +228,7 @@ func (c *Client) Login() error {
 
 	// Determine auth type (default to password)
 	authType := c.config.AuthType
-	if authType == "" {
+	if authType != AuthTypePassword {
 		authType = AuthTypePassword
 	}
 
@@ -232,15 +237,7 @@ func (c *Client) Login() error {
 		Str("authType", string(authType)).
 		Msg("Logging in")
 
-	var err error
-	switch authType {
-	case AuthTypeOAuth2:
-		err = c.loginOAuth2()
-	default:
-		err = c.loginPassword()
-	}
-
-	if err != nil {
+	if err := c.loginPassword(); err != nil {
 		return err
 	}
 
@@ -291,25 +288,6 @@ func (c *Client) loginPassword() error {
 	if err := c.client.Login(c.config.Username, c.config.Password).Wait(); err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
-	return nil
-}
-
-// loginOAuth2 authenticates using OAuth2 XOAUTH2 SASL mechanism
-func (c *Client) loginOAuth2() error {
-	if c.config.AccessToken == "" {
-		return fmt.Errorf("OAuth2 authentication requires an access token")
-	}
-
-	// Check if server supports XOAUTH2
-	// Note: Most servers advertise AUTH=XOAUTH2 or just support it
-	c.log.Debug().Msg("Authenticating with XOAUTH2")
-
-	saslClient := NewXOAuth2Client(c.config.Username, c.config.AccessToken)
-
-	if err := c.client.Authenticate(saslClient); err != nil {
-		return fmt.Errorf("XOAUTH2 authentication failed: %w", err)
-	}
-
 	return nil
 }
 

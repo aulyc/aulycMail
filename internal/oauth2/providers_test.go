@@ -63,17 +63,3 @@ func TestGetProvider(t *testing.T) {
 	}
 }
 
-func TestSupportedProviders(t *testing.T) {
-	providers := SupportedProviders()
-
-	if len(providers) != 2 {
-		t.Fatalf("SupportedProviders() returned %d providers, want 2", len(providers))
-	}
-
-	want := map[string]bool{"google": true, "microsoft": true}
-	for _, p := range providers {
-		if !want[p] {
-			t.Errorf("unexpected provider %q in SupportedProviders()", p)
-		}
-	}
-}

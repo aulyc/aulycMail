@@ -23,10 +23,6 @@ wails doctor
 **Build & run:**
 
 ```bash
-# Set Microsoft and Google OAuth creds (optional — IMAP/SMTP works without them)
-cp .env.example .env.local
-# Fill in your own creds
-
 # Build (produces build/bin/aulycmail.app, ad-hoc signed)
 make build
 
@@ -37,6 +33,5 @@ open build/bin/aulycmail.app
 make install-darwin
 ```
 
-> OAuth credentials are optional. Without them, Gmail/Outlook one-click login is
-> unavailable, but generic IMAP/SMTP accounts (including Gmail/iCloud via an
-> app-specific password) work fine. See `.env.example` for how to obtain creds.
+> Mail accounts use IMAP/SMTP passwords. Providers such as Gmail and iCloud may
+> require an app-specific password.

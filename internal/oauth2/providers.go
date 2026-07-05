@@ -17,7 +17,7 @@ type ProviderConfig struct {
 	//                       matching an existing read account. Empty = no hint.
 }
 
-// GoogleProvider returns the OAuth2 configuration for Google/Gmail
+// GoogleProvider returns the OAuth2 configuration for the core Google slot.
 func GoogleProvider() ProviderConfig {
 	return ProviderConfig{
 		Name:        "google",
@@ -36,7 +36,7 @@ func GoogleProvider() ProviderConfig {
 	}
 }
 
-// MicrosoftProvider returns the OAuth2 configuration for Microsoft/Outlook
+// MicrosoftProvider returns the OAuth2 configuration for the core Microsoft slot.
 func MicrosoftProvider() ProviderConfig {
 	return ProviderConfig{
 		Name:        "microsoft",
@@ -95,14 +95,13 @@ func MicrosoftContactsOnlyProvider() ProviderConfig {
 
 // GetProvider returns the OAuth2 configuration for the specified provider.
 //
-// For the mail entry-point names ("google", "microsoft") the returned
+// For the core provider names ("google", "microsoft") the returned
 // config's ClientID/ClientSecret reflect the full resolver chain
 // (UserOverrideLookup → SlotAliasLookup → registered providers), so a
 // user-supplied client_id saved via Settings → OAuth Credentials wins
 // over the shipped build-time defaults. Without this overlay the
-// mail-add flow (App.StartOAuthFlow → Manager.StartAuthFlow → GetProvider)
-// would silently use the embedded ClientID even after the user saved
-// their own override — issue #138.
+// legacy account-linked flow would silently use the embedded ClientID even
+// after the user saved their own override — issue #138.
 //
 // Other names (extension / standalone-contacts variants) return their
 // static ProviderConfig unchanged. Their callers (app/coreimpl.go and
@@ -138,9 +137,4 @@ func overlayResolvedCreds(base ProviderConfig, slot string) ProviderConfig {
 	base.ClientID = creds.ClientID
 	base.ClientSecret = creds.ClientSecret
 	return base
-}
-
-// SupportedProviders returns the list of supported OAuth provider names for email accounts
-func SupportedProviders() []string {
-	return []string{"google", "microsoft"}
 }

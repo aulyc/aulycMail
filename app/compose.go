@@ -20,7 +20,6 @@ import (
 	"github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/oauth2"
 	"github.com/aulyc/aulycmail/internal/smtp"
 	goImap "github.com/emersion/go-imap/v2"
 	"github.com/rs/zerolog"
@@ -37,78 +36,16 @@ type ComposerAttachment struct {
 
 // composeOps holds shared dependencies for compose-related operations.
 type composeOps struct {
-	accountStore  *account.Store
-	folderStore   *folder.Store
-	credStore     *credentials.Store
-	certStore     *certificate.Store
-	contactStore  *contact.Store
-	oauth2Manager *oauth2.Manager
-	draftOps      *draftOps // for draft cleanup on send
-}
-
-// getValidOAuthToken returns a valid OAuth token, refreshing if needed.
-// ctx is the caller's Wails context (for EventsEmit on reauth).
-func (ops *composeOps) getValidOAuthToken(ctx context.Context, accountID string) (*credentials.OAuthTokens, error) {
-	log := logging.WithComponent("composeOps")
-
-	tokens, err := ops.credStore.GetOAuthTokens(accountID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get OAuth tokens: %w", err)
-	}
-
-	// Check if token expires within 5 minutes
-	if !tokens.IsExpiringSoon(5 * time.Minute) {
-		return tokens, nil
-	}
-
-	log.Debug().
-		Str("account_id", accountID).
-		Time("expires_at", tokens.ExpiresAt).
-		Msg("OAuth token expiring soon, refreshing")
-
-	// Refresh the token
-	newTokenResp, err := ops.oauth2Manager.RefreshToken(tokens.Provider, tokens.RefreshToken)
-	if err != nil {
-		log.Error().Err(err).
-			Str("account_id", accountID).
-			Msg("OAuth token refresh failed")
-
-		// Emit event for frontend to prompt re-authorization
-		wailsRuntime.EventsEmit(ctx, "oauth:reauth-required", map[string]interface{}{
-			"accountId": accountID,
-			"provider":  tokens.Provider,
-			"error":     err.Error(),
-		})
-
-		return nil, fmt.Errorf("OAuth token refresh failed, re-authorization required: %w", err)
-	}
-
-	// Calculate new expiry time
-	expiresAt := time.Now().Add(time.Duration(newTokenResp.ExpiresIn) * time.Second)
-
-	// Update tokens in store
-	tokens.AccessToken = newTokenResp.AccessToken
-	tokens.ExpiresAt = expiresAt
-	if newTokenResp.RefreshToken != "" {
-		tokens.RefreshToken = newTokenResp.RefreshToken
-	}
-
-	if err := ops.credStore.SetOAuthTokens(accountID, tokens); err != nil {
-		log.Warn().Err(err).Msg("Failed to save refreshed OAuth tokens")
-		// Continue anyway - we have valid tokens in memory
-	}
-
-	log.Info().
-		Str("account_id", accountID).
-		Time("new_expires_at", expiresAt).
-		Msg("OAuth token refreshed successfully")
-
-	return tokens, nil
+	accountStore *account.Store
+	folderStore  *folder.Store
+	credStore    *credentials.Store
+	certStore    *certificate.Store
+	contactStore *contact.Store
+	draftOps     *draftOps // for draft cleanup on send
 }
 
 // getIMAPCredentials returns IMAP credentials for an account.
-// Handles both password and OAuth2 authentication.
-func (ops *composeOps) getIMAPCredentials(ctx context.Context, accountID string) (*imap.ClientConfig, error) {
+func (ops *composeOps) getIMAPCredentials(accountID string) (*imap.ClientConfig, error) {
 	acc, err := ops.accountStore.Get(accountID)
 	if err != nil {
 		return nil, err
@@ -124,22 +61,12 @@ func (ops *composeOps) getIMAPCredentials(ctx context.Context, accountID string)
 	config.Username = acc.Username
 	config.TLSConfig = certificate.BuildTLSConfig(acc.IMAPHost, ops.certStore)
 
-	switch acc.AuthType {
-	case account.AuthOAuth2:
-		tokens, err := ops.getValidOAuthToken(ctx, accountID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get OAuth token: %w", err)
-		}
-		config.AuthType = imap.AuthTypeOAuth2
-		config.AccessToken = tokens.AccessToken
-	default:
-		password, err := ops.credStore.GetPassword(accountID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get password: %w", err)
-		}
-		config.AuthType = imap.AuthTypePassword
-		config.Password = password
+	password, err := ops.credStore.GetPassword(accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get password: %w", err)
 	}
+	config.AuthType = imap.AuthTypePassword
+	config.Password = password
 
 	return &config, nil
 }
@@ -163,7 +90,7 @@ func (ops *composeOps) getSpecialFolder(accountID string, folderType folder.Type
 }
 
 // saveToSentFolder appends the sent message to the Sent folder via IMAP.
-func (ops *composeOps) saveToSentFolder(ctx context.Context, accountID string, acc *account.Account, rawMsg []byte) error {
+func (ops *composeOps) saveToSentFolder(accountID string, acc *account.Account, rawMsg []byte) error {
 	log := logging.WithComponent("composeOps")
 
 	// Resolve the Sent folder using the same logic as App.GetSpecialFolder
@@ -179,7 +106,7 @@ func (ops *composeOps) saveToSentFolder(ctx context.Context, accountID string, a
 		Msg("Saving sent message to folder via IMAP APPEND")
 
 	// Create IMAP client
-	clientConfig, err := ops.getIMAPCredentials(ctx, accountID)
+	clientConfig, err := ops.getIMAPCredentials(accountID)
 	if err != nil {
 		return fmt.Errorf("failed to get IMAP credentials: %w", err)
 	}
@@ -261,33 +188,21 @@ func (ops *composeOps) sendMessage(ctx context.Context, accountID string, msg sm
 		}
 	}
 	// Separate SMTP credentials override (Generic provider; gated by
-	// non-empty SMTPUsername at the model layer). Doesn't apply to OAuth
-	// accounts — those keep the bearer-token path below.
-	smtpUsesSeparateCreds := acc.SMTPUsername != "" && acc.AuthType != account.AuthOAuth2
+	// non-empty SMTPUsername at the model layer).
+	smtpUsesSeparateCreds := acc.SMTPUsername != ""
 	if smtpUsesSeparateCreds {
 		smtpConfig.Username = acc.SMTPUsername
 	}
 	smtpConfig.TLSConfig = certificate.BuildTLSConfig(acc.SMTPHost, ops.certStore)
 
-	// Handle authentication based on auth type
-	switch acc.AuthType {
-	case account.AuthOAuth2:
-		tokens, tokenErr := ops.getValidOAuthToken(ctx, accountID)
-		if tokenErr != nil {
-			return nil, fmt.Errorf("failed to get OAuth token: %w", tokenErr)
+	smtpConfig.AuthType = smtp.AuthTypePassword
+	if smtpUsesSeparateCreds {
+		password, passErr := ops.credStore.GetSMTPPassword(accountID)
+		if passErr != nil {
+			return nil, fmt.Errorf("failed to get SMTP password: %w", passErr)
 		}
-		smtpConfig.AuthType = smtp.AuthTypeOAuth2
-		smtpConfig.AccessToken = tokens.AccessToken
-	default:
-		smtpConfig.AuthType = smtp.AuthTypePassword
-		if smtpUsesSeparateCreds {
-			password, passErr := ops.credStore.GetSMTPPassword(accountID)
-			if passErr != nil {
-				return nil, fmt.Errorf("failed to get SMTP password: %w", passErr)
-			}
-			smtpConfig.Password = password
-			break
-		}
+		smtpConfig.Password = password
+	} else {
 		password, passErr := ops.credStore.GetPassword(accountID)
 		if passErr != nil {
 			return nil, fmt.Errorf("failed to get password: %w", passErr)
@@ -318,7 +233,7 @@ func (ops *composeOps) sendMessage(ctx context.Context, accountID string, msg sm
 	// Save to Sent folder (using IMAP APPEND) if provider doesn't auto-save
 	if !providerAutoSavesSentMail(acc.IMAPHost) {
 		log.Debug().Str("host", acc.IMAPHost).Msg("Provider doesn't auto-save, using IMAP APPEND")
-		if err := ops.saveToSentFolder(ctx, accountID, acc, rawMsg); err != nil {
+		if err := ops.saveToSentFolder(accountID, acc, rawMsg); err != nil {
 			log.Warn().Err(err).Msg("Failed to save message to Sent folder")
 			// Don't fail the send operation if saving fails
 		}

@@ -253,10 +253,6 @@ type App struct {
 	// OAuth2 manager
 	oauth2Manager *oauth2.Manager
 
-	// Temporary OAuth token storage (for pending account creation)
-	pendingOAuthTokens *oauth2.TokenResponse
-	pendingOAuthEmail  string
-
 	// Pending mailto: URL data (from command line)
 	PendingMailto *MailtoData
 
@@ -621,13 +617,12 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize shared compose operations
 	a.composeOps = composeOps{
-		accountStore:  a.accountStore,
-		folderStore:   a.folderStore,
-		credStore:     a.credStore,
-		certStore:     a.certStore,
-		contactStore:  a.contactStore,
-		oauth2Manager: a.oauth2Manager,
-		draftOps:      &a.draftOps,
+		accountStore: a.accountStore,
+		folderStore:  a.folderStore,
+		credStore:    a.credStore,
+		certStore:    a.certStore,
+		contactStore: a.contactStore,
+		draftOps:     &a.draftOps,
 	}
 
 	// Initialize network connectivity monitor (event-driven, zero polling).
@@ -897,16 +892,9 @@ func (a *App) updateDBConnectionPool() {
 	}
 }
 
-// getIMAPCredentials returns IMAP credentials for an account.
-// Handles both password and OAuth2 authentication.
+// getIMAPCredentials returns password IMAP credentials for an account.
 func (a *App) getIMAPCredentials(accountID string) (*imap.ClientConfig, error) {
-	return a.composeOps.getIMAPCredentials(a.ctx, accountID)
-}
-
-// getValidOAuthToken returns a valid OAuth token, refreshing if needed.
-// If refresh fails, emits an event for the frontend to prompt re-authorization.
-func (a *App) getValidOAuthToken(accountID string) (*credentials.OAuthTokens, error) {
-	return a.composeOps.getValidOAuthToken(a.ctx, accountID)
+	return a.composeOps.getIMAPCredentials(accountID)
 }
 
 // menuLabels returns the localized strings for the native macOS menu. The menu

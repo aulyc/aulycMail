@@ -611,28 +611,6 @@ export namespace app {
 	        this.body = source["body"];
 	    }
 	}
-	export class OAuthStatus {
-	    isOAuth: boolean;
-	    provider: string;
-	    email: string;
-	    expiresAt: string;
-	    isExpired: boolean;
-	    needsReauth: boolean;
-
-	    static createFrom(source: any = {}) {
-	        return new OAuthStatus(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.isOAuth = source["isOAuth"];
-	        this.provider = source["provider"];
-	        this.email = source["email"];
-	        this.expiresAt = source["expiresAt"];
-	        this.isExpired = source["isExpired"];
-	        this.needsReauth = source["needsReauth"];
-	    }
-	}
 
 }
 

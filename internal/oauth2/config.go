@@ -1,4 +1,4 @@
-// Package oauth2 provides OAuth2 authentication for email providers
+// Package oauth2 provides OAuth2 authorization flows for contacts/extensions.
 package oauth2
 
 import (
@@ -16,18 +16,18 @@ import (
 // See Makefile for the complete build command.
 // If ldflags are not set, credentials are loaded from the aulycmail-creds shim binary.
 var (
-	// GoogleClientID is the OAuth2 client ID for Google/Gmail (Mail-scoped project).
+	// GoogleClientID is the OAuth2 client ID for the core Google slot.
 	// Same client also backs first-party extensions' Google flows for any scopes
 	// listed in the extension manifest's first_party_uses_core_for_scopes (today:
 	// contacts.readonly). When that's not enough (write scopes, full Calendar),
 	// the picker UI offers GoogleTestingClientID instead — see below.
 	GoogleClientID string
 
-	// GoogleClientSecret is the OAuth2 client secret for Google/Gmail
+	// GoogleClientSecret is the OAuth2 client secret for the core Google slot.
 	GoogleClientSecret string
 
-	// MicrosoftClientID is the OAuth2 client ID for Microsoft/Outlook
-	// (Mail-scoped registration). Also serves microsoft-contacts and
+	// MicrosoftClientID is the OAuth2 client ID for the core Microsoft slot.
+	// Also serves microsoft-contacts and
 	// microsoft-calendar — Microsoft Graph doesn't gate scopes behind
 	// verification, so one app registration covers all three surfaces.
 	MicrosoftClientID string
@@ -47,7 +47,6 @@ var (
 	// GoogleTestingClientSecret pairs with GoogleTestingClientID.
 	GoogleTestingClientSecret string
 )
-
 
 func init() {
 	if GoogleClientID != "" {

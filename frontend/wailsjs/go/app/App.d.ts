@@ -18,19 +18,13 @@ export function AddAccount(arg1:account.AccountConfig):Promise<account.Account>;
 
 export function AddImageAllowlist(arg1:string,arg2:string):Promise<void>;
 
-export function AddMicrosoftSharedMailbox(arg1:string,arg2:string,arg3:string):Promise<account.Account>;
-
 export function Archive(arg1:Array<string>):Promise<void>;
 
 export function CancelAllSyncs():Promise<void>;
 
 export function CancelFolderSync(arg1:string,arg2:string):Promise<void>;
 
-export function CancelOAuthFlow():Promise<void>;
-
 export function ChooseBackupDirectory():Promise<string>;
-
-export function CompleteOAuthAccountSetup(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<account.Account>;
 
 export function Contacts_CreateContact(arg1:v1.ContactCreateInput):Promise<string>;
 
@@ -98,8 +92,6 @@ export function GetBackupViewerMessage(arg1:string,arg2:string):Promise<app.Back
 
 export function GetComposerFormat():Promise<string>;
 
-export function GetConfiguredOAuthProviders():Promise<Array<string>>;
-
 export function GetContactMessages(arg1:string,arg2:number):Promise<Array<message.ContactMessage>>;
 
 export function GetConversation(arg1:string,arg2:string):Promise<message.Conversation>;
@@ -136,11 +128,7 @@ export function GetMessageListSortOrder():Promise<string>;
 
 export function GetMessageSource(arg1:string):Promise<string>;
 
-export function GetMicrosoftSharedMailboxes(arg1:string):Promise<Array<account.Account>>;
-
 export function GetNativeTitleBar():Promise<boolean>;
-
-export function GetOAuthStatus(arg1:string):Promise<app.OAuthStatus>;
 
 export function GetPendingMailto():Promise<app.MailtoData>;
 
@@ -188,8 +176,6 @@ export function IsFlatpak():Promise<boolean>;
 
 export function IsImageAllowed(arg1:string):Promise<boolean>;
 
-export function IsOAuthConfigured(arg1:string):Promise<boolean>;
-
 export function IsReady():Promise<boolean>;
 
 export function ListEnabledExtensions():Promise<Array<string>>;
@@ -236,8 +222,6 @@ export function QuitApp():Promise<void>;
 
 export function ReadFileAsAttachment(arg1:string):Promise<app.ComposerAttachment>;
 
-export function ReauthorizeAccount(arg1:string):Promise<void>;
-
 export function RefreshContactsFromMail():Promise<number>;
 
 export function RefreshWindowConstraints():Promise<void>;
@@ -259,10 +243,6 @@ export function SaveAttachmentAs(arg1:string):Promise<string>;
 export function SaveBackupViewerAttachmentAs(arg1:string,arg2:string,arg3:number):Promise<string>;
 
 export function SaveDraft(arg1:string,arg2:smtp.ComposeMessage,arg3:string):Promise<app.DraftResult>;
-
-export function SaveOAuthTokens(arg1:string,arg2:string,arg3:string,arg4:string,arg5:number):Promise<void>;
-
-export function SavePendingOAuthTokens(arg1:string):Promise<void>;
 
 export function SaveUIState(arg1:appstate.UIState):Promise<void>;
 
@@ -326,8 +306,6 @@ export function ShowWindow():Promise<void>;
 
 export function Star(arg1:Array<string>):Promise<void>;
 
-export function StartOAuthFlow(arg1:string):Promise<void>;
-
 export function SubscribeAllFolders(arg1:string):Promise<void>;
 
 export function SubscribeFolder(arg1:string,arg2:string):Promise<void>;
@@ -345,8 +323,6 @@ export function SyncPendingDrafts(arg1:string):Promise<void>;
 export function TestAccountConnection(arg1:string):Promise<app.ConnectionTestResult>;
 
 export function TestConnection(arg1:account.AccountConfig):Promise<app.ConnectionTestResult>;
-
-export function TestOAuthConnection(arg1:string):Promise<void>;
 
 export function Trash(arg1:Array<string>):Promise<boolean>;
 

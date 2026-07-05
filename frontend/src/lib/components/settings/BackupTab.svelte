@@ -281,7 +281,7 @@
       <div class="min-w-0">
         <Label>{$_('settingsBackup.directory')}</Label>
       </div>
-      <div class="min-w-0 flex-1">
+      <div class="w-[28rem] max-w-full shrink-0">
         <BackupDirectoryPicker
           {directory}
           placeholder={$_('settingsBackup.directoryPlaceholder')}
@@ -301,7 +301,7 @@
       </div>
       <div
         bind:this={scopeMenuEl}
-        class="relative w-72 shrink-0"
+        class="relative w-[28rem] max-w-full shrink-0"
       >
         <button
           type="button"
@@ -363,7 +363,7 @@
       <div class="min-w-0">
         <Label>{$_('settingsBackup.backupStatus')}</Label>
       </div>
-      <div class="w-72 shrink-0 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+      <div class="w-[28rem] max-w-full shrink-0 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
         <div class="flex items-center justify-between gap-3">
           <span class="font-medium">{getModeLabel(status?.mode)}</span>
           <span class="text-xs text-muted-foreground">{$_('settingsBackup.selectedMailboxes', { values: { count: selectedAccountsCount } })}</span>
@@ -408,16 +408,19 @@
       </div>
     {/if}
 
-    <div class="flex justify-end">
-      <Button onclick={handleRunBackup} disabled={running || saving || !directory || regularAccounts.length === 0}>
-        {#if running}
-          <Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />
-          {$_('settingsBackup.backupRunning')}
-        {:else}
-          <Icon icon="mdi:archive-arrow-down-outline" class="mr-2 h-4 w-4" />
-          {$_('settingsBackup.startBackup')}
-        {/if}
-      </Button>
+    <div class="flex items-center justify-between gap-4">
+      <div class="min-w-0"></div>
+      <div class="flex w-[28rem] max-w-full shrink-0 justify-end">
+        <Button onclick={handleRunBackup} disabled={running || saving || !directory || regularAccounts.length === 0}>
+          {#if running}
+            <Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />
+            {$_('settingsBackup.backupRunning')}
+          {:else}
+            <Icon icon="mdi:archive-arrow-down-outline" class="mr-2 h-4 w-4" />
+            {$_('settingsBackup.startBackup')}
+          {/if}
+        </Button>
+      </div>
     </div>
   </div>
 {/if}

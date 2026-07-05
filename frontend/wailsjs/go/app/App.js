@@ -14,10 +14,6 @@ export function AddImageAllowlist(arg1, arg2) {
   return window['go']['app']['App']['AddImageAllowlist'](arg1, arg2);
 }
 
-export function AddMicrosoftSharedMailbox(arg1, arg2, arg3) {
-  return window['go']['app']['App']['AddMicrosoftSharedMailbox'](arg1, arg2, arg3);
-}
-
 export function Archive(arg1) {
   return window['go']['app']['App']['Archive'](arg1);
 }
@@ -30,16 +26,8 @@ export function CancelFolderSync(arg1, arg2) {
   return window['go']['app']['App']['CancelFolderSync'](arg1, arg2);
 }
 
-export function CancelOAuthFlow() {
-  return window['go']['app']['App']['CancelOAuthFlow']();
-}
-
 export function ChooseBackupDirectory() {
   return window['go']['app']['App']['ChooseBackupDirectory']();
-}
-
-export function CompleteOAuthAccountSetup(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['app']['App']['CompleteOAuthAccountSetup'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function Contacts_CreateContact(arg1) {
@@ -174,10 +162,6 @@ export function GetComposerFormat() {
   return window['go']['app']['App']['GetComposerFormat']();
 }
 
-export function GetConfiguredOAuthProviders() {
-  return window['go']['app']['App']['GetConfiguredOAuthProviders']();
-}
-
 export function GetContactMessages(arg1, arg2) {
   return window['go']['app']['App']['GetContactMessages'](arg1, arg2);
 }
@@ -250,16 +234,8 @@ export function GetMessageSource(arg1) {
   return window['go']['app']['App']['GetMessageSource'](arg1);
 }
 
-export function GetMicrosoftSharedMailboxes(arg1) {
-  return window['go']['app']['App']['GetMicrosoftSharedMailboxes'](arg1);
-}
-
 export function GetNativeTitleBar() {
   return window['go']['app']['App']['GetNativeTitleBar']();
-}
-
-export function GetOAuthStatus(arg1) {
-  return window['go']['app']['App']['GetOAuthStatus'](arg1);
 }
 
 export function GetPendingMailto() {
@@ -354,10 +330,6 @@ export function IsImageAllowed(arg1) {
   return window['go']['app']['App']['IsImageAllowed'](arg1);
 }
 
-export function IsOAuthConfigured(arg1) {
-  return window['go']['app']['App']['IsOAuthConfigured'](arg1);
-}
-
 export function IsReady() {
   return window['go']['app']['App']['IsReady']();
 }
@@ -450,10 +422,6 @@ export function ReadFileAsAttachment(arg1) {
   return window['go']['app']['App']['ReadFileAsAttachment'](arg1);
 }
 
-export function ReauthorizeAccount(arg1) {
-  return window['go']['app']['App']['ReauthorizeAccount'](arg1);
-}
-
 export function RefreshContactsFromMail() {
   return window['go']['app']['App']['RefreshContactsFromMail']();
 }
@@ -496,14 +464,6 @@ export function SaveBackupViewerAttachmentAs(arg1, arg2, arg3) {
 
 export function SaveDraft(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveDraft'](arg1, arg2, arg3);
-}
-
-export function SaveOAuthTokens(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['app']['App']['SaveOAuthTokens'](arg1, arg2, arg3, arg4, arg5);
-}
-
-export function SavePendingOAuthTokens(arg1) {
-  return window['go']['app']['App']['SavePendingOAuthTokens'](arg1);
 }
 
 export function SaveUIState(arg1) {
@@ -630,10 +590,6 @@ export function Star(arg1) {
   return window['go']['app']['App']['Star'](arg1);
 }
 
-export function StartOAuthFlow(arg1) {
-  return window['go']['app']['App']['StartOAuthFlow'](arg1);
-}
-
 export function SubscribeAllFolders(arg1) {
   return window['go']['app']['App']['SubscribeAllFolders'](arg1);
 }
@@ -668,10 +624,6 @@ export function TestAccountConnection(arg1) {
 
 export function TestConnection(arg1) {
   return window['go']['app']['App']['TestConnection'](arg1);
-}
-
-export function TestOAuthConnection(arg1) {
-  return window['go']['app']['App']['TestOAuthConnection'](arg1);
 }
 
 export function Trash(arg1) {

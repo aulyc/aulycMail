@@ -106,7 +106,7 @@ For a complete, real-world example of a translated locale file, refer to `fronte
   - Some placeholders contain localized relative time strings from date-fns (e.g., `{time}` may render as "2 minutes ago" or "2 分鐘前")
   - Example: English `"synced": "Synced {time}"` → Chinese `"synced": "{time}同步"` (time goes before the verb in Chinese)
 - Do not translate JSON keys (left side of `:`)
-- The file has ~800 keys organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `settingsBackup`, `backupViewer`, `editor`, `account`, `identity`, `certificate`, `terms`, `oauthMissing`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `syncLog`, `images`, `oauth`
+- The file is organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `settingsBackup`, `backupViewer`, `editor`, `account`, `identity`, `certificate`, `terms`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `syncLog`, `images`
 - **Extension strings are NOT in this file.** Each extension owns its own locale files under `extensions/<name>/frontend/i18n/locales/`. See [§ Extension translations](#extension-translations) for the per-extension flow.
 
 ### 2. Register the Locale
@@ -288,7 +288,6 @@ Each directory you find is an extension whose UI can be translated.
 | `identity` | Identity editor (email address management, display names, signatures) |
 | `certificate` | TLS certificate trust dialog |
 | `terms` | Terms of service dialog |
-| `oauthMissing` | Dialog shown when the build lacks OAuth client credentials |
 | `dialog` | Generic dialog strings (confirmations, warnings) |
 | `date` | Date/time labels (just now, yesterday, etc.) |
 | `aria` | Accessibility labels (screen reader text) |
@@ -297,7 +296,6 @@ Each directory you find is an extension whose UI can be translated.
 | `search` | Search UI |
 | `syncLog` | Sync activity log panel |
 | `images` | Remote image allowlist management (addresses, domains) |
-| `oauth` | OAuth flow UI |
 
 ### Extensions (`extensions/<name>/frontend/i18n/locales/<code>.json`)
 
@@ -321,7 +319,6 @@ Future extensions add their own top-level namespace (e.g., `calendar.*` for a Ca
   - `{folder}` — folder name
   - `{percentage}` — sync progress percentage
   - `{version}` — app version string
-  - `{provider}` — OAuth provider name (Google, Microsoft)
   - `{query}` — search query text
   - `{domain}` / `{sender}` — email domain or sender address
   - `{description}` — undo action description

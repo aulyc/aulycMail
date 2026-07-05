@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/certificate"
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/settings"
@@ -348,24 +347,12 @@ func (a *App) SendReadReceipt(accountID, messageID string) error {
 		TLSConfig: certificate.BuildTLSConfig(acc.SMTPHost, a.certStore),
 	}
 
-	// Handle authentication based on auth type
-	if acc.AuthType == account.AuthOAuth2 {
-		// Get valid OAuth token (refreshing if needed)
-		tokens, err := a.getValidOAuthToken(accountID)
-		if err != nil {
-			return fmt.Errorf("failed to get OAuth token: %w", err)
-		}
-		smtpConfig.AuthType = smtp.AuthTypeOAuth2
-		smtpConfig.AccessToken = tokens.AccessToken
-	} else {
-		// Default to password authentication
-		password, err := a.credStore.GetPassword(accountID)
-		if err != nil {
-			return fmt.Errorf("failed to get password: %w", err)
-		}
-		smtpConfig.AuthType = smtp.AuthTypePassword
-		smtpConfig.Password = password
+	password, err := a.credStore.GetPassword(accountID)
+	if err != nil {
+		return fmt.Errorf("failed to get password: %w", err)
 	}
+	smtpConfig.AuthType = smtp.AuthTypePassword
+	smtpConfig.Password = password
 
 	// Create SMTP client and connect
 	client := smtp.NewClient(smtpConfig)

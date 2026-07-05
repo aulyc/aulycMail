@@ -20,8 +20,18 @@ type AuthType string
 
 const (
 	AuthPassword AuthType = "password"
-	AuthOAuth2   AuthType = "oauth2"
 )
+
+func normalizeAuthType(authType AuthType) AuthType {
+	switch authType {
+	case "", AuthPassword:
+		return AuthPassword
+	default:
+		// Legacy/unknown values, including the removed "oauth2", are treated as
+		// password accounts so old databases do not enter a removed auth path.
+		return AuthPassword
+	}
+}
 
 const (
 	SignatureSeparatorDash     = "-----"
@@ -279,9 +289,7 @@ func (c *AccountConfig) Validate() error {
 	if c.SMTPSecurity == "" {
 		c.SMTPSecurity = SecurityStartTLS
 	}
-	if c.AuthType == "" {
-		c.AuthType = AuthPassword
-	}
+	c.AuthType = normalizeAuthType(c.AuthType)
 	if c.SyncPeriodDays < 0 {
 		c.SyncPeriodDays = 30
 	}

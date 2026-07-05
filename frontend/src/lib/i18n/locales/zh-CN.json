@@ -658,17 +658,7 @@
     "signatureBadgePlain": "纯文本签名",
     "saveIdentityChanges": "保存",
     "saveFailed": "保存发件地址别名失败。",
-    "addEmailAddressButton": "添加别名",
-    "sharedMailboxes": "共享邮箱",
-    "sharedMailboxesHelp": "添加您有权访问的 Microsoft 365 共享邮箱。",
-    "addSharedMailbox": "添加共享邮箱",
-    "noSharedMailboxes": "尚未配置共享邮箱。",
-    "sharedMailboxEmail": "共享邮箱电子邮件",
-    "sharedMailboxDisplayName": "显示名称",
-    "sharedMailboxAdded": "共享邮箱已添加。",
-    "sharedMailboxRemoved": "共享邮箱已移除。",
-    "failedToAddSharedMailbox": "添加共享邮箱失败",
-    "failedToDeleteSharedMailbox": "移除共享邮箱失败。"
+    "addEmailAddressButton": "添加别名"
   },
   "certificate": {
     "title": "不受信任的证书",

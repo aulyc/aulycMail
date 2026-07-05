@@ -8,7 +8,7 @@ import (
 // TestGetProvider_OverrideMatrix verifies that GetProvider("google") and
 // GetProvider("microsoft") honour the resolver chain across all four
 // credential states: neither, shipped only, override only, and both
-// (override wins). Pre-fix, the mail-add OAuth flow always used the
+// (override wins). Pre-fix, the account-linked OAuth flow always used the
 // shipped (build-time) ClientID even after the user saved a custom
 // override — see issue #138.
 //
