@@ -3,7 +3,6 @@
   // dimmed full-window backdrop with a centered search box and a live results
   // list below it. Searches mail or contacts depending on the
   // active rail. Selecting a result navigates to it via the parent's callbacks.
-  import { tick } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
   import { accountStore } from '$lib/stores/accounts.svelte'
@@ -42,6 +41,15 @@
     label: string
   }
 
+  interface SearchScopeSlot {
+    scope: SearchScope
+    sourceIndex: number
+    offset: number
+    key: string
+  }
+
+  const SEARCH_SCOPE_SIDE_SLOT_COUNT = 10
+
   let { open = $bindable(false), mode, onClose, onSelectMail, onSelectContact }: Props = $props()
 
   let query = $state('')
@@ -51,7 +59,6 @@
   let activeIndex = $state(0)
   let selectedScopeId = $state('')
   let inputEl = $state<HTMLInputElement | null>(null)
-  let scopeStripEl = $state<HTMLDivElement | null>(null)
   let debounce: ReturnType<typeof setTimeout> | null = null
   let searchSeq = 0
   // True while an IME is composing (e.g. typing pinyin before picking a hanzi).
@@ -71,6 +78,9 @@
       })),
   ])
   const selectedScopeIndex = $derived(Math.max(0, scopes.findIndex((scope) => scope.id === selectedScopeId)))
+  const selectedScope = $derived(scopes[selectedScopeIndex])
+  const leftScopeSlots = $derived.by(() => buildScopeSideSlots(-1))
+  const rightScopeSlots = $derived.by(() => buildScopeSideSlots(1))
 
   // Reset + focus whenever the overlay opens.
   $effect(() => {
@@ -91,35 +101,6 @@
     const hasSelectedScope = scopes.some((scope) => scope.id === selectedScopeId)
     if (!hasSelectedScope) selectedScopeId = ''
   })
-
-  $effect(() => {
-    if (!open) return
-    void centerSelectedScope(selectedScopeId, scopes.length)
-  })
-
-  async function centerSelectedScope(scopeID: string, scopeCount: number) {
-    await tick()
-    await nextAnimationFrame()
-    await nextAnimationFrame()
-    if (!open || scopeID !== selectedScopeId || scopeCount !== scopes.length) return
-    const strip = scopeStripEl
-    if (!strip) return
-    const button = strip.querySelector<HTMLElement>(`[data-scope-index="${selectedScopeIndex}"]`)
-    if (!button) return
-
-    const stripRect = strip.getBoundingClientRect()
-    const buttonRect = button.getBoundingClientRect()
-    const buttonCenter = buttonRect.left - stripRect.left + strip.scrollLeft + buttonRect.width / 2
-    const targetLeft = buttonCenter - strip.clientWidth / 2
-    const maxLeft = Math.max(0, strip.scrollWidth - strip.clientWidth)
-    strip.scrollTo({ left: Math.min(Math.max(0, targetLeft), maxLeft), behavior: 'auto' })
-  }
-
-  function nextAnimationFrame(): Promise<void> {
-    return new Promise((resolve) => {
-      requestAnimationFrame(() => resolve())
-    })
-  }
 
   function runSearch() {
     const q = query.trim()
@@ -178,7 +159,6 @@
     }
     selectedScopeId = scopeID
     activeIndex = 0
-    void centerSelectedScope(scopeID, scopes.length)
     if (debounce) clearTimeout(debounce)
     runSearch()
     setTimeout(() => inputEl?.focus(), 0)
@@ -189,6 +169,32 @@
     const currentIndex = Math.max(0, scopes.findIndex((scope) => scope.id === selectedScopeId))
     const nextIndex = (currentIndex + delta + scopes.length) % scopes.length
     selectScope(scopes[nextIndex].id)
+  }
+
+  function wrapIndex(index: number, count: number): number {
+    return ((index % count) + count) % count
+  }
+
+  function buildScopeSideSlots(direction: -1 | 1): SearchScopeSlot[] {
+    const count = scopes.length
+    if (count <= 1) return []
+    const slots: SearchScopeSlot[] = []
+    let step = 1
+    while (slots.length < SEARCH_SCOPE_SIDE_SLOT_COUNT && step <= SEARCH_SCOPE_SIDE_SLOT_COUNT * count) {
+      const offset = direction * step
+      const sourceIndex = wrapIndex(selectedScopeIndex + offset, count)
+      if (sourceIndex !== selectedScopeIndex) {
+        const scope = scopes[sourceIndex]
+        slots.push({
+          scope,
+          sourceIndex,
+          offset,
+          key: `${direction}:${step}:${sourceIndex}:${scope.id || 'all'}`,
+        })
+      }
+      step += 1
+    }
+    return direction === -1 ? slots.reverse() : slots
   }
 
   function selectIndex(i: number) {
@@ -251,28 +257,47 @@
     >
       <!-- Search scope tags -->
       <div class="mb-3 overflow-hidden">
-        <div
-          bind:this={scopeStripEl}
-          class="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          <span class="shrink-0 basis-1/2" aria-hidden="true"></span>
-          {#each scopes as scope, i (scope.id || 'all')}
+        <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 overflow-hidden">
+          <div class="flex min-w-0 justify-end gap-2 overflow-hidden">
+            {#each leftScopeSlots as item (item.key)}
+              <button
+                type="button"
+                tabindex="-1"
+                aria-pressed="false"
+                class="max-w-[220px] shrink-0 truncate rounded-md border border-border/70 bg-transparent px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-border hover:bg-muted/20 hover:text-foreground"
+                onmousedown={(e) => e.preventDefault()}
+                onclick={() => selectScope(item.scope.id)}
+              >
+                {item.scope.label}
+              </button>
+            {/each}
+          </div>
+          {#if selectedScope}
             <button
               type="button"
               tabindex="-1"
-              aria-pressed={selectedScopeId === scope.id}
-              data-scope-index={i}
-              class="max-w-[220px] shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors truncate
-                {selectedScopeId === scope.id
-                  ? 'border-primary/75 bg-primary/15 text-primary'
-                  : 'border-border/70 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground'}"
+              aria-pressed="true"
+              class="max-w-[220px] shrink-0 truncate rounded-md border border-primary/75 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm backdrop-blur-sm transition-colors"
               onmousedown={(e) => e.preventDefault()}
-              onclick={() => selectScope(scope.id)}
+              onclick={() => selectScope(selectedScope.id)}
             >
-              {scope.label}
+              {selectedScope.label}
             </button>
-          {/each}
-          <span class="shrink-0 basis-1/2" aria-hidden="true"></span>
+          {/if}
+          <div class="flex min-w-0 justify-start gap-2 overflow-hidden">
+            {#each rightScopeSlots as item (item.key)}
+              <button
+                type="button"
+                tabindex="-1"
+                aria-pressed="false"
+                class="max-w-[220px] shrink-0 truncate rounded-md border border-border/70 bg-transparent px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-border hover:bg-muted/20 hover:text-foreground"
+                onmousedown={(e) => e.preventDefault()}
+                onclick={() => selectScope(item.scope.id)}
+              >
+                {item.scope.label}
+              </button>
+            {/each}
+          </div>
         </div>
       </div>
 
