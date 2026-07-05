@@ -7,7 +7,7 @@
   // @ts-ignore - wailsjs path
   import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage, GetComposerFormat, SetComposerFormat, GetNativeTitleBar, SetNativeTitleBar, GetAlwaysLoadImages, SetAlwaysLoadImages, GetDarkMailContent, SetDarkMailContent, GetAccentBarUnread, SetAccentBarUnread, GetMenuBarIcon, SetMenuBarIcon, GetShowMessageListCircles, SetShowMessageListCircles, GetShowViewerCircles, SetShowViewerCircles, QuitApp } from '../../../../wailsjs/go/app/App.js'
   import { addToast } from '$lib/stores/toast'
-  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, setRunBackground as updateRunBackgroundStore, setStartHidden as updateStartHiddenStore, setAutostart as updateAutostartStore, setLanguage as updateLanguageStore, setComposerFormat as updateComposerFormatStore, setNativeTitleBar as updateNativeTitleBarStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setAccentBarUnread as updateAccentBarUnreadStore, setMenuBarIcon as updateMenuBarIconStore, setShowMessageListCircles as updateShowMessageListCirclesStore, setShowViewerCircles as updateShowViewerCirclesStore, type MessageListDensity, type ThemeMode, type ComposerFormat } from '$lib/stores/settings.svelte'
+  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, setRunBackground as updateRunBackgroundStore, setStartHidden as updateStartHiddenStore, setAutostart as updateAutostartStore, setLanguage as updateLanguageStore, setComposerFormat as updateComposerFormatStore, setNativeTitleBar as updateNativeTitleBarStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setAccentBarUnread as updateAccentBarUnreadStore, setShowMessageListCircles as updateShowMessageListCirclesStore, setShowViewerCircles as updateShowViewerCirclesStore, type MessageListDensity, type ThemeMode, type ComposerFormat } from '$lib/stores/settings.svelte'
   import { applyThemeFromMode } from '$lib/stores/theme.svelte'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
@@ -181,7 +181,6 @@
       updateAlwaysLoadImagesStore(alwaysLoadImages)
       updateDarkMailContentStore(darkMailContent)
       updateAccentBarUnreadStore(accentBarUnread)
-      updateMenuBarIconStore(menuBarIcon)
       updateShowMessageListCirclesStore(showMessageListCircles)
       updateShowViewerCirclesStore(showViewerCircles)
       addToast({
