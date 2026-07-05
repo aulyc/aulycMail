@@ -20,7 +20,9 @@ This records the local macOS rebuild/install flow used for this checkout.
    /bin/zsh -lc "PATH=/Users/crp/.nvm/versions/node/v24.13.0/bin:/Users/crp/go/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin make install-darwin"
    ```
 
-2. If install fails because the app is still running, quit it manually and retry.
+2. If install fails because the app is still running after the built-in wait,
+   quit it manually and retry. AppleScript `-128` during the quit request is
+   handled by `make install-darwin` as long as the process exits afterward.
 
    ```sh
    osascript -e 'tell application id "com.aulyc.aulycmail" to quit'
@@ -37,7 +39,7 @@ This records the local macOS rebuild/install flow used for this checkout.
 
 - Date/time: 2026-07-01 23:21 CST
 - Running app PID before quit: a running `aulycmail` process was detected by `make install-darwin`
-- Quit result: the first AppleScript quit request returned `-128` ("user cancelled"), but a follow-up process-table check showed no installed `aulycmail` main process; retrying `make install-darwin` then reported no running process and continued
+- Quit result: the quit target treats AppleScript `-128` ("user cancelled") as non-fatal when the follow-up process-table check shows no installed `aulycmail` main process
 - Install result: success
 - Installed binary: `/Applications/aulycmail.app/Contents/MacOS/aulycmail`
 - Installed timestamp observed: `Jul 1 23:21`

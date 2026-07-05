@@ -167,7 +167,13 @@ quit-running-darwin:
 	@echo "Checking for running aulycmail..."
 	@if pgrep -x aulycmail >/dev/null; then \
 		echo "Quitting running aulycmail..."; \
-		osascript -e 'tell application id "com.aulyc.aulycmail" to quit'; \
+		quit_log=$$(mktemp); \
+		if osascript -e 'tell application id "com.aulyc.aulycmail" to quit' >"$$quit_log" 2>&1; then \
+			rm -f "$$quit_log"; \
+		else \
+			rm -f "$$quit_log"; \
+			echo "Quit request returned a non-zero status; waiting for process exit..."; \
+		fi; \
 	fi
 	@for i in $$(seq 1 20); do \
 		if ! pgrep -x aulycmail >/dev/null; then \
