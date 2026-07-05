@@ -70,7 +70,6 @@
     })),
   ])
   const selectedScope = $derived(accountScopes.find((scope) => scope.id === selectedAccountEmail) ?? accountScopes[0])
-  const detailHeaderTitle = $derived(detail ? (detail.subject || $_('backupViewer.unknownSubject')) : $_('backupViewer.messageDetail'))
   const searchScopeIndex = $derived(Math.max(0, accountScopes.findIndex((scope) => scope.id === searchScopeEmail)))
   const darkFilterStyle = $derived.by(() => {
     void getThemeMode()
@@ -473,7 +472,7 @@
           onValueChange={(value) => void selectScope(value)}
           disabled={!catalog?.messageCount}
         >
-          <Select.Trigger class="h-10 w-[154px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
+          <Select.Trigger class="h-10 w-[192px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
             <Select.Value placeholder={$_('backupViewer.scopeAll')}>
               {selectedScope?.label ?? $_('backupViewer.scopeAll')}
             </Select.Value>
@@ -528,13 +527,11 @@
           </button>
         </div>
 
-        <span class="w-8 shrink-0 text-right text-xs text-muted-foreground">{visibleMessages.length}</span>
         {#if errorMessage}
           <span class="max-w-[220px] shrink truncate text-sm text-destructive" title={errorMessage}>{errorMessage}</span>
         {/if}
 
-        <span class="h-7 w-px shrink-0 bg-border" aria-hidden="true"></span>
-        <h3 class="min-w-[180px] flex-1 truncate text-sm font-semibold" title={detailHeaderTitle}>{detailHeaderTitle}</h3>
+        <span class="min-w-0 flex-1" aria-hidden="true"></span>
         {#if detail?.size}
           <span class="shrink-0 text-xs text-muted-foreground">{formatFileSize(detail.size)}</span>
         {/if}
