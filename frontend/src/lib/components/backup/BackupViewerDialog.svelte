@@ -42,6 +42,8 @@
     key: string
   }
 
+  const SEARCH_SCOPE_SIDE_SLOT_COUNT = 10
+
   let { open = $bindable(false), onClose }: Props = $props()
 
   let directory = $state('')
@@ -82,21 +84,9 @@
   const selectedScope = $derived(accountScopes.find((scope) => scope.id === selectedAccountEmail) ?? accountScopes[0])
   const detailHeaderTitle = $derived(detail ? (detail.subject || $_('backupViewer.unknownSubject')) : '')
   const searchScopeIndex = $derived(Math.max(0, accountScopes.findIndex((scope) => scope.id === searchScopeEmail)))
-  const searchScopeSlots = $derived.by((): SearchScopeSlot[] => {
-    const count = accountScopes.length
-    if (count === 0) return []
-    const offsets = count === 1 ? [0] : count === 2 ? [-1, 0, 1] : [-2, -1, 0, 1, 2]
-    return offsets.map((offset) => {
-      const sourceIndex = wrapIndex(searchScopeIndex + offset, count)
-      const scope = accountScopes[sourceIndex]
-      return {
-        scope,
-        sourceIndex,
-        offset,
-        key: `${offset}:${sourceIndex}:${scope.id || 'all'}`,
-      }
-    })
-  })
+  const selectedSearchScope = $derived(accountScopes[searchScopeIndex])
+  const searchScopeLeftSlots = $derived.by(() => buildSearchScopeSideSlots(-1))
+  const searchScopeRightSlots = $derived.by(() => buildSearchScopeSideSlots(1))
   const darkFilterStyle = $derived.by(() => {
     void getThemeMode()
     if (!darkFilterEnabled) return ''
@@ -421,6 +411,28 @@
 
   function wrapIndex(index: number, count: number): number {
     return ((index % count) + count) % count
+  }
+
+  function buildSearchScopeSideSlots(direction: -1 | 1): SearchScopeSlot[] {
+    const count = accountScopes.length
+    if (count <= 1) return []
+    const slots: SearchScopeSlot[] = []
+    let step = 1
+    while (slots.length < SEARCH_SCOPE_SIDE_SLOT_COUNT && step <= SEARCH_SCOPE_SIDE_SLOT_COUNT * count) {
+      const offset = direction * step
+      const sourceIndex = wrapIndex(searchScopeIndex + offset, count)
+      if (sourceIndex !== searchScopeIndex) {
+        const scope = accountScopes[sourceIndex]
+        slots.push({
+          scope,
+          sourceIndex,
+          offset,
+          key: `${direction}:${step}:${sourceIndex}:${scope.id || 'all'}`,
+        })
+      }
+      step += 1
+    }
+    return direction === -1 ? slots.reverse() : slots
   }
 
   async function selectSearchResult(index: number) {
@@ -792,25 +804,47 @@
         onclick={(event) => event.stopPropagation()}
       >
         <div class="mb-3 overflow-hidden">
-          <div
-            class="flex items-center justify-center gap-2 overflow-hidden"
-          >
-            {#each searchScopeSlots as item (item.key)}
-              {@const isSelectedScope = item.offset === 0}
+          <div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 overflow-hidden">
+            <div class="flex min-w-0 justify-end gap-2 overflow-hidden">
+              {#each searchScopeLeftSlots as item (item.key)}
+                <button
+                  type="button"
+                  tabindex="-1"
+                  aria-pressed="false"
+                  class="max-w-[240px] shrink-0 truncate rounded-md border border-border/70 bg-transparent px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-border hover:bg-muted/20 hover:text-foreground"
+                  onmousedown={(event) => event.preventDefault()}
+                  onclick={() => selectSearchScope(item.scope.id)}
+                >
+                  {item.scope.label}
+                </button>
+              {/each}
+            </div>
+            {#if selectedSearchScope}
               <button
                 type="button"
                 tabindex="-1"
-                aria-pressed={isSelectedScope}
-                class="max-w-[240px] shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors truncate
-                  {isSelectedScope
-                    ? 'border-primary/75 bg-primary/15 text-primary'
-                    : 'border-border/70 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground'}"
+                aria-pressed="true"
+                class="max-w-[240px] shrink-0 truncate rounded-md border border-primary/75 bg-primary/15 px-3 py-1.5 text-xs font-semibold text-primary shadow-sm backdrop-blur-sm transition-colors"
                 onmousedown={(event) => event.preventDefault()}
-                onclick={() => selectSearchScope(item.scope.id)}
+                onclick={() => selectSearchScope(selectedSearchScope.id)}
               >
-                {item.scope.label}
+                {selectedSearchScope.label}
               </button>
-            {/each}
+            {/if}
+            <div class="flex min-w-0 justify-start gap-2 overflow-hidden">
+              {#each searchScopeRightSlots as item (item.key)}
+                <button
+                  type="button"
+                  tabindex="-1"
+                  aria-pressed="false"
+                  class="max-w-[240px] shrink-0 truncate rounded-md border border-border/70 bg-transparent px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm backdrop-blur-sm transition-colors hover:border-border hover:bg-muted/20 hover:text-foreground"
+                  onmousedown={(event) => event.preventDefault()}
+                  onclick={() => selectSearchScope(item.scope.id)}
+                >
+                  {item.scope.label}
+                </button>
+              {/each}
+            </div>
           </div>
         </div>
 
