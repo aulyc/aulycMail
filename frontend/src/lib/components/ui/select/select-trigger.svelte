@@ -7,9 +7,10 @@
   interface Props {
     class?: string;
     children?: Snippet;
+    showChevron?: boolean;
   }
 
-  let { class: className, children }: Props = $props()
+  let { class: className, children, showChevron = true }: Props = $props()
 </script>
 
 <SelectPrimitive.Trigger
@@ -21,5 +22,7 @@
   {#if children}
     {@render children()}
   {/if}
-  <Icon icon="mdi:chevron-down" class="h-4 w-4 opacity-50" />
+  {#if showChevron}
+    <Icon icon="mdi:chevron-down" class="h-4 w-4 opacity-50" />
+  {/if}
 </SelectPrimitive.Trigger>
