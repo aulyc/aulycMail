@@ -151,11 +151,6 @@ func (p *Paths) SearchIndexPath(accountID string) string {
 	return filepath.Join(p.Data, "search", accountID)
 }
 
-// KeyringPath returns the path to the PGP keyring directory
-func (p *Paths) KeyringPath() string {
-	return filepath.Join(p.Data, "keys")
-}
-
 // ConfigFilePath returns the path to the main config file
 func (p *Paths) ConfigFilePath() string {
 	return filepath.Join(p.Config, "config.toml")

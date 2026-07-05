@@ -107,9 +107,6 @@ func (stubUI) RegisterContextMenuItem(ContextMenuRequest) (Unregister, error) {
 func (stubUI) RegisterInboxView(InboxViewRequest) (Unregister, error) {
 	return func() {}, ErrUnimplemented
 }
-func (stubUI) RegisterAccountSetupHook(AccountSetupHookRequest) (Unregister, error) {
-	return func() {}, ErrUnimplemented
-}
 func (stubUI) OpenURL(string) error { return ErrUnimplemented }
 
 type stubStorage struct{}

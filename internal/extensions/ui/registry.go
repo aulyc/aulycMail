@@ -12,23 +12,21 @@ import (
 // Registry is the in-memory store of all extension UI registrations. Safe
 // for concurrent Register/Unregister/List from multiple goroutines.
 type Registry struct {
-	mu                sync.RWMutex
-	nextID            atomic.Uint64
-	railTabs          map[uint64]coreapi.RailTabRequest
-	settingsTabs      map[uint64]coreapi.SettingsTabRequest
-	contextMenuItems  map[uint64]coreapi.ContextMenuRequest
-	inboxViews        map[uint64]coreapi.InboxViewRequest
-	accountSetupHooks map[uint64]coreapi.AccountSetupHookRequest
+	mu               sync.RWMutex
+	nextID           atomic.Uint64
+	railTabs         map[uint64]coreapi.RailTabRequest
+	settingsTabs     map[uint64]coreapi.SettingsTabRequest
+	contextMenuItems map[uint64]coreapi.ContextMenuRequest
+	inboxViews       map[uint64]coreapi.InboxViewRequest
 }
 
 // NewRegistry constructs an empty Registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		railTabs:          make(map[uint64]coreapi.RailTabRequest),
-		settingsTabs:      make(map[uint64]coreapi.SettingsTabRequest),
-		contextMenuItems:  make(map[uint64]coreapi.ContextMenuRequest),
-		inboxViews:        make(map[uint64]coreapi.InboxViewRequest),
-		accountSetupHooks: make(map[uint64]coreapi.AccountSetupHookRequest),
+		railTabs:         make(map[uint64]coreapi.RailTabRequest),
+		settingsTabs:     make(map[uint64]coreapi.SettingsTabRequest),
+		contextMenuItems: make(map[uint64]coreapi.ContextMenuRequest),
+		inboxViews:       make(map[uint64]coreapi.InboxViewRequest),
 	}
 }
 
@@ -95,22 +93,6 @@ func (r *Registry) RegisterInboxView(req coreapi.InboxViewRequest) (coreapi.Unre
 	return r.unregisterFunc(&r.inboxViews, id), nil
 }
 
-// RegisterAccountSetupHook adds a post-account-add panel. The hook is offered
-// to the user when an account with a provider in req.Providers is created.
-func (r *Registry) RegisterAccountSetupHook(req coreapi.AccountSetupHookRequest) (coreapi.Unregister, error) {
-	if req.ExtensionID == "" || req.ButtonLabel == "" || req.Component == "" {
-		return nil, fmt.Errorf("ui.RegisterAccountSetupHook: ExtensionID, ButtonLabel, and Component are required")
-	}
-	if len(req.Providers) == 0 {
-		return nil, fmt.Errorf("ui.RegisterAccountSetupHook: at least one provider is required")
-	}
-	id := r.nextID.Add(1)
-	r.mu.Lock()
-	r.accountSetupHooks[id] = req
-	r.mu.Unlock()
-	return r.unregisterFunc(&r.accountSetupHooks, id), nil
-}
-
 // ListRailTabs returns all registered rail tabs in Order ASC then registration
 // order. The returned slice is a copy — callers may not mutate the registry
 // state via it.
@@ -164,31 +146,6 @@ func (r *Registry) ListInboxViews() []coreapi.InboxViewRequest {
 	return out
 }
 
-// ListAccountSetupHooksForProvider returns all hooks whose Providers list
-// contains the given provider string. Returns an empty slice when none match
-// (never nil — frontends can iterate without a nil check).
-func (r *Registry) ListAccountSetupHooksForProvider(provider string) []coreapi.AccountSetupHookRequest {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	out := make([]coreapi.AccountSetupHookRequest, 0)
-	for _, hook := range r.accountSetupHooks {
-		if !containsProvider(hook.Providers, provider) {
-			continue
-		}
-		out = append(out, hook)
-	}
-	return out
-}
-
-func containsProvider(providers []string, p string) bool {
-	for _, v := range providers {
-		if v == p {
-			return true
-		}
-	}
-	return false
-}
-
 // unregisterFunc returns an Unregister func that deletes the entry with the
 // given id from a typed registry map. mapPtr is a pointer to the typed map
 // so the closure can dereference it without the generic-types gymnastics.
@@ -204,8 +161,6 @@ func (r *Registry) unregisterFunc(mapPtr interface{}, id uint64) coreapi.Unregis
 		case *map[uint64]coreapi.ContextMenuRequest:
 			delete(*m, id)
 		case *map[uint64]coreapi.InboxViewRequest:
-			delete(*m, id)
-		case *map[uint64]coreapi.AccountSetupHookRequest:
 			delete(*m, id)
 		}
 	}

@@ -73,7 +73,6 @@ active build/install flow is macOS-only.
 - Notification that brings focus to the e-mail when clicked
 - Auto-Sync when system wakes from suspend
 - Multiple color themes (More to come...)
-- PGP & S/MIME support
 - 1st party extension system with the following shipped:
     - Contacts (ALPHA) - Disabled by Default
 - [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)

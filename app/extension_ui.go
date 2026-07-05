@@ -49,21 +49,6 @@ func (a *App) ListExtensionRailTabs() ([]coreapi.RailTabRequest, error) {
 	return out, nil
 }
 
-// ListAccountSetupHooksForProvider returns hook panels matching the given
-// provider. Called by AccountDialog.svelte after a new account is created,
-// to render any "Also set up X" panels.
-//
-// Hooks are returned regardless of whether their extension is currently
-// enabled — the hook itself is the discovery surface. Filtering by enabled
-// state here would hide first-party features from new users if optional
-// extensions are added later.
-func (a *App) ListAccountSetupHooksForProvider(provider string) ([]coreapi.AccountSetupHookRequest, error) {
-	if a.uiRegistry == nil {
-		return nil, nil
-	}
-	return a.uiRegistry.ListAccountSetupHooksForProvider(provider), nil
-}
-
 // enabledExtensionSet returns a set of currently-enabled extension names.
 func (a *App) enabledExtensionSet() (map[string]bool, error) {
 	set := make(map[string]bool, len(settings.AllExtensionKeys))
@@ -78,4 +63,3 @@ func (a *App) enabledExtensionSet() (map[string]bool, error) {
 	}
 	return set, nil
 }
-

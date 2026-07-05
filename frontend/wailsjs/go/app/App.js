@@ -358,20 +358,12 @@ export function IsReady() {
   return window['go']['app']['App']['IsReady']();
 }
 
-export function ListAccountSetupHooksForProvider(arg1) {
-  return window['go']['app']['App']['ListAccountSetupHooksForProvider'](arg1);
-}
-
 export function ListEnabledExtensions() {
   return window['go']['app']['App']['ListEnabledExtensions']();
 }
 
 export function ListExtensionRailTabs() {
   return window['go']['app']['App']['ListExtensionRailTabs']();
-}
-
-export function LogFrontend(arg1, arg2) {
-  return window['go']['app']['App']['LogFrontend'](arg1, arg2);
 }
 
 export function MarkAllFolderMessagesAsRead(arg1) {

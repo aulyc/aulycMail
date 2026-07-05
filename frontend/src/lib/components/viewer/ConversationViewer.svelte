@@ -482,7 +482,6 @@
     }
   }
 
-  // Process S/MIME messages on-view (verify/decrypt fresh each time)
   // Fetch bodies on-demand for messages that don't have them yet
   async function fetchUnfetchedBodies(messages: messageModels.Message[]) {
     for (const msg of messages) {

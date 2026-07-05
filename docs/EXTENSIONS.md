@@ -226,10 +226,7 @@ func (e *Extension) Register(core coreapi.Core) (coreapi.Unregister, error) {
     })
     if err != nil { return nil, err }
 
-    unregHook, err := core.UI().RegisterAccountSetupHook(coreapi.AccountSetupHookRequest{...})
-    if err != nil { unregRail(); return nil, err }
-
-    return func() { unregHook(); unregRail() }, nil
+    return func() { unregRail() }, nil
 }
 ```
 
@@ -279,7 +276,7 @@ func (b *Bridge) Contacts_ListContactsForBrowse(query, sourceID string, limit, o
     return b.api.ListContacts(query, sourceID, limit, offset)
 }
 // ... Contacts_GetContactDetail, Contacts_CreateContact, Contacts_UpdateContact,
-//     Contacts_DeleteLocalContact, Contacts_ResizeContactPhoto,
+//     Contacts_DeleteLocalContact,
 //     Contacts_ListAddressbooks, Contacts_ListSources, Contacts_LinkAccountSource ...
 ```
 
@@ -453,7 +450,7 @@ This is the complete list of APIs your extension is allowed to consume. Anything
 | `core.Composer()` | ⚠️ | `OpenComposer` (mailto URL form) | `Attachments` and `ReplyTo` in `ComposeRequest` return `ErrUnimplemented`. |
 | `core.Contacts()` | ✅ | `ListSources`, `LinkAccountSource`, `ListAddressbooks`, `SetSourceWritable`, `SearchContacts`; `ContactSource.AccountID` field surfaced | Source-management surface used by the Contacts extension itself + the first read-side cross-extension method (`SearchContacts`). `SearchContacts` was wired in v0.3.0 to back the Calendar extension's attendee-picker autocomplete — see [§ Cross-extension consumption (Search example)](#cross-extension-consumption-search-example) below. Remaining contact CRUD methods (`GetContact`/`ListContacts`/`Create`/`Update`/`Delete`/`ListAddressbooks`) still return `ErrUnimplemented` — no cross-extension consumer queries those yet, and routing them through coreImpl would force the Contacts extension to initialize even when disabled. They get wired in when a real consumer arrives. |
 | `core.Auth()` | ✅ | `HTTPClient(accountID, scopes)` — bearer + transparent refresh; `StartIncrementalConsent(req StartIncrementalConsentRequest)` — synchronous OAuth consent flow that persists tokens against either an account or a standalone contacts source (see [§ Write-access grant flow](#write-access-grant-flow-account-picker-model)) | `IMAPClient` and `SMTPClient` return `ErrUnimplemented`. |
-| `core.UI()` | ⚠️ | `RegisterRailTab`, `RegisterAccountSetupHook`, `OpenURL` | `RegisterSettingsTab`, `RegisterContextMenuItem`, `RegisterInboxView` accept registrations but no consumer reads them yet. `OpenURL` opens URLs in the system browser via the host's hardened resolver (protocol allowlist, Linux portal-first). |
+| `core.UI()` | ⚠️ | `RegisterRailTab`, `OpenURL` | `RegisterSettingsTab`, `RegisterContextMenuItem`, `RegisterInboxView` accept registrations but no consumer reads them yet. `OpenURL` opens URLs in the system browser via the host's hardened resolver (protocol allowlist, Linux portal-first). |
 | `core.Storage()` | ⚠️ | `Secrets(extensionID)` — keyring-first with AES-encrypted DB fallback | `KV(extensionID)` still returns `stubKV` (all methods `ErrUnimplemented`) — wires up when a real consumer arrives. Per-extension SQLite (your own `*sql.DB`) is the parallel persistence path — see [§ Per-extension storage](#per-extension-storage). |
 | `core.Notifications()` | ✅ | `Show(NotifyRequest)` — dispatches to the host's platform notifier; click routing supports `open-extension` (raises window + emits Wails `extension:open`) | Calendar's VALARM scheduler is the first concrete consumer. |
 | `core.Events()` | ✅ | `Publish` (fan-out to Go subscribers + Wails frontend) + `Subscribe` (in-process Go handlers); host publishes `system:wake` and `system:network-online` for sleep/wake + network state | Lazy singleton via `sync.Once` — disabled-only configs pay nothing. Calendar consumes both system events. |
@@ -763,16 +760,15 @@ type UI interface {
     RegisterSettingsTab(req SettingsTabRequest) (Unregister, error)
     RegisterContextMenuItem(req ContextMenuRequest) (Unregister, error)
     RegisterInboxView(req InboxViewRequest) (Unregister, error)
-    RegisterAccountSetupHook(req AccountSetupHookRequest) (Unregister, error)
 
     // UI actions
     OpenURL(url string) error
 }
 ```
 
-Two halves: the five `Register*` methods that extensions use to publish UI surface descriptions to the host, and `OpenURL` for triggering a host-mediated user-facing action.
+Two halves: the four `Register*` methods that extensions use to publish UI surface descriptions to the host, and `OpenURL` for triggering a host-mediated user-facing action.
 
-**Registrations.** Concrete impl: [`internal/extensions/ui/registry.go`](../internal/extensions/ui/registry.go) (Phase 2a). All five registration methods are wired and concurrency-safe (`RWMutex`-protected map per kind). `RailTab` and `AccountSetupHook` have real frontend consumers in v0.3.x; the other three (`SettingsTab`, `ContextMenuItem`, `InboxView`) accept registrations but no consumer reads them yet. See [§ UI registration](#ui-registration).
+**Registrations.** Concrete impl: [`internal/extensions/ui/registry.go`](../internal/extensions/ui/registry.go) (Phase 2a). All four registration methods are wired and concurrency-safe (`RWMutex`-protected map per kind). `RailTab` is consumed by the frontend; the other three (`SettingsTab`, `ContextMenuItem`, `InboxView`) accept registrations but no consumer reads them yet. See [§ UI registration](#ui-registration).
 
 **`OpenURL(url string) error`** opens the given URL in the user's system browser via the host's hardened resolver. Behavior:
 
@@ -1078,63 +1074,9 @@ unreg, err := core.UI().RegisterRailTab(coreapi.RailTabRequest{
 })
 ```
 
-### `RegisterAccountSetupHook` — Phase 2a (Contacts)
-
-A panel that appears in the post-account-add flow in `AccountDialog`. See [§ Account-setup hook contract](#account-setup-hook-contract).
-
-```go
-unreg, err := core.UI().RegisterAccountSetupHook(coreapi.AccountSetupHookRequest{
-    ExtensionID: "contacts",
-    Providers:   []string{"google", "microsoft"},
-    ButtonLabel: "Also set up your contacts",
-    Component:   "AccountContactsHookPanel",
-})
-```
-
 ### `RegisterSettingsTab`, `RegisterContextMenuItem`, `RegisterInboxView` — Phase 3+
 
 Registrations are accepted but no consumer reads them yet. Reserved for future use; design preserved in the v1 interface so extensions can declare intent now.
-
----
-
-## Account-setup hook contract
-
-The most important contract for extension UX. Mirrors Thunderbird's "Also set up Calendar / Contacts for this account?" flow.
-
-### Backend registration
-
-In your extension's startup wiring:
-
-```go
-core.UI().RegisterAccountSetupHook(coreapi.AccountSetupHookRequest{
-    ExtensionID: "myext",
-    Providers:   []string{"google", "microsoft", "imap"},
-    ButtonLabel: "Also set up <feature> for this account",
-    Description: "Optional context shown alongside the button",
-    Component:   "MyExtAccountHookPanel",  // Svelte component identifier
-})
-```
-
-`Providers` lists which mail-account provider strings the hook matches. Only hooks whose `Providers` includes the just-added account's provider will be offered to the user.
-
-### Frontend flow
-
-Wired in Phase 2a via [`AccountDialog.svelte`](../frontend/src/lib/components/settings/AccountDialog.svelte):
-
-1. After `AccountDialog.handleSubmit` successfully creates an account, the dialog computes a `provider` string: `oauthCredentials.provider` for OAuth accounts (`"google"` or `"microsoft"`), `"imap"` otherwise.
-2. Dialog calls `loadAccountSetupHooks(provider)` ([`extensionRegistry.svelte.ts`](../frontend/src/lib/stores/extensionRegistry.svelte.ts)) which wraps the Wails-bound `App.ListAccountSetupHooksForProvider`. Hooks are returned regardless of enable state — the hook IS the discovery surface that enables the extension.
-3. **Zero hooks** → dialog closes. **Non-zero** → dialog renders a "hooks step" UI that dispatches each hook to its registered Svelte component by `hook.component` name (e.g., `"AccountContactsHookPanel"` → [`extensions/contacts/frontend/hooks/AccountContactsHookPanel.svelte`](../extensions/contacts/frontend/hooks/AccountContactsHookPanel.svelte)).
-4. Each panel is opt-in: user clicks "Set up" or "Skip". The "Set up" handler runs the extension's onboarding (Phase 2a Contacts: `LinkAccountContactSource` + `SetExtensionEnabled('contacts', true)` + `refreshExtensionRegistry()`).
-5. When all panels resolve (set up or skipped), or the user clicks "Skip all", the dialog closes.
-
-The dispatch in `AccountDialog.svelte` is a static `{#if hook.component === '...'}` block. When you add a new hook component, extend that block — don't switch to `<svelte:component>` dynamic mounting (the component identifier is descriptive only).
-
-### Constraints
-
-- Hook panels must NEVER auto-enable extensions or auto-grant scopes. Every action requires an explicit user click.
-- Skipping a panel is the explicit default. Closing the dialog mid-wizard is equivalent to skipping.
-- Hooks register at `App.Startup` (synchronously, before Wails serves the frontend) so the dialog's query is always race-free.
-- Hooks are returned regardless of whether their extension is currently enabled. The hook IS the discovery surface — its "Set up" handler is what enables the extension. Filtering by enabled state would hide first-party features from new users (extensions default to disabled).
 
 ---
 
@@ -1146,7 +1088,7 @@ Three things, **and nothing else**, run unconditionally per extension at startup
 
 1. **Bridge struct allocation** — `app/extension_<name>.go` calls `extbe.NewBridge(...)`. This is a zero-cost struct literal with host-dependency fields only; no SQLite, no migrations, no stores.
 2. **Extension lifecycle struct allocation** — `extbe.NewExtension()` returns a manifest holder. Manifest copy only.
-3. **`Extension.Register(core)`** — wires descriptive UI registrations (rail tab, account-setup hook) into the host's registries so the Settings UI and account-setup dialog can always list them. The frontend filters at render time on enabled state.
+3. **`Extension.Register(core)`** — wires descriptive UI registrations into the host's registries. The frontend filters rail tabs at render time on enabled state.
 
 ```go
 // In app/app.go Startup:
@@ -1174,7 +1116,7 @@ Background services (sync schedulers, IDLE managers, event publishers) follow th
 
 ### Enable / disable
 
-User-facing enable/disable goes through `App.SetExtensionEnabled(name, enabled)` ([§ Wails-bound surface](#wails-bound-surface)). The host is responsible for starting/stopping the extension's background services in response to the flag changing. Phase 1 ships the flag; full lifecycle wiring lands when each extension ships its own background services.
+The enable/disable flag lives in the settings store (`Store.SetExtensionEnabled`, see [§ Settings keys](#settings-keys)). There is currently no user-facing toggle — the former `App.SetExtensionEnabled` binding was removed as unused and should be reintroduced together with the Settings → Extensions UI. The host is responsible for starting/stopping the extension's background services in response to the flag changing. Phase 1 ships the flag; full lifecycle wiring lands when each extension ships its own background services.
 
 ---
 
@@ -1210,19 +1152,11 @@ Extension-relevant subset. Many other `App.*` methods exist for mail-side concer
 
 | Method | Purpose |
 |---|---|
-| `App.IsExtensionEnabled(name string) (bool, error)` | Read the extension's enabled flag |
-| `App.SetExtensionEnabled(name string, enabled bool) error` | Write the enabled flag (frontend triggers from Settings UI) |
-| `App.LogFrontend(level, message string)` | Bridge for frontend logging — appears in the same zerolog stream as backend logs with `component=frontend`. Levels: `debug|info|warn|error`. Unknown levels fall through to info. |
 | `App.ListEnabledExtensions() ([]string, error)` | All currently-enabled extension names (iterates `settings.AllExtensionKeys`). The frontend rail renders when `len() >= 1` (one enabled extension + always-on Mail = two rail items to switch between). |
 | `App.ListExtensionRailTabs() ([]v1.RailTabRequest, error)` | Rail tabs for currently-enabled extensions only. Source: [`app/extension_ui.go`](../app/extension_ui.go). |
-| `App.ListAccountSetupHooksForProvider(provider string) ([]v1.AccountSetupHookRequest, error)` | Hooks matching a provider, returned regardless of enable state (hooks are the discovery surface that enables an extension). Called by `AccountDialog.svelte` after a new account is created. |
-| `App.ListExtensions() ([]app.ExtensionInfo, error)` | Full extension listing for Settings → Extensions tab. Returns manifest fields + current `enabled` state per extension. Iterates `a.knownExtensions`. Source: [`app/extension_ui.go`](../app/extension_ui.go). |
-| `App.SetContactSourceWritable(sourceID string, writable bool) error` | Flip a contact source's writable flag. Used by the Contacts extension's settings UI to enable/disable write access on CardDAV sources (a pure flag flip) and to disable previously-enabled OAuth sources. Enabling OAuth sources goes through `<Extension>_StartIncrementalConsent` (which calls `SetSourceWritable` server-side after consent). |
-| `App.GetOAuthCredsStatus(configID string) (app.OAuthCredsStatus, error)` | Reports per-slot config presence (`hasUserOverride`, `hasShipped`, last-4-char fingerprint of the active client_id). Never returns secret values. Used by the OAuth Credentials editor in each extension's settings dialog. |
-| `App.SetOAuthCreds(configID, clientID, clientSecret string) error` | Persist user-supplied client_id + secret for a slot (overrides any shipped defaults). |
-| `App.ClearOAuthCreds(configID string) error` | Remove a user override for a slot (reverts to shipped values, if any). Used both by the editor's "Clear" action and when the slot dropdown switches from Custom back to the aulycmail-shipped option. |
-| `App.ListAuthContextsForProvider(provider string) ([]app.AuthContextInfo, error)` | Enumerates existing matching-provider auth identities: mail accounts (from `accountStore`) + standalone contact sources (`carddavStore.ListSources()` where `AccountID IS NULL` and `Type == provider`). Drives the `WriteAccessAccountPicker` dialog's radio list. Result entries carry `kind` (`"mail"` or `"standalone-contacts"`), `identifier` (account_id or source_id), `email`, and a pre-built display `label`. |
 | `App.CancelOAuthFlow()` | Cancel any in-progress OAuth flow (account add, write-access grant, etc.). Stops the OAuth manager's callback server; in-flight backend code returns with a cancellation error. |
+
+Earlier revisions also bound per-extension enable/disable toggles (`IsExtensionEnabled`/`SetExtensionEnabled`/`ListExtensions`), a frontend log bridge (`LogFrontend`), and the OAuth credential override editor (`GetOAuthCredsStatus`/`SetOAuthCreds`/`ClearOAuthCreds`). No frontend UI ever consumed them, so the bindings were removed; reintroduce them together with their UI if those features ship. The write-access surface (`SetContactSourceWritable`, `ListAuthContextsForProvider`) described in [§ Write-access grant flow](#write-access-grant-flow-account-picker-model) is design-stage and not yet implemented.
 
 ### Extension bridge methods (`<Extension>_` prefix, defined on the embedded `*Bridge`)
 
@@ -1247,11 +1181,9 @@ Currently bound by the Contacts extension's bridge (all gate on `extension_conta
 | `App.Contacts_CreateContact(input v1.ContactCreateInput) (string, error)` | Create new contact. Dispatches by `input.SourceID`: `local:manual` → local store; CardDAV UUID → server PUT to the addressbook; Google source → People API; Microsoft source → Graph API. |
 | `App.Contacts_UpdateContact(id string, patch v1.ContactPatch) error` | Multi-field patch update. Backend dispatches by source type (local / CardDAV / Google / Microsoft). |
 | `App.Contacts_DeleteLocalContact(idOrEmail string) error` | Delete contact. Method name is historical — handles all source types (local cascade + CardDAV / Google / Microsoft server DELETE), not just local. |
-| `App.Contacts_ResizeContactPhoto(b64In string) (backend.ResizedContactPhoto, error)` | Backend image resize for the Edit dialog's photo picker (decodes base64 → CatmullRom rescale to 256px max edge → JPEG re-encode at quality 85). Returns `{data, mediaType}`. |
 | `App.Contacts_ListAddressbooks(sourceID string) ([]v1.Addressbook, error)` | Addressbooks for a source — CardDAV addressbooks; Google contactGroups (as `google-group:*` synthetic IDs) + a `google-mycontacts:*` default; Microsoft contactFolders (as `ms-folder:*`) + a `ms-default:*` default. See [§ Contacts](#contacts) for the synthetic-ID table. |
 | `App.Contacts_ListSources() ([]v1.ContactSource, error)` | All configured contact sources. Routes through `coreapi.Contacts.ListSources` (host-owned, not bridge-API). |
-| `App.Contacts_LinkAccountSource(accountID, name string, syncInterval int) (string, error)` | Creates a contact source backed by an existing OAuth account. Routes through `coreapi.Contacts.LinkAccountSource`. Used by `AccountContactsHookPanel`. |
-| `App.Contacts_EnableWriteAccess(sourceID, authContextKind, authContextIdentifier, expectedEmail string) error` | Single entry point for granting write access on a Google or Microsoft contacts source. The frontend `WriteAccessAccountPicker` calls this after the user picks an existing auth identity (mail account or standalone contacts source). Backend derives `clientConfigID` and write-scope from the source's provider, then dispatches into `coreapi.Auth.StartIncrementalConsent` with either `AccountID` (for `"mail"` contexts) or `SourceID` (for `"standalone-contacts"` contexts) populated. `expectedEmail` is enforced post-callback — if the granted identity's email doesn't match, the tokens are discarded and the call returns an error. Flips the source's writable flag on success. Cancellable mid-flow via `App.CancelOAuthFlow`. |
+| `App.Contacts_LinkAccountSource(accountID, name string, syncInterval int) (string, error)` | Creates a contact source backed by an existing OAuth account. Routes through `coreapi.Contacts.LinkAccountSource`. |
 
 ### Frontend logger
 
@@ -1393,15 +1325,14 @@ Adding a new extension's i18n is purely a file drop under `extensions/<name>/fro
 [`frontend/src/lib/stores/extensionRegistry.svelte.ts`](../frontend/src/lib/stores/extensionRegistry.svelte.ts) — frontend cache of enabled extensions and rail tabs. Exposes:
 
 ```ts
-extensionRegistry.enabled       // string[]
-extensionRegistry.railTabs      // v1.RailTabRequest[]
-extensionRegistry.railVisible   // boolean (true when length >= 1 — Mail + 1 extension)
-extensionRegistry.isEnabled(name)
-refreshExtensionRegistry()      // call after enable/disable toggle
-loadAccountSetupHooks(provider) // returns v1.AccountSetupHookRequest[]
+getEnabledExtensions()      // string[]
+getRailTabs()               // v1.RailTabRequest[]
+isRailVisible()             // boolean (true when length >= 1 — Mail + 1 extension)
+isExtensionEnabled(name)
+refreshExtensionRegistry()  // call after enable/disable toggle
 ```
 
-Call `refreshExtensionRegistry()` after `SetExtensionEnabled` so the rail/hooks reflect the new state.
+Call `refreshExtensionRegistry()` after changing extension enablement so the rail reflects the new state.
 
 ### Active-extension state
 
@@ -1469,13 +1400,15 @@ This coupling is architectural debt — extensions touching `frontend/vite.confi
 
 The kit at [`frontend/src/lib/components/kit/`](../frontend/src/lib/components/kit) is the layer extensions compose their UI from. Theme tokens, keyboard navigation, density, accent-bar selection, avatar palette, dialog interactions — all are baked in, **matching mail's behavior 1-for-1**. Your extension provides data and callbacks, the kit owns rendering, and the end user gets a UX indistinguishable from the rest of aulycmail.
 
+> **Status note.** The kit currently ships nine primitives: `PaneLayout`, `ListPane`, `ListRow`, `ListHeader`, `DetailPane`, `SourceSidebar`, `SidebarFrame`, `ResponsiveSidebarToggle`, `ConfirmDialog`. Several primitives documented below were pre-built for the Calendar extension but removed while unconsumed (`DetailOverlay`, `SourceItem`, `SidebarAddItem`, `ColorPicker`; `Avatar` was never built). Their specs remain here as design reference; recover implementations from git history or rebuild to spec when a consumer ships.
+
 ### Why the UI kit exists
 
 Extensions need to look and behave like the rest of aulycmail — same keys, same focus rules, same scrolling, same dialog interactions. Modifying mail's code (`MessageList.svelte`, `Sidebar.svelte`, `ConversationViewer.svelte`, etc.) to share components directly carries too much regression risk to do that way. The kit is the mechanism for getting cohesion without touching mail. **It's not an alternative design — it's the necessary copy of mail's UX, made consumable by extensions.**
 
 ### The 1-for-1 rule
 
-Every kit primitive (`Avatar`, `PaneLayout`, `ListPane`, `ListRow`, `ListHeader`, `ResponsiveSidebarToggle`, `SidebarFrame`, `SourceSidebar`, `SourceItem`, `SidebarAddItem`, `DetailPane`, `ConfirmDialog`, `ColorPicker`, `OAuthCredsSlotEditor`, …) is a behavioral replica of how the equivalent functionality works in mail today: same key bindings, same focus semantics, same scroll-into-view, same edge-case behavior. The backwards-compat test: **if mail were ever refactored to consume the kit, the user should see zero difference**. If you can't pass that test on a kit primitive you're writing, you've diverged.
+Every kit primitive (`PaneLayout`, `ListPane`, `ListRow`, `ListHeader`, `ResponsiveSidebarToggle`, `SidebarFrame`, `SourceSidebar`, `DetailPane`, `ConfirmDialog`) is a behavioral replica of how the equivalent functionality works in mail today: same key bindings, same focus semantics, same scroll-into-view, same edge-case behavior. The backwards-compat test: **if mail were ever refactored to consume the kit, the user should see zero difference**. If you can't pass that test on a kit primitive you're writing, you've diverged.
 
 **Greenfield exception (R25).** Some kit primitives have no mail equivalent — Calendar's `DetailOverlay`, for example, since mail's viewer is a flex-chain pane, not a fixed overlay. Per [`EXT_RULES.md` R25](./EXT_RULES.md), kit is an extension-driven SDK; when mail has no counterpart, the primitive is designed cleanly from the consumer's needs. The 1-for-1 rule applies to primitives that DO have a mail counterpart (`SidebarAddItem` ↔ mail's "+ Add Account" inline button, `ConfirmDialog` ↔ mail's confirms, etc.). Greenfield primitives are still bound by the kit's general conventions: theme tokens, density-aware sizing, layout-store responsive handling, `shortcuts.ts` predicates for keys, and **no imports from mail's `components/{list,sidebar,viewer}/` namespace**.
 
@@ -1501,7 +1434,7 @@ The **implementations differ per layer** — mail dispatches via concrete compon
 
 #### `Avatar` — colored initials circle
 
-[`frontend/src/lib/components/kit/Avatar.svelte`](../frontend/src/lib/components/kit/Avatar.svelte)
+`frontend/src/lib/components/kit/Avatar.svelte` *(removed — spec below is design reference)*
 
 ```svelte
 <Avatar email={contact.email} name={contact.name} density="standard" />
@@ -1582,7 +1515,7 @@ The `onDelete` handler typically opens a `ConfirmDialog` (see below) rather than
 
 #### `SourceSidebar` + `SourceItem` — sectioned sidebar
 
-[`frontend/src/lib/components/kit/SourceSidebar.svelte`](../frontend/src/lib/components/kit/SourceSidebar.svelte) and [`SourceItem.svelte`](../frontend/src/lib/components/kit/SourceItem.svelte)
+[`frontend/src/lib/components/kit/SourceSidebar.svelte`](../frontend/src/lib/components/kit/SourceSidebar.svelte) and `SourceItem.svelte`
 
 ```svelte
 <SourceSidebar
@@ -1643,7 +1576,7 @@ Lower-level kit primitive owning *only* the visual chrome of an extension sideba
 
 #### `SidebarAddItem` — "+ Add …" entry for sidebar lists
 
-[`frontend/src/lib/components/kit/SidebarAddItem.svelte`](../frontend/src/lib/components/kit/SidebarAddItem.svelte)
+`frontend/src/lib/components/kit/SidebarAddItem.svelte` *(removed — spec below is design reference)*
 
 ```svelte
 <SidebarAddItem
@@ -1686,7 +1619,7 @@ Read-only shell — no keyboard ownership. Header is fixed; body scrolls. Empty-
 
 #### `DetailOverlay` — right-side detail panel with focus mode
 
-[`frontend/src/lib/components/kit/DetailOverlay.svelte`](../frontend/src/lib/components/kit/DetailOverlay.svelte)
+`frontend/src/lib/components/kit/DetailOverlay.svelte` *(removed — spec below is design reference)*
 
 ```svelte
 <DetailOverlay
@@ -1839,7 +1772,7 @@ The bits-ui Root wrappers (`ui/dialog/Dialog`, `ui/alert-dialog/AlertDialog`) de
 
 #### `ColorPicker` — preset palette + hex input
 
-[`frontend/src/lib/components/kit/ColorPicker.svelte`](../frontend/src/lib/components/kit/ColorPicker.svelte)
+`frontend/src/lib/components/kit/ColorPicker.svelte` *(removed — spec below is design reference)*
 
 ```svelte
 <ColorPicker
@@ -2000,12 +1933,9 @@ Mixed-scope calls (some routing to core, some to extension) are REJECTED — the
 
 ### User-supplied OAuth credentials (override UI)
 
-Users can paste their own Client ID + Secret per slot via aulycmail's settings:
+> **Status: storage layer only.** The backend override storage and resolution chain below are live. The editor UI (`OAuthCredsSlotEditor`, the settings disclosures) and its App bindings (`GetOAuthCredsStatus`/`GetOAuthCredsChoices`/`SetOAuthCreds`/`SetOAuthCredsChoice`/`ClearOAuthCreds`) were never consumed by any shipped UI and have been removed; reintroduce them together when the editor ships.
 
-- **aulycmail core's `*-mail` slots** → Settings → Accounts → "OAuth Credentials (advanced)" disclosure (collapsed by default). See [`aulycmailCoreOAuthSection.svelte`](../frontend/src/lib/components/settings/aulycmailCoreOAuthSection.svelte).
-- **Per-extension slots** → that extension's own settings dialog. See [`ContactsSettingsDialog.svelte`](../extensions/contacts/frontend/components/ContactsSettingsDialog.svelte) for the canonical layout.
-
-Both UIs use the same shared primitive [`kit/OAuthCredsSlotEditor.svelte`](../frontend/src/lib/components/kit/OAuthCredsSlotEditor.svelte) (composed from existing `ui/input`, `ui/button`, `ui/select`, `ui/confirm-dialog` — no new low-level inputs). The picker shows an enumerated set of choices returned by `App.GetOAuthCredsChoices(configID, extensionID)`. The choice IDs are stable and persisted via `App.SetOAuthCredsChoice(configID, choiceID)`:
+The design: users can paste their own Client ID + Secret per slot via aulycmail's settings — core `*-mail` slots under Settings → Accounts, per-extension slots in that extension's settings dialog. A shared slot-editor primitive shows an enumerated set of choices:
 
 - **`custom`** — user-supplied Client ID + Secret. Always available. Selecting reveals the edit form; saving writes to the `user_oauth_clients` table.
 - **`aulycmail-shipped`** — the slot's own built-in client (compiled in via the extension's `.env` ldflags). Only listed when the slot's shipped creds are populated. Label is per-slot:
@@ -2024,7 +1954,9 @@ Storage: encrypted via `credentials.Store` (OS keyring primary, encrypted DB fal
 
 ### Per-extension settings dialog
 
-Extensions register their settings dialog via `core.UI().RegisterSettingsTab(...)`. The host dispatcher [`ExtensionSettingsDialog.svelte`](../frontend/src/lib/components/settings/ExtensionSettingsDialog.svelte) opens the matching dialog (static dispatch by extension ID — same pattern as account-setup hooks).
+> **Status: designed, not yet implemented.** `coreapi.UI.RegisterSettingsTab` exists as an interface method, but no extension registers a tab yet and the host dispatcher component has not been built.
+
+Extensions register their settings dialog via `core.UI().RegisterSettingsTab(...)`. A host dispatcher component (`ExtensionSettingsDialog.svelte`) opens the matching dialog (static dispatch by extension ID — same pattern as account-setup hooks).
 
 Two entry paths:
 1. **Explicit Edit button** in Settings → Extensions → row (when the extension is enabled)
@@ -2032,9 +1964,11 @@ Two entry paths:
 
 ### Write-access grant flow (account-picker model)
 
+> **Status: designed, not yet implemented.** None of the pieces below exist in code yet (`WriteAccessAccountPicker.svelte`, `App.ListAuthContextsForProvider`, `App.SetContactSourceWritable`, `Contacts_EnableWriteAccess`). This section is the design spec for when write access ships.
+
 When the user wants to enable writes on a Google or Microsoft contacts source, the UI is explicit: a dialog asks which existing aulycmail auth identity to attach the new write grant to. No silent retries on access-denied; no inline "consent required" dialogs popping up mid-write.
 
-**Frontend.** [`WriteAccessAccountPicker.svelte`](../frontend/src/lib/components/oauth/WriteAccessAccountPicker.svelte) is the canonical UI. It's a generic dialog that takes `provider` (`'google'` or `'microsoft'`), `sourceID`, and `sourceName`. On open it fetches `App.ListAuthContextsForProvider(provider)` to populate the radio list. The list is the union of:
+**Frontend.** `WriteAccessAccountPicker.svelte` is the canonical UI. It's a generic dialog that takes `provider` (`'google'` or `'microsoft'`), `sourceID`, and `sourceName`. On open it fetches `App.ListAuthContextsForProvider(provider)` to populate the radio list. The list is the union of:
 
 - Mail accounts of that provider (from the host's account store)
 - Standalone contacts sources of that provider (from `carddavStore.ListSources()` where `AccountID IS NULL`)
@@ -2043,7 +1977,7 @@ There is **no "Add another account"** entry. All identities must come from aulyc
 
 On Continue, the dialog calls the extension's `<Extension>_EnableWriteAccess(sourceID, authContextKind, authContextIdentifier, expectedEmail)` bridge method.
 
-**Backend.** The extension's bridge method ([`Contacts_EnableWriteAccess`](../extensions/contacts/backend/bridge.go) is the reference) does:
+**Backend.** The extension's bridge method (`Contacts_EnableWriteAccess`, to live in `extensions/contacts/backend/bridge.go`) does:
 
 1. Derive the slot's `clientConfigID` and the write scope from the source's provider (e.g. `google-contacts` + `https://www.googleapis.com/auth/contacts`).
 2. Build a `coreapi.StartIncrementalConsentRequest`. Set exactly one of `AccountID` (when `authContextKind == "mail"`) or `SourceID` (when `"standalone-contacts"`). Set `ExpectedEmail` to the picked identity's email. Pass through to `core.Auth().StartIncrementalConsent(req)`.

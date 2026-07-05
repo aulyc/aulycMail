@@ -171,10 +171,9 @@ type Contacts interface {
 	ListSources() ([]ContactSource, error)
 
 	// LinkAccountSource creates a new contact source backed by an existing
-	// email account's OAuth tokens (used by the AccountContactsHookPanel
-	// after a user adds a Google or Microsoft account). Returns the new
-	// source's id. syncInterval is in minutes; 60 is the conventional
-	// default. Errors with ErrAccountNotFound when the account doesn't exist.
+	// email account's OAuth tokens. Returns the new source's id. syncInterval
+	// is in minutes; 60 is the conventional default. Errors with
+	// ErrAccountNotFound when the account doesn't exist.
 	LinkAccountSource(accountID, name string, syncInterval int) (string, error)
 
 	// SyncSource triggers an immediate sync against the given source.

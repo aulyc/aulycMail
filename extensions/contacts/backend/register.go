@@ -32,10 +32,9 @@ func NewExtension() *Extension {
 // Manifest returns the parsed manifest embedded at build time.
 func (e *Extension) Manifest() coreapi.Manifest { return e.manifest }
 
-// Register wires the Contacts extension's UI surfaces (rail tab + account-setup
-// hook). Runs once per aulycmail process lifetime, at App.Startup, regardless of
-// whether the extension is currently enabled — descriptive registrations
-// persist across enable/disable cycles. The frontend filters by enabled
+// Register wires the Contacts extension's descriptive UI surface. Runs once per
+// aulycmail process lifetime, at App.Startup, regardless of whether the
+// extension is currently enabled. The frontend filters rail tabs by enabled
 // state at render time.
 //
 // Returns an Unregister func that tears all registrations down. Called by

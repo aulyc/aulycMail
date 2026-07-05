@@ -526,7 +526,7 @@ var migrations = []Migration{
 	{
 		Version: 19,
 		SQL: `
-			-- S/MIME user certificates (imported PKCS#12 with private key in keyring/encrypted fallback)
+			-- Legacy reserved S/MIME certificate schema retained for compatibility
 			CREATE TABLE IF NOT EXISTS smime_certificates (
 				id TEXT PRIMARY KEY,
 				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -546,7 +546,7 @@ var migrations = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_smime_certificates_account ON smime_certificates(account_id);
 			CREATE INDEX IF NOT EXISTS idx_smime_certificates_email ON smime_certificates(email);
 
-			-- Auto-collected sender public certificates (from incoming signed messages)
+			-- Legacy reserved sender certificate schema retained for compatibility
 			CREATE TABLE IF NOT EXISTS smime_sender_certs (
 				id TEXT PRIMARY KEY,
 				email TEXT NOT NULL,
@@ -564,12 +564,12 @@ var migrations = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_smime_sender_certs_email ON smime_sender_certs(email);
 			CREATE INDEX IF NOT EXISTS idx_smime_sender_certs_fingerprint ON smime_sender_certs(fingerprint);
 
-			-- Cached verification results on messages
+			-- Legacy reserved verification-result columns
 			ALTER TABLE messages ADD COLUMN smime_status TEXT;
 			ALTER TABLE messages ADD COLUMN smime_signer_email TEXT;
 			ALTER TABLE messages ADD COLUMN smime_signer_subject TEXT;
 
-			-- Per-account signing policy
+			-- Legacy reserved per-account signing policy
 			ALTER TABLE accounts ADD COLUMN smime_sign_policy TEXT NOT NULL DEFAULT 'never';
 			ALTER TABLE accounts ADD COLUMN smime_default_cert_id TEXT;
 		`,
@@ -577,30 +577,30 @@ var migrations = []Migration{
 	{
 		Version: 20,
 		SQL: `
-			-- Raw S/MIME body for on-view verification/decryption
+			-- Legacy reserved raw-message body column
 			ALTER TABLE messages ADD COLUMN smime_raw_body BLOB;
 
-			-- Whether the message is encrypted (so viewer knows to decrypt)
+			-- Legacy reserved encrypted-message flag
 			ALTER TABLE messages ADD COLUMN smime_encrypted INTEGER NOT NULL DEFAULT 0;
 
-			-- Per-account encryption policy
+			-- Legacy reserved per-account encryption policy
 			ALTER TABLE accounts ADD COLUMN smime_encrypt_policy TEXT NOT NULL DEFAULT 'never';
 		`,
 	},
 	{
 		Version: 21,
 		SQL: `
-			-- Whether the draft body is encrypted (encrypt-to-self)
+			-- Legacy reserved encrypted-draft flag
 			ALTER TABLE drafts ADD COLUMN encrypted INTEGER NOT NULL DEFAULT 0;
 
-			-- Encrypted draft body (PKCS#7 DER blob)
+			-- Legacy reserved encrypted-draft payload
 			ALTER TABLE drafts ADD COLUMN encrypted_body BLOB;
 		`,
 	},
 	{
 		Version: 22,
 		SQL: `
-			-- Per-message S/MIME sign preference (preserved across draft save/load)
+			-- Legacy reserved per-message signing preference
 			ALTER TABLE drafts ADD COLUMN sign_message INTEGER NOT NULL DEFAULT 0;
 		`,
 	},
@@ -608,15 +608,15 @@ var migrations = []Migration{
 		Version: 23,
 		SQL: `
 			-- Store attachment data alongside draft body (inline images + regular attachments)
-			-- JSON-serialized []smtp.Attachment for non-encrypted drafts
-			-- For encrypted drafts, attachments are included in the encrypted_body payload
+			-- JSON-serialized []smtp.Attachment for regular drafts
+			-- Legacy encrypted-draft rows kept attachments in encrypted_body.
 			ALTER TABLE drafts ADD COLUMN attachments_data BLOB;
 		`,
 	},
 	{
 		Version: 24,
 		SQL: `
-			-- PGP user keypairs
+			-- Legacy reserved PGP key schema retained for compatibility
 			CREATE TABLE IF NOT EXISTS pgp_keys (
 				id TEXT PRIMARY KEY,
 				account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
@@ -637,7 +637,7 @@ var migrations = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_pgp_keys_email ON pgp_keys(email);
 			CREATE INDEX IF NOT EXISTS idx_pgp_keys_fingerprint ON pgp_keys(fingerprint);
 
-			-- Collected sender public keys
+			-- Legacy reserved collected sender public-key schema
 			CREATE TABLE IF NOT EXISTS pgp_sender_keys (
 				id TEXT PRIMARY KEY,
 				email TEXT NOT NULL,
@@ -656,19 +656,19 @@ var migrations = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_pgp_sender_keys_email ON pgp_sender_keys(email);
 			CREATE INDEX IF NOT EXISTS idx_pgp_sender_keys_fingerprint ON pgp_sender_keys(fingerprint);
 
-			-- Message PGP columns (parallel to smime_* columns)
+			-- Legacy reserved message PGP columns
 			ALTER TABLE messages ADD COLUMN pgp_status TEXT;
 			ALTER TABLE messages ADD COLUMN pgp_signer_email TEXT;
 			ALTER TABLE messages ADD COLUMN pgp_signer_key_id TEXT;
 			ALTER TABLE messages ADD COLUMN pgp_raw_body BLOB;
 			ALTER TABLE messages ADD COLUMN pgp_encrypted INTEGER NOT NULL DEFAULT 0;
 
-			-- Account PGP policies
+			-- Legacy reserved account PGP policies
 			ALTER TABLE accounts ADD COLUMN pgp_sign_policy TEXT NOT NULL DEFAULT 'never';
 			ALTER TABLE accounts ADD COLUMN pgp_encrypt_policy TEXT NOT NULL DEFAULT 'never';
 			ALTER TABLE accounts ADD COLUMN pgp_default_key_id TEXT;
 
-			-- Draft PGP fields
+			-- Legacy reserved draft PGP fields
 			ALTER TABLE drafts ADD COLUMN pgp_sign_message INTEGER NOT NULL DEFAULT 0;
 			ALTER TABLE drafts ADD COLUMN pgp_encrypted INTEGER NOT NULL DEFAULT 0;
 			ALTER TABLE drafts ADD COLUMN pgp_encrypted_body BLOB;
@@ -677,7 +677,7 @@ var migrations = []Migration{
 	{
 		Version: 25,
 		SQL: `
-			-- PGP key servers table (user-manageable, including defaults)
+			-- Legacy reserved PGP key-server table retained for compatibility
 			CREATE TABLE IF NOT EXISTS pgp_keyservers (
 				id INTEGER PRIMARY KEY AUTOINCREMENT,
 				url TEXT NOT NULL UNIQUE,

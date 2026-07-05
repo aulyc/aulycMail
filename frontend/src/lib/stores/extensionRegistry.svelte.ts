@@ -1,5 +1,5 @@
-// Extension registry — frontend cache of enabled extensions, rail tabs, and
-// account-setup hooks. Loaded once at app startup; refresh() re-pulls from the
+// Extension registry — frontend cache of enabled extensions and rail tabs.
+// Loaded once at app startup; refresh() re-pulls from the
 // backend after Settings toggles an extension or after an account is added.
 //
 // IMPORTANT: read access goes through plain exported FUNCTIONS, not via an
@@ -10,7 +10,7 @@
 // elsewhere in the codebase (see getActiveExtension in uiState.svelte.ts).
 
 // @ts-ignore - wailsjs bindings
-import { ListEnabledExtensions, ListExtensionRailTabs, ListAccountSetupHooksForProvider } from '../../../wailsjs/go/app/App'
+import { ListEnabledExtensions, ListExtensionRailTabs } from '../../../wailsjs/go/app/App'
 // @ts-ignore - wailsjs bindings
 import type { v1 } from '../../../wailsjs/go/models'
 
@@ -44,18 +44,5 @@ export async function refreshExtensionRegistry(): Promise<void> {
     console.error('Failed to refresh extension registry:', err)
     enabledExtensions = []
     railTabs = []
-  }
-}
-
-
-// Provider-keyed hook cache. Hooks change rarely (only when extension state
-// changes), but we re-fetch per provider on demand since the result is small.
-export async function loadAccountSetupHooks(provider: string): Promise<v1.AccountSetupHookRequest[]> {
-  try {
-    const hooks = await ListAccountSetupHooksForProvider(provider)
-    return hooks || []
-  } catch (err) {
-    console.error('Failed to load account setup hooks for provider', provider, err)
-    return []
   }
 }

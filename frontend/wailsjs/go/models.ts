@@ -1361,27 +1361,6 @@ export namespace sync {
 }
 
 export namespace v1 {
-	
-	export class AccountSetupHookRequest {
-	    extensionId: string;
-	    providers: string[];
-	    buttonLabel: string;
-	    description?: string;
-	    component: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new AccountSetupHookRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.extensionId = source["extensionId"];
-	        this.providers = source["providers"];
-	        this.buttonLabel = source["buttonLabel"];
-	        this.description = source["description"];
-	        this.component = source["component"];
-	    }
-	}
 	export class ContactIMPP {
 	    handle: string;
 	    type?: string;
@@ -1733,4 +1712,3 @@ export namespace v1 {
 	}
 
 }
-

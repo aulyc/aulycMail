@@ -603,8 +603,6 @@
       console.error('Failed to load account settings:', err)
     }
 
-    // Load S/MIME and PGP availability for the selected identity's email
-
     // Initialize TipTap editor (no-op in plain text mode — its element isn't
     // mounted yet; created lazily when the user switches to rich text).
     ensureEditor()

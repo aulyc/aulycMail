@@ -58,17 +58,6 @@ func TestSearchIndexPath(t *testing.T) {
 	}
 }
 
-func TestKeyringPath(t *testing.T) {
-	paths, err := GetPaths()
-	if err != nil {
-		t.Fatalf("GetPaths() returned error: %v", err)
-	}
-	keyringPath := paths.KeyringPath()
-	if !strings.HasSuffix(keyringPath, "keys") {
-		t.Errorf("KeyringPath() = %q, want suffix 'keys'", keyringPath)
-	}
-}
-
 func TestIsFlatpak(t *testing.T) {
 	tests := []struct {
 		name      string

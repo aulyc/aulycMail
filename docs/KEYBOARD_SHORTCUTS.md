@@ -114,8 +114,6 @@ These only work when the composer is open.
 | `Ctrl+Enter` | Send message |
 | `Alt+T` | Activate/Deactivate toolbar mode |
 | `Alt+A` | Attach a file |
-| `Alt+P` | Toggle PGP security mode (S = sign, E = encrypt) |
-| `Alt+S` | Toggle S/MIME security mode (S = sign, E = encrypt) |
 | `Ctrl+D` | Pop out/detach composer to separate window |
 | `Escape` | Close composer (prompts to save draft if unsaved) |
 
@@ -154,9 +152,6 @@ COMPOSE & REPLY
   Ctrl + Enter        Send (in composer)
   Ctrl + D            Detach composer
   Alt  + T            Toggle format toolbar mode
-  Alt + P             PGP mode (S/E to toggle sign/encrypt)
-  Alt + S             S/MIME mode (S/E to toggle sign/encrypt)
-
 SELECTION
   Ctrl + A            Select all messages (list) / text (viewer)
 

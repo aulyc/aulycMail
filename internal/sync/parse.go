@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	gomessage "github.com/emersion/go-message"
 	"github.com/aulyc/aulycmail/internal/message"
+	gomessage "github.com/emersion/go-message"
 )
 
 // parseMessageBodyFull parses a raw email and extracts text, HTML, and attachment metadata.
@@ -283,7 +283,7 @@ func (e *Engine) parseSinglePartBody(entity *gomessage.Entity, result *ParsedBod
 
 // parseMessageBody parses a raw email message and extracts text/plain and text/html parts.
 // This is the legacy parsing path used by buildMessageFromStreamedData (via FetchServerMessage).
-// It does not handle S/MIME or PGP detection - see parseMessageBodyInternal for the modern path.
+// The streamed parser path is preferred for new fetches.
 func (e *Engine) parseMessageBody(raw []byte) (bodyText, bodyHTML string, hasAttachments bool) {
 	reader := bytes.NewReader(raw)
 

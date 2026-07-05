@@ -45,22 +45,6 @@ type InboxViewRequest struct {
 	Component   string `json:"component"`
 }
 
-// AccountSetupHookRequest registers an "Also set up X for this account?"
-// button into the post-account-add flow in AccountForm.
-//
-// Intended flow (Phase 2 implementation, interface frozen here):
-//  1. User completes adding a Mail account in AccountForm.
-//  2. Frontend queries all registered AccountSetupHooks matching the new account's provider.
-//  3. Renders each as a labeled button/checkbox.
-//  4. User clicks → extension's onboarding handler runs (incremental OAuth + provider discovery).
-type AccountSetupHookRequest struct {
-	ExtensionID string   `json:"extensionId"`
-	Providers   []string `json:"providers"`            // e.g., ["google", "microsoft", "imap"]
-	ButtonLabel string   `json:"buttonLabel"`          // e.g., "Also set up your calendar"
-	Description string   `json:"description,omitempty"`
-	Component   string   `json:"component"`            // Svelte component handling the onboarding flow
-}
-
 // UI is the surface for extension-driven UI registrations and UI actions.
 //
 // All registrations are interface-only in Phase 1; the host implementation is
@@ -72,7 +56,6 @@ type UI interface {
 	RegisterSettingsTab(req SettingsTabRequest) (Unregister, error)
 	RegisterContextMenuItem(req ContextMenuRequest) (Unregister, error)
 	RegisterInboxView(req InboxViewRequest) (Unregister, error)
-	RegisterAccountSetupHook(req AccountSetupHookRequest) (Unregister, error)
 
 	// OpenURL opens the given URL in the user's system browser via the
 	// host's hardened resolver (protocol allowlist, portal-first on Linux,

@@ -106,7 +106,7 @@ For a complete, real-world example of a translated locale file, refer to `fronte
   - Some placeholders contain localized relative time strings from date-fns (e.g., `{time}` may render as "2 minutes ago" or "2 分鐘前")
   - Example: English `"synced": "Synced {time}"` → Chinese `"synced": "{time}同步"` (time goes before the verb in Chinese)
 - Do not translate JSON keys (left side of `:`)
-- The file has ~900+ keys organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `editor`, `account`, `identity`, `security`, `contactSource`, `certificate`, `terms`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `sort`, `oauth`
+- The file has ~840 keys organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `settingsBackup`, `backupViewer`, `editor`, `account`, `identity`, `certificate`, `terms`, `oauthMissing`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `syncLog`, `images`, `oauth`
 - **Extension strings are NOT in this file.** Each extension owns its own locale files under `extensions/<name>/frontend/i18n/locales/`. See [§ Extension translations](#extension-translations) for the per-extension flow.
 
 ### 2. Register the Locale
@@ -272,7 +272,7 @@ Each directory you find is an extension whose UI can be translated.
 | `common` | Shared buttons and labels (Save, Cancel, Delete, etc.) |
 | `sidebar` | Sidebar navigation (Compose, All Inboxes, folder names) |
 | `messageList` | Message list UI (select all, no messages, loading) |
-| `viewer` | Message viewer (reply, forward, attachments, error states, S/MIME/PGP banners) |
+| `viewer` | Message viewer (reply, forward, attachments, read receipts, error states) |
 | `composer` | Email composer (To, Cc, Subject, Send, formatting) |
 | `contextMenu` | Right-click context menus (Reply, Archive, Mark as Read) |
 | `toast` | Toast notification messages (clean translated messages without raw error details) |
@@ -281,20 +281,22 @@ Each directory you find is an extension whose UI can be translated.
 | `settingsAbout` | About tab in settings |
 | `settingsAccounts` | Accounts tab in settings |
 | `settingsGeneral` | General settings tab (theme, density, read receipts) |
+| `settingsBackup` | Backup settings tab (backup directory, scope, schedule) |
+| `backupViewer` | Backup viewer dialog (browsing exported mail backups) |
 | `editor` | TipTap editor toolbar labels |
 | `account` | Account dialog and management |
 | `identity` | Identity editor (email address management, display names, signatures) |
-| `security` | S/MIME and PGP security settings |
-| `contactSource` | CardDAV contact source management |
 | `certificate` | TLS certificate trust dialog |
 | `terms` | Terms of service dialog |
+| `oauthMissing` | Dialog shown when the build lacks OAuth client credentials |
 | `dialog` | Generic dialog strings (confirmations, warnings) |
 | `date` | Date/time labels (just now, yesterday, etc.) |
 | `aria` | Accessibility labels (screen reader text) |
 | `window` | Window management (minimize, maximize, close) |
 | `attachment` | Attachment handling (download, save, open) |
 | `search` | Search UI |
-| `sort` | Sort options (newest first, oldest first) |
+| `syncLog` | Sync activity log panel |
+| `images` | Remote image allowlist management (addresses, domains) |
 | `oauth` | OAuth flow UI |
 
 ### Extensions (`extensions/<name>/frontend/i18n/locales/<code>.json`)

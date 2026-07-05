@@ -190,13 +190,9 @@ export function IsOAuthConfigured(arg1:string):Promise<boolean>;
 
 export function IsReady():Promise<boolean>;
 
-export function ListAccountSetupHooksForProvider(arg1:string):Promise<Array<v1.AccountSetupHookRequest>>;
-
 export function ListEnabledExtensions():Promise<Array<string>>;
 
 export function ListExtensionRailTabs():Promise<Array<v1.RailTabRequest>>;
-
-export function LogFrontend(arg1:string,arg2:string):Promise<void>;
 
 export function MarkAllFolderMessagesAsRead(arg1:string):Promise<void>;
 

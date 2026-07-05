@@ -498,9 +498,6 @@ func (u uiCoreImpl) RegisterContextMenuItem(req coreapi.ContextMenuRequest) (cor
 func (u uiCoreImpl) RegisterInboxView(req coreapi.InboxViewRequest) (coreapi.Unregister, error) {
 	return u.app.uiRegistry.RegisterInboxView(req)
 }
-func (u uiCoreImpl) RegisterAccountSetupHook(req coreapi.AccountSetupHookRequest) (coreapi.Unregister, error) {
-	return u.app.uiRegistry.RegisterAccountSetupHook(req)
-}
 
 // OpenURL delegates to App.OpenURL which owns the protocol allowlist +
 // Linux portal-first path + xdg-open fallback. The extension never sees
