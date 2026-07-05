@@ -641,11 +641,16 @@ ${processedHtml}
 
     if (iframeElement && html) {
       const content = buildIframeContent(html, applyDarken)
-      iframeElement.srcdoc = content
       iframeReady = false
+      iframeElement.style.opacity = '0'
+      iframeElement.srcdoc = content
       lastSentMessageId = null
     }
   })
+
+  function handleIframeLoad() {
+    iframeReady = true
+  }
 
   // Send inline images when ready
   $effect(() => {
@@ -775,13 +780,17 @@ ${processedHtml}
       </div>
     {/if}
 
-    <iframe
-      bind:this={iframeElement}
-      title={$_('aria.emailContent')}
-      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-      class="w-full border-0 rounded-md min-h-[100px]"
-      style="height: 200px; background-color: {iframeOuterBg};"
-    ></iframe>
+    <div class="rounded-md overflow-hidden" style="background-color: hsl(var(--background));">
+      <iframe
+        bind:this={iframeElement}
+        title={$_('aria.emailContent')}
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
+        class="block w-full border-0 min-h-[100px]"
+        style="height: 200px; background-color: {iframeOuterBg}; opacity: {iframeReady ? 1 : 0};"
+        aria-busy={!iframeReady}
+        onload={handleIframeLoad}
+      ></iframe>
+    </div>
   {:else if bodyText}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="whitespace-pre-wrap font-sans text-sm text-foreground bg-muted/30 rounded-md p-4"

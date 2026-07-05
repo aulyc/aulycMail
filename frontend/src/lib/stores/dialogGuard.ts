@@ -7,7 +7,7 @@ export function dialogGuardOpen() {
 }
 
 export function dialogGuardClose() {
-  count--
+  count = Math.max(0, count - 1)
 }
 
 export function isDialogGuardActive(): boolean {

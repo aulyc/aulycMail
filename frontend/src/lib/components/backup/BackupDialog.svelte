@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte'
   import Icon from '@iconify/svelte'
-  import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
@@ -12,38 +12,68 @@
   }
 
   let { open = $bindable(false), onClose }: Props = $props()
+  let guardActive = false
 
-  $effect(() => {
-    if (open) {
+  function setGuardActive(active: boolean) {
+    if (active === guardActive) return
+    guardActive = active
+    if (active) {
       dialogGuardOpen()
-      return () => dialogGuardClose()
+    } else {
+      dialogGuardClose()
     }
-  })
-
-  function closeDialog() {
-    open = false
-    onClose?.()
   }
 
-  function handleOpenChange(isOpen: boolean) {
-    open = isOpen
-    if (!isOpen) onClose?.()
+  $effect(() => {
+    setGuardActive(open)
+  })
+
+  $effect(() => {
+    if (!open) return
+
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      closeDialog()
+    }
+
+    window.addEventListener('keydown', handleKeydown, true)
+    return () => window.removeEventListener('keydown', handleKeydown, true)
+  })
+
+  onDestroy(() => setGuardActive(false))
+
+  function closeDialog() {
+    if (!open) return
+    open = false
+    setGuardActive(false)
+    onClose?.()
   }
 </script>
 
-<Dialog.Root bind:open onOpenChange={handleOpenChange}>
-  {#if open}
-    <Dialog.Content
-      class="flex max-h-[85vh] w-[min(92vw,760px)] max-w-2xl flex-col overflow-hidden"
-      preventCloseAutoFocus
-      onInteractOutside={(e) => e.preventDefault()}
+{#if open}
+  <div class="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4">
+    <div
+      class="flex max-h-[85vh] w-[min(92vw,760px)] max-w-2xl flex-col overflow-hidden rounded-lg border bg-background p-6 shadow-lg"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="backup-dialog-title"
     >
-      <Dialog.Header>
-        <Dialog.Title class="flex items-center gap-2">
-          <Icon icon="lucide:archive" class="h-5 w-5" />
+      <div class="mb-4 flex items-center gap-3">
+        <Icon icon="lucide:archive" class="h-5 w-5 shrink-0" />
+        <h2 id="backup-dialog-title" class="min-w-0 flex-1 text-lg font-semibold leading-none">
           {$_('settingsBackup.title')}
-        </Dialog.Title>
-      </Dialog.Header>
+        </h2>
+        <button
+          type="button"
+          class="shrink-0 rounded-sm p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label={$_('common.close')}
+          onclick={closeDialog}
+        >
+          <Icon icon="mdi:close" class="h-4 w-4" />
+        </button>
+      </div>
 
       <div class="h-[min(64vh,430px)] min-h-0 overflow-y-auto pl-1 pr-3">
         <BackupTab />
@@ -54,6 +84,6 @@
           {$_('common.close')}
         </Button>
       </div>
-    </Dialog.Content>
-  {/if}
-</Dialog.Root>
+    </div>
+  </div>
+{/if}
