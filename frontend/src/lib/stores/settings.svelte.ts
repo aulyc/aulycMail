@@ -61,10 +61,6 @@ export function getAccentBarUnread(): boolean {
   return accentBarUnread
 }
 
-export function getMenuBarIcon(): boolean {
-  return menuBarIcon
-}
-
 export function getCurrentDateFnsLocale(): Locale | undefined {
   // Fall back to the auto-detected system locale when no language was explicitly
   // saved, so relative times match the (auto-detected) UI language.
