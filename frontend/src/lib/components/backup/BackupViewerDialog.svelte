@@ -49,6 +49,9 @@
   let darkFilterEnabled = $state(false)
   let savingAttachmentIndexes = $state<Set<number>>(new Set())
   let attachmentCountsByKey = $state<Record<string, number>>({})
+  let attachmentsExpanded = $state(true)
+  let messageSortOrder = $state<'newest' | 'oldest'>('newest')
+  let messageListEl = $state<HTMLDivElement | null>(null)
 
   let searchOpen = $state(false)
   let searchQuery = $state('')
@@ -81,8 +84,10 @@
   })
   const visibleMessages = $derived.by(() => {
     const source = catalog?.messages ?? []
-    if (!selectedAccountEmail) return source
-    return source.filter((message) => message.accountEmail === selectedAccountEmail)
+    const filtered = selectedAccountEmail
+      ? source.filter((message) => message.accountEmail === selectedAccountEmail)
+      : source
+    return [...filtered].sort(compareMessagesByDate)
   })
 
   $effect(() => {
@@ -145,6 +150,8 @@
     errorMessage = ''
     savingAttachmentIndexes = new Set()
     attachmentCountsByKey = {}
+    attachmentsExpanded = true
+    messageSortOrder = 'newest'
   }
 
   async function loadCatalog(dir: string, options: { fromHistory?: boolean; remember?: boolean } = {}) {
@@ -236,14 +243,18 @@
     if (!directory.trim() || !key) return
     selectedMessageKey = key
     loadingDetail = true
+    errorMessage = ''
     try {
       const loadedDetail = await GetBackupViewerMessage(directory, key)
       detail = loadedDetail
+      errorMessage = ''
+      attachmentsExpanded = true
       updateMessageAttachmentCount(key, loadedDetail?.attachments?.length ?? 0)
     } catch (err) {
       console.error('Failed to load backup message:', err)
       detail = null
-      errorMessage = $_('backupViewer.messageLoadFailed')
+      const reason = describeError(err)
+      errorMessage = reason ? `${$_('backupViewer.messageLoadFailed')}: ${reason}` : $_('backupViewer.messageLoadFailed')
     } finally {
       loadingDetail = false
     }
@@ -257,6 +268,37 @@
 
   function messageAttachmentCount(message: app.BackupViewerMessageSummary): number {
     return attachmentCountsByKey[message.key] ?? message.attachmentCount ?? 0
+  }
+
+  function compareMessagesByDate(left: app.BackupViewerMessageSummary, right: app.BackupViewerMessageSummary): number {
+    const leftTime = parseViewerDate(left.date)?.getTime() ?? 0
+    const rightTime = parseViewerDate(right.date)?.getTime() ?? 0
+    if (leftTime !== rightTime) {
+      return messageSortOrder === 'newest' ? rightTime - leftTime : leftTime - rightTime
+    }
+    return messageSortOrder === 'newest'
+      ? right.key.localeCompare(left.key)
+      : left.key.localeCompare(right.key)
+  }
+
+  function scrollMessageListToTop() {
+    messageListEl?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function toggleMessageSortOrder() {
+    messageSortOrder = messageSortOrder === 'newest' ? 'oldest' : 'newest'
+    scrollMessageListToTop()
+  }
+
+  function describeError(err: unknown): string {
+    if (!err) return ''
+    if (typeof err === 'string') return err
+    if (err instanceof Error) return err.message
+    if (typeof err === 'object' && 'message' in err) {
+      const message = (err as { message?: unknown }).message
+      return typeof message === 'string' ? message : ''
+    }
+    return String(err)
   }
 
   function closeDialog() {
@@ -487,7 +529,7 @@
         >
           <Select.Trigger class="h-10 w-[300px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
             <Select.Value class="min-w-0 flex-1" placeholder={$_('backupViewer.scopeAll')}>
-              <span class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+              <span class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 pl-6">
                 <span class="truncate">{scopeLabel(selectedScope)}</span>
                 {#if typeof selectedScope?.count === 'number'}
                   <span class="shrink-0 tabular-nums text-muted-foreground">{selectedScope.count}</span>
@@ -509,10 +551,20 @@
           </Select.Content>
         </Select.Root>
 
-        <div class="flex shrink-0 items-center gap-0.5" role="toolbar" aria-label={$_('backupViewer.title')}>
+        <div class="flex shrink-0 items-center gap-1" role="toolbar" aria-label={$_('backupViewer.title')}>
           <button
             type="button"
-            class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!catalog?.messageCount}
+            title={$_('backupViewer.scrollToTop')}
+            aria-label={$_('backupViewer.scrollToTop')}
+            onclick={scrollMessageListToTop}
+          >
+            <Icon icon="mdi:arrow-collapse-up" class="h-5 w-5 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!directory}
             title={$_('backupViewer.clearDirectory')}
             aria-label={$_('backupViewer.clearDirectory')}
@@ -522,7 +574,7 @@
           </button>
           <button
             type="button"
-            class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!directory || loadingCatalog}
             title={$_('backupViewer.refresh')}
             aria-label={$_('backupViewer.refresh')}
@@ -532,7 +584,7 @@
           </button>
           <button
             type="button"
-            class="rounded-md p-1.5 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
             disabled={!catalog?.messageCount}
             title={$_('backupViewer.search')}
             aria-label={$_('backupViewer.search')}
@@ -542,7 +594,17 @@
           </button>
           <button
             type="button"
-            class="rounded-md p-1.5 transition-colors hover:bg-muted"
+            class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!catalog?.messageCount}
+            title={messageSortOrder === 'newest' ? $_('backupViewer.showingNewest') : $_('backupViewer.showingOldest')}
+            aria-label={messageSortOrder === 'newest' ? $_('backupViewer.showingNewest') : $_('backupViewer.showingOldest')}
+            onclick={toggleMessageSortOrder}
+          >
+            <Icon icon={messageSortOrder === 'newest' ? 'mdi:sort-descending' : 'mdi:sort-ascending'} class="h-5 w-5 text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            class="rounded-md p-2 transition-colors hover:bg-muted"
             aria-pressed={darkFilterEnabled}
             aria-label={$_('backupViewer.darkFilter')}
             title={$_('backupViewer.darkFilter')}
@@ -573,7 +635,7 @@
           {:else if visibleMessages.length === 0}
             <div class="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">{$_('backupViewer.noMessages')}</div>
           {:else}
-            <div class="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+            <div bind:this={messageListEl} class="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
               {#each visibleMessages as message (message.key)}
                 <button
                   type="button"
@@ -585,8 +647,8 @@
                     <span class="flex items-baseline gap-2">
                       <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{message.subject || $_('backupViewer.unknownSubject')}</span>
                       {#if messageAttachmentCount(message) > 0}
-                        <span class="shrink-0 text-muted-foreground" title={$_('backupViewer.attachments')}>
-                          <Icon icon="mdi:paperclip" class="h-3.5 w-3.5" />
+                        <span class="shrink-0 text-amber-600 dark:text-amber-500" title={$_('backupViewer.attachments')}>
+                          <Icon icon="mdi:paperclip" class="h-4 w-4" />
                         </span>
                       {/if}
                       <span class="shrink-0 text-xs text-muted-foreground">{formatShortDate(message.date)}</span>
@@ -659,29 +721,42 @@
 
               {#if detail.attachments?.length}
                 <div class="mb-5">
-                  <h3 class="mb-2 text-sm font-semibold">{$_('backupViewer.attachments')}</h3>
-                  <div class="space-y-2">
-                    {#each detail.attachments as attachment, index (attachment.filename + '-' + index)}
-                      {@const attachmentIndex = typeof attachment.index === 'number' ? attachment.index : index}
-                      {@const isSavingAttachment = savingAttachmentIndexes.has(attachmentIndex)}
-                      <button
-                        type="button"
-                        class="flex w-full items-center gap-3 rounded-md border border-border bg-muted/20 px-3 py-2 text-left transition hover:bg-muted/40 disabled:cursor-wait disabled:opacity-70"
-                        disabled={isSavingAttachment}
-                        title={$_('attachment.download')}
-                        onclick={() => saveBackupAttachment(attachment, index)}
-                      >
-                        {#if isSavingAttachment}
-                          <Icon icon="mdi:loading" class="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
-                        {:else}
-                          <Icon icon="mdi:paperclip" class="h-4 w-4 shrink-0 text-muted-foreground" />
-                        {/if}
-                        <span class="min-w-0 flex-1 truncate text-sm">{attachment.filename}</span>
-                        <span class="text-xs text-muted-foreground">{attachment.contentType}</span>
-                        <span class="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</span>
-                        <Icon icon="mdi:download" class="h-4 w-4 shrink-0 text-muted-foreground" />
-                      </button>
-                    {/each}
+                  <div class="overflow-hidden rounded-md border border-border bg-muted/20">
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold transition hover:bg-muted/40"
+                      aria-expanded={attachmentsExpanded}
+                      onclick={() => attachmentsExpanded = !attachmentsExpanded}
+                    >
+                      <Icon icon={attachmentsExpanded ? 'mdi:chevron-down' : 'mdi:chevron-right'} class="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span class="min-w-0 flex-1">{$_('backupViewer.attachments')}</span>
+                      <span class="shrink-0 tabular-nums text-xs text-muted-foreground">{detail.attachments.length}</span>
+                    </button>
+                    {#if attachmentsExpanded}
+                      <div class="border-t border-border">
+                        {#each detail.attachments as attachment, index (attachment.filename + '-' + index)}
+                          {@const attachmentIndex = typeof attachment.index === 'number' ? attachment.index : index}
+                          {@const isSavingAttachment = savingAttachmentIndexes.has(attachmentIndex)}
+                          <button
+                            type="button"
+                            class="flex w-full items-center gap-3 border-b border-border px-3 py-2 text-left transition last:border-b-0 hover:bg-muted/40 disabled:cursor-wait disabled:opacity-70"
+                            disabled={isSavingAttachment}
+                            title={$_('attachment.download')}
+                            onclick={() => saveBackupAttachment(attachment, index)}
+                          >
+                            {#if isSavingAttachment}
+                              <Icon icon="mdi:loading" class="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
+                            {:else}
+                              <Icon icon="mdi:paperclip" class="h-4 w-4 shrink-0 text-muted-foreground" />
+                            {/if}
+                            <span class="min-w-0 flex-1 truncate text-sm">{attachment.filename}</span>
+                            <span class="text-xs text-muted-foreground">{attachment.contentType}</span>
+                            <span class="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</span>
+                            <Icon icon="mdi:download" class="h-4 w-4 shrink-0 text-muted-foreground" />
+                          </button>
+                        {/each}
+                      </div>
+                    {/if}
                   </div>
                 </div>
               {/if}
@@ -776,8 +851,8 @@
                     <span class="flex min-w-0 items-baseline gap-2">
                       <span class="min-w-0 flex-1 truncate text-sm text-foreground">{result.subject || $_('backupViewer.unknownSubject')}</span>
                       {#if messageAttachmentCount(result) > 0}
-                        <span class="shrink-0 text-muted-foreground" title={$_('backupViewer.attachments')}>
-                          <Icon icon="mdi:paperclip" class="h-3.5 w-3.5" />
+                        <span class="shrink-0 text-amber-600 dark:text-amber-500" title={$_('backupViewer.attachments')}>
+                          <Icon icon="mdi:paperclip" class="h-4 w-4" />
                         </span>
                       {/if}
                       <span class="shrink-0 text-xs text-muted-foreground">{formatShortDate(result.date)}</span>
