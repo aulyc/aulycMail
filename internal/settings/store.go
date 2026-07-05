@@ -30,6 +30,7 @@ const (
 	KeyAlwaysLoadImages          = "always_load_images"
 	KeyDarkMailContent           = "dark_mail_content"
 	KeyAccentBarUnread           = "accent_bar_unread"
+	KeyMenuBarIcon               = "menu_bar_icon"
 	KeyShowMessageListCircles    = "show_message_list_circles"
 	KeyShowViewerCircles         = "show_viewer_circles"
 	KeyLastSeenVersion           = "last_seen_version"      // for "What's new in this version" launch dialog
@@ -279,6 +280,24 @@ func (s *Store) SetAccentBarUnread(enabled bool) error {
 		v = "true"
 	}
 	return s.Set(KeyAccentBarUnread, v)
+}
+
+// GetMenuBarIcon returns whether the macOS menu bar status item is enabled.
+func (s *Store) GetMenuBarIcon() (bool, error) {
+	value, err := s.Get(KeyMenuBarIcon)
+	if err != nil {
+		return false, err
+	}
+	return value == "true", nil
+}
+
+// SetMenuBarIcon enables or disables the macOS menu bar status item.
+func (s *Store) SetMenuBarIcon(enabled bool) error {
+	v := "false"
+	if enabled {
+		v = "true"
+	}
+	return s.Set(KeyMenuBarIcon, v)
 }
 
 // GetShowMessageListCircles returns whether colored sender circles

@@ -518,6 +518,15 @@ func (a *App) Startup(ctx context.Context) {
 		}
 	})
 	platform.InstallAppMenu(a.menuLabels())
+	platform.SetStatusItemHandler(func(action string) {
+		switch action {
+		case "show":
+			a.ShowWindow()
+		case "settings":
+			a.ShowWindow()
+			wailsRuntime.EventsEmit(a.ctx, "menu:openSettings")
+		}
+	})
 
 	// Scale database connection pool based on number of accounts
 	a.updateDBConnectionPool()
@@ -629,9 +638,9 @@ func (a *App) Startup(ctx context.Context) {
 	// Initialize and start background email sync (polling + IDLE)
 	a.initBackgroundSync(ctx)
 
-	// Seed the Dock badge with the unread count carried over from the last
-	// session, before the first sync refreshes it.
-	a.refreshDockBadge()
+	// Seed native unread badges with the count carried over from the last
+	// session, before the first sync refreshes them.
+	a.refreshUnreadBadges()
 
 	// Sync any pending drafts from previous sessions
 	go a.syncAllPendingDrafts()
@@ -919,6 +928,22 @@ func (a *App) menuLabels() platform.MenuLabels {
 		Settings: "Settings", BackupViewer: "Backup Viewer", About: "About", Quit: "Quit",
 		Edit: "Edit", Undo: "Undo", Redo: "Redo",
 		Cut: "Cut", Copy: "Copy", Paste: "Paste", Delete: "Delete",
+	}
+}
+
+// statusItemLabels returns localized strings for the macOS menu bar status item.
+func (a *App) statusItemLabels() platform.StatusItemLabels {
+	zh := true
+	if lang, err := a.GetLanguage(); err == nil && lang != "" && !strings.HasPrefix(lang, "zh") {
+		zh = false
+	}
+	if zh {
+		return platform.StatusItemLabels{
+			Open: "打开 aulycmail", Settings: "设置", Quit: "退出",
+		}
+	}
+	return platform.StatusItemLabels{
+		Open: "Open aulycmail", Settings: "Settings", Quit: "Quit",
 	}
 }
 

@@ -60,6 +60,27 @@ func (a *App) SetAccentBarUnread(enabled bool) error {
 	return a.settingsStore.SetAccentBarUnread(enabled)
 }
 
+// GetMenuBarIcon returns whether the macOS menu bar status item is enabled.
+func (a *App) GetMenuBarIcon() (bool, error) {
+	return a.settingsStore.GetMenuBarIcon()
+}
+
+// SetMenuBarIcon enables or disables the macOS menu bar status item.
+// Enabling also keeps the app running in the background so the status item
+// remains available after the main window closes.
+func (a *App) SetMenuBarIcon(enabled bool) error {
+	if enabled {
+		if err := a.settingsStore.SetRunBackground(true); err != nil {
+			return err
+		}
+	}
+	if err := a.settingsStore.SetMenuBarIcon(enabled); err != nil {
+		return err
+	}
+	a.refreshUnreadBadges()
+	return nil
+}
+
 // GetShowMessageListCircles returns whether colored sender circles are shown in the message list
 func (a *App) GetShowMessageListCircles() (bool, error) {
 	return a.settingsStore.GetShowMessageListCircles()
@@ -134,7 +155,13 @@ func (a *App) SetRunBackground(enabled bool) error {
 		return err
 	}
 	if !enabled {
-		return a.settingsStore.SetStartHidden(false)
+		if err := a.settingsStore.SetStartHidden(false); err != nil {
+			return err
+		}
+		if err := a.settingsStore.SetMenuBarIcon(false); err != nil {
+			return err
+		}
+		a.refreshUnreadBadges()
 	}
 	return nil
 }

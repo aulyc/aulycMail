@@ -145,7 +145,7 @@ func (a *App) setReadStatus(messageIDs []string, isRead bool) error {
 		if len(folderCounts) > 0 {
 			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
 		}
-		a.refreshDockBadge()
+		a.refreshUnreadBadges()
 	}()
 
 	// Sync to IMAP in background with retry
@@ -390,7 +390,7 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 		if len(folderCounts) > 0 {
 			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
 		}
-		a.refreshDockBadge()
+		a.refreshUnreadBadges()
 	}()
 
 	// Sync to IMAP in background (COPY + DELETE), then sync destination to get correct UIDs.
@@ -937,7 +937,7 @@ func (a *App) gmailRemoveLabel(messages []*message.Message) error {
 		if len(folderCounts) > 0 {
 			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
 		}
-		a.refreshDockBadge()
+		a.refreshUnreadBadges()
 	}()
 
 	// IMAP: DELETE from source folders (no COPY — just remove the label)
@@ -1122,7 +1122,7 @@ func (a *App) DeletePermanently(messageIDs []string) error {
 		if len(folderCounts) > 0 {
 			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
 		}
-		a.refreshDockBadge()
+		a.refreshUnreadBadges()
 	}()
 
 	// Delete from IMAP in background
