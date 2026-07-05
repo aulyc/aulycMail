@@ -527,10 +527,10 @@
           onValueChange={(value) => void selectScope(value)}
           disabled={!catalog?.messageCount}
         >
-          <Select.Trigger showChevron={false} class="relative h-10 w-[300px] shrink-0 border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
+          <Select.Trigger showChevron={false} class="relative h-10 w-[300px] shrink-0 justify-start border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
             <Icon icon="mdi:chevron-down" class="pointer-events-none absolute left-3 h-4 w-4 opacity-50" />
-            <Select.Value class="min-w-0 flex-1" placeholder={$_('backupViewer.scopeAll')}>
-              <span class="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 pl-6">
+            <Select.Value class="min-w-0 flex-1 text-left" placeholder={$_('backupViewer.scopeAll')}>
+              <span class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 pl-6">
                 <span class="truncate">{scopeLabel(selectedScope)}</span>
                 {#if typeof selectedScope?.count === 'number'}
                   <span class="shrink-0 tabular-nums text-muted-foreground">{selectedScope.count}</span>
