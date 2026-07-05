@@ -19,19 +19,11 @@ func (a *App) SearchConversations(accountID, folderID, query string, offset, lim
 	return results, err
 }
 
-// SearchMailInFolder does a substring (case-insensitive) match over a folder's
-// messages — subject, sender, recipients, snippet. Powers the `/` search
+// SearchMailInAccount does a substring (case-insensitive) match over
+// messages — subject, sender, recipients, snippet — scoped to one account
+// when accountID is set, or all accounts when empty. Powers the `/` search
 // overlay, where partial/mid-word matches (CJK + pinyin) must work, which the
 // FTS-backed SearchConversations can't do.
-func (a *App) SearchMailInFolder(folderID, query string, limit int) ([]*message.ContactMessage, error) {
-	if a.messageStore == nil {
-		return []*message.ContactMessage{}, nil
-	}
-	return a.messageStore.SearchMessagesInFolder(folderID, query, limit)
-}
-
-// SearchMailInAccount does the same substring search as SearchMailInFolder,
-// scoped to one account when accountID is set, or all accounts when empty.
 func (a *App) SearchMailInAccount(accountID, query string, limit int) ([]*message.ContactMessage, error) {
 	if a.messageStore == nil {
 		return []*message.ContactMessage{}, nil
@@ -62,24 +54,9 @@ func (a *App) GetFTSIndexStatus(folderID string) (*message.FTSIndexStatus, error
 	return a.ftsIndexer.GetIndexStatus(folderID)
 }
 
-// GetFTSIndexStatusAll returns the indexing status for all folders
-func (a *App) GetFTSIndexStatusAll() (map[string]*message.FTSIndexStatus, error) {
-	return a.ftsIndexer.GetAllIndexStatuses()
-}
-
-// IsFTSIndexComplete checks if a folder is fully indexed
-func (a *App) IsFTSIndexComplete(folderID string) bool {
-	return a.ftsIndexer.IsIndexComplete(folderID)
-}
-
 // IsFTSIndexing returns true if any folder is currently being indexed
 func (a *App) IsFTSIndexing() bool {
 	return a.ftsIndexer.IsAnyIndexing()
-}
-
-// RebuildFTSIndex forces a rebuild of the FTS index for a folder
-func (a *App) RebuildFTSIndex(folderID string) error {
-	return a.ftsIndexer.RebuildIndex(a.ctx, folderID)
 }
 
 // IMAPSearchFolder performs a server-side IMAP SEARCH query on a specific folder.

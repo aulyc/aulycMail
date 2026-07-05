@@ -67,8 +67,8 @@ type HostSecrets interface {
 // Storage provides per-extension data services. KV is small string config
 // (non-sensitive). Secrets is sensitive credential storage (keyring + AES
 // fallback transparently). HostSecrets is read-only access to host-managed
-// credentials. Per-extension SQLite is implicit (each extension opens its
-// own DB via internal/extensions.OpenStore for richer data).
+// credentials. Per-extension SQLite, when needed, is owned by the extension's
+// backend store.
 type Storage interface {
 	KV(extensionID string) KVStore
 	Secrets(extensionID string) Secrets

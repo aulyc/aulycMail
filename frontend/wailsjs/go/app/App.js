@@ -10,10 +10,6 @@ export function AddAccount(arg1) {
   return window['go']['app']['App']['AddAccount'](arg1);
 }
 
-export function AddContact(arg1, arg2) {
-  return window['go']['app']['App']['AddContact'](arg1, arg2);
-}
-
 export function AddImageAllowlist(arg1, arg2) {
   return window['go']['app']['App']['AddImageAllowlist'](arg1, arg2);
 }
@@ -24,14 +20,6 @@ export function AddMicrosoftSharedMailbox(arg1, arg2, arg3) {
 
 export function Archive(arg1) {
   return window['go']['app']['App']['Archive'](arg1);
-}
-
-export function CanUndo() {
-  return window['go']['app']['App']['CanUndo']();
-}
-
-export function CancelAccountSync(arg1) {
-  return window['go']['app']['App']['CancelAccountSync'](arg1);
 }
 
 export function CancelAllSyncs() {
@@ -48,14 +36,6 @@ export function CancelOAuthFlow() {
 
 export function ChooseBackupDirectory() {
   return window['go']['app']['App']['ChooseBackupDirectory']();
-}
-
-export function ClearOAuthCreds(arg1) {
-  return window['go']['app']['App']['ClearOAuthCreds'](arg1);
-}
-
-export function CloseWindow() {
-  return window['go']['app']['App']['CloseWindow']();
 }
 
 export function CompleteOAuthAccountSetup(arg1, arg2, arg3, arg4, arg5) {
@@ -82,10 +62,6 @@ export function Contacts_ListContactsForBrowse(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['Contacts_ListContactsForBrowse'](arg1, arg2, arg3, arg4);
 }
 
-export function Contacts_ResizeContactPhoto(arg1) {
-  return window['go']['app']['App']['Contacts_ResizeContactPhoto'](arg1);
-}
-
 export function Contacts_UpdateContact(arg1, arg2) {
   return window['go']['app']['App']['Contacts_UpdateContact'](arg1, arg2);
 }
@@ -98,20 +74,12 @@ export function CreateIdentity(arg1, arg2) {
   return window['go']['app']['App']['CreateIdentity'](arg1, arg2);
 }
 
-export function DeleteContact(arg1) {
-  return window['go']['app']['App']['DeleteContact'](arg1);
-}
-
 export function DeleteDraft(arg1) {
   return window['go']['app']['App']['DeleteDraft'](arg1);
 }
 
 export function DeleteIdentity(arg1) {
   return window['go']['app']['App']['DeleteIdentity'](arg1);
-}
-
-export function DeleteLocalMessages(arg1) {
-  return window['go']['app']['App']['DeleteLocalMessages'](arg1);
 }
 
 export function DeletePermanently(arg1) {
@@ -174,10 +142,6 @@ export function GetAppInfo() {
   return window['go']['app']['App']['GetAppInfo']();
 }
 
-export function GetAttachment(arg1) {
-  return window['go']['app']['App']['GetAttachment'](arg1);
-}
-
 export function GetAttachments(arg1) {
   return window['go']['app']['App']['GetAttachments'](arg1);
 }
@@ -214,16 +178,8 @@ export function GetConfiguredOAuthProviders() {
   return window['go']['app']['App']['GetConfiguredOAuthProviders']();
 }
 
-export function GetContact(arg1) {
-  return window['go']['app']['App']['GetContact'](arg1);
-}
-
 export function GetContactMessages(arg1, arg2) {
   return window['go']['app']['App']['GetContactMessages'](arg1, arg2);
-}
-
-export function GetContext() {
-  return window['go']['app']['App']['GetContext']();
 }
 
 export function GetConversation(arg1, arg2) {
@@ -250,10 +206,6 @@ export function GetFTSIndexStatus(arg1) {
   return window['go']['app']['App']['GetFTSIndexStatus'](arg1);
 }
 
-export function GetFTSIndexStatusAll() {
-  return window['go']['app']['App']['GetFTSIndexStatusAll']();
-}
-
 export function GetFolderTree(arg1) {
   return window['go']['app']['App']['GetFolderTree'](arg1);
 }
@@ -262,16 +214,8 @@ export function GetFolders(arg1) {
   return window['go']['app']['App']['GetFolders'](arg1);
 }
 
-export function GetIMAPConnectionForUndo(arg1, arg2) {
-  return window['go']['app']['App']['GetIMAPConnectionForUndo'](arg1, arg2);
-}
-
 export function GetIdentities(arg1) {
   return window['go']['app']['App']['GetIdentities'](arg1);
-}
-
-export function GetIdentity(arg1) {
-  return window['go']['app']['App']['GetIdentity'](arg1);
 }
 
 export function GetImageAllowlist() {
@@ -286,20 +230,8 @@ export function GetLanguage() {
   return window['go']['app']['App']['GetLanguage']();
 }
 
-export function GetLastSeenVersion() {
-  return window['go']['app']['App']['GetLastSeenVersion']();
-}
-
 export function GetMarkAsReadDelay() {
   return window['go']['app']['App']['GetMarkAsReadDelay']();
-}
-
-export function GetMessage(arg1) {
-  return window['go']['app']['App']['GetMessage'](arg1);
-}
-
-export function GetMessageCount(arg1, arg2) {
-  return window['go']['app']['App']['GetMessageCount'](arg1, arg2);
 }
 
 export function GetMessageListDensity() {
@@ -314,10 +246,6 @@ export function GetMessageSource(arg1) {
   return window['go']['app']['App']['GetMessageSource'](arg1);
 }
 
-export function GetMessages(arg1, arg2, arg3, arg4) {
-  return window['go']['app']['App']['GetMessages'](arg1, arg2, arg3, arg4);
-}
-
 export function GetMicrosoftSharedMailboxes(arg1) {
   return window['go']['app']['App']['GetMicrosoftSharedMailboxes'](arg1);
 }
@@ -326,24 +254,8 @@ export function GetNativeTitleBar() {
   return window['go']['app']['App']['GetNativeTitleBar']();
 }
 
-export function GetOAuthBuildStatus() {
-  return window['go']['app']['App']['GetOAuthBuildStatus']();
-}
-
-export function GetOAuthCredsChoices(arg1, arg2) {
-  return window['go']['app']['App']['GetOAuthCredsChoices'](arg1, arg2);
-}
-
-export function GetOAuthCredsStatus(arg1) {
-  return window['go']['app']['App']['GetOAuthCredsStatus'](arg1);
-}
-
 export function GetOAuthStatus(arg1) {
   return window['go']['app']['App']['GetOAuthStatus'](arg1);
-}
-
-export function GetOAuthWarningDisabled() {
-  return window['go']['app']['App']['GetOAuthWarningDisabled']();
 }
 
 export function GetPendingMailto() {
@@ -410,10 +322,6 @@ export function GetUIState() {
   return window['go']['app']['App']['GetUIState']();
 }
 
-export function GetUndoDescription() {
-  return window['go']['app']['App']['GetUndoDescription']();
-}
-
 export function GetUnifiedInboxConversations(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['GetUnifiedInboxConversations'](arg1, arg2, arg3, arg4);
 }
@@ -422,28 +330,12 @@ export function GetUnifiedInboxCount(arg1) {
   return window['go']['app']['App']['GetUnifiedInboxCount'](arg1);
 }
 
-export function GetUnifiedInboxUnreadCount() {
-  return window['go']['app']['App']['GetUnifiedInboxUnreadCount']();
-}
-
 export function IMAPSearchFolder(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['IMAPSearchFolder'](arg1, arg2, arg3, arg4);
 }
 
 export function IgnoreReadReceipt(arg1, arg2) {
   return window['go']['app']['App']['IgnoreReadReceipt'](arg1, arg2);
-}
-
-export function InitiateShutdown() {
-  return window['go']['app']['App']['InitiateShutdown']();
-}
-
-export function IsExtensionEnabled(arg1) {
-  return window['go']['app']['App']['IsExtensionEnabled'](arg1);
-}
-
-export function IsFTSIndexComplete(arg1) {
-  return window['go']['app']['App']['IsFTSIndexComplete'](arg1);
 }
 
 export function IsFTSIndexing() {
@@ -470,24 +362,12 @@ export function ListAccountSetupHooksForProvider(arg1) {
   return window['go']['app']['App']['ListAccountSetupHooksForProvider'](arg1);
 }
 
-export function ListContacts(arg1) {
-  return window['go']['app']['App']['ListContacts'](arg1);
-}
-
-export function ListDrafts(arg1) {
-  return window['go']['app']['App']['ListDrafts'](arg1);
-}
-
 export function ListEnabledExtensions() {
   return window['go']['app']['App']['ListEnabledExtensions']();
 }
 
 export function ListExtensionRailTabs() {
   return window['go']['app']['App']['ListExtensionRailTabs']();
-}
-
-export function ListExtensions() {
-  return window['go']['app']['App']['ListExtensions']();
 }
 
 export function LogFrontend(arg1, arg2) {
@@ -516,10 +396,6 @@ export function MarkAsSpam(arg1) {
 
 export function MarkAsUnread(arg1) {
   return window['go']['app']['App']['MarkAsUnread'](arg1);
-}
-
-export function MoveLocalMessages(arg1, arg2) {
-  return window['go']['app']['App']['MoveLocalMessages'](arg1, arg2);
 }
 
 export function MoveMessagesToFolder(arg1, arg2) {
@@ -580,10 +456,6 @@ export function ReadFileAsAttachment(arg1) {
 
 export function ReauthorizeAccount(arg1) {
   return window['go']['app']['App']['ReauthorizeAccount'](arg1);
-}
-
-export function RebuildFTSIndex(arg1) {
-  return window['go']['app']['App']['RebuildFTSIndex'](arg1);
 }
 
 export function RefreshContactsFromMail() {
@@ -658,10 +530,6 @@ export function SearchMailInAccount(arg1, arg2, arg3) {
   return window['go']['app']['App']['SearchMailInAccount'](arg1, arg2, arg3);
 }
 
-export function SearchMailInFolder(arg1, arg2, arg3) {
-  return window['go']['app']['App']['SearchMailInFolder'](arg1, arg2, arg3);
-}
-
 export function SearchUnifiedInbox(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['SearchUnifiedInbox'](arg1, arg2, arg3, arg4);
 }
@@ -676,10 +544,6 @@ export function SendReadReceipt(arg1, arg2) {
 
 export function SetAccentBarUnread(arg1) {
   return window['go']['app']['App']['SetAccentBarUnread'](arg1);
-}
-
-export function SetAccountEnabled(arg1, arg2) {
-  return window['go']['app']['App']['SetAccountEnabled'](arg1, arg2);
 }
 
 export function SetAlwaysLoadImages(arg1) {
@@ -706,16 +570,8 @@ export function SetDefaultIdentity(arg1, arg2) {
   return window['go']['app']['App']['SetDefaultIdentity'](arg1, arg2);
 }
 
-export function SetExtensionEnabled(arg1, arg2) {
-  return window['go']['app']['App']['SetExtensionEnabled'](arg1, arg2);
-}
-
 export function SetLanguage(arg1) {
   return window['go']['app']['App']['SetLanguage'](arg1);
-}
-
-export function SetLastSeenVersion(arg1) {
-  return window['go']['app']['App']['SetLastSeenVersion'](arg1);
 }
 
 export function SetMarkAsReadDelay(arg1) {
@@ -732,18 +588,6 @@ export function SetMessageListSortOrder(arg1) {
 
 export function SetNativeTitleBar(arg1) {
   return window['go']['app']['App']['SetNativeTitleBar'](arg1);
-}
-
-export function SetOAuthCreds(arg1, arg2, arg3) {
-  return window['go']['app']['App']['SetOAuthCreds'](arg1, arg2, arg3);
-}
-
-export function SetOAuthCredsChoice(arg1, arg2) {
-  return window['go']['app']['App']['SetOAuthCredsChoice'](arg1, arg2);
-}
-
-export function SetOAuthWarningDisabled(arg1) {
-  return window['go']['app']['App']['SetOAuthWarningDisabled'](arg1);
 }
 
 export function SetReadReceiptResponsePolicy(arg1) {
@@ -830,10 +674,6 @@ export function TestOAuthConnection(arg1) {
   return window['go']['app']['App']['TestOAuthConnection'](arg1);
 }
 
-export function TestSMTPConnection(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['app']['App']['TestSMTPConnection'](arg1, arg2, arg3, arg4, arg5);
-}
-
 export function Trash(arg1) {
   return window['go']['app']['App']['Trash'](arg1);
 }
@@ -856,8 +696,4 @@ export function UpdateAccount(arg1, arg2) {
 
 export function UpdateIdentity(arg1, arg2) {
   return window['go']['app']['App']['UpdateIdentity'](arg1, arg2);
-}
-
-export function UpdateLocalFlags(arg1, arg2, arg3) {
-  return window['go']['app']['App']['UpdateLocalFlags'](arg1, arg2, arg3);
 }

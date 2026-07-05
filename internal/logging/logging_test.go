@@ -27,15 +27,3 @@ func TestWithComponent(t *testing.T) {
 		t.Error("WithComponent() returned logger that produces nil events")
 	}
 }
-
-func TestWithAccountID(t *testing.T) {
-	// Ensure Init has been called
-	_ = Init(Config{Console: true, Level: "debug"})
-
-	logger := WithAccountID("account-123")
-	// Verify we got a non-zero logger by checking it can create events
-	event := logger.Debug()
-	if event == nil {
-		t.Error("WithAccountID() returned logger that produces nil events")
-	}
-}

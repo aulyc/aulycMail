@@ -24,11 +24,6 @@ func (a *App) GetAttachments(messageID string) ([]*message.Attachment, error) {
 	return a.attachmentStore.GetByMessage(messageID)
 }
 
-// GetAttachment returns a single attachment by ID
-func (a *App) GetAttachment(attachmentID string) (*message.Attachment, error) {
-	return a.attachmentStore.Get(attachmentID)
-}
-
 // GetInlineAttachments returns a map of content-id to data URL for all inline attachments
 // This is used to resolve cid: references in HTML email bodies
 // Content is read from the database (stored during sync) for fast offline access

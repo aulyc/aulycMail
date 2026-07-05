@@ -145,25 +145,6 @@ type FetchOptions struct {
 	Attachments bool
 }
 
-// DefaultFetchOptions returns options for fetching message headers only
-func DefaultFetchOptions() FetchOptions {
-	return FetchOptions{
-		Envelope: true,
-		Flags:    true,
-	}
-}
-
-// FullFetchOptions returns options for fetching the complete message
-func FullFetchOptions() FetchOptions {
-	return FetchOptions{
-		Envelope:    true,
-		Flags:       true,
-		BodyText:    true,
-		BodyHTML:    true,
-		Attachments: true,
-	}
-}
-
 // ConversationSearchResult extends Conversation with search-specific fields
 // including highlighted text and folder information for search results display
 type ConversationSearchResult struct {

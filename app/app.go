@@ -788,33 +788,6 @@ func (a *App) ShowWindow() {
 	wailsRuntime.EventsEmit(a.ctx, "window:show")
 }
 
-// CloseWindow handles the window close button click.
-// If background mode is enabled, hides the window instead of quitting.
-// Called by the frontend title bar close button.
-func (a *App) CloseWindow() {
-	runBg, _ := a.settingsStore.GetRunBackground()
-	if runBg {
-		log := logging.WithComponent("app")
-		log.Info().Msg("Window close requested, hiding to background")
-		wailsRuntime.WindowHide(a.ctx)
-		a.windowHidden = true
-		return
-	}
-
-	// Normal shutdown flow
-	if shuttingDown {
-		return
-	}
-	shuttingDown = true
-
-	log := logging.WithComponent("app")
-	log.Info().Msg("Window close requested, shutting down")
-	go func() {
-		defer recoverPanic("app", "shutdown")
-		wailsRuntime.Quit(a.ctx)
-	}()
-}
-
 // QuitApp forces a real quit, bypassing background mode.
 // Used by frontend or future tray menu to actually exit.
 func (a *App) QuitApp() {
@@ -835,18 +808,6 @@ func (a *App) QuitApp() {
 // removed; the window is always shown on startup.
 func (a *App) GetStartHiddenActive() bool {
 	return false
-}
-
-// InitiateShutdown triggers the application quit (called from frontend)
-func (a *App) InitiateShutdown() {
-	if shuttingDown {
-		return
-	}
-	shuttingDown = true
-
-	log := logging.WithComponent("app")
-	log.Info().Msg("Initiating shutdown")
-	wailsRuntime.Quit(a.ctx)
 }
 
 // Shutdown is called when the app is closing
@@ -937,11 +898,6 @@ func (a *App) getIMAPCredentials(accountID string) (*imap.ClientConfig, error) {
 // If refresh fails, emits an event for the frontend to prompt re-authorization.
 func (a *App) getValidOAuthToken(accountID string) (*credentials.OAuthTokens, error) {
 	return a.composeOps.getValidOAuthToken(a.ctx, accountID)
-}
-
-// GetContext returns the app context
-func (a *App) GetContext() context.Context {
-	return a.ctx
 }
 
 // menuLabels returns the localized strings for the native macOS menu. The menu

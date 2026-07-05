@@ -44,8 +44,3 @@ func (m *DarwinThemeMonitor) Events() <-chan SystemTheme {
 func (m *DarwinThemeMonitor) Stop() error {
 	return nil
 }
-
-// ReadSystemTheme returns empty on macOS (frontend uses matchMedia)
-func ReadSystemTheme() string {
-	return string(SystemThemeNoPreference)
-}

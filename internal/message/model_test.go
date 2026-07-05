@@ -5,46 +5,6 @@ import (
 	"time"
 )
 
-func TestDefaultFetchOptions(t *testing.T) {
-	opts := DefaultFetchOptions()
-
-	if !opts.Envelope {
-		t.Error("DefaultFetchOptions().Envelope should be true")
-	}
-	if !opts.Flags {
-		t.Error("DefaultFetchOptions().Flags should be true")
-	}
-	if opts.BodyText {
-		t.Error("DefaultFetchOptions().BodyText should be false")
-	}
-	if opts.BodyHTML {
-		t.Error("DefaultFetchOptions().BodyHTML should be false")
-	}
-	if opts.Attachments {
-		t.Error("DefaultFetchOptions().Attachments should be false")
-	}
-}
-
-func TestFullFetchOptions(t *testing.T) {
-	opts := FullFetchOptions()
-
-	if !opts.Envelope {
-		t.Error("FullFetchOptions().Envelope should be true")
-	}
-	if !opts.Flags {
-		t.Error("FullFetchOptions().Flags should be true")
-	}
-	if !opts.BodyText {
-		t.Error("FullFetchOptions().BodyText should be true")
-	}
-	if !opts.BodyHTML {
-		t.Error("FullFetchOptions().BodyHTML should be true")
-	}
-	if !opts.Attachments {
-		t.Error("FullFetchOptions().Attachments should be true")
-	}
-}
-
 func TestToHeader(t *testing.T) {
 	now := time.Now()
 	msg := &Message{

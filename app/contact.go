@@ -109,26 +109,6 @@ func (a *App) SearchContacts(query string, limit int) ([]*contact.Contact, error
 	return contacts, nil
 }
 
-// GetContact returns a single contact by ID
-func (a *App) GetContact(id string) (*contact.Contact, error) {
-	return a.contactStore.Get(id)
-}
-
-// AddContact adds or updates a contact
-func (a *App) AddContact(email, displayName string) error {
-	return a.contactStore.AddOrUpdate(email, displayName)
-}
-
-// DeleteContact deletes a contact
-func (a *App) DeleteContact(id string) error {
-	return a.contactStore.Delete(id)
-}
-
-// ListContacts returns all contacts
-func (a *App) ListContacts(limit int) ([]*contact.Contact, error) {
-	return a.contactStore.List(limit)
-}
-
 // GetContactMessages returns recent mail involving the given contact address
 // (as sender, To, Cc, or Bcc), newest first. Powers the Contacts detail's
 // "related mail" list; clicking a row navigates to that conversation in mail.

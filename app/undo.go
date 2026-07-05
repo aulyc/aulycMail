@@ -1,10 +1,8 @@
 package app
 
 import (
-	"context"
 	"fmt"
 
-	"github.com/aulyc/aulycmail/internal/imap"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -30,120 +28,9 @@ func (a *App) Undo() (string, error) {
 	return cmd.Description(), nil
 }
 
-// CanUndo returns true if there's an action that can be undone
-func (a *App) CanUndo() bool {
-	return a.undoStack.CanUndo()
-}
-
-// GetUndoDescription returns the description of what would be undone
-func (a *App) GetUndoDescription() string {
-	cmd := a.undoStack.Peek()
-	if cmd == nil {
-		return ""
-	}
-	return cmd.Description()
-}
-
 // ============================================================================
 // UndoContext Implementation - Required for undo.Command operations
 // ============================================================================
-
-// GetIMAPConnectionForUndo implements undo.UndoContext
-func (a *App) GetIMAPConnectionForUndo(ctx context.Context, accountID string) (*imap.Client, func(), error) {
-	poolConn, err := a.imapPool.GetConnection(ctx, accountID)
-	if err != nil {
-		return nil, nil, err
-	}
-	return poolConn.Client(), func() { a.imapPool.Release(poolConn) }, nil
-}
-
-// UpdateLocalFlags implements undo.UndoContext
-func (a *App) UpdateLocalFlags(messageIDs []string, isRead, isStarred *bool) error {
-	err := a.messageStore.UpdateFlagsBatch(messageIDs, isRead, isStarred)
-	if err != nil {
-		return err
-	}
-	// Emit read-state events for the only flag payload the frontend listens to.
-	if isRead != nil {
-		wailsRuntime.EventsEmit(a.ctx, "messages:readChanged", map[string]interface{}{
-			"messageIds": messageIDs,
-			"isRead":     *isRead,
-		})
-	}
-	return nil
-}
-
-// MoveLocalMessages implements undo.UndoContext
-func (a *App) MoveLocalMessages(messageIDs []string, folderID string) error {
-	// Get the source folder IDs before moving (for count updates)
-	messages, err := a.messageStore.GetByIDs(messageIDs)
-	if err != nil {
-		return fmt.Errorf("failed to get messages: %w", err)
-	}
-
-	// Group by source folder
-	sourceFolderIDs := make(map[string]bool)
-	for _, msg := range messages {
-		sourceFolderIDs[msg.FolderID] = true
-	}
-
-	// Move messages in database
-	err = a.messageStore.MoveMessages(messageIDs, folderID)
-	if err != nil {
-		return err
-	}
-
-	// Emit messages:moved event
-	wailsRuntime.EventsEmit(a.ctx, "messages:moved", map[string]interface{}{
-		"messageIds":   messageIDs,
-		"destFolderId": folderID,
-	})
-
-	// Update folder counts for all affected folders (source + destination)
-	go func() {
-		defer recoverPanic("app.undo", "update folder counts")
-		folderCounts := make(map[string]int)
-
-		// Update source folders
-		for sourceFolderID := range sourceFolderIDs {
-			unreadCount, err := a.messageStore.CountUnreadByFolder(sourceFolderID)
-			if err == nil {
-				folderObj, err := a.folderStore.Get(sourceFolderID)
-				if err == nil && folderObj != nil {
-					totalCount, _ := a.messageStore.CountByFolder(sourceFolderID)
-					_ = a.folderStore.UpdateCounts(sourceFolderID, totalCount, unreadCount)
-					folderCounts[sourceFolderID] = unreadCount
-				}
-			}
-		}
-
-		// Update destination folder
-		unreadCount, err := a.messageStore.CountUnreadByFolder(folderID)
-		if err == nil {
-			folderObj, err := a.folderStore.Get(folderID)
-			if err == nil && folderObj != nil {
-				totalCount, _ := a.messageStore.CountByFolder(folderID)
-				_ = a.folderStore.UpdateCounts(folderID, totalCount, unreadCount)
-				folderCounts[folderID] = unreadCount
-			}
-		}
-
-		if len(folderCounts) > 0 {
-			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
-		}
-	}()
-
-	return nil
-}
-
-// DeleteLocalMessages implements undo.UndoContext
-func (a *App) DeleteLocalMessages(messageIDs []string) error {
-	err := a.messageStore.DeleteBatch(messageIDs)
-	if err == nil {
-		wailsRuntime.EventsEmit(a.ctx, "messages:deleted", messageIDs)
-	}
-	return err
-}
 
 // FindLocalMessageIDs implements undo.UndoContext
 // Finds current local DB message IDs by RFC822 Message-ID header and folder

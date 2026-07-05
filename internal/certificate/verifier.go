@@ -81,19 +81,6 @@ func Fingerprint(derCert []byte) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// FormatFingerprint formats a hex fingerprint with colon separators for display
-func FormatFingerprint(fp string) string {
-	var parts []string
-	for i := 0; i < len(fp); i += 2 {
-		end := i + 2
-		if end > len(fp) {
-			end = len(fp)
-		}
-		parts = append(parts, strings.ToUpper(fp[i:end]))
-	}
-	return strings.Join(parts, ":")
-}
-
 // ExtractCertInfo parses a DER-encoded certificate into display-friendly info
 func ExtractCertInfo(rawCert []byte, verifyErr error) *CertificateInfo {
 	cert, err := x509.ParseCertificate(rawCert)

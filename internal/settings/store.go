@@ -585,21 +585,3 @@ func (s *Store) SetDarkMailContent(enabled bool) error {
 	}
 	return s.Set(KeyDarkMailContent, value)
 }
-
-// ReadNativeTitleBar opens the database directly to read the native_titlebar setting.
-// Used in main.go before wails.Run() when the full DB isn't initialized yet.
-// Returns false on any error (first run, missing DB, etc.).
-func ReadNativeTitleBar(dbPath string) bool {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return false
-	}
-	defer db.Close()
-
-	var value string
-	err = db.QueryRow("SELECT value FROM settings WHERE key = ?", KeyNativeTitleBar).Scan(&value)
-	if err != nil {
-		return false
-	}
-	return value == "true"
-}

@@ -1,7 +1,6 @@
 package platform
 
-// DialogIcon controls the icon and severity styling of native OS dialogs
-// shown via ShowDialog / ShowDialogAsync.
+// DialogIcon controls the icon and severity styling of native OS dialogs.
 type DialogIcon int
 
 const (
@@ -26,13 +25,6 @@ const (
 // Does NOT call os.Exit — caller's responsibility.
 func ShowDialog(icon DialogIcon, title, text string) {
 	showDialog(icon, title, text, true)
-}
-
-// ShowDialogAsync is the non-blocking variant of ShowDialog. Use when the
-// dialog is informational and the program should keep running while the user
-// reads (e.g. background warnings detected mid-session).
-func ShowDialogAsync(icon DialogIcon, title, text string) {
-	showDialog(icon, title, text, false)
 }
 
 // ShowDialogWithLink displays a blocking native dialog with two buttons: a

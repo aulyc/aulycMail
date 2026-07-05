@@ -393,24 +393,6 @@ func (a *App) CancelFolderSync(accountID, folderID string) {
 	}
 }
 
-// CancelAccountSync cancels any running syncs for the specified account (all folders)
-func (a *App) CancelAccountSync(accountID string) {
-	log := logging.WithComponent("app")
-	a.syncMu.Lock()
-	defer a.syncMu.Unlock()
-
-	// Find and cancel all syncs for this account (keys are "accountID:folderID")
-	prefix := accountID + ":"
-	for key, cancel := range a.syncContexts {
-		if strings.HasPrefix(key, prefix) {
-			log.Info().Str("syncKey", key).Msg("Cancelling folder sync")
-			cancel()
-			delete(a.syncContexts, key)
-		}
-	}
-
-}
-
 // CancelAllSyncs cancels all running syncs and force-closes pool connections.
 // Force-closing is needed because context cancellation cannot interrupt blocked
 // TCP reads on dead sockets (e.g., after network changes). ForceClose kills the

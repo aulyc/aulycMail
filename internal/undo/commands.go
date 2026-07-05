@@ -1,22 +1,11 @@
 package undo
 
 import (
-	"context"
 	"fmt"
-
-	imapPkg "github.com/aulyc/aulycmail/internal/imap"
 )
 
 // UndoContext provides dependencies for undo operations
 type UndoContext interface {
-	// GetIMAPConnectionForUndo returns an IMAP client for the account
-	GetIMAPConnectionForUndo(ctx context.Context, accountID string) (*imapPkg.Client, func(), error)
-	// UpdateLocalFlags updates flags in local database
-	UpdateLocalFlags(messageIDs []string, isRead, isStarred *bool) error
-	// MoveLocalMessages moves messages in local database
-	MoveLocalMessages(messageIDs []string, folderID string) error
-	// DeleteLocalMessages deletes messages from local database
-	DeleteLocalMessages(messageIDs []string) error
 	// FindLocalMessageIDs finds current local DB message IDs by RFC822 Message-ID and folder
 	FindLocalMessageIDs(accountID, folderID string, rfc822MessageIDs []string) ([]string, error)
 	// MoveMessagesToFolder moves messages using the full move pipeline (IMAP + local DB)

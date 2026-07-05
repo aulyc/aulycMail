@@ -309,30 +309,6 @@ func (a *App) RemoveAccount(id string) error {
 	return nil
 }
 
-// SetAccountEnabled enables or disables an account
-func (a *App) SetAccountEnabled(id string, enabled bool) error {
-	err := a.accountStore.SetEnabled(id, enabled)
-	if err != nil {
-		return err
-	}
-
-	// Update IDLE manager
-	if a.idleManager != nil {
-		if enabled {
-			// Start IDLE for the account
-			acc, err := a.accountStore.Get(id)
-			if err == nil && acc != nil {
-				a.idleManager.StartAccount(acc.ID, acc.Name)
-			}
-		} else {
-			// Stop IDLE for the account
-			a.idleManager.StopAccount(id)
-		}
-	}
-
-	return nil
-}
-
 // ReorderAccounts updates the order of accounts
 func (a *App) ReorderAccounts(ids []string) error {
 	return a.accountStore.Reorder(ids)
@@ -371,11 +347,6 @@ func (a *App) GetAllAccountIdentities() ([]AccountIdentityGroup, error) {
 // GetIdentities returns all identities for an account
 func (a *App) GetIdentities(accountID string) ([]*account.Identity, error) {
 	return a.accountStore.GetIdentities(accountID)
-}
-
-// GetIdentity returns a single identity by ID
-func (a *App) GetIdentity(identityID string) (*account.Identity, error) {
-	return a.accountStore.GetIdentity(identityID)
 }
 
 // CreateIdentity creates a new email identity for an account

@@ -3,34 +3,24 @@
 import {certificate} from '../models';
 import {account} from '../models';
 import {v1} from '../models';
-import {backend} from '../models';
 import {message} from '../models';
 import {folder} from '../models';
 import {app} from '../models';
-import {contact} from '../models';
-import {context} from '../models';
 import {smtp} from '../models';
-import {imap} from '../models';
 import {settings} from '../models';
 import {appstate} from '../models';
 import {sync} from '../models';
-import {draft} from '../models';
+import {contact} from '../models';
 
 export function AcceptCertificate(arg1:string,arg2:certificate.CertificateInfo,arg3:boolean):Promise<void>;
 
 export function AddAccount(arg1:account.AccountConfig):Promise<account.Account>;
-
-export function AddContact(arg1:string,arg2:string):Promise<void>;
 
 export function AddImageAllowlist(arg1:string,arg2:string):Promise<void>;
 
 export function AddMicrosoftSharedMailbox(arg1:string,arg2:string,arg3:string):Promise<account.Account>;
 
 export function Archive(arg1:Array<string>):Promise<void>;
-
-export function CanUndo():Promise<boolean>;
-
-export function CancelAccountSync(arg1:string):Promise<void>;
 
 export function CancelAllSyncs():Promise<void>;
 
@@ -39,10 +29,6 @@ export function CancelFolderSync(arg1:string,arg2:string):Promise<void>;
 export function CancelOAuthFlow():Promise<void>;
 
 export function ChooseBackupDirectory():Promise<string>;
-
-export function ClearOAuthCreds(arg1:string):Promise<void>;
-
-export function CloseWindow():Promise<void>;
 
 export function CompleteOAuthAccountSetup(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<account.Account>;
 
@@ -56,21 +42,15 @@ export function Contacts_GetContactDetail(arg1:string):Promise<v1.Contact>;
 
 export function Contacts_ListContactsForBrowse(arg1:string,arg2:string,arg3:number,arg4:number):Promise<Array<v1.Contact>>;
 
-export function Contacts_ResizeContactPhoto(arg1:string):Promise<backend.ResizedContactPhoto>;
-
 export function Contacts_UpdateContact(arg1:string,arg2:v1.ContactPatch):Promise<void>;
 
 export function CopyToFolder(arg1:Array<string>,arg2:string):Promise<void>;
 
 export function CreateIdentity(arg1:string,arg2:account.IdentityConfig):Promise<account.Identity>;
 
-export function DeleteContact(arg1:string):Promise<void>;
-
 export function DeleteDraft(arg1:string):Promise<void>;
 
 export function DeleteIdentity(arg1:string):Promise<void>;
-
-export function DeleteLocalMessages(arg1:Array<string>):Promise<void>;
 
 export function DeletePermanently(arg1:Array<string>):Promise<void>;
 
@@ -102,8 +82,6 @@ export function GetAlwaysLoadImages():Promise<boolean>;
 
 export function GetAppInfo():Promise<app.AppInfo>;
 
-export function GetAttachment(arg1:string):Promise<message.Attachment>;
-
 export function GetAttachments(arg1:string):Promise<Array<message.Attachment>>;
 
 export function GetAutoDetectedFolders(arg1:string):Promise<Record<string, string>>;
@@ -122,11 +100,7 @@ export function GetComposerFormat():Promise<string>;
 
 export function GetConfiguredOAuthProviders():Promise<Array<string>>;
 
-export function GetContact(arg1:string):Promise<contact.Contact>;
-
 export function GetContactMessages(arg1:string,arg2:number):Promise<Array<message.ContactMessage>>;
-
-export function GetContext():Promise<context.Context>;
 
 export function GetConversation(arg1:string,arg2:string):Promise<message.Conversation>;
 
@@ -140,17 +114,11 @@ export function GetDraft(arg1:string):Promise<smtp.ComposeMessage>;
 
 export function GetFTSIndexStatus(arg1:string):Promise<message.FTSIndexStatus>;
 
-export function GetFTSIndexStatusAll():Promise<Record<string, message.FTSIndexStatus>>;
-
 export function GetFolderTree(arg1:string):Promise<Array<folder.FolderTree>>;
 
 export function GetFolders(arg1:string):Promise<Array<folder.Folder>>;
 
-export function GetIMAPConnectionForUndo(arg1:context.Context,arg2:string):Promise<imap.Client>;
-
 export function GetIdentities(arg1:string):Promise<Array<account.Identity>>;
-
-export function GetIdentity(arg1:string):Promise<account.Identity>;
 
 export function GetImageAllowlist():Promise<Array<settings.AllowlistEntry>>;
 
@@ -158,13 +126,7 @@ export function GetInlineAttachments(arg1:string):Promise<Record<string, string>
 
 export function GetLanguage():Promise<string>;
 
-export function GetLastSeenVersion():Promise<string>;
-
 export function GetMarkAsReadDelay():Promise<number>;
-
-export function GetMessage(arg1:string):Promise<message.Message>;
-
-export function GetMessageCount(arg1:string,arg2:string):Promise<number>;
 
 export function GetMessageListDensity():Promise<string>;
 
@@ -172,21 +134,11 @@ export function GetMessageListSortOrder():Promise<string>;
 
 export function GetMessageSource(arg1:string):Promise<string>;
 
-export function GetMessages(arg1:string,arg2:string,arg3:number,arg4:number):Promise<Array<message.MessageHeader>>;
-
 export function GetMicrosoftSharedMailboxes(arg1:string):Promise<Array<account.Account>>;
 
 export function GetNativeTitleBar():Promise<boolean>;
 
-export function GetOAuthBuildStatus():Promise<app.OAuthBuildStatus>;
-
-export function GetOAuthCredsChoices(arg1:string,arg2:string):Promise<app.OAuthCredsChoices>;
-
-export function GetOAuthCredsStatus(arg1:string):Promise<app.OAuthCredsStatus>;
-
 export function GetOAuthStatus(arg1:string):Promise<app.OAuthStatus>;
-
-export function GetOAuthWarningDisabled():Promise<boolean>;
 
 export function GetPendingMailto():Promise<app.MailtoData>;
 
@@ -220,23 +172,13 @@ export function GetTrustedCertificates(arg1:Array<string>):Promise<Array<certifi
 
 export function GetUIState():Promise<appstate.UIState>;
 
-export function GetUndoDescription():Promise<string>;
-
 export function GetUnifiedInboxConversations(arg1:number,arg2:number,arg3:string,arg4:string):Promise<Array<message.Conversation>>;
 
 export function GetUnifiedInboxCount(arg1:string):Promise<number>;
 
-export function GetUnifiedInboxUnreadCount():Promise<number>;
-
 export function IMAPSearchFolder(arg1:string,arg2:string,arg3:string,arg4:number):Promise<sync.IMAPSearchResponse>;
 
 export function IgnoreReadReceipt(arg1:string,arg2:string):Promise<void>;
-
-export function InitiateShutdown():Promise<void>;
-
-export function IsExtensionEnabled(arg1:string):Promise<boolean>;
-
-export function IsFTSIndexComplete(arg1:string):Promise<boolean>;
 
 export function IsFTSIndexing():Promise<boolean>;
 
@@ -250,15 +192,9 @@ export function IsReady():Promise<boolean>;
 
 export function ListAccountSetupHooksForProvider(arg1:string):Promise<Array<v1.AccountSetupHookRequest>>;
 
-export function ListContacts(arg1:number):Promise<Array<contact.Contact>>;
-
-export function ListDrafts(arg1:string):Promise<Array<draft.Draft>>;
-
 export function ListEnabledExtensions():Promise<Array<string>>;
 
 export function ListExtensionRailTabs():Promise<Array<v1.RailTabRequest>>;
-
-export function ListExtensions():Promise<Array<app.ExtensionInfo>>;
 
 export function LogFrontend(arg1:string,arg2:string):Promise<void>;
 
@@ -273,8 +209,6 @@ export function MarkAsRead(arg1:Array<string>):Promise<void>;
 export function MarkAsSpam(arg1:Array<string>):Promise<boolean>;
 
 export function MarkAsUnread(arg1:Array<string>):Promise<void>;
-
-export function MoveLocalMessages(arg1:Array<string>,arg2:string):Promise<void>;
 
 export function MoveMessagesToFolder(arg1:Array<string>,arg2:string):Promise<void>;
 
@@ -305,8 +239,6 @@ export function QuitApp():Promise<void>;
 export function ReadFileAsAttachment(arg1:string):Promise<app.ComposerAttachment>;
 
 export function ReauthorizeAccount(arg1:string):Promise<void>;
-
-export function RebuildFTSIndex(arg1:string):Promise<void>;
 
 export function RefreshContactsFromMail():Promise<number>;
 
@@ -344,8 +276,6 @@ export function SearchConversations(arg1:string,arg2:string,arg3:string,arg4:num
 
 export function SearchMailInAccount(arg1:string,arg2:string,arg3:number):Promise<Array<message.ContactMessage>>;
 
-export function SearchMailInFolder(arg1:string,arg2:string,arg3:number):Promise<Array<message.ContactMessage>>;
-
 export function SearchUnifiedInbox(arg1:string,arg2:number,arg3:number,arg4:string):Promise<Array<message.ConversationSearchResult>>;
 
 export function SendMessage(arg1:string,arg2:smtp.ComposeMessage):Promise<void>;
@@ -353,8 +283,6 @@ export function SendMessage(arg1:string,arg2:smtp.ComposeMessage):Promise<void>;
 export function SendReadReceipt(arg1:string,arg2:string):Promise<void>;
 
 export function SetAccentBarUnread(arg1:boolean):Promise<void>;
-
-export function SetAccountEnabled(arg1:string,arg2:boolean):Promise<void>;
 
 export function SetAlwaysLoadImages(arg1:boolean):Promise<void>;
 
@@ -368,11 +296,7 @@ export function SetDarkMailContent(arg1:boolean):Promise<void>;
 
 export function SetDefaultIdentity(arg1:string,arg2:string):Promise<void>;
 
-export function SetExtensionEnabled(arg1:string,arg2:boolean):Promise<void>;
-
 export function SetLanguage(arg1:string):Promise<void>;
-
-export function SetLastSeenVersion(arg1:string):Promise<void>;
 
 export function SetMarkAsReadDelay(arg1:number):Promise<void>;
 
@@ -381,12 +305,6 @@ export function SetMessageListDensity(arg1:string):Promise<void>;
 export function SetMessageListSortOrder(arg1:string):Promise<void>;
 
 export function SetNativeTitleBar(arg1:boolean):Promise<void>;
-
-export function SetOAuthCreds(arg1:string,arg2:string,arg3:string):Promise<void>;
-
-export function SetOAuthCredsChoice(arg1:string,arg2:string):Promise<void>;
-
-export function SetOAuthWarningDisabled(arg1:boolean):Promise<void>;
 
 export function SetReadReceiptResponsePolicy(arg1:string):Promise<void>;
 
@@ -430,8 +348,6 @@ export function TestConnection(arg1:account.AccountConfig):Promise<app.Connectio
 
 export function TestOAuthConnection(arg1:string):Promise<void>;
 
-export function TestSMTPConnection(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string):Promise<void>;
-
 export function Trash(arg1:Array<string>):Promise<boolean>;
 
 export function Undo():Promise<string>;
@@ -443,5 +359,3 @@ export function UnsubscribeFolder(arg1:string,arg2:string):Promise<void>;
 export function UpdateAccount(arg1:string,arg2:account.AccountConfig):Promise<account.Account>;
 
 export function UpdateIdentity(arg1:string,arg2:account.IdentityConfig):Promise<account.Identity>;
-
-export function UpdateLocalFlags(arg1:Array<string>,arg2:any,arg3:any):Promise<void>;

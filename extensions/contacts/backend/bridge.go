@@ -274,30 +274,3 @@ func (b *ContactsBridge) Contacts_DeleteLocalContact(idOrEmail string) error {
 	}
 	return err
 }
-
-// ResizedContactPhoto is the return shape for Contacts_ResizeContactPhoto.
-// Frontend destructures {data, mediaType}. Empty Data + empty MediaType
-// is not used here (caller filters out empties); errors come back as Go
-// errors. Defined here so the extension owns its types end-to-end.
-type ResizedContactPhoto struct {
-	Data      string `json:"data"`
-	MediaType string `json:"mediaType"`
-}
-
-// Contacts_ResizeContactPhoto takes a base64-encoded image, decodes it,
-// resizes to a max edge of 256px, and re-encodes as JPEG at quality 85.
-// Used by the contacts Edit dialog after the frontend HTML file input
-// hands over a picked image.
-func (b *ContactsBridge) Contacts_ResizeContactPhoto(b64In string) (ResizedContactPhoto, error) {
-	if !b.gateEnabled() {
-		return ResizedContactPhoto{}, nil
-	}
-	if err := b.ensureInit(); err != nil {
-		return ResizedContactPhoto{}, err
-	}
-	data, mediaType, err := b.api.ResizeContactPhoto(b64In)
-	if err != nil {
-		return ResizedContactPhoto{}, err
-	}
-	return ResizedContactPhoto{Data: data, MediaType: mediaType}, nil
-}

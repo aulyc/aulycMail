@@ -182,25 +182,6 @@ func providerChainLookup(id string) (ClientCredentials, bool) {
 	return ClientCredentials{}, false
 }
 
-// ShippedClientConfigForID returns whatever the registered provider chain
-// resolves for the given id, bypassing any user override and any user-set
-// slot alias. Used by the settings UI when it needs to know whether the
-// slot's own shipped creds exist independent of the user's current pick.
-//
-// This exists so probing for "is there a shipped option?" doesn't have to
-// mutate the global hook variables — that pattern was racy against
-// concurrent ClientConfigForID readers (every OAuth refresh).
-func ShippedClientConfigForID(id string) (ClientCredentials, bool) {
-	providersMu.RLock()
-	defer providersMu.RUnlock()
-	for _, p := range providers {
-		if creds, ok := p.Lookup(id); ok {
-			return creds, true
-		}
-	}
-	return ClientCredentials{}, false
-}
-
 // ClientConfigIDForProvider maps a provider name (as used by the existing
 // GetProvider API and stored in the oauth_tokens.provider column) to its
 // default mail-flavored client_config_id. Used by the credentials store to

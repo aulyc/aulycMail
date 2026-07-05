@@ -16,14 +16,6 @@ import (
 //go:embed manifest.json
 var manifestJSON []byte
 
-// ManifestJSON returns the raw manifest.json bytes embedded in the binary.
-// Useful for shipping the manifest over IPC to inspector UIs without re-marshalling.
-func ManifestJSON() []byte {
-	out := make([]byte, len(manifestJSON))
-	copy(out, manifestJSON)
-	return out
-}
-
 // Manifest returns the parsed manifest. Panics on malformed JSON since the
 // file is compiled into the binary — a parse error is a build-time bug.
 func Manifest() coreapi.Manifest {

@@ -89,11 +89,6 @@ func WithComponent(component string) zerolog.Logger {
 	return Logger.With().Str("component", component).Logger()
 }
 
-// WithAccountID returns a logger with an account ID field
-func WithAccountID(accountID string) zerolog.Logger {
-	return Logger.With().Str("account_id", accountID).Logger()
-}
-
 // Debug logs a debug message
 func Debug() *zerolog.Event {
 	return Logger.Debug()
@@ -112,9 +107,4 @@ func Warn() *zerolog.Event {
 // Error logs an error message
 func Error() *zerolog.Event {
 	return Logger.Error()
-}
-
-// Fatal logs a fatal message and exits
-func Fatal() *zerolog.Event {
-	return Logger.Fatal()
 }

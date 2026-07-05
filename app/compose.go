@@ -752,52 +752,6 @@ func parseDataURL(dataURL string) (contentType, base64Data string) {
 	return rest[:idx], rest[idx+8:]
 }
 
-// TestSMTPConnection tests SMTP connection settings
-func (a *App) TestSMTPConnection(host string, port int, security, username, password string) error {
-	log := logging.WithComponent("app")
-
-	// Map security string to type
-	var securityType smtp.SecurityType
-	switch security {
-	case "none":
-		securityType = smtp.SecurityNone
-	case "starttls":
-		securityType = smtp.SecurityStartTLS
-	case "tls":
-		securityType = smtp.SecurityTLS
-	default:
-		securityType = smtp.SecurityStartTLS
-	}
-
-	// Create client config
-	config := smtp.DefaultConfig()
-	config.Host = host
-	config.Port = port
-	config.Security = securityType
-	config.Username = username
-	config.Password = password
-	config.AuthType = smtp.AuthTypePassword
-	config.TLSConfig = certificate.BuildTLSConfig(host, a.certStore)
-
-	client := smtp.NewClient(config)
-
-	// Test connection
-	if err := client.Connect(); err != nil {
-		log.Error().Err(err).Msg("SMTP connection test failed")
-		return fmt.Errorf("connection failed: %w", err)
-	}
-	defer client.Close()
-
-	// Test authentication
-	if err := client.Login(); err != nil {
-		log.Error().Err(err).Msg("SMTP login test failed")
-		return fmt.Errorf("authentication failed: %w", err)
-	}
-
-	log.Info().Str("host", host).Int("port", port).Msg("SMTP connection test successful")
-	return nil
-}
-
 // PickAttachmentFiles opens a file picker dialog and returns the selected files as attachments
 func (a *App) PickAttachmentFiles() ([]ComposerAttachment, error) {
 	return pickAttachmentFiles(a.ctx)

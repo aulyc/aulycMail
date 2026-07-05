@@ -597,8 +597,3 @@ func (a *App) messageToComposeMessage(msg *message.Message) *smtp.ComposeMessage
 		InReplyTo: msg.InReplyTo,
 	}
 }
-
-// ListDrafts returns all drafts for an account
-func (a *App) ListDrafts(accountID string) ([]*draft.Draft, error) {
-	return a.draftStore.ListByAccount(accountID)
-}

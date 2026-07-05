@@ -914,39 +914,24 @@ Use `errors.Is(err, coreapi.ErrXxx)` for sentinel matching. `ErrAdditionalConsen
 
 ## Per-extension storage
 
-Package: [`internal/extensions/`](../internal/extensions/) (file [`store.go`](../internal/extensions/store.go)).
+There is no shared `internal/extensions.OpenStore` helper in the current codebase.
+An extension that needs persistence owns its backend store under
+`extensions/<name>/backend/store.go`, including opening
+`<dataDir>/extensions/<name>/data.db`, creating its private tables, and applying
+its own migrations.
 
-```go
-import "github.com/aulyc/aulycmail/internal/extensions"
+**File location:** Linux `~/.local/share/aulycmail/extensions/<name>/data.db`,
+macOS `~/Library/Application Support/aulycmail/extensions/<name>/data.db`,
+Windows `%LOCALAPPDATA%\aulycmail\extensions\<name>\data.db`. The
+`extensions/` parent is created by [`internal/platform/paths.go EnsureDirectories`](../internal/platform/paths.go).
 
-func NewStore(dataDir string) (*extensions.Store, error) {
-    return extensions.OpenStore(dataDir, "myextension", []extensions.Migration{
-        {Version: 1, SQL: `CREATE TABLE myitems (...)`},
-        {Version: 2, SQL: `CREATE INDEX ...`},
-    })
-}
-```
+**Lifecycle:** per-extension stores open lazily inside the extension bridge's
+`ensureInit()` on the first enabled bridge call. Disabled extensions should not
+open databases, start goroutines, or allocate background resources.
 
-**What `OpenStore` does:**
-
-1. Resolves the path to `<dataDir>/extensions/<name>/data.db` (creates parent dirs with 0700 perms)
-2. Opens the DB via the standard `database.Open` (inherits WAL, busy timeout, 0600 file perms, etc.)
-3. Creates an extension-private `migrations` table and applies user migrations in version order, idempotently
-
-**Reaching the SQL:**
-
-```go
-db := store.DB()           // *sql.DB; for the extension's own tables only
-store.Path()               // on-disk file path
-```
-
-**Migrations** start at version 1, increment monotonically. Each runs inside a transaction. Already-applied versions are skipped on every startup. Each extension's migration sequence is INDEPENDENT — no global migration namespace.
-
-**File location:** Linux `~/.local/share/aulycmail/extensions/<name>/data.db`, macOS `~/Library/Application Support/aulycmail/extensions/<name>/data.db`, Windows `%LOCALAPPDATA%\aulycmail\extensions\<name>\data.db`. The `extensions/` parent is created by [`internal/platform/paths.go EnsureDirectories`](../internal/platform/paths.go).
-
-**Lifecycle:** Per the architecture doc, stores open EAGERLY at `App.Startup`, regardless of whether the extension is currently enabled. This keeps schemas valid across enable/disable cycles — users can disable, the migrations stay applied, re-enabling is instantaneous.
-
-**KV namespace:** host-provided `coreapi.Storage.KV` is still a Phase 1 stub (see [§ Storage](#storage)). Store small extension config in your own migration-defined tables until a real KV consumer appears.
+**KV namespace:** host-provided `coreapi.Storage.KV` is still a Phase 1 stub
+(see [§ Storage](#storage)). Store small extension config in your own
+migration-defined tables until a real KV consumer appears.
 
 ---
 
@@ -1297,7 +1282,7 @@ When you ADD a method to an interface in `coreapi`, update `stubCore` in the sam
 
 ### Real-store integration tests
 
-[`internal/extensions/store_test.go`](../internal/extensions/store_test.go), [`internal/extensions/auth/broker_test.go`](../internal/extensions/auth/broker_test.go): open a real SQLite via `t.TempDir()` + `database.Open`, exercise the API, assert on results. No mocking of the credentials store or DB.
+[`internal/extensions/auth/broker_test.go`](../internal/extensions/auth/broker_test.go): opens a real SQLite via `t.TempDir()` + `database.Open`, exercises the API, and asserts on results. No mocking of the credentials store or DB.
 
 ### Auth broker test pattern
 
@@ -2172,7 +2157,7 @@ The Contacts extension *is allowed* to receive a `*database.DB` handle to aulycm
 
 **2. If the extension needs persistence, it brings its own database.**
 
-Per-extension SQLite is the only persistence path. Use [`internal/extensions.OpenStore`](../internal/extensions/store.go) (see [§ Per-extension storage](#per-extension-storage)). That opens `<dataDir>/extensions/<name>/data.db`, applies the extension's own migrations, and gives back a `*sql.DB` scoped to that file only. Tiny config (sync tokens, view prefs) should live in the extension's own migration-defined tables until host KV is implemented.
+Per-extension SQLite is the only persistence path. If an extension needs storage, implement its own backend store under `extensions/<name>/backend/store.go`; it opens `<dataDir>/extensions/<name>/data.db`, applies the extension's own migrations, and keeps all tables scoped to that file only. Tiny config (sync tokens, view prefs) should live in the extension's own migration-defined tables until host KV is implemented.
 
 If the extension wants to read or write data aulycmail itself owns (e.g., list messages, insert a contact, move a message), the only legitimate path is calling the relevant `coreapi` interface method — and only if that method already exists and is implemented. If it doesn't exist or returns `ErrUnimplemented`, see [§ Requesting a new extension API](#requesting-a-new-extension-api) below.
 
@@ -2208,7 +2193,7 @@ extensions/<name>/
     register.go                  # Extension struct + NewExtension() + Register()
     bridge.go                    # <Name>Bridge struct + <Name>BridgeDeps + New<Name>Bridge() + all <Name>_-prefixed methods
     api.go                       # internal API the bridge methods delegate to
-    store.go                     # per-extension SQLite via extensions.OpenStore (opened by ensureInit, not eagerly)
+    store.go                     # per-extension SQLite store + migrations (opened by ensureInit, not eagerly)
     # ... whatever else the extension needs ...
   frontend/
     components/                  # Svelte components rendered into RailTab / settings slots
@@ -2244,7 +2229,7 @@ Every Wails-bound method on the Bridge MUST be named `<Extension>_<Method>` (e.g
 
 Whether the extension is first-party or third-party (if an intake opens), the review covers:
 
-1. **The two hard rules above hold.** No imports from `internal/` outside the small allowed surface. No queries against `aulycmail.db`. Own SQLite via `extensions.OpenStore` if persistence is needed.
+1. **The two hard rules above hold.** No imports from `internal/` outside the small allowed surface. No queries against `aulycmail.db`. Own SQLite under the extension backend if persistence is needed.
 2. **No `internal/core/api/v1/` changes in this PR.** If the extension needed a new API method, that landed in a separate, prior PR (gated by a Feature Request issue).
 3. **Lightweight invariant intact.** Trace every line that runs at startup (`NewBridge`, `NewExtension`, `Register`, `registerExtensionI18n`). None of it can open SQLite, spawn goroutines, or do network I/O. `ensureInit()` is the ONLY place those happen.
 4. **All Wails-bound methods are gated.** Every method on `*Bridge` calls `b.gateEnabled()` and short-circuits if false. Disabled state returns `nil`/empty, never an error.

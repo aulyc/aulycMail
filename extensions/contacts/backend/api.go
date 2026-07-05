@@ -1,12 +1,10 @@
 package backend
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/aulyc/aulycmail/extensions/contacts/backend/imaging"
 	"github.com/aulyc/aulycmail/internal/contact"
 	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
 	"github.com/google/uuid"
@@ -557,27 +555,4 @@ func (a *API) DeleteContact(id string) error {
 		return nil
 	}
 	return a.localStore.DeleteRecord(rec.ID)
-}
-
-// ResizeContactPhoto takes a base64-encoded image (PNG / JPEG / WEBP / GIF),
-// rescales it to a max edge of 256px preserving aspect ratio, and re-encodes
-// as JPEG at quality 85. Returns the resized base64 + "image/jpeg" ready to
-// drop into a coreapi.ContactPatch.Photo.
-func (a *API) ResizeContactPhoto(b64In string) (b64Out string, mediaType string, err error) {
-	b64In = strings.TrimSpace(b64In)
-	if b64In == "" {
-		return "", "", fmt.Errorf("contacts.ResizeContactPhoto: empty input")
-	}
-	raw, err := base64.StdEncoding.DecodeString(b64In)
-	if err != nil {
-		return "", "", fmt.Errorf("contacts.ResizeContactPhoto: decode base64: %w", err)
-	}
-	jpegBytes, mt, err := imaging.ResizeToJPEG(raw, imaging.ResizeOptions{
-		MaxEdge: 256,
-		Quality: 85,
-	})
-	if err != nil {
-		return "", "", fmt.Errorf("contacts.ResizeContactPhoto: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(jpegBytes), mt, nil
 }

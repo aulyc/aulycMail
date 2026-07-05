@@ -11,21 +11,6 @@ import (
 // Message API - Exposed to frontend via Wails bindings
 // ============================================================================
 
-// GetMessages returns messages for a folder with pagination
-func (a *App) GetMessages(accountID, folderID string, offset, limit int) ([]*message.MessageHeader, error) {
-	return a.messageStore.ListByFolder(folderID, offset, limit)
-}
-
-// GetMessageCount returns the total message count for a folder
-func (a *App) GetMessageCount(accountID, folderID string) (int, error) {
-	return a.messageStore.CountByFolder(folderID)
-}
-
-// GetMessage returns a full message by ID
-func (a *App) GetMessage(id string) (*message.Message, error) {
-	return a.messageStore.Get(id)
-}
-
 // GetMessageSource fetches the raw RFC822 source of a message from the IMAP server
 func (a *App) GetMessageSource(messageID string) (string, error) {
 	log := logging.WithComponent("app")
@@ -99,11 +84,6 @@ func (a *App) GetUnifiedInboxConversations(offset, limit int, sortOrder, filter 
 // GetUnifiedInboxCount returns the total conversation count across all inbox folders
 func (a *App) GetUnifiedInboxCount(filter string) (int, error) {
 	return a.messageStore.CountConversationsUnifiedInbox(filter)
-}
-
-// GetUnifiedInboxUnreadCount returns the total unread count across all inbox folders
-func (a *App) GetUnifiedInboxUnreadCount() (int, error) {
-	return a.messageStore.GetUnifiedInboxUnreadCount()
 }
 
 // GetConversation returns all messages in a conversation/thread

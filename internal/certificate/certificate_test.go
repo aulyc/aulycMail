@@ -75,27 +75,6 @@ func TestFingerprint(t *testing.T) {
 	}
 }
 
-func TestFormatFingerprint(t *testing.T) {
-	tests := []struct {
-		input string
-		want  string
-	}{
-		{"abcd1234", "AB:CD:12:34"},
-		{"aa", "AA"},
-		{"aabb", "AA:BB"},
-		{"a", "A"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.input, func(t *testing.T) {
-			got := FormatFingerprint(tt.input)
-			if got != tt.want {
-				t.Fatalf("FormatFingerprint(%q) = %q, want %q", tt.input, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestExtractCertInfo(t *testing.T) {
 	der := generateTestCert(t)
 	info := ExtractCertInfo(der, errors.New("test error"))
