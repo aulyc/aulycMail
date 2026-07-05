@@ -618,17 +618,18 @@
           {:else}
             <div bind:this={messageListEl} class="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
               {#each visibleMessages as message (message.key)}
+                {@const hasAttachments = messageAttachmentCount(message) > 0}
                 <button
                   type="button"
-                  class="flex w-full items-start gap-3 border-b border-border px-4 py-3 text-left transition-colors {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
+                  class="relative flex w-full items-start gap-3 border-b border-border py-3 pl-4 text-left transition-colors {hasAttachments ? 'pr-6' : 'pr-4'} {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
                   onclick={() => selectMessage(message.key)}
                 >
                   <Icon icon="mdi:email-outline" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                   <span class="min-w-0 flex-1">
-                    <span class="flex items-baseline gap-2">
+                    <span class="flex items-center gap-2">
                       <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{message.subject || $_('backupViewer.unknownSubject')}</span>
-                      {#if messageAttachmentCount(message) > 0}
-                        <span class="shrink-0 text-amber-600 dark:text-amber-500" title={$_('backupViewer.attachments')}>
+                      {#if hasAttachments}
+                        <span class="shrink-0 text-primary" title={$_('backupViewer.attachments')}>
                           <Icon icon="mdi:paperclip" class="h-4 w-4" />
                         </span>
                       {/if}
@@ -642,6 +643,9 @@
                       {/if}
                     </span>
                   </span>
+                  {#if hasAttachments}
+                    <span class="pointer-events-none absolute bottom-0 right-0 top-0 w-[5px] bg-amber-500" aria-hidden="true"></span>
+                  {/if}
                 </button>
               {/each}
             </div>
