@@ -10,6 +10,7 @@
   import { contactsView, reloadContacts, selectSource, activateContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { registerExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
+  import { consumePendingDeepLink } from '$lib/stores/extensionDeepLink.svelte'
   import { KEY } from '$extensions/contacts/frontend/keyboard/shortcuts'
   // @ts-ignore - wailsjs bindings
   import { EventsOn } from '$wailsjs/runtime/runtime'
@@ -57,6 +58,25 @@
     editTarget = contact
     showEdit = true
   }
+
+  function contactIdFromDeepLink(path: string): string | null {
+    const clean = path.trim().split(/[?#]/, 1)[0]
+    if (!clean) return null
+
+    const segments = clean.split('/').filter(Boolean)
+    const rawId = segments[0] === 'contact' || segments[0] === 'contacts'
+      ? segments[1]
+      : segments[segments.length - 1]
+    return rawId ? decodeURIComponent(rawId) : null
+  }
+
+  $effect(() => {
+    const path = consumePendingDeepLink('contacts')
+    const contactId = path ? contactIdFromDeepLink(path) : null
+    if (contactId) {
+      void activateContact(contactId)
+    }
+  })
 
   async function handleCreated(id: string) {
     // The sidebar is now account-grouped rather than manual/collected-grouped,

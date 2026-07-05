@@ -40,16 +40,15 @@ const (
 )
 
 // Extension enable/disable keys. Format: extension_<name>_enabled.
-// All extensions default to disabled — minimalists see no UI changes until
-// they explicitly opt in. Phase 1 reserves keys only for confirmed first-
-// party extensions (Contacts).
+// Contacts is currently the only built-in extension and is always enabled;
+// the reserved key remains for schema compatibility with earlier settings.
 const (
 	KeyExtensionContactsEnabled = "extension_contacts_enabled"
 )
 
 // AllExtensionKeys is the list of all known first-party extension names. Add
 // a new extension's name here when its enable/disable key is reserved above.
-// IsExtensionEnabled / SetExtensionEnabled work on names from this list.
+// IsExtensionEnabled currently treats these built-ins as enabled.
 var AllExtensionKeys = []string{
 	"contacts",
 }
@@ -76,35 +75,35 @@ const DefaultMessageListSortOrder = SortOrderNewest
 
 // Theme mode values
 const (
-	ThemeModeSystem      = "system"
-	ThemeModeLight       = "light"        // Default light purple
-	ThemeModeLightBlue   = "light-blue"   // New
-	ThemeModeLightOrange   = "light-orange"   // New
-	ThemeModeLightBalanced = "light-balanced" // New
-	ThemeModeAdwaitaLight  = "adwaita-light"  // Adwaita Light
-	ThemeModeBreezeLight   = "breeze-light"   // Breeze Light
-	ThemeModeDark          = "dark"           // Default dark purple
-	ThemeModeDarkGray     = "dark-gray"     // New
-	ThemeModeDarkBalanced = "dark-balanced" // New
-	ThemeModeAdwaitaDark  = "adwaita-dark"  // Adwaita Dark
-	ThemeModeBreezeDark   = "breeze-dark"   // Breeze Dark
+	ThemeModeSystem              = "system"
+	ThemeModeLight               = "light"                // Default light purple
+	ThemeModeLightBlue           = "light-blue"           // New
+	ThemeModeLightOrange         = "light-orange"         // New
+	ThemeModeLightBalanced       = "light-balanced"       // New
+	ThemeModeAdwaitaLight        = "adwaita-light"        // Adwaita Light
+	ThemeModeBreezeLight         = "breeze-light"         // Breeze Light
+	ThemeModeDark                = "dark"                 // Default dark purple
+	ThemeModeDarkGray            = "dark-gray"            // New
+	ThemeModeDarkBalanced        = "dark-balanced"        // New
+	ThemeModeAdwaitaDark         = "adwaita-dark"         // Adwaita Dark
+	ThemeModeBreezeDark          = "breeze-dark"          // Breeze Dark
 	ThemeModeCatppuccinLatte     = "catppuccin-latte"     // Catppuccin Latte
 	ThemeModeCatppuccinFrappe    = "catppuccin-frappe"    // Catppuccin Frappé
 	ThemeModeCatppuccinMacchiato = "catppuccin-macchiato" // Catppuccin Macchiato
 	ThemeModeCatppuccinMocha     = "catppuccin-mocha"     // Catppuccin Mocha
-	ThemeModeDracula         = "dracula"          // Dracula
-	ThemeModeGithubLight     = "github-light"     // GitHub Light
-	ThemeModeGithubDark      = "github-dark"      // GitHub Dark
-	ThemeModeGithubSoftDark  = "github-soft-dark" // GitHub Soft Dark
-	ThemeModeTokyoNight      = "tokyo-night"      // Tokyo Night
-	ThemeModeNordLight       = "nord-light"       // Nord Light
-	ThemeModeNordDark        = "nord-dark"        // Nord Dark
-	ThemeModePopLight        = "pop-light"        // Pop! Light
-	ThemeModePopDark         = "pop-dark"         // Pop! Dark
-	ThemeModeYaruLight       = "yaru-light"       // Yaru Light
-	ThemeModeYaruDark        = "yaru-dark"        // Yaru Dark
-	ThemeModeVSCodeLight     = "vs-code-light"    // VS Code Light
-	ThemeModeVSCodeDark      = "vs-code-dark"     // VS Code Dark
+	ThemeModeDracula             = "dracula"              // Dracula
+	ThemeModeGithubLight         = "github-light"         // GitHub Light
+	ThemeModeGithubDark          = "github-dark"          // GitHub Dark
+	ThemeModeGithubSoftDark      = "github-soft-dark"     // GitHub Soft Dark
+	ThemeModeTokyoNight          = "tokyo-night"          // Tokyo Night
+	ThemeModeNordLight           = "nord-light"           // Nord Light
+	ThemeModeNordDark            = "nord-dark"            // Nord Dark
+	ThemeModePopLight            = "pop-light"            // Pop! Light
+	ThemeModePopDark             = "pop-dark"             // Pop! Dark
+	ThemeModeYaruLight           = "yaru-light"           // Yaru Light
+	ThemeModeYaruDark            = "yaru-dark"            // Yaru Dark
+	ThemeModeVSCodeLight         = "vs-code-light"        // VS Code Light
+	ThemeModeVSCodeDark          = "vs-code-dark"         // VS Code Dark
 )
 
 // DefaultThemeMode is the default theme mode

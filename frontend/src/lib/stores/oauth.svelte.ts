@@ -21,16 +21,16 @@ import { get } from 'svelte/store'
 import { _ } from '$lib/i18n'
 import { addToast } from './toast'
 
-export type OAuthFlowState = 'idle' | 'pending' | 'success' | 'error' | 'cancelled'
-export type OAuthProvider = 'google' | 'microsoft'
+type OAuthFlowState = 'idle' | 'pending' | 'success' | 'error' | 'cancelled'
+type OAuthProvider = 'google' | 'microsoft'
 
-export interface OAuthFlowResult {
+interface OAuthFlowResult {
   provider: OAuthProvider
   email: string
   expiresIn: number
 }
 
-export interface OAuthStatus {
+interface OAuthStatus {
   isOAuth: boolean
   provider: string
   email: string

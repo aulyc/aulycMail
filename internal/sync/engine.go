@@ -4,6 +4,7 @@ package sync
 import (
 	"context"
 	"io"
+	stdsync "sync"
 
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/contact"
@@ -83,6 +84,14 @@ type Engine struct {
 	sanitizer        *email.Sanitizer
 	log              zerolog.Logger
 	progressCallback ProgressCallback
+
+	messageSyncMu stdsync.Mutex
+	messageSyncs  map[messageSyncKey]chan struct{}
+}
+
+type messageSyncKey struct {
+	accountID string
+	folderID  string
 }
 
 // NewEngine creates a new sync engine
@@ -97,6 +106,47 @@ func NewEngine(pool *imapPkg.Pool, accountStore *account.Store, folderStore *fol
 		attachExtractor: email.NewAttachmentExtractor(),
 		sanitizer:       email.NewSanitizer(),
 		log:             logging.WithComponent("sync"),
+		messageSyncs:    make(map[messageSyncKey]chan struct{}),
+	}
+}
+
+func (e *Engine) acquireMessageSync(ctx context.Context, accountID, folderID string) (func(), error) {
+	key := messageSyncKey{accountID: accountID, folderID: folderID}
+
+	for {
+		e.messageSyncMu.Lock()
+		if e.messageSyncs == nil {
+			e.messageSyncs = make(map[messageSyncKey]chan struct{})
+		}
+		if done, exists := e.messageSyncs[key]; exists {
+			e.messageSyncMu.Unlock()
+
+			e.log.Debug().
+				Str("account", accountID).
+				Str("folderID", folderID).
+				Msg("Waiting for existing message sync")
+
+			select {
+			case <-done:
+				continue
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		done := make(chan struct{})
+		e.messageSyncs[key] = done
+		e.messageSyncMu.Unlock()
+
+		release := func() {
+			e.messageSyncMu.Lock()
+			if current, exists := e.messageSyncs[key]; exists && current == done {
+				delete(e.messageSyncs, key)
+				close(done)
+			}
+			e.messageSyncMu.Unlock()
+		}
+		return release, nil
 	}
 }
 

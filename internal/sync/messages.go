@@ -9,28 +9,33 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emersion/go-imap/v2"
-	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/aulyc/aulycmail/internal/contact"
 	"github.com/aulyc/aulycmail/internal/folder"
 	imapPkg "github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/message"
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapclient"
 )
 
 // SyncMessages synchronizes messages for a folder with incremental sync support.
 // syncPeriodDays determines how far back to sync (0 = all messages).
 // Messages are fetched in two phases: headers first (fast), then bodies (background).
 //
-// NOTE: From the app package, prefer App.SyncFolder() over calling this directly.
-// SyncFolder wraps SyncMessages with debouncing, cancellation of concurrent syncs
-// on the same folder, and proper event emission (sync:progress, folder:synced).
-// Calling SyncMessages directly from app/ risks race conditions when multiple
-// operations trigger syncs on the same folder concurrently.
+// SyncMessages serializes work per account+folder so manual sync, scheduler,
+// IDLE-triggered sync, and sent-folder refresh cannot mutate the same local
+// folder at the same time. App.SyncFolder still adds UI-facing debounce,
+// cancellation, and completion events around this engine-level invariant.
 func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, syncPeriodDays int) error {
 	// Check context at start
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+
+	releaseSync, err := e.acquireMessageSync(ctx, accountID, folderID)
+	if err != nil {
+		return err
+	}
+	defer releaseSync()
 
 	// Get folder from store
 	f, err := e.folderStore.Get(folderID)

@@ -6,38 +6,6 @@ import (
 	"time"
 )
 
-// PowerState represents the current power state
-type PowerState string
-
-const (
-	PowerStateAC         PowerState = "ac"
-	PowerStateBattery    PowerState = "battery"
-	PowerStateLowBattery PowerState = "low-battery"
-	PowerStateUnknown    PowerState = "unknown"
-)
-
-// PowerInfo contains information about the current power state
-type PowerInfo struct {
-	State             PowerState `json:"state"`
-	BatteryPercentage int        `json:"batteryPercentage"` // -1 if unknown
-	IsCharging        bool       `json:"isCharging"`
-}
-
-// PowerMonitor monitors power state changes
-type PowerMonitor interface {
-	// GetPowerInfo returns the current power state
-	GetPowerInfo() (*PowerInfo, error)
-
-	// Subscribe registers a callback for power state changes
-	Subscribe(callback func(PowerInfo)) error
-
-	// Unsubscribe removes the callback
-	Unsubscribe() error
-
-	// Close cleans up resources
-	Close() error
-}
-
 // SleepWakeEvent represents a system sleep or wake event
 type SleepWakeEvent struct {
 	IsSleeping bool      // true = going to sleep, false = waking up

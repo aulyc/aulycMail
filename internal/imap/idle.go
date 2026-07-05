@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-sasl"
-	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 
@@ -46,9 +46,9 @@ func DefaultIdleConfig() IdleConfig {
 		ReconnectBackoff:     1 * time.Second,
 		MaxReconnectBackoff:  5 * time.Minute,
 		MaxReconnectAttempts: 10,
-		EventSendTimeout:     2 * time.Second,  // Don't block forever on event send
-		HealthCheckEnabled:   true,             // Verify connection before IDLE
-		ShutdownTimeout:      5 * time.Second,  // Graceful shutdown timeout
+		EventSendTimeout:     2 * time.Second, // Don't block forever on event send
+		HealthCheckEnabled:   true,            // Verify connection before IDLE
+		ShutdownTimeout:      5 * time.Second, // Graceful shutdown timeout
 	}
 }
 
@@ -490,23 +490,37 @@ func (m *IdleManager) SetConnectivityCheck(check func() bool) {
 
 // Start starts the IDLE manager
 func (m *IdleManager) Start(ctx context.Context) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.cancel != nil && m.ctx != nil && m.ctx.Err() == nil {
+		m.log.Debug().Msg("IDLE manager already started")
+		return
+	}
+
 	m.ctx, m.cancel = context.WithCancel(ctx)
 	m.log.Info().Msg("IDLE manager started")
 }
 
 // Stop stops all IDLE connections
 func (m *IdleManager) Stop() {
-	if m.cancel != nil {
-		m.cancel()
+	m.mu.Lock()
+	cancel := m.cancel
+	m.cancel = nil
+	m.ctx = nil
+
+	connections := m.connections
+	m.connections = make(map[string]*IdleConnection)
+	m.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
 	}
 
-	m.mu.Lock()
-	for accountID, conn := range m.connections {
+	for accountID, conn := range connections {
 		m.log.Debug().Str("account", accountID).Msg("Stopping IDLE connection")
 		conn.Stop()
 	}
-	m.connections = make(map[string]*IdleConnection)
-	m.mu.Unlock()
 
 	m.wg.Wait()
 	m.log.Info().Msg("IDLE manager stopped")
@@ -521,6 +535,12 @@ func (m *IdleManager) Events() <-chan MailEvent {
 func (m *IdleManager) StartAccount(accountID, accountName string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	ctx := m.ctx
+	if ctx == nil || ctx.Err() != nil {
+		m.log.Debug().Str("account", accountName).Msg("IDLE manager is not running, skipping account start")
+		return
+	}
 
 	// Check if already running
 	if conn, exists := m.connections[accountID]; exists {
@@ -544,7 +564,7 @@ func (m *IdleManager) StartAccount(accountID, accountName string) {
 	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
-		conn.Start(m.ctx, m.events)
+		conn.Start(ctx, m.events)
 	}()
 
 	m.log.Info().Str("account", accountName).Msg("Started IDLE for account")
@@ -553,13 +573,18 @@ func (m *IdleManager) StartAccount(accountID, accountName string) {
 // StopAccount stops IDLE for a specific account
 func (m *IdleManager) StopAccount(accountID string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if conn, exists := m.connections[accountID]; exists {
-		conn.Stop()
+	conn, exists := m.connections[accountID]
+	if exists {
 		delete(m.connections, accountID)
-		m.log.Info().Str("accountID", accountID).Msg("Stopped IDLE for account")
 	}
+	m.mu.Unlock()
+
+	if !exists {
+		return
+	}
+
+	conn.Stop()
+	m.log.Info().Str("accountID", accountID).Msg("Stopped IDLE for account")
 }
 
 // RestartAccount restarts IDLE for a specific account

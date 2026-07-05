@@ -2,7 +2,7 @@
 // Provides reactive state for application settings
 
 // @ts-ignore - wailsjs path
-import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetRunBackground, GetStartHidden, GetAutostart, GetLanguage, GetComposerFormat, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread, GetShowMessageListCircles, GetShowViewerCircles } from '../../../wailsjs/go/app/App'
+import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetLanguage, GetComposerFormat, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread } from '../../../wailsjs/go/app/App'
 import { setLocale as setI18nLocale, detectSystemLocale } from '$lib/i18n'
 import { loadDateFnsLocale, getDateFnsLocale } from '$lib/i18n/dateFnsLocale'
 import type { Locale } from 'date-fns'
@@ -25,16 +25,11 @@ export type ThemeMode =
 let messageListDensity = $state<MessageListDensity>('standard')
 let messageListSortOrder = $state<MessageListSortOrder>('newest')
 let themeMode = $state<ThemeMode>('system')
-let runBackground = $state<boolean>(false)
-let startHidden = $state<boolean>(false)
-let autostart = $state<boolean>(false)
 let language = $state<string>('')
 let composerFormat = $state<ComposerFormat>('plain')
 let alwaysLoadImages = $state<boolean>(false)
 let darkMailContent = $state<boolean>(false)
 let accentBarUnread = $state<boolean>(false)
-let showMessageListCircles = $state<boolean>(true)
-let showViewerCircles = $state<boolean>(true)
 
 // Getter functions to access the state
 export function getMessageListDensity(): MessageListDensity {
@@ -49,35 +44,8 @@ export function getThemeMode(): ThemeMode {
   return themeMode
 }
 
-export function getShowTitleBar(): boolean {
-  // Title bar is hardcoded to OS-native — the custom title bar is never shown.
-  return false
-}
-
-export function getRunBackground(): boolean {
-  return runBackground
-}
-
-export function getStartHidden(): boolean {
-  return startHidden
-}
-
-export function getAutostart(): boolean {
-  return autostart
-}
-
-export function getLanguage(): string {
-  return language
-}
-
-
 export function getComposerFormat(): ComposerFormat {
   return composerFormat
-}
-
-export function getNativeTitleBar(): boolean {
-  // Title bar is hardcoded to OS-native.
-  return true
 }
 
 export function getAlwaysLoadImages(): boolean {
@@ -90,14 +58,6 @@ export function getDarkMailContent(): boolean {
 
 export function getAccentBarUnread(): boolean {
   return accentBarUnread
-}
-
-export function getShowMessageListCircles(): boolean {
-  return showMessageListCircles
-}
-
-export function getShowViewerCircles(): boolean {
-  return showViewerCircles
 }
 
 export function getCurrentDateFnsLocale(): Locale | undefined {
@@ -124,15 +84,15 @@ export function setShowTitleBar(show: boolean) {
 }
 
 export function setRunBackground(v: boolean) {
-  runBackground = v
+  void v
 }
 
 export function setStartHidden(v: boolean) {
-  startHidden = v
+  void v
 }
 
 export function setAutostart(v: boolean) {
-  autostart = v
+  void v
 }
 
 export function setLanguage(lang: string) {
@@ -164,44 +124,34 @@ export function setAccentBarUnread(v: boolean) {
 }
 
 export function setShowMessageListCircles(v: boolean) {
-  showMessageListCircles = v
+  void v
 }
 
 export function setShowViewerCircles(v: boolean) {
-  showViewerCircles = v
+  void v
 }
 
 // Load settings from backend (call on app startup)
 export async function loadSettings(): Promise<ThemeMode> {
   try {
-    const [density, sortOrder, theme, runBg, startHid, autoSt, lang, compFormat, alwaysImages, darkMail, accentBar, listCircles, viewerCircles] = await Promise.all([
+    const [density, sortOrder, theme, lang, compFormat, alwaysImages, darkMail, accentBar] = await Promise.all([
       GetMessageListDensity(),
       GetMessageListSortOrder(),
       GetThemeMode(),
-      GetRunBackground(),
-      GetStartHidden(),
-      GetAutostart(),
       GetLanguage(),
       GetComposerFormat(),
       GetAlwaysLoadImages(),
       GetDarkMailContent(),
       GetAccentBarUnread(),
-      GetShowMessageListCircles(),
-      GetShowViewerCircles(),
     ])
     // 'micro' was removed from the UI; fold any stored value into 'compact' (小).
     messageListDensity = (density === 'micro' ? 'compact' : (density as MessageListDensity)) || 'standard'
     messageListSortOrder = (sortOrder as MessageListSortOrder) || 'newest'
     themeMode = (theme as ThemeMode) || 'system'
-    runBackground = runBg ?? false
-    startHidden = startHid ?? false
-    autostart = autoSt ?? false
     composerFormat = (compFormat as ComposerFormat) || 'plain'
     alwaysLoadImages = alwaysImages ?? false
     darkMailContent = darkMail ?? false
     accentBarUnread = accentBar ?? false
-    showMessageListCircles = listCircles ?? true
-    showViewerCircles = viewerCircles ?? true
     // Apply saved language (if set, overrides system detection from initI18n)
     if (lang) {
       language = lang

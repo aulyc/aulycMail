@@ -13,7 +13,7 @@ export type ComposeMode = 'new' | 'reply' | 'reply-all' | 'forward'
  * Signature marker - used to identify where signature starts for removal/swapping
  * Using three zero-width spaces as an invisible marker that TipTap preserves in text nodes
  */
-export const SIGNATURE_MARKER = '\u200B\u200B\u200B'
+const SIGNATURE_MARKER = '\u200B\u200B\u200B'
 
 export function getSignatureSeparator(identity: Identity): string {
   const style = identity.signatureSeparatorStyle

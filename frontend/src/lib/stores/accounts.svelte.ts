@@ -17,7 +17,7 @@ import { account, app, folder } from '../../../wailsjs/go/models'
 // @ts-ignore - wailsjs runtime
 import { EventsOn } from '../../../wailsjs/runtime/runtime'
 
-export interface AccountWithFolders {
+interface AccountWithFolders {
   account: account.Account
   folders: folder.FolderTree[]
   loading: boolean
@@ -26,7 +26,7 @@ export interface AccountWithFolders {
   lastSync: Date | null
 }
 
-export interface SyncProgress {
+interface SyncProgress {
   folderId: string
   fetched: number
   total: number
@@ -34,7 +34,7 @@ export interface SyncProgress {
   percentage: number
 }
 
-export interface SelectedFolder {
+interface SelectedFolder {
   accountId: string
   folderId: string
   folderPath: string

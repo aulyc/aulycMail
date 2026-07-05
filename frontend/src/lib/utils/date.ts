@@ -87,10 +87,3 @@ export function formatMessageDate(date: Date): string {
 
   return format(date, 'MMM d, yyyy \'at\' h:mm a', { locale })
 }
-
-/**
- * Format a date for full display (tooltips, etc.)
- */
-export function formatFullDate(date: Date): string {
-  return format(date, 'EEEE, MMMM d, yyyy \'at\' h:mm:ss a', { locale: getCurrentDateFnsLocale() })
-}

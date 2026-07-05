@@ -1,10 +1,22 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "entry": [
-    "src/composerMain.ts",
-    "index.html",
-    "composer.html"
+    "index.html"
   ],
+  "ignoreDependencies": [
+    "@iconify-json/heroicons",
+    "@iconify-json/logos",
+    "@iconify-json/lucide",
+    "@iconify-json/mdi",
+    "@iconify-json/simple-icons"
+  ],
+  "ignoreIssues": {
+    "src/lib/components/ui/**/index.ts": ["exports"],
+    "src/lib/keyboard/shortcuts.ts": ["exports"],
+    "src/lib/stores/extensionDeepLink.svelte.ts": ["exports"],
+    "src/lib/stores/extensionRegistry.svelte.ts": ["exports"],
+    "src/lib/stores/extensionShortcuts.svelte.ts": ["exports", "types"]
+  },
   "project": ["src/**/*.{ts,svelte}"],
   "includeEntryExports": false
 }

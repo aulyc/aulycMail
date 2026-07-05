@@ -22,7 +22,7 @@ export function getIsDarkActive(): boolean {
  *  [data-theme="..."] block, so each theme owns its own scheme — no JS list to
  *  maintain. We mirror it as the `.dark` class so Tailwind `dark:` variants and
  *  any `.dark mark`-style selectors keep working. */
-export function applyTheme(themeName: ThemeMode) {
+function applyTheme(themeName: ThemeMode) {
   document.documentElement.setAttribute('data-theme', themeName)
   const scheme = getComputedStyle(document.documentElement).colorScheme.trim()
   const dark = scheme === 'dark'

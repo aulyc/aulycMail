@@ -8,9 +8,9 @@
 import { EventsOn } from '../../../wailsjs/runtime/runtime'
 import { accountStore } from './accounts.svelte'
 
-export type SyncLogLevel = 'success' | 'error' | 'info'
+type SyncLogLevel = 'success' | 'error' | 'info'
 
-export interface SyncLogEntry {
+interface SyncLogEntry {
   id: number
   time: Date
   level: SyncLogLevel

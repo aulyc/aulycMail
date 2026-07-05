@@ -4,18 +4,6 @@
  */
 
 /**
- * Convert base64 string to byte array for attachment content
- */
-export function base64ToBytes(base64: string): number[] {
-  const binaryString = atob(base64)
-  const bytes = new Array(binaryString.length)
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i)
-  }
-  return bytes
-}
-
-/**
  * Format file size for display
  */
 export function formatFileSize(bytes: number): string {
@@ -155,7 +143,7 @@ export function stripParagraphStyles(html: string): string {
 /**
  * Keywords that suggest attachments should be present
  */
-export const ATTACHMENT_KEYWORDS = [
+const ATTACHMENT_KEYWORDS = [
   'attach', 'attached', 'attaching', 'attachment', 'attachments',
   'enclosed', 'enclosing', 'enclose',
   'see attached', 'please find attached', 'i have attached', "i've attached"

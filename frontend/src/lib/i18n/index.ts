@@ -75,4 +75,4 @@ export function setLocale(code: string) {
   locale.set(code)
 }
 
-export { _, locale }
+export { _ }

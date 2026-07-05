@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store'
 
-export interface ToastAction {
+interface ToastAction {
   label: string
   onClick: () => void
 }

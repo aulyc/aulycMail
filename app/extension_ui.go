@@ -9,9 +9,8 @@ import (
 // extensions. Order is stable but not meaningful — the frontend renders
 // rail tabs in coreapi.RailTabRequest.Order order, not list order.
 //
-// Phase 2a knows about two extension keys: contacts and calendar. As more
-// first-party extensions land, add their keys to settings.AllExtensionKeys
-// (which this method iterates).
+// Contacts is the only first-party extension currently registered. As more
+// first-party extensions land, add their keys to settings.AllExtensionKeys.
 func (a *App) ListEnabledExtensions() ([]string, error) {
 	out := make([]string, 0, len(settings.AllExtensionKeys))
 	for _, name := range settings.AllExtensionKeys {
@@ -55,10 +54,9 @@ func (a *App) ListExtensionRailTabs() ([]coreapi.RailTabRequest, error) {
 // to render any "Also set up X" panels.
 //
 // Hooks are returned regardless of whether their extension is currently
-// enabled — the hook itself is the discovery surface, and the user enabling
-// the extension is what the hook's "Set up" handler does. Filtering by
-// enabled state here would hide first-party features from new users
-// (extensions default to disabled).
+// enabled — the hook itself is the discovery surface. Filtering by enabled
+// state here would hide first-party features from new users if optional
+// extensions are added later.
 func (a *App) ListAccountSetupHooksForProvider(provider string) ([]coreapi.AccountSetupHookRequest, error) {
 	if a.uiRegistry == nil {
 		return nil, nil
@@ -84,14 +82,14 @@ func (a *App) enabledExtensionSet() (map[string]bool, error) {
 // ExtensionInfo is the row shape returned by ListExtensions — manifest fields
 // plus the current enable state. Wails-friendly (all primitive/slice types).
 type ExtensionInfo struct {
-	ID               string   `json:"id"`
-	Name             string   `json:"name"`
-	Version          string   `json:"version"`
-	Description      string   `json:"description"`
-	Author           string   `json:"author"`
+	ID                  string   `json:"id"`
+	Name                string   `json:"name"`
+	Version             string   `json:"version"`
+	Description         string   `json:"description"`
+	Author              string   `json:"author"`
 	MinaulycmailVersion string   `json:"minaulycmailVersion"`
-	Capabilities     []string `json:"capabilities"`
-	Enabled          bool     `json:"enabled"`
+	Capabilities        []string `json:"capabilities"`
+	Enabled             bool     `json:"enabled"`
 }
 
 // ListExtensions returns the full extension listing for the Settings UI.
@@ -109,14 +107,14 @@ func (a *App) ListExtensions() ([]ExtensionInfo, error) {
 			return nil, err
 		}
 		out = append(out, ExtensionInfo{
-			ID:               m.ID,
-			Name:             m.Name,
-			Version:          m.Version,
-			Description:      m.Description,
-			Author:           m.Author,
+			ID:                  m.ID,
+			Name:                m.Name,
+			Version:             m.Version,
+			Description:         m.Description,
+			Author:              m.Author,
 			MinaulycmailVersion: m.MinaulycmailVersion,
-			Capabilities:     m.Capabilities,
-			Enabled:          enabled,
+			Capabilities:        m.Capabilities,
+			Enabled:             enabled,
 		})
 	}
 	return out, nil

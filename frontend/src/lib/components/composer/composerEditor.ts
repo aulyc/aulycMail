@@ -22,7 +22,7 @@ import { _ } from 'svelte-i18n'
 /**
  * Extended TextStyle to handle legacy <font> tags from signatures/pasted content
  */
-export const ExtendedTextStyle = TextStyle.extend({
+const ExtendedTextStyle = TextStyle.extend({
   parseHTML() {
     return [
       { tag: 'span' },
@@ -34,7 +34,7 @@ export const ExtendedTextStyle = TextStyle.extend({
 /**
  * Extended Color to handle legacy <font color="..."> tags
  */
-export const ExtendedColor = Color.extend({
+const ExtendedColor = Color.extend({
   addGlobalAttributes() {
     return [
       {

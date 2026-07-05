@@ -282,11 +282,6 @@
       window.focus()
     })
 
-    // Listen for shutdown event from backend (triggered by OS close signal)
-    EventsOn('app:shutting-down', () => {
-      isShuttingDown = true
-    })
-
     // Listen for untrusted certificate events from background sync
     EventsOn('certificate:untrusted', (data: { accountId: string; certificate: certificate.CertificateInfo }) => {
       // Only show if not already showing a cert dialog
@@ -305,14 +300,6 @@
     // Listen for external mailto from second instance (routed through backend)
     EventsOn('mailto:external', (data: MailtoData) => {
       handleMailtoData(data)
-    })
-
-    // Toast confirmation when a detached composer sends a message
-    EventsOn('composer:messageSent', () => {
-      addToast({
-        type: 'success',
-        message: $_('composer.messageSent'),
-      })
     })
 
     // Listen for escape-iframe-focus event (from EmailBody when navigating away from iframe)

@@ -29,19 +29,3 @@ export function getCached(messageId: string): Record<string, string> | null {
 export function setCache(messageId: string, data: Record<string, string>): void {
   cache.set(messageId, data)
 }
-
-/**
- * Clear the entire cache
- * Can be used for memory management if needed
- */
-export function clearCache(): void {
-  cache.clear()
-}
-
-/**
- * Get the current cache size (number of messages cached)
- * Useful for debugging
- */
-export function getCacheSize(): number {
-  return cache.size
-}

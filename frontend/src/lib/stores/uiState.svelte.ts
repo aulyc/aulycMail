@@ -159,21 +159,6 @@ export function setAccountExpanded(accountId: string, expanded: boolean): void {
   saveUIState({ expandedAccounts: newExpandedAccounts })
 }
 
-// Helper to check if unified inbox is expanded
-export function isUnifiedInboxExpanded(): boolean {
-  return currentState.unifiedInboxExpanded !== false
-}
-
-// Helper to set unified inbox expanded state
-export function setUnifiedInboxExpanded(expanded: boolean): void {
-  saveUIState({ unifiedInboxExpanded: expanded })
-}
-
-// Helper to check if a folder is collapsed (defaults to true/collapsed if not set)
-export function isFolderCollapsed(folderId: string): boolean {
-  return currentState.collapsedFolders[folderId] !== false
-}
-
 // Helper to set folder collapsed state
 export function setFolderCollapsed(folderId: string, collapsed: boolean): void {
   const newCollapsedFolders = { ...currentState.collapsedFolders, [folderId]: collapsed }
@@ -199,10 +184,4 @@ export function setActiveExtension(name: string): void {
   const value = name || 'mail'
   activeExtensionState = value
   saveUIState({ activeExtension: value })
-}
-
-// Get pane width constraints (for UI components)
-export const paneConstraints = {
-  sidebar: { min: SIDEBAR_MIN, max: SIDEBAR_MAX },
-  list: { min: LIST_MIN, max: LIST_MAX },
 }

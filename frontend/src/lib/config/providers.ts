@@ -6,17 +6,17 @@ import zohoIcon from '$lib/icons/providers/zoho.svg?url'
 import gmxIcon from '$lib/icons/providers/gmx.svg?url'
 import mailcomIcon from '$lib/icons/providers/mailcom.svg?url'
 
-export type SecurityType = 'none' | 'tls' | 'starttls'
-export type AuthMethod = 'password' | 'oauth2'
+type SecurityType = 'none' | 'tls' | 'starttls'
+type AuthMethod = 'password' | 'oauth2'
 export type OAuthProvider = 'google' | 'microsoft'
 
-export interface ServerConfig {
+interface ServerConfig {
   host: string
   port: number
   security: SecurityType
 }
 
-export interface OAuthConfig {
+interface OAuthConfig {
   provider: OAuthProvider
   // OAuth can also fall back to password (app password) for Gmail
   allowPasswordFallback?: boolean
@@ -180,13 +180,6 @@ export function detectProvider(email: string): EmailProvider | null {
 }
 
 /**
- * Get provider by ID
- */
-export function getProvider(id: string): EmailProvider | undefined {
-  return providers.find((p) => p.id === id)
-}
-
-/**
  * Get the custom/manual provider
  */
 export function getCustomProvider(): EmailProvider {
@@ -212,13 +205,6 @@ export function allowsPasswordFallback(provider: EmailProvider): boolean {
  */
 export function getOAuthProviderType(provider: EmailProvider): OAuthProvider | null {
   return provider.oauth?.provider ?? null
-}
-
-/**
- * Get all OAuth-enabled providers
- */
-export function getOAuthProviders(): EmailProvider[] {
-  return providers.filter(isOAuthProvider)
 }
 
 /**
