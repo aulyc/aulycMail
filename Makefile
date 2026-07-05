@@ -6,7 +6,7 @@
 #   make help     - Show all available targets
 
 .PHONY: all build dev dev-race generate clean test lint lint-go lint-frontend \
-        fmt frontend-deps frontend-update install uninstall \
+        fmt frontend-deps frontend-update normalize-wails-bindings install uninstall \
         install-darwin quit-running-darwin launch-darwin uninstall-darwin help
 
 # Go module path
@@ -55,7 +55,7 @@ all: build
 build:
 	@echo "Building aulycmail..."
 	$(DARWIN_LINK_WARN_ENV) wails generate module
-	@perl -pi -e 's/[ \t]+$$//' frontend/wailsjs/go/app/App.d.ts frontend/wailsjs/go/app/App.js frontend/wailsjs/go/models.ts
+	@tools/normalize_wails_bindings.sh
 	@if [ ! -d frontend/node_modules ]; then \
 		echo "Installing frontend dependencies..."; \
 		cd frontend && npm install; \
@@ -99,6 +99,12 @@ dev-race:
 generate:
 	@echo "Generating Wails bindings..."
 	wails generate module
+	@tools/normalize_wails_bindings.sh
+
+# Normalize generated Wails bindings so local generation does not create
+# whitespace-only diffs.
+normalize-wails-bindings:
+	@tools/normalize_wails_bindings.sh
 
 ## Code Quality
 
