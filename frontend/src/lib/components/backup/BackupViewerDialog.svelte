@@ -16,7 +16,7 @@
   // @ts-ignore - wailsjs path
   import type { app } from '../../../../wailsjs/go/models'
   import { toasts } from '$lib/stores/toast'
-  import { getThemeMode } from '$lib/stores/settings.svelte'
+  import { getDarkMailContent, getThemeMode } from '$lib/stores/settings.svelte'
   import { buildDarkMailFilterStyles } from '$lib/utils/dark-mail'
   import { formatFileSize } from '$lib/utils/fileSize'
   import {
@@ -33,6 +33,14 @@
     id: string
     label: string
     count?: number
+  }
+
+  interface SearchScopeItem {
+    scope: Scope
+    sourceIndex: number
+    loopIndex: number
+    isCenterCopy: boolean
+    key: string
   }
 
   let { open = $bindable(false), onClose }: Props = $props()
@@ -76,6 +84,21 @@
   const selectedScope = $derived(accountScopes.find((scope) => scope.id === selectedAccountEmail) ?? accountScopes[0])
   const detailHeaderTitle = $derived(detail ? (detail.subject || $_('backupViewer.unknownSubject')) : '')
   const searchScopeIndex = $derived(Math.max(0, accountScopes.findIndex((scope) => scope.id === searchScopeEmail)))
+  const searchScopeLoopCenterIndex = $derived(accountScopes.length > 1 ? accountScopes.length + searchScopeIndex : searchScopeIndex)
+  const searchScopeItems = $derived.by((): SearchScopeItem[] => {
+    if (accountScopes.length === 0) return []
+    const cycleCount = accountScopes.length > 1 ? 3 : 1
+    const centerCycle = accountScopes.length > 1 ? 1 : 0
+    return Array.from({ length: cycleCount }).flatMap((_, cycle) =>
+      accountScopes.map((scope, index) => ({
+        scope,
+        sourceIndex: index,
+        loopIndex: cycle * accountScopes.length + index,
+        isCenterCopy: cycle === centerCycle,
+        key: `${cycle}:${index}:${scope.id || 'all'}`,
+      }))
+    )
+  })
   const darkFilterStyle = $derived.by(() => {
     void getThemeMode()
     if (!darkFilterEnabled) return ''
@@ -100,7 +123,7 @@
 
   $effect(() => {
     if (!searchOpen) return
-    void centerScope(searchScopeStripEl, searchScopeIndex)
+    void centerScope(searchScopeStripEl, searchScopeLoopCenterIndex)
   })
 
   $effect(() => {
@@ -127,6 +150,7 @@
 
   async function initialize() {
     resetViewerContent()
+    darkFilterEnabled = getDarkMailContent()
     try {
       const settings = await GetBackupSettings()
       if (settings?.directory) {
@@ -390,7 +414,6 @@
   function selectSearchScope(scopeID: string) {
     searchScopeEmail = scopeID
     searchActiveIndex = 0
-    void centerScope(searchScopeStripEl, searchScopeIndex)
     if (searchDebounce) clearTimeout(searchDebounce)
     runSearch()
     setTimeout(() => searchInputEl?.focus(), 0)
@@ -440,11 +463,11 @@
     }
   }
 
-  async function centerScope(strip: HTMLDivElement | null, scopeIndex: number) {
+  async function centerScope(strip: HTMLDivElement | null, loopIndex: number) {
     await tick()
     await nextAnimationFrame()
     if (!strip) return
-    const button = strip.querySelector<HTMLElement>(`[data-scope-index="${scopeIndex}"]`)
+    const button = strip.querySelector<HTMLElement>(`[data-scope-loop-index="${loopIndex}"]`)
     if (!button) return
     const stripRect = strip.getBoundingClientRect()
     const buttonRect = button.getBoundingClientRect()
@@ -794,24 +817,23 @@
             bind:this={searchScopeStripEl}
             class="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            <span class="shrink-0 basis-1/2" aria-hidden="true"></span>
-            {#each accountScopes as scope, index (scope.id || 'all')}
+            {#each searchScopeItems as item (item.key)}
+              {@const isSelectedScope = item.isCenterCopy && item.sourceIndex === searchScopeIndex}
               <button
                 type="button"
                 tabindex="-1"
-                aria-pressed={searchScopeEmail === scope.id}
-                data-scope-index={index}
+                aria-pressed={isSelectedScope}
+                data-scope-loop-index={item.loopIndex}
                 class="max-w-[240px] shrink-0 rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors truncate
-                  {searchScopeEmail === scope.id
+                  {isSelectedScope
                     ? 'border-primary/75 bg-primary/15 text-primary'
                     : 'border-border/70 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground'}"
                 onmousedown={(event) => event.preventDefault()}
-                onclick={() => selectSearchScope(scope.id)}
+                onclick={() => selectSearchScope(item.scope.id)}
               >
-                {scope.label}
+                {item.scope.label}
               </button>
             {/each}
-            <span class="shrink-0 basis-1/2" aria-hidden="true"></span>
           </div>
         </div>
 
