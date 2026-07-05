@@ -106,7 +106,6 @@
     "sendReceipt": "Send Receipt",
     "ignoreReceipt": "Ignore",
     "sendingReadReceipt": "Sending read receipt...",
-    "decryptingMessage": "Decrypting message...",
     "viewSource": "View Source",
     "hideSource": "Hide Source",
     "loadingSource": "Loading message source...",

@@ -106,7 +106,7 @@ For a complete, real-world example of a translated locale file, refer to `fronte
   - Some placeholders contain localized relative time strings from date-fns (e.g., `{time}` may render as "2 minutes ago" or "2 分鐘前")
   - Example: English `"synced": "Synced {time}"` → Chinese `"synced": "{time}同步"` (time goes before the verb in Chinese)
 - Do not translate JSON keys (left side of `:`)
-- The file has ~840 keys organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `settingsBackup`, `backupViewer`, `editor`, `account`, `identity`, `certificate`, `terms`, `oauthMissing`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `syncLog`, `images`, `oauth`
+- The file has ~800 keys organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `settingsBackup`, `backupViewer`, `editor`, `account`, `identity`, `certificate`, `terms`, `oauthMissing`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `syncLog`, `images`, `oauth`
 - **Extension strings are NOT in this file.** Each extension owns its own locale files under `extensions/<name>/frontend/i18n/locales/`. See [§ Extension translations](#extension-translations) for the per-extension flow.
 
 ### 2. Register the Locale

@@ -106,7 +106,6 @@
     "sendReceipt": "发送回执",
     "ignoreReceipt": "忽略",
     "sendingReadReceipt": "正在发送回执...",
-    "decryptingMessage": "正在解密邮件...",
     "viewSource": "查看源码",
     "hideSource": "隐藏源码",
     "loadingSource": "正在加载邮件源码...",
