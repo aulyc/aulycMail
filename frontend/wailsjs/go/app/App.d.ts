@@ -128,6 +128,8 @@ export function GetLanguage():Promise<string>;
 
 export function GetMarkAsReadDelay():Promise<number>;
 
+export function GetMenuBarIcon():Promise<boolean>;
+
 export function GetMessageListDensity():Promise<string>;
 
 export function GetMessageListSortOrder():Promise<string>;
@@ -295,6 +297,8 @@ export function SetDefaultIdentity(arg1:string,arg2:string):Promise<void>;
 export function SetLanguage(arg1:string):Promise<void>;
 
 export function SetMarkAsReadDelay(arg1:number):Promise<void>;
+
+export function SetMenuBarIcon(arg1:boolean):Promise<void>;
 
 export function SetMessageListDensity(arg1:string):Promise<void>;
 

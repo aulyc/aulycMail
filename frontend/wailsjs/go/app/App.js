@@ -234,6 +234,10 @@ export function GetMarkAsReadDelay() {
   return window['go']['app']['App']['GetMarkAsReadDelay']();
 }
 
+export function GetMenuBarIcon() {
+  return window['go']['app']['App']['GetMenuBarIcon']();
+}
+
 export function GetMessageListDensity() {
   return window['go']['app']['App']['GetMessageListDensity']();
 }
@@ -568,6 +572,10 @@ export function SetLanguage(arg1) {
 
 export function SetMarkAsReadDelay(arg1) {
   return window['go']['app']['App']['SetMarkAsReadDelay'](arg1);
+}
+
+export function SetMenuBarIcon(arg1) {
+  return window['go']['app']['App']['SetMenuBarIcon'](arg1);
 }
 
 export function SetMessageListDensity(arg1) {

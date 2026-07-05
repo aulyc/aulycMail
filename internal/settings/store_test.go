@@ -293,6 +293,20 @@ func TestSetGetBoolSettings(t *testing.T) {
 			value:  false,
 			defVal: false,
 		},
+		{
+			name:   "MenuBarIcon_true",
+			set:    (*Store).SetMenuBarIcon,
+			get:    (*Store).GetMenuBarIcon,
+			value:  true,
+			defVal: false,
+		},
+		{
+			name:   "MenuBarIcon_false",
+			set:    (*Store).SetMenuBarIcon,
+			get:    (*Store).GetMenuBarIcon,
+			value:  false,
+			defVal: false,
+		},
 	}
 
 	for _, tt := range tests {

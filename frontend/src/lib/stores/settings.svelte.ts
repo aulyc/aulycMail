@@ -2,7 +2,7 @@
 // Provides reactive state for application settings
 
 // @ts-ignore - wailsjs path
-import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetLanguage, GetComposerFormat, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread } from '../../../wailsjs/go/app/App'
+import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetLanguage, GetComposerFormat, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread, GetMenuBarIcon } from '../../../wailsjs/go/app/App'
 import { setLocale as setI18nLocale, detectSystemLocale } from '$lib/i18n'
 import { loadDateFnsLocale, getDateFnsLocale } from '$lib/i18n/dateFnsLocale'
 import type { Locale } from 'date-fns'
@@ -30,6 +30,7 @@ let composerFormat = $state<ComposerFormat>('plain')
 let alwaysLoadImages = $state<boolean>(false)
 let darkMailContent = $state<boolean>(false)
 let accentBarUnread = $state<boolean>(false)
+let menuBarIcon = $state<boolean>(false)
 
 // Getter functions to access the state
 export function getMessageListDensity(): MessageListDensity {
@@ -58,6 +59,10 @@ export function getDarkMailContent(): boolean {
 
 export function getAccentBarUnread(): boolean {
   return accentBarUnread
+}
+
+export function getMenuBarIcon(): boolean {
+  return menuBarIcon
 }
 
 export function getCurrentDateFnsLocale(): Locale | undefined {
@@ -123,6 +128,10 @@ export function setAccentBarUnread(v: boolean) {
   accentBarUnread = v
 }
 
+export function setMenuBarIcon(v: boolean) {
+  menuBarIcon = v
+}
+
 export function setShowMessageListCircles(v: boolean) {
   void v
 }
@@ -134,7 +143,7 @@ export function setShowViewerCircles(v: boolean) {
 // Load settings from backend (call on app startup)
 export async function loadSettings(): Promise<ThemeMode> {
   try {
-    const [density, sortOrder, theme, lang, compFormat, alwaysImages, darkMail, accentBar] = await Promise.all([
+    const [density, sortOrder, theme, lang, compFormat, alwaysImages, darkMail, accentBar, menuBar] = await Promise.all([
       GetMessageListDensity(),
       GetMessageListSortOrder(),
       GetThemeMode(),
@@ -143,6 +152,7 @@ export async function loadSettings(): Promise<ThemeMode> {
       GetAlwaysLoadImages(),
       GetDarkMailContent(),
       GetAccentBarUnread(),
+      GetMenuBarIcon(),
     ])
     // 'micro' was removed from the UI; fold any stored value into 'compact' (小).
     messageListDensity = (density === 'micro' ? 'compact' : (density as MessageListDensity)) || 'standard'
@@ -152,6 +162,7 @@ export async function loadSettings(): Promise<ThemeMode> {
     alwaysLoadImages = alwaysImages ?? false
     darkMailContent = darkMail ?? false
     accentBarUnread = accentBar ?? false
+    menuBarIcon = menuBar ?? false
     // Apply saved language (if set, overrides system detection from initI18n)
     if (lang) {
       language = lang

@@ -149,7 +149,7 @@ func (a *App) GetRunBackground() (bool, error) {
 }
 
 // SetRunBackground sets whether aulycmail keeps running when the window is closed.
-// Disabling also force-disables start_hidden.
+// Disabling also force-disables start_hidden and the menu bar status item.
 func (a *App) SetRunBackground(enabled bool) error {
 	if err := a.settingsStore.SetRunBackground(enabled); err != nil {
 		return err

@@ -350,6 +350,7 @@
     "background": "Background",
     "runInBackground": "Run in background",
     "runInBackgroundHelp": "Keep aulycmail running when the window is closed",
+    "menuBarIcon": "Menu bar icon",
     "startHidden": "Start hidden on launch",
     "startHiddenHelp": "Launch with the window hidden",
     "startup": "Startup",

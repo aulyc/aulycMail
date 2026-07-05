@@ -18,6 +18,7 @@
     onAutostartChange: (value: boolean) => void
     onLanguageChange: (value: string) => void
     accentBarUnread: boolean
+    menuBarIcon: boolean
     darkMailContent: boolean
     composerFormat: string
     readReceiptResponsePolicy: string
@@ -37,6 +38,7 @@
     onAutostartChange,
     onLanguageChange,
     accentBarUnread = $bindable(),
+    menuBarIcon = $bindable(),
     darkMailContent = $bindable(),
     composerFormat = $bindable(),
     readReceiptResponsePolicy = $bindable(),
@@ -115,7 +117,18 @@
 
   function handleRunBackgroundChange(value: boolean) {
     runBackground = value
+    if (!value && menuBarIcon) {
+      menuBarIcon = false
+    }
     onRunBackgroundChange?.(value)
+  }
+
+  function handleMenuBarIconChange(value: boolean) {
+    menuBarIcon = value
+    if (value && !runBackground) {
+      runBackground = true
+      onRunBackgroundChange?.(true)
+    }
   }
 
   function handleAutostartChange(value: boolean) {
@@ -210,6 +223,14 @@
       <Label for="run-background">{$_('settingsGeneral.runInBackground')}</Label>
     </div>
     <BoolSelect id="run-background" bind:checked={runBackground} onCheckedChange={handleRunBackgroundChange} class="w-36" />
+  </div>
+
+  <!-- Menu bar icon -->
+  <div class="flex items-center justify-between gap-3">
+    <div class="space-y-0.5">
+      <Label for="menu-bar-icon">{$_('settingsGeneral.menuBarIcon')}</Label>
+    </div>
+    <BoolSelect id="menu-bar-icon" bind:checked={menuBarIcon} onCheckedChange={handleMenuBarIconChange} class="w-36" />
   </div>
 
   <!-- Autostart on login -->
