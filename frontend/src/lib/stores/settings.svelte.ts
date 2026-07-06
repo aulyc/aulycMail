@@ -79,22 +79,6 @@ export function setThemeMode(mode: ThemeMode) {
   themeMode = mode
 }
 
-export function setShowTitleBar(show: boolean) {
-  void show
-}
-
-export function setRunBackground(v: boolean) {
-  void v
-}
-
-export function setStartHidden(v: boolean) {
-  void v
-}
-
-export function setAutostart(v: boolean) {
-  void v
-}
-
 export function setLanguage(lang: string) {
   language = lang
   if (lang) {
@@ -107,10 +91,6 @@ export function setComposerFormat(format: ComposerFormat) {
   composerFormat = format
 }
 
-export function setNativeTitleBar(v: boolean) {
-  void v
-}
-
 export function setAlwaysLoadImages(v: boolean) {
   alwaysLoadImages = v
 }
@@ -121,14 +101,6 @@ export function setDarkMailContent(v: boolean) {
 
 export function setAccentBarUnread(v: boolean) {
   accentBarUnread = v
-}
-
-export function setShowMessageListCircles(v: boolean) {
-  void v
-}
-
-export function setShowViewerCircles(v: boolean) {
-  void v
 }
 
 // Load settings from backend (call on app startup)

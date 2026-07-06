@@ -5,9 +5,9 @@
   import * as Tabs from '$lib/components/ui/tabs'
   import { Button } from '$lib/components/ui/button'
   // @ts-ignore - wailsjs path
-  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage, GetComposerFormat, SetComposerFormat, GetNativeTitleBar, SetNativeTitleBar, GetAlwaysLoadImages, SetAlwaysLoadImages, GetDarkMailContent, SetDarkMailContent, GetAccentBarUnread, SetAccentBarUnread, GetMenuBarIcon, SetMenuBarIcon, GetShowMessageListCircles, SetShowMessageListCircles, GetShowViewerCircles, SetShowViewerCircles, QuitApp } from '../../../../wailsjs/go/app/App.js'
+  import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage, GetComposerFormat, SetComposerFormat, GetNativeTitleBar, SetNativeTitleBar, GetAlwaysLoadImages, SetAlwaysLoadImages, GetDarkMailContent, SetDarkMailContent, GetAccentBarUnread, SetAccentBarUnread, GetMenuBarIcon, SetMenuBarIcon, QuitApp } from '../../../../wailsjs/go/app/App.js'
   import { addToast } from '$lib/stores/toast'
-  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setShowTitleBar as updateShowTitleBarStore, setRunBackground as updateRunBackgroundStore, setStartHidden as updateStartHiddenStore, setAutostart as updateAutostartStore, setLanguage as updateLanguageStore, setComposerFormat as updateComposerFormatStore, setNativeTitleBar as updateNativeTitleBarStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setAccentBarUnread as updateAccentBarUnreadStore, setShowMessageListCircles as updateShowMessageListCirclesStore, setShowViewerCircles as updateShowViewerCirclesStore, type MessageListDensity, type ThemeMode, type ComposerFormat } from '$lib/stores/settings.svelte'
+  import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setLanguage as updateLanguageStore, setComposerFormat as updateComposerFormatStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setAccentBarUnread as updateAccentBarUnreadStore, type MessageListDensity, type ThemeMode, type ComposerFormat } from '$lib/stores/settings.svelte'
   import { applyThemeFromMode } from '$lib/stores/theme.svelte'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
@@ -44,8 +44,6 @@
   let darkMailContent = $state<boolean>(false)
   let accentBarUnread = $state<boolean>(false)
   let menuBarIcon = $state<boolean>(false)
-  let showMessageListCircles = $state<boolean>(true)
-  let showViewerCircles = $state<boolean>(true)
   let originalNativeTitleBar = false
   // Snapshot of the saved theme at dialog open time. Used to revert live preview
   // if the dialog closes without Save (Cancel / ESC / click-outside).
@@ -90,7 +88,7 @@
     loading = true
     hasSaved = false
     try {
-      const [policy, delayMs, density, theme, titleBar, runBg, startHid, autoSt, lang, compFmt, nativeTB, alwaysImages, darkMail, accentBar, menuBar, listCircles, viewerCircles] = await Promise.all([
+      const [policy, delayMs, density, theme, titleBar, runBg, startHid, autoSt, lang, compFmt, nativeTB, alwaysImages, darkMail, accentBar, menuBar] = await Promise.all([
         GetReadReceiptResponsePolicy(),
         GetMarkAsReadDelay(),
         GetMessageListDensity(),
@@ -106,8 +104,6 @@
         GetDarkMailContent(),
         GetAccentBarUnread(),
         GetMenuBarIcon(),
-        GetShowMessageListCircles(),
-        GetShowViewerCircles(),
       ])
       readReceiptResponsePolicy = policy
       // Convert ms to seconds for display
@@ -128,8 +124,6 @@
       darkMailContent = darkMail ?? false
       accentBarUnread = accentBar ?? false
       menuBarIcon = menuBar ?? false
-      showMessageListCircles = listCircles ?? true
-      showViewerCircles = viewerCircles ?? true
       originalNativeTitleBar = nativeTitleBar
     } catch (err) {
       console.error('Failed to load settings:', err)
@@ -163,26 +157,17 @@
       await SetDarkMailContent(darkMailContent)
       await SetAccentBarUnread(accentBarUnread)
       await SetMenuBarIcon(menuBarIcon)
-      await SetShowMessageListCircles(showMessageListCircles)
-      await SetShowViewerCircles(showViewerCircles)
       // Update the reactive stores so UI updates immediately
       updateDensityStore(messageListDensity as MessageListDensity)
       updateThemeStore(themeMode as ThemeMode)
-      updateShowTitleBarStore(showTitleBar)
       runBackground = effectiveRunBackground
-      updateRunBackgroundStore(effectiveRunBackground)
-      updateStartHiddenStore(startHidden)
-      updateAutostartStore(autostart)
       if (language) {
         updateLanguageStore(language)
       }
       updateComposerFormatStore(composerFormat as ComposerFormat)
-      updateNativeTitleBarStore(nativeTitleBar)
       updateAlwaysLoadImagesStore(alwaysLoadImages)
       updateDarkMailContentStore(darkMailContent)
       updateAccentBarUnreadStore(accentBarUnread)
-      updateShowMessageListCirclesStore(showMessageListCircles)
-      updateShowViewerCirclesStore(showViewerCircles)
       addToast({
         type: 'success',
         message: $_('toast.settingsSaved'),

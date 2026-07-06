@@ -35,29 +35,6 @@ func TestDatabasePath(t *testing.T) {
 	}
 }
 
-func TestContactsDatabasePath(t *testing.T) {
-	paths, err := GetPaths()
-	if err != nil {
-		t.Fatalf("GetPaths() returned error: %v", err)
-	}
-	contactsPath := paths.ContactsDatabasePath()
-	if !strings.HasSuffix(contactsPath, "contacts.db") {
-		t.Errorf("ContactsDatabasePath() = %q, want suffix 'contacts.db'", contactsPath)
-	}
-}
-
-func TestSearchIndexPath(t *testing.T) {
-	paths, err := GetPaths()
-	if err != nil {
-		t.Fatalf("GetPaths() returned error: %v", err)
-	}
-	accountID := "test-account-123"
-	indexPath := paths.SearchIndexPath(accountID)
-	if !strings.Contains(indexPath, accountID) {
-		t.Errorf("SearchIndexPath() = %q, want to contain %q", indexPath, accountID)
-	}
-}
-
 func TestIsFlatpak(t *testing.T) {
 	tests := []struct {
 		name      string

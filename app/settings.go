@@ -80,26 +80,6 @@ func (a *App) SetMenuBarIcon(enabled bool) error {
 	return nil
 }
 
-// GetShowMessageListCircles returns whether colored sender circles are shown in the message list
-func (a *App) GetShowMessageListCircles() (bool, error) {
-	return a.settingsStore.GetShowMessageListCircles()
-}
-
-// SetShowMessageListCircles enables or disables colored sender circles in the message list
-func (a *App) SetShowMessageListCircles(enabled bool) error {
-	return a.settingsStore.SetShowMessageListCircles(enabled)
-}
-
-// GetShowViewerCircles returns whether colored sender circles are shown in the conversation viewer
-func (a *App) GetShowViewerCircles() (bool, error) {
-	return a.settingsStore.GetShowViewerCircles()
-}
-
-// SetShowViewerCircles enables or disables colored sender circles in the conversation viewer
-func (a *App) SetShowViewerCircles(enabled bool) error {
-	return a.settingsStore.SetShowViewerCircles(enabled)
-}
-
 // GetMessageListSortOrder returns the message list sort order setting
 func (a *App) GetMessageListSortOrder() (string, error) {
 	return a.settingsStore.GetMessageListSortOrder()

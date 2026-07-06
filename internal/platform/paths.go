@@ -11,8 +11,8 @@ const appName = "aulycmail"
 
 // Paths holds the application data paths
 type Paths struct {
-	Config string // Configuration files (config.toml, accounts/)
-	Data   string // Persistent data (databases, keys, attachments)
+	Config string // Configuration files
+	Data   string // Persistent data (database, attachment downloads)
 	Cache  string // Cached data (can be deleted)
 }
 
@@ -112,19 +112,14 @@ func IsFlatpak() bool {
 	return os.Getenv("FLATPAK_ID") != ""
 }
 
-// EnsureDirectories creates all necessary directories if they don't exist
+// EnsureDirectories creates the root directories if they don't exist.
+// Subdirectories (e.g. attachment downloads) are created on demand by
+// their owners.
 func (p *Paths) EnsureDirectories() error {
 	dirs := []string{
 		p.Config,
-		filepath.Join(p.Config, "accounts"),
 		p.Data,
-		filepath.Join(p.Data, "search"),
-		filepath.Join(p.Data, "attachments"),
-		filepath.Join(p.Data, "keys"),
-		filepath.Join(p.Data, "extensions"),
 		p.Cache,
-		filepath.Join(p.Cache, "avatars"),
-		filepath.Join(p.Cache, "bodies"),
 	}
 
 	for _, dir := range dirs {
@@ -141,29 +136,8 @@ func (p *Paths) DatabasePath() string {
 	return filepath.Join(p.Data, "aulycmail.db")
 }
 
-// ContactsDatabasePath returns the path to the contacts database
-func (p *Paths) ContactsDatabasePath() string {
-	return filepath.Join(p.Data, "contacts.db")
-}
-
-// SearchIndexPath returns the path to the search index directory for an account
-func (p *Paths) SearchIndexPath(accountID string) string {
-	return filepath.Join(p.Data, "search", accountID)
-}
-
-// ConfigFilePath returns the path to the main config file
-func (p *Paths) ConfigFilePath() string {
-	return filepath.Join(p.Config, "config.toml")
-}
-
 // AttachmentsPath returns the path to the attachments directory
 func (p *Paths) AttachmentsPath() string {
 	return filepath.Join(p.Data, "attachments")
 }
 
-// ExtensionsDir returns the root directory containing per-extension SQLite
-// databases at <ExtensionsDir>/<name>/data.db. Each extension owns its own
-// subdirectory; cross-extension data access goes through the v1 Core API.
-func (p *Paths) ExtensionsDir() string {
-	return filepath.Join(p.Data, "extensions")
-}
