@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte'
+  import { onMount, onDestroy, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   import ConversationRow from './ConversationRow.svelte'
   import { DropdownMenu } from 'bits-ui'
@@ -31,6 +31,7 @@
     onRowActionComplete?: () => void
     /** Double-click a draft row → open it in the composer (drafts folder only). */
     onOpenDraft?: (messageId: string) => void
+    onSearch?: () => void
     isFocused?: boolean
     isFlashing?: boolean
     showFolderToggle?: boolean
@@ -47,6 +48,7 @@
     onReply,
     onRowActionComplete,
     onOpenDraft,
+    onSearch,
     isFocused: _isFocused = false,
     isFlashing = false,
     showFolderToggle = false,
@@ -798,6 +800,9 @@
     // Normal click - select for viewing, clear multi-selection
     checkedThreadIds = new Set()
     selectedThreadId = threadId
+    if (isSearchMode) {
+      scrollToIndex(index, 'start')
+    }
 
     // For unified view or search, use real folderId and accountId from conversation data
     const conversation = activeList[index] as any
@@ -1029,7 +1034,10 @@
   // after loading so the folder-change auto-select-first doesn't override it.
   export async function selectThread(threadId: string) {
     selectedThreadId = threadId
-    if (isSearchMode) return
+    if (isSearchMode) {
+      clearSearch()
+      await tick()
+    }
 
     let iterations = 0
     let loads = 0
@@ -1363,6 +1371,14 @@
       <div class="flex-1"></div>
     {/if}
     <div class="flex items-center gap-1 flex-shrink-0">
+      <button
+        class="p-2 rounded-md hover:bg-muted transition-colors"
+        title={$_('common.search')}
+        aria-label={$_('common.search')}
+        onclick={onSearch}
+      >
+        <Icon icon="mdi:magnify" class="w-5 h-5 text-muted-foreground" />
+      </button>
       <!-- Scroll list to top -->
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors"

@@ -18,6 +18,7 @@
   import { setFocusedPane, getFocusedPane, isPaneFlashing, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
 
   type Density = 'micro' | 'compact' | 'standard' | 'large'
+  type ScrollBlock = 'start' | 'center' | 'end' | 'nearest'
 
   interface Props {
     /** Items to render. Each must have a stable `id`. */
@@ -37,6 +38,9 @@
     /** Loading snippet shown when `loading` is true. */
     loading?: boolean
     loadingSnippet?: Snippet
+    /** Optional one-shot scroll request for a programmatic selection. */
+    selectedScrollSignal?: number
+    selectedScrollBlock?: ScrollBlock
 
     /** Fired on j/k/Arrow navigation when the highlighted row changes.
      *  Semantics: this is "focus change," NOT "open." Consumers should use
@@ -94,6 +98,8 @@
     empty,
     loading = false,
     loadingSnippet,
+    selectedScrollSignal = 0,
+    selectedScrollBlock = 'nearest',
     onSelect,
     onActivate,
     onToggleCheck,
@@ -108,6 +114,7 @@
   // Inner scrollable region — referenced so keyboard navigation can scroll the
   // newly-selected row into view (matches MessageList's pattern).
   let scrollRegionRef = $state<HTMLDivElement | null>(null)
+  let handledSelectedScrollSignal = $state(0)
 
   // Take DOM focus when this slot becomes the focused pane.
   $effect(() => {
@@ -124,11 +131,17 @@
   // so this only kicks in when the user navigates with j/k or arrow keys.
   $effect(() => {
     const _ = selectedId  // dep-tracked
+    const signal = selectedScrollSignal
     if (!scrollRegionRef || selectedId == null) return
+    const useRequestedScroll = signal !== handledSelectedScrollSignal
+    const block = useRequestedScroll ? selectedScrollBlock : 'nearest'
     queueMicrotask(() => {
       if (!scrollRegionRef) return
       const row = scrollRegionRef.querySelector('[aria-selected="true"]') as HTMLElement | null
-      row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      row?.scrollIntoView({ block, behavior: 'smooth' })
+      if (useRequestedScroll) {
+        handledSelectedScrollSignal = signal
+      }
     })
   })
 

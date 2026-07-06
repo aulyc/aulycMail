@@ -280,6 +280,13 @@
     messageListEl?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  function scrollMessageIntoView(key: string) {
+    if (!messageListEl || !key) return
+    const row = [...messageListEl.querySelectorAll<HTMLElement>('[data-backup-message-key]')]
+      .find((element) => element.dataset.backupMessageKey === key)
+    row?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }
+
   function toggleMessageSortOrder() {
     messageSortOrder = messageSortOrder === 'newest' ? 'oldest' : 'newest'
     scrollMessageListToTop()
@@ -402,7 +409,10 @@
     if (!message) return
     selectedAccountEmail = message.accountEmail
     closeSearch()
+    await tick()
     await selectMessage(message.key)
+    await tick()
+    scrollMessageIntoView(message.key)
   }
 
   function onSearchKeydown(event: KeyboardEvent) {
@@ -621,6 +631,7 @@
                 {@const hasAttachments = messageAttachmentCount(message) > 0}
                 <button
                   type="button"
+                  data-backup-message-key={message.key}
                   class="relative flex w-full items-start gap-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
                   onclick={() => selectMessage(message.key)}
                 >

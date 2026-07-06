@@ -633,7 +633,6 @@
     "defaultEmailReadonlyHelp": "The default address must match the account email and cannot be changed.",
     "emailAddressLabel": "Sender Alias",
     "displayNameLabel": "Display Name",
-    "displayNameHelp": "Name shown to email recipients",
     "emailRequired": "Sender alias is required",
     "invalidEmailFormat": "Invalid email format",
     "displayNameRequired": "Display name is required",

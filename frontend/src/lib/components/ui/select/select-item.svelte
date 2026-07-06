@@ -26,7 +26,7 @@
   {label}
   {disabled}
   class={cn(
-    'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none',
+    'flex w-full cursor-default select-none items-center gap-2 rounded-sm py-1.5 pl-2 pr-2 text-sm outline-none',
     'text-popover-foreground',
     'focus:bg-accent focus:text-accent-foreground',
     'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground',
@@ -35,15 +35,17 @@
   )}
 >
   {#snippet children({ selected })}
-    <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+    <span class="min-w-0 flex-1">
+      {#if itemContent}
+        {@render itemContent()}
+      {:else}
+        <span class="block truncate">{label || value}</span>
+      {/if}
+    </span>
+    <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
       {#if selected}
         <Icon icon="mdi:check" class="h-4 w-4" />
       {/if}
     </span>
-    {#if itemContent}
-      {@render itemContent()}
-    {:else}
-      {label || value}
-    {/if}
   {/snippet}
 </SelectPrimitive.Item>

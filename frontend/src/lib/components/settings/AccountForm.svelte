@@ -585,10 +585,7 @@
       <div class="space-y-4">
         <div>
           <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <Label for="displayName">{$_('account.displayName')}</Label>
-              <p class="text-xs text-muted-foreground">{$_('account.displayNameHelp')}</p>
-            </div>
+            <Label for="displayName">{$_('account.displayName')}</Label>
             <Input
               id="displayName"
               type="text"
@@ -620,10 +617,7 @@
         </div>
 
         <div class="flex items-center justify-between gap-4">
-          <div class="min-w-0">
-            <Label for="username">{$_('account.username')}</Label>
-            <p class="text-xs text-muted-foreground">{$_('account.usernameHelp')}</p>
-          </div>
+          <Label for="username">{$_('account.username')}</Label>
           <Input
             id="username"
             type="text"
@@ -651,31 +645,6 @@
             <p class="text-sm text-destructive mt-1">{errors.password}</p>
           {/if}
         </div>
-      </div>
-
-      <!-- Sender addresses. Requires a persisted account because aliases are
-           stored separately from AccountConfig and need accountId. -->
-      <div class="pt-2 border-t border-border">
-        {#if editAccount}
-          <AccountIdentityTab
-            accountId={editAccount.id}
-            {editAccount}
-            defaultDisplayName={displayName}
-            {displayNameLoaded}
-            onDefaultDisplayNameChange={(v) => displayName = v}
-          />
-        {:else}
-          <div class="flex items-center justify-between gap-4 opacity-60">
-            <div class="min-w-0">
-              <Label>{$_('identity.emailAddresses')}</Label>
-              <p class="text-xs text-muted-foreground">{$_('account.saveAccountFirst')}</p>
-            </div>
-            <Button type="button" variant="outline" size="sm" disabled>
-              <Icon icon="mdi:email-multiple-outline" class="w-4 h-4 mr-1" />
-              {$_('identity.addEmailAddress')}
-            </Button>
-          </div>
-        {/if}
       </div>
 
       <!-- Advanced Settings Toggle — label (styled like a field label) on the
@@ -800,7 +769,6 @@
                     {/each}
                   </Select.Content>
                 </Select.Root>
-                <p class="text-xs text-muted-foreground">{$_('account.replyForwardWithHelp')}</p>
               </div>
             {:else}
             <div class="grid grid-cols-2 gap-3">
@@ -852,12 +820,34 @@
           <!-- Divider -->
           <div class="border-t border-border"></div>
 
+          <!-- Sender addresses. Requires a persisted account because aliases are
+               stored separately from AccountConfig and need accountId. -->
+          <div class="pt-1">
+            {#if editAccount}
+              <AccountIdentityTab
+                accountId={editAccount.id}
+                {editAccount}
+                defaultDisplayName={displayName}
+                {displayNameLoaded}
+                onDefaultDisplayNameChange={(v) => displayName = v}
+              />
+            {:else}
+              <div class="flex items-center justify-between gap-4 opacity-60">
+                <Label>{$_('identity.emailAddresses')}</Label>
+                <Button type="button" variant="outline" size="sm" disabled>
+                  <Icon icon="mdi:email-multiple-outline" class="w-4 h-4 mr-1" />
+                  {$_('identity.addEmailAddress')}
+                </Button>
+              </div>
+            {/if}
+          </div>
+
+          <!-- Divider -->
+          <div class="border-t border-border"></div>
+
           <!-- Sync settings (label + control on one row) -->
           <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <Label>{$_('account.syncPeriod')}</Label>
-              <p class="text-xs text-muted-foreground">{$_('account.syncPeriodHelp')}</p>
-            </div>
+            <Label>{$_('account.syncPeriod')}</Label>
             <Select.Root bind:value={syncPeriodDays}>
               <Select.Trigger class="w-48 shrink-0">
                 <Select.Value placeholder="Select">
@@ -873,10 +863,7 @@
           </div>
 
           <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <Label>{$_('account.checkNewMail')}</Label>
-              <p class="text-xs text-muted-foreground">{$_('account.checkNewMailHelp')}</p>
-            </div>
+            <Label>{$_('account.checkNewMail')}</Label>
             <Select.Root bind:value={syncInterval}>
               <Select.Trigger class="w-48 shrink-0">
                 <Select.Value placeholder="Select">
@@ -892,10 +879,7 @@
           </div>
 
           <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <Label>{$_('account.requestReadReceipts')}</Label>
-              <p class="text-xs text-muted-foreground">{$_('account.requestReadReceiptsHelp')}</p>
-            </div>
+            <Label>{$_('account.requestReadReceipts')}</Label>
             <Select.Root bind:value={readReceiptRequestPolicy}>
               <Select.Trigger class="w-48 shrink-0">
                 <Select.Value placeholder="Select">
@@ -933,10 +917,6 @@
 
             {#if showFolderMapping}
               <div class="space-y-3 pl-6 pt-2 border-l border-border ml-2">
-                <p class="text-xs text-muted-foreground">
-                  {$_('account.folderMappingHelp2')}
-                </p>
-
                 {#if loadingFolders}
                   <div class="flex items-center gap-2 text-sm text-muted-foreground">
                     <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
@@ -1089,7 +1069,6 @@
                 icon={showFolderSync ? 'mdi:chevron-down' : 'mdi:chevron-right'}
                 class="w-4 h-4"
               />
-              <Icon icon="mdi:folder-sync-outline" class="w-4 h-4" />
               {$_('account.folderSync')}
               {#if !editAccount}
                 <span class="text-xs text-muted-foreground">{$_('account.saveAccountFirst')}</span>
@@ -1106,9 +1085,6 @@
                       onCheckedChange={(v) => { syncFoldersEnabled = v; if (v) loadSyncFolders() }}
                     />
                   </div>
-                  <p class="text-xs text-muted-foreground">
-                    {$_('account.manageFolderSyncHelp')}
-                  </p>
                 </div>
 
                 {#if syncFoldersEnabled}
@@ -1164,7 +1140,6 @@
                 icon={showTrustedCerts ? 'mdi:chevron-down' : 'mdi:chevron-right'}
                 class="w-4 h-4"
               />
-              <Icon icon="mdi:shield-lock-outline" class="w-4 h-4" />
               {$_('account.trustedCertificates')}
               {#if !editAccount}
                 <span class="text-xs text-muted-foreground">{$_('account.saveAccountFirst')}</span>

@@ -2,7 +2,7 @@
   // Load offline icon data before anything else
   import './lib/iconify-offline'
 
-  import { onMount, untrack } from 'svelte'
+  import { onMount, tick, untrack } from 'svelte'
   import Sidebar from './lib/components/sidebar/Sidebar.svelte'
   import MessageList from './lib/components/list/MessageList.svelte'
   import ConversationViewer from './lib/components/viewer/ConversationViewer.svelte'
@@ -18,7 +18,7 @@
   import SearchOverlay from './lib/components/SearchOverlay.svelte'
   import BackupDialog from './lib/components/backup/BackupDialog.svelte'
   import BackupViewerDialog from './lib/components/backup/BackupViewerDialog.svelte'
-  import { activateContact as activateContactInView } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { activateContactFromGlobalSearch } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import ContactsPane from '$extensions/contacts/frontend/components/ContactsPane.svelte'
   import { preloadContactAccountGroups } from '$extensions/contacts/frontend/stores/contactAccountGroups.svelte'
   import { refreshExtensionRegistry, getRailTabs } from '$lib/stores/extensionRegistry.svelte'
@@ -486,8 +486,29 @@
     })
   }
 
+  function selectMailFolder(accountId: string, folderId: string) {
+    const folderInfo = findFolderById(accountId, folderId)
+    const folderName = folderInfo?.name || 'Inbox'
+    const folderType = folderInfo?.type || 'inbox'
+
+    selectedAccountId = accountId
+    selectedFolderId = folderId
+    selectedFolderName = folderName
+    selectedFolderType = folderType
+    selectionSource = 'account'
+    accountStore.selectFolder(accountId, folderId, folderInfo?.path || '', folderName)
+    sidebarRef?.revealFolder(accountId, folderId)
+
+    return { folderName, folderType }
+  }
+
   // Handle conversation selection from list
   function handleConversationSelect(threadId: string, folderId: string, accountId: string) {
+    if (accountId && folderId && (accountId !== selectedAccountId || folderId !== selectedFolderId)) {
+      openMailConversation({ accountId, folderId, threadId })
+      return
+    }
+
     selectedThreadId = threadId
     selectedConversationFolderId = folderId
     selectedConversationAccountId = accountId
@@ -506,29 +527,29 @@
   // (from Go), the Contacts related-mail list (via EventsEmit), and the `/`
   // search overlay.
   function openMailConversation(data: { accountId: string; folderId: string; threadId: string }) {
-    const folderInfo = findFolderById(data.accountId, data.folderId)
     setActiveExtension('mail')
 
-    selectedAccountId = data.accountId
-    selectedFolderId = data.folderId
-    selectedFolderName = folderInfo?.name || 'Inbox'
-    selectedFolderType = folderInfo?.type || 'inbox'
-    selectionSource = 'account'
+    const { folderName, folderType } = selectMailFolder(data.accountId, data.folderId)
 
     selectedThreadId = data.threadId
     selectedConversationAccountId = data.accountId
     selectedConversationFolderId = data.folderId
+    showViewer()
 
     // Highlight the thread in the message list (small delay so the list loads)
-    setTimeout(() => {
-      messageListRef?.selectThread(data.threadId)
+    setTimeout(async () => {
+      await messageListRef?.selectThread(data.threadId)
+      selectedThreadId = data.threadId
+      selectedConversationAccountId = data.accountId
+      selectedConversationFolderId = data.folderId
+      showViewer()
     }, 100)
 
     saveUIState({
       selectedAccountId: data.accountId,
       selectedFolderId: data.folderId,
-      selectedFolderName: folderInfo?.name || 'Inbox',
-      selectedFolderType: folderInfo?.type || 'inbox',
+      selectedFolderName: folderName,
+      selectedFolderType: folderType,
       selectedThreadId: data.threadId,
       selectedConversationAccountId: data.accountId,
       selectedConversationFolderId: data.folderId,
@@ -961,7 +982,7 @@
       if (leftAltHeld || focusedPane === 'sidebar') {
         if (!selectedFolderId) return
         const folderEl = document.querySelector(
-          `[data-sidebar-item="folder"][data-folder-id="${selectedFolderId}"]`
+          `[data-sidebar-item="folder"][data-account-id="${selectedAccountId}"][data-folder-id="${selectedFolderId}"]`
         ) as HTMLElement | null
         if (!folderEl) return
         const rect = folderEl.getBoundingClientRect()
@@ -1397,6 +1418,7 @@
         onFolderSelect={handleFolderSelect}
         onCompose={handleCompose}
         onMessagesMoved={() => messageListRef?.handleActionComplete(false)}
+        selectedAccountId={selectedAccountId}
         selectedFolderId={selectedFolderId}
         selectionSource={selectionSource}
         isFocused={getFocusedPane() === 'sidebar'}
@@ -1438,6 +1460,7 @@
         onEmptyFolder={handleEmptyFolder}
         onReply={handleReply}
         onOpenDraft={handleEditDraft}
+        onSearch={() => { showSearchOverlay = true }}
         onRowActionComplete={() => viewerRef?.refreshFlags()}
         isFocused={getFocusedPane() === 'messageList'}
         isFlashing={isPaneFlashing('messageList')}
@@ -1523,10 +1546,11 @@
       threadId: r.threadId,
     })
   }}
-  onSelectContact={(c) => {
+  onSelectContact={async (c) => {
     showSearchOverlay = false
     setActiveExtension('contacts')
-    activateContactInView(c.id)
+    await tick()
+    await activateContactFromGlobalSearch(c.id)
   }}
 />
 

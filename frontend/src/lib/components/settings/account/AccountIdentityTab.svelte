@@ -190,11 +190,10 @@
   <div class="flex items-center justify-between">
     <div>
       <h3 class="text-sm font-medium flex items-center gap-2">
-        <Icon icon="mdi:email-multiple-outline" class="w-4 h-4" />
         {$_('identity.emailAddresses')}
       </h3>
     </div>
-    <Button size="sm" onclick={handleAddIdentity}>
+    <Button type="button" size="sm" onclick={handleAddIdentity}>
       <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
       {$_('identity.addEmailAddress')}
     </Button>
@@ -242,8 +241,9 @@
           </div>
 
           <!-- Actions -->
-          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div class="flex items-center gap-1">
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               onclick={() => handleEditIdentity(identity)}
@@ -253,6 +253,7 @@
               <Icon icon="mdi:pencil" class="w-4 h-4" />
             </Button>
             <Button
+              type="button"
               variant="ghost"
               size="sm"
               onclick={() => handleDeleteIdentity(identity)}

@@ -91,6 +91,7 @@
           id="always-load-images"
           bind:checked={alwaysLoadImages}
           onCheckedChange={handleAlwaysLoadImagesChange}
+          class="w-36"
         />
       </div>
     </div>
@@ -105,17 +106,16 @@
           class="w-full flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors text-left"
           onclick={() => addressesCollapsed = !addressesCollapsed}
         >
-          <Icon icon={addressesCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
-          <Icon icon="mdi:email-outline" class="w-4 h-4" />
           {$_('images.addresses')}
           <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{addresses.length}</span>
+          <Icon icon={addressesCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
         </button>
 
         {#if !addressesCollapsed}
           {#if addresses.length === 0}
-            <p class="text-sm text-muted-foreground ml-6">{$_('images.noAddresses')}</p>
+            <p class="text-sm text-muted-foreground">{$_('images.noAddresses')}</p>
           {:else}
-            <div class="space-y-1.5 max-h-48 overflow-y-auto ml-6">
+            <div class="space-y-1.5 max-h-48 overflow-y-auto">
               {#each addresses as entry (entry.id)}
                 <div class="flex items-center gap-3 p-2 rounded-md border border-border">
                   <Icon icon="mdi:email-outline" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -136,17 +136,16 @@
           class="w-full flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors text-left"
           onclick={() => domainsCollapsed = !domainsCollapsed}
         >
-          <Icon icon={domainsCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
-          <Icon icon="mdi:web" class="w-4 h-4" />
           {$_('images.domains')}
           <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{domains.length}</span>
+          <Icon icon={domainsCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
         </button>
 
         {#if !domainsCollapsed}
           {#if domains.length === 0}
-            <p class="text-sm text-muted-foreground ml-6">{$_('images.noDomains')}</p>
+            <p class="text-sm text-muted-foreground">{$_('images.noDomains')}</p>
           {:else}
-            <div class="space-y-1.5 max-h-48 overflow-y-auto ml-6">
+            <div class="space-y-1.5 max-h-48 overflow-y-auto">
               {#each domains as entry (entry.id)}
                 <div class="flex items-center gap-3 p-2 rounded-md border border-border">
                   <Icon icon="mdi:web" class="w-4 h-4 text-muted-foreground flex-shrink-0" />

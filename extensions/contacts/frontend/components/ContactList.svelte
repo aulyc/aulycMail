@@ -115,10 +115,21 @@
   // shows all its contacts. selectSource() already cleared the store's
   // searchQuery; this keeps the local input + open state in sync.
   let lastSourceId = contactsView.selectedSourceId
+  let lastResetSignal = contactsView.listResetSignal
   $effect(() => {
     const sel = contactsView.selectedSourceId
     if (sel !== lastSourceId) {
       lastSourceId = sel
+      searchInput = ''
+      showSearch = false
+      if (debounce) clearTimeout(debounce)
+    }
+  })
+
+  $effect(() => {
+    const signal = contactsView.listResetSignal
+    if (signal !== lastResetSignal) {
+      lastResetSignal = signal
       searchInput = ''
       showSearch = false
       if (debounce) clearTimeout(debounce)
@@ -252,6 +263,8 @@
     focusSlot="messageList"
     label={$_('contacts.list.label')}
     loading={contactsView.loading}
+    selectedScrollSignal={contactsView.selectedContactScrollTopSignal}
+    selectedScrollBlock="start"
     onSelect={(id) => focusContact(id)}
     onActivate={(id) => activateContact(id)}
     onDelete={requestDelete}

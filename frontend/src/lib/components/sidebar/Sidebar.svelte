@@ -100,6 +100,7 @@
     onFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
     onCompose?: () => void
     onMessagesMoved?: () => void
+    selectedAccountId?: string | null
     selectedFolderId?: string | null
     selectionSource?: 'account' | null
     isFocused?: boolean
@@ -112,6 +113,7 @@
     onFolderSelect,
     onCompose,
     onMessagesMoved,
+    selectedAccountId = null,
     selectedFolderId = null,
     selectionSource = null,
     isFocused: _isFocused = false,
@@ -233,7 +235,7 @@
 
     // Find the selected folder item
     return navList.findIndex(item =>
-      item.type === 'folder' && item.folderId === selectedFolderId
+      item.type === 'folder' && item.accountId === selectedAccountId && item.folderId === selectedFolderId
     )
   }
 
@@ -267,8 +269,8 @@
     let selector: string | null = null
     if (item.type === 'account-header' && item.accountId) {
       selector = `[data-sidebar-item="account-header"][data-account-id="${item.accountId}"]`
-    } else if (item.type === 'folder' && item.folderId) {
-      selector = `[data-sidebar-item="folder"][data-folder-id="${item.folderId}"]`
+    } else if (item.type === 'folder' && item.accountId && item.folderId) {
+      selector = `[data-sidebar-item="folder"][data-account-id="${item.accountId}"][data-folder-id="${item.folderId}"]`
     }
 
     if (selector) {
@@ -313,24 +315,22 @@
 
   // Check if the currently selected folder has children
   export function hasSelectedFolderWithChildren(): boolean {
-    if (!selectedFolderId || selectionSource !== 'account') return false
-    return folderHasChildren(selectedFolderId)
+    if (!selectedAccountId || !selectedFolderId || selectionSource !== 'account') return false
+    return folderHasChildren(selectedAccountId, selectedFolderId)
   }
 
   // Toggle collapse for the currently selected folder
   export function toggleSelectedFolderCollapse(): void {
-    if (!selectedFolderId || selectionSource !== 'account') return
-    if (!folderHasChildren(selectedFolderId)) return
+    if (!selectedAccountId || !selectedFolderId || selectionSource !== 'account') return
+    if (!folderHasChildren(selectedAccountId, selectedFolderId)) return
     toggleFolderCollapsed(selectedFolderId)
   }
 
   // Check if a folder has children by searching the account folder trees
-  function folderHasChildren(folderId: string): boolean {
-    for (const acc of accountStore.accounts) {
-      const found = findTreeNode(acc.folders || [], folderId)
-      if (found) return (found.children && found.children.length > 0) || false
-    }
-    return false
+  function folderHasChildren(accountId: string, folderId: string): boolean {
+    const acc = accountStore.accounts.find((item) => item.account.id === accountId)
+    const found = acc ? findTreeNode(acc.folders || [], folderId) : null
+    return (found?.children?.length ?? 0) > 0
   }
 
   // Find a FolderTree node by folder ID
@@ -343,6 +343,41 @@
       }
     }
     return null
+  }
+
+  function findAncestorFolderIds(trees: folder.FolderTree[], folderId: string, ancestors: string[] = []): string[] | null {
+    for (const tree of trees) {
+      if (!tree.folder) continue
+      if (tree.folder.id === folderId) return ancestors
+      const found = findAncestorFolderIds(tree.children || [], folderId, [...ancestors, tree.folder.id])
+      if (found) return found
+    }
+    return null
+  }
+
+  export function revealFolder(accountId: string, folderId: string) {
+    if (!accountId || !folderId) return
+    focusedAccountId = null
+    expandedAccounts = { ...expandedAccounts, [accountId]: true }
+    setAccountExpanded(accountId, true)
+
+    const acc = accountStore.accounts.find((item) => item.account.id === accountId)
+    const ancestors = acc ? findAncestorFolderIds(acc.folders || [], folderId) : null
+    if (ancestors?.length) {
+      const nextCollapsed = { ...collapsedFolders }
+      for (const ancestorId of ancestors) {
+        nextCollapsed[ancestorId] = false
+        setFolderCollapsed(ancestorId, false)
+      }
+      collapsedFolders = nextCollapsed
+    }
+
+    requestAnimationFrame(() => scrollItemIntoView({
+      type: 'folder',
+      accountId,
+      folderId,
+      folderName: '',
+    }))
   }
 </script>
 
@@ -397,7 +432,8 @@
           loading={accWithFolders.loading}
           syncing={accWithFolders.syncing}
           error={accWithFolders.error}
-          selectedFolderId={accountStore.selectedFolder?.folderId ?? ''}
+          selectedAccountId={accountStore.selectedFolder?.accountId ?? selectedAccountId ?? ''}
+          selectedFolderId={accountStore.selectedFolder?.folderId ?? selectedFolderId ?? ''}
           {selectionSource}
           isHeaderFocused={focusedAccountId === accWithFolders.account.id}
           isExpanded={expandedAccounts[accWithFolders.account.id] ?? true}

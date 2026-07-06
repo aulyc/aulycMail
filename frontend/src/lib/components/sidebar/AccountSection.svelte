@@ -11,6 +11,7 @@
     loading: boolean
     syncing: boolean
     error: string | null
+    selectedAccountId: string
     selectedFolderId: string
     selectionSource: 'unified' | 'account' | null
     isHeaderFocused?: boolean
@@ -28,6 +29,7 @@
     loading,
     syncing,
     error,
+    selectedAccountId,
     selectedFolderId,
     selectionSource,
     isHeaderFocused = false,
@@ -124,6 +126,7 @@
           <FolderTreeItem
             {tree}
             accountId={acc.id}
+            {selectedAccountId}
             {selectedFolderId}
             {selectionSource}
             {collapsedFolders}

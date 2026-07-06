@@ -32,6 +32,9 @@ let selectedContactId = $state<string | null>(null)
 let contacts = $state<v1.Contact[]>([])
 let detail = $state<v1.Contact | null>(null)
 let loading = $state<boolean>(false)
+let listResetSignal = $state(0)
+let selectedContactScrollTopSignal = $state(0)
+let contactsLoadSeq = 0
 
 export const contactsView = {
   get selectedSourceId(): string {
@@ -52,6 +55,12 @@ export const contactsView = {
   get loading(): boolean {
     return loading
   },
+  get listResetSignal(): number {
+    return listResetSignal
+  },
+  get selectedContactScrollTopSignal(): number {
+    return selectedContactScrollTopSignal
+  },
 }
 
 export function selectSource(sourceId: string): void {
@@ -62,6 +71,7 @@ export function selectSource(sourceId: string): void {
   // its contacts (not the intersection with a lingering query). The ContactList
   // mirrors this by clearing its own search input + closing the search bar.
   searchQuery = ''
+  listResetSignal += 1
   // Dismiss the sidebar overlay on narrow viewports. Self-gating store
   // call — no-op on full/medium.
   hideSidebar()
@@ -73,14 +83,22 @@ export function setSearchQuery(q: string): void {
 }
 
 export async function reloadContacts(limit = 200, offset = 0): Promise<void> {
+  const seq = ++contactsLoadSeq
   loading = true
   try {
-    contacts = await ListContactsForBrowse(searchQuery, selectedSourceId, limit, offset) || []
+    const result = await ListContactsForBrowse(searchQuery, selectedSourceId, limit, offset) || []
+    if (seq === contactsLoadSeq) {
+      contacts = result
+    }
   } catch (err) {
     console.error('Failed to list contacts for browse:', err)
-    contacts = []
+    if (seq === contactsLoadSeq) {
+      contacts = []
+    }
   } finally {
-    loading = false
+    if (seq === contactsLoadSeq) {
+      loading = false
+    }
   }
 }
 
@@ -121,6 +139,15 @@ export async function activateContact(id: string | null): Promise<void> {
     console.error('Failed to load contact detail:', err)
     detail = null
   }
+}
+
+export async function activateContactFromGlobalSearch(id: string): Promise<void> {
+  selectedSourceId = ''
+  searchQuery = ''
+  listResetSignal += 1
+  await reloadContacts(0)
+  await activateContact(id)
+  selectedContactScrollTopSignal += 1
 }
 
 

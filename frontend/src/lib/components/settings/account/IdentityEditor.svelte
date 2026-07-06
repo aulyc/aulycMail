@@ -29,6 +29,7 @@
 
   type SignatureMode = 'none' | 'html' | 'plain'
   type SignatureSeparatorOption = 'none' | 'dash' | 'asterisk'
+  const maxPlainSignatureLines = 100
 
   let {
     open = $bindable(false),
@@ -157,6 +158,29 @@
     }
   }
 
+  function normalizePlainSignature(value: string): string {
+    const normalized = value.replace(/\r\n?/g, '\n')
+    const lines = normalized.split('\n')
+    return lines.length <= maxPlainSignatureLines
+      ? normalized
+      : lines.slice(0, maxPlainSignatureLines).join('\n')
+  }
+
+  function handleSignatureTextInput(event: Event) {
+    const target = event.currentTarget as HTMLTextAreaElement
+    const nextValue = normalizePlainSignature(target.value)
+    if (target.value !== nextValue) {
+      target.value = nextValue
+    }
+    signatureText = nextValue
+  }
+
+  function handleSignatureTextKeydown(event: KeyboardEvent) {
+    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+      event.stopPropagation()
+    }
+  }
+
   function getSignatureStatusLabel(mode: SignatureMode): string {
     if (mode === 'none') return $_('identity.signatureStatusDisabled')
     if (mode === 'plain') return $_('identity.signatureStatusPlain')
@@ -227,7 +251,6 @@
           <div class="flex items-center justify-between gap-4">
             <div class="min-w-0">
               <Label for="name">{$_('identity.displayNameLabel')}</Label>
-              <p class="text-xs text-muted-foreground">{$_('identity.displayNameHelp')}</p>
             </div>
             <Input
               id="name"
@@ -289,10 +312,12 @@
               <Label for="signatureText">{$_('identity.plainTextSignature')}</Label>
               <textarea
                 id="signatureText"
-                bind:value={signatureText}
+                value={signatureText}
+                oninput={handleSignatureTextInput}
+                onkeydown={handleSignatureTextKeydown}
                 rows="4"
                 placeholder="Plain text version for text-only emails..."
-                class="w-full p-3 text-sm bg-background border border-input rounded-md resize-none overflow-y-auto focus:outline-none focus:ring-2 focus:ring-ring font-mono"
+                class="w-full h-[6.75rem] p-3 text-sm leading-5 bg-background border border-input rounded-md resize-none overflow-y-auto focus:outline-none focus:ring-2 focus:ring-ring font-mono"
               ></textarea>
             </div>
           {/if}

@@ -12,6 +12,7 @@
   interface Props {
     tree: folder.FolderTree
     accountId: string
+    selectedAccountId: string
     selectedFolderId: string
     selectionSource: 'unified' | 'account' | null
     collapsedFolders: Record<string, boolean>
@@ -23,6 +24,7 @@
   let {
     tree,
     accountId,
+    selectedAccountId,
     selectedFolderId,
     selectionSource,
     collapsedFolders,
@@ -48,7 +50,7 @@
   }
 
   function isFolderSelected(folderId: string): boolean {
-    return selectionSource === 'account' && selectedFolderId === folderId
+    return selectionSource === 'account' && selectedAccountId === accountId && selectedFolderId === folderId
   }
 
   let hasChildren = $derived(tree.children && tree.children.length > 0)
@@ -119,7 +121,7 @@
     if (!payload.messageIds || payload.messageIds.length === 0) return
 
     // Same-folder drop: no-op
-    if (tree.folder.id === selectedFolderId && selectionSource === 'account') {
+    if (tree.folder.id === selectedFolderId && selectedAccountId === accountId && selectionSource === 'account') {
       return
     }
 
@@ -153,6 +155,7 @@
         ? 'bg-primary/10 text-primary font-medium'
         : 'text-foreground hover:bg-muted/50'} {isDragOver ? 'ring-2 ring-primary ring-inset' : ''}"
       data-sidebar-item="folder"
+      data-account-id={accountId}
       data-folder-id={tree.folder.id}
       data-has-children={hasChildren ? 'true' : undefined}
       onclick={() => onFolderSelect?.(tree.folder!)}
@@ -206,6 +209,7 @@
         <Self
           tree={childTree}
           {accountId}
+          {selectedAccountId}
           {selectedFolderId}
           {selectionSource}
           {collapsedFolders}
