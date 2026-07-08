@@ -131,6 +131,9 @@ func (ops *draftOps) saveDraftToDB(accountID string, localDraft *draft.Draft, ms
 		localDraft.BodyHTML = body.bodyHTML
 		localDraft.BodyText = body.bodyText
 		localDraft.InReplyToID = msg.InReplyTo
+		localDraft.SourceMessageID = msg.SourceMessageID
+		localDraft.ReplyType = msg.ReplyType
+		localDraft.ReferencesList = referencesToJSON(msg.References)
 		localDraft.AttachmentsData = body.attachmentsData
 		localDraft.SyncStatus = draft.SyncStatusPending
 
@@ -151,6 +154,9 @@ func (ops *draftOps) saveDraftToDB(accountID string, localDraft *draft.Draft, ms
 		BodyHTML:        body.bodyHTML,
 		BodyText:        body.bodyText,
 		InReplyToID:     msg.InReplyTo,
+		SourceMessageID: msg.SourceMessageID,
+		ReplyType:       msg.ReplyType,
+		ReferencesList:  referencesToJSON(msg.References),
 		AttachmentsData: body.attachmentsData,
 		SyncStatus:      draft.SyncStatusPending,
 	}
@@ -322,14 +328,17 @@ func (ops *draftOps) toComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 	}
 
 	return &smtp.ComposeMessage{
-		To:          parseAddressList(d.ToList),
-		Cc:          parseAddressList(d.CcList),
-		Bcc:         parseAddressList(d.BccList),
-		Subject:     d.Subject,
-		HTMLBody:    d.BodyHTML,
-		TextBody:    d.BodyText,
-		Attachments: attachments,
-		InReplyTo:   d.InReplyToID,
+		To:              parseAddressList(d.ToList),
+		Cc:              parseAddressList(d.CcList),
+		Bcc:             parseAddressList(d.BccList),
+		Subject:         d.Subject,
+		HTMLBody:        d.BodyHTML,
+		TextBody:        d.BodyText,
+		Attachments:     attachments,
+		InReplyTo:       d.InReplyToID,
+		References:      parseReferencesList(d.ReferencesList),
+		SourceMessageID: d.SourceMessageID,
+		ReplyType:       d.ReplyType,
 	}
 }
 
@@ -388,6 +397,10 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 	if err != nil {
 		return nil, err
 	}
+	if err := a.messageStore.MarkComposeDraft(localDraft.SourceMessageID, localDraft.ReplyType, localDraft.ID); err != nil {
+		log.Warn().Err(err).Str("draftID", localDraft.ID).Msg("Failed to mark source message as having compose draft")
+	}
+	a.emitSourceMessageUpdated(localDraft.SourceMessageID)
 
 	// Cancel any previous in-flight sync for this draft before starting a new one
 	a.cancelDraftSync(localDraft.ID)
@@ -519,6 +532,10 @@ func (a *App) DeleteDraft(draftID string) error {
 	if err != nil {
 		return err
 	}
+	if err := a.messageStore.ClearComposeDraft(d.SourceMessageID, d.ID); err != nil {
+		log.Warn().Err(err).Str("draftID", d.ID).Msg("Failed to clear source message draft marker")
+	}
+	a.emitSourceMessageUpdated(d.SourceMessageID)
 
 	// Notify frontend to refresh the message list for this folder
 	if draftsFolder != nil {

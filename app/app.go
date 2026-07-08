@@ -566,6 +566,7 @@ func (a *App) Startup(ctx context.Context) {
 		credStore:    a.credStore,
 		certStore:    a.certStore,
 		contactStore: a.contactStore,
+		messageStore: a.messageStore,
 		draftOps:     &a.draftOps,
 	}
 

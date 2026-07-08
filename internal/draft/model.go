@@ -31,9 +31,10 @@ type Draft struct {
 	BodyText string `json:"bodyText"`
 
 	// Reply/forward context
-	InReplyToID    string `json:"inReplyToId,omitempty"`
-	ReplyType      string `json:"replyType,omitempty"` // "reply", "reply-all", "forward"
-	ReferencesList string `json:"referencesList,omitempty"`
+	InReplyToID     string `json:"inReplyToId,omitempty"`
+	SourceMessageID string `json:"sourceMessageId,omitempty"`
+	ReplyType       string `json:"replyType,omitempty"` // "reply", "reply-all", "forward"
+	ReferencesList  string `json:"referencesList,omitempty"`
 
 	// Identity
 	IdentityID string `json:"identityId,omitempty"`

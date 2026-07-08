@@ -59,6 +59,26 @@ func filterWhereClause(filter, prefix string) string {
 	}
 }
 
+func applyComposeStatusRank(c *Conversation, rank int) {
+	switch {
+	case rank >= 20:
+		c.ComposeStatus = ComposeStatusSent
+	case rank >= 10:
+		c.ComposeStatus = ComposeStatusDraft
+	default:
+		return
+	}
+
+	switch rank % 10 {
+	case 3:
+		c.ComposeAction = ComposeActionReplyAll
+	case 2:
+		c.ComposeAction = ComposeActionReply
+	case 1:
+		c.ComposeAction = ComposeActionForward
+	}
+}
+
 // ListByFolder returns message headers for a folder with pagination
 func (s *Store) ListByFolder(folderID string, offset, limit int) ([]*MessageHeader, error) {
 	query := `
@@ -133,10 +153,20 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder, filt
 			a.name as account_name,
 			a.color as account_color,
 			f.id as folder_id,
+			MAX(CASE
+				WHEN mcs.status = 'sent' AND mcs.action_type = 'reply-all' THEN 23
+				WHEN mcs.status = 'sent' AND mcs.action_type = 'reply' THEN 22
+				WHEN mcs.status = 'sent' AND mcs.action_type = 'forward' THEN 21
+				WHEN mcs.status = 'draft' AND mcs.action_type = 'reply-all' THEN 13
+				WHEN mcs.status = 'draft' AND mcs.action_type = 'reply' THEN 12
+				WHEN mcs.status = 'draft' AND mcs.action_type = 'forward' THEN 11
+				ELSE 0
+			END) as compose_status_rank,
 			json_group_array(DISTINCT json_object('name', m.from_name, 'email', m.from_email)) as participants_json
 		FROM messages m
 		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
+		LEFT JOIN message_compose_status mcs ON mcs.source_message_id = m.id
 		GROUP BY COALESCE(m.thread_id, m.id), a.id` +
 		filterHavingClause(filter, "m.") + `
 		` + orderClause + `
@@ -156,6 +186,7 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder, filt
 		var snippet sql.NullString
 		var messageIDsStr sql.NullString
 		var participantsJSON sql.NullString
+		var composeStatusRank sql.NullInt64
 
 		err := rows.Scan(
 			&c.ThreadID,
@@ -172,6 +203,7 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder, filt
 			&c.AccountName,
 			&c.AccountColor,
 			&c.FolderID,
+			&composeStatusRank,
 			&participantsJSON,
 		)
 		if err != nil {
@@ -192,6 +224,9 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder, filt
 
 		if participantsJSON.Valid {
 			c.Participants = parseParticipantsJSON(participantsJSON.String)
+		}
+		if composeStatusRank.Valid {
+			applyComposeStatusRank(c, int(composeStatusRank.Int64))
 		}
 
 		conversations = append(conversations, c)
@@ -738,6 +773,85 @@ func (s *Store) MarkReadReceiptHandled(id string) error {
 	return nil
 }
 
+// MarkComposeDraft records that a source message currently has a reply/forward draft.
+// A sent status is kept if the message was already successfully handled.
+func (s *Store) MarkComposeDraft(sourceMessageID, actionType, draftID string) error {
+	actionType = NormalizeComposeAction(actionType)
+	if sourceMessageID == "" || actionType == "" || draftID == "" {
+		return nil
+	}
+
+	query := `
+		INSERT INTO message_compose_status (source_message_id, action_type, status, draft_id, updated_at)
+		VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+		ON CONFLICT(source_message_id) DO UPDATE SET
+			action_type = CASE
+				WHEN message_compose_status.status = ? THEN message_compose_status.action_type
+				ELSE excluded.action_type
+			END,
+			status = CASE
+				WHEN message_compose_status.status = ? THEN message_compose_status.status
+				ELSE excluded.status
+			END,
+			draft_id = CASE
+				WHEN message_compose_status.status = ? THEN message_compose_status.draft_id
+				ELSE excluded.draft_id
+			END,
+			updated_at = CURRENT_TIMESTAMP
+	`
+	_, err := s.db.Exec(query,
+		sourceMessageID, actionType, ComposeStatusDraft, draftID,
+		ComposeStatusSent, ComposeStatusSent, ComposeStatusSent,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to mark compose draft: %w", err)
+	}
+	return nil
+}
+
+// MarkComposeSent records that a reply/reply-all/forward for a source message
+// has been sent successfully.
+func (s *Store) MarkComposeSent(sourceMessageID, actionType string) error {
+	actionType = NormalizeComposeAction(actionType)
+	if sourceMessageID == "" || actionType == "" {
+		return nil
+	}
+
+	query := `
+		INSERT INTO message_compose_status (source_message_id, action_type, status, draft_id, updated_at)
+		VALUES (?, ?, ?, NULL, CURRENT_TIMESTAMP)
+		ON CONFLICT(source_message_id) DO UPDATE SET
+			action_type = excluded.action_type,
+			status = excluded.status,
+			draft_id = NULL,
+			updated_at = CURRENT_TIMESTAMP
+	`
+	_, err := s.db.Exec(query, sourceMessageID, actionType, ComposeStatusSent)
+	if err != nil {
+		return fmt.Errorf("failed to mark compose sent: %w", err)
+	}
+	return nil
+}
+
+// ClearComposeDraft removes a draft marker if the marker still points at the
+// deleted draft. Sent markers are intentionally preserved.
+func (s *Store) ClearComposeDraft(sourceMessageID, draftID string) error {
+	if sourceMessageID == "" || draftID == "" {
+		return nil
+	}
+
+	_, err := s.db.Exec(
+		`DELETE FROM message_compose_status WHERE source_message_id = ? AND draft_id = ? AND status = ?`,
+		sourceMessageID,
+		draftID,
+		ComposeStatusDraft,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to clear compose draft: %w", err)
+	}
+	return nil
+}
+
 // Delete deletes a message
 func (s *Store) Delete(id string) error {
 	_, err := s.db.Exec("DELETE FROM messages WHERE id = ?", id)
@@ -1205,30 +1319,40 @@ func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, so
 	// aggregates per-message to_list JSON arrays into a nested array
 	// that parseAggregatedToListJSON flattens + dedupes in Go (DISTINCT
 	// doesn't work across nested-array values in SQLite).
-	participantsExpr := `json_group_array(DISTINCT json_object('name', from_name, 'email', from_email))`
+	participantsExpr := `json_group_array(DISTINCT json_object('name', m.from_name, 'email', m.from_email))`
 	if useToList {
-		participantsExpr = `json_group_array(json(to_list))`
+		participantsExpr = `json_group_array(json(m.to_list))`
 	}
 
 	// Get conversations grouped by thread_id, ordered by date
 	// Use GROUP_CONCAT to get all message IDs in a single query
 	query := fmt.Sprintf(`
 		SELECT
-			COALESCE(thread_id, id) as conv_thread_id,
-			MIN(subject) as subject,
-			MAX(snippet) as snippet,
+			COALESCE(m.thread_id, m.id) as conv_thread_id,
+			MIN(m.subject) as subject,
+			MAX(m.snippet) as snippet,
 			COUNT(*) as message_count,
-			SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) as unread_count,
-			MAX(CASE WHEN has_attachments = 1 THEN 1 ELSE 0 END) as has_attachments,
-			MAX(CASE WHEN is_starred = 1 THEN 1 ELSE 0 END) as is_starred,
-			MAX(date) as latest_date,
-			GROUP_CONCAT(id) as message_ids,
-			MAX(CASE WHEN smime_encrypted = 1 OR pgp_encrypted = 1 THEN 1 ELSE 0 END) as is_encrypted,
+			SUM(CASE WHEN m.is_read = 0 THEN 1 ELSE 0 END) as unread_count,
+			MAX(CASE WHEN m.has_attachments = 1 THEN 1 ELSE 0 END) as has_attachments,
+			MAX(CASE WHEN m.is_starred = 1 THEN 1 ELSE 0 END) as is_starred,
+			MAX(m.date) as latest_date,
+			GROUP_CONCAT(m.id) as message_ids,
+			MAX(CASE WHEN m.smime_encrypted = 1 OR m.pgp_encrypted = 1 THEN 1 ELSE 0 END) as is_encrypted,
+			MAX(CASE
+				WHEN mcs.status = 'sent' AND mcs.action_type = 'reply-all' THEN 23
+				WHEN mcs.status = 'sent' AND mcs.action_type = 'reply' THEN 22
+				WHEN mcs.status = 'sent' AND mcs.action_type = 'forward' THEN 21
+				WHEN mcs.status = 'draft' AND mcs.action_type = 'reply-all' THEN 13
+				WHEN mcs.status = 'draft' AND mcs.action_type = 'reply' THEN 12
+				WHEN mcs.status = 'draft' AND mcs.action_type = 'forward' THEN 11
+				ELSE 0
+			END) as compose_status_rank,
 			%s as participants_json
-		FROM messages
-		WHERE folder_id = ?
-		GROUP BY COALESCE(thread_id, id)`+
-		filterHavingClause(filter, "")+`
+		FROM messages m
+		LEFT JOIN message_compose_status mcs ON mcs.source_message_id = m.id
+		WHERE m.folder_id = ?
+		GROUP BY COALESCE(m.thread_id, m.id)`+
+		filterHavingClause(filter, "m.")+`
 		`+orderClause+`
 		LIMIT ? OFFSET ?
 	`, participantsExpr)
@@ -1246,6 +1370,7 @@ func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, so
 		var snippet sql.NullString
 		var messageIDsStr sql.NullString
 		var participantsJSON sql.NullString
+		var composeStatusRank sql.NullInt64
 
 		err := rows.Scan(
 			&c.ThreadID,
@@ -1258,6 +1383,7 @@ func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, so
 			&latestDateStr,
 			&messageIDsStr,
 			&c.IsEncrypted,
+			&composeStatusRank,
 			&participantsJSON,
 		)
 		if err != nil {
@@ -1283,6 +1409,9 @@ func (s *Store) ListConversationsByFolder(folderID string, offset, limit int, so
 			if !useToList {
 				c.Participants = parseParticipantsJSON(participantsJSON.String)
 			}
+		}
+		if composeStatusRank.Valid {
+			applyComposeStatusRank(c, int(composeStatusRank.Int64))
 		}
 
 		conversations = append(conversations, c)

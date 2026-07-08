@@ -50,6 +50,7 @@
       "openInMail": "在邮件中打开",
       "readonlyHint": "只读",
       "labels": {
+        "displayName": "显示名称",
         "email": "电子邮件",
         "associatedAccounts": "关联邮箱",
         "phone": "电话",

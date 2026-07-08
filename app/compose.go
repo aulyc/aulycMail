@@ -41,6 +41,7 @@ type composeOps struct {
 	credStore    *credentials.Store
 	certStore    *certificate.Store
 	contactStore *contact.Store
+	messageStore *message.Store
 	draftOps     *draftOps // for draft cleanup on send
 }
 
@@ -251,6 +252,12 @@ func (ops *composeOps) sendMessage(ctx context.Context, accountID string, msg sm
 		_ = ops.contactStore.AddOrUpdateWithRole(bcc.Address, bcc.Name, contact.RoleBcc)
 	}
 
+	if ops.messageStore != nil {
+		if err := ops.messageStore.MarkComposeSent(msg.SourceMessageID, msg.ReplyType); err != nil {
+			log.Warn().Err(err).Str("sourceMessageID", msg.SourceMessageID).Msg("Failed to mark source message as compose sent")
+		}
+	}
+
 	// Delete draft if one was provided (send already succeeded — log errors, don't fail)
 	if d != nil && ops.draftOps != nil {
 		if _, delErr := ops.draftOps.deleteDraftCore(ctx, d); delErr != nil {
@@ -330,6 +337,7 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 	if err != nil {
 		return err
 	}
+	a.emitSourceMessageUpdated(msg.SourceMessageID)
 	// A successful send is also a successful connection — refresh the stamp.
 	a.recordAccountConnOK(accountID)
 	go func() {
@@ -339,6 +347,20 @@ func (a *App) SendMessage(accountID string, msg smtp.ComposeMessage) error {
 		}
 	}()
 	return nil
+}
+
+func (a *App) emitSourceMessageUpdated(sourceMessageID string) {
+	if sourceMessageID == "" {
+		return
+	}
+	msg, err := a.messageStore.Get(sourceMessageID)
+	if err != nil || msg == nil {
+		return
+	}
+	wailsRuntime.EventsEmit(a.ctx, "messages:updated", map[string]interface{}{
+		"accountId": msg.AccountID,
+		"folderId":  msg.FolderID,
+	})
 }
 
 // handleExternalMailto handles a mailto URL received from a second instance.
@@ -599,15 +621,17 @@ func (a *App) PrepareReply(messageID, mode string) (*smtp.ComposeMessage, error)
 	}
 
 	return &smtp.ComposeMessage{
-		From:        from,
-		To:          to,
-		Cc:          cc,
-		Subject:     subject,
-		HTMLBody:    htmlBody,
-		TextBody:    textBody,
-		InReplyTo:   ensureAngleBrackets(msg.MessageID),
-		References:  refs,
-		Attachments: attachments,
+		From:            from,
+		To:              to,
+		Cc:              cc,
+		Subject:         subject,
+		HTMLBody:        htmlBody,
+		TextBody:        textBody,
+		InReplyTo:       ensureAngleBrackets(msg.MessageID),
+		References:      refs,
+		Attachments:     attachments,
+		SourceMessageID: msg.ID,
+		ReplyType:       message.NormalizeComposeAction(mode),
 	}, nil
 }
 
@@ -804,6 +828,25 @@ func addressListToJSON(addrs []smtp.Address) string {
 	}
 	data, _ := json.Marshal(addrs)
 	return string(data)
+}
+
+func referencesToJSON(refs []string) string {
+	if len(refs) == 0 {
+		return ""
+	}
+	data, _ := json.Marshal(refs)
+	return string(data)
+}
+
+func parseReferencesList(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var refs []string
+	if err := json.Unmarshal([]byte(s), &refs); err == nil {
+		return refs
+	}
+	return strings.Fields(s)
 }
 
 // detectContentType returns the MIME type for a file based on extension

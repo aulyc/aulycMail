@@ -50,6 +50,23 @@
     onFolderSelect?.(acc.id, f.id, f.path, f.name, f.type)
   }
 
+  const defaultAccountColors = [
+    '#3B82F6',
+    '#10B981',
+    '#F59E0B',
+    '#EF4444',
+    '#8B5CF6',
+    '#EC4899',
+    '#06B6D4',
+    '#F97316',
+  ]
+
+  function getAccountColor(targetAccount: account.Account): string {
+    if (targetAccount.color) return targetAccount.color
+    const index = Math.max(0, targetAccount.orderIndex || 0)
+    return defaultAccountColors[index % defaultAccountColors.length]
+  }
+
   function sumAccountBadgeCounts(trees: folder.FolderTree[]): { unread: number; drafts: number } {
     const totals = { unread: 0, drafts: 0 }
     for (const tree of trees) {
@@ -69,6 +86,7 @@
 
   let accountBadgeCounts = $derived(sumAccountBadgeCounts(folders))
   let accountBadgeTotal = $derived(accountBadgeCounts.unread + accountBadgeCounts.drafts)
+  let accountColor = $derived(getAccountColor(acc))
 </script>
 
 <div class="mb-1">
@@ -85,6 +103,11 @@
         icon={isExpanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
         class="w-4 h-4 text-muted-foreground"
       />
+      <span
+        class="w-2 h-2 rounded-full flex-shrink-0"
+        style="background-color: {accountColor}"
+        aria-hidden="true"
+      ></span>
       <span class="truncate flex-1 text-left">{acc.name || acc.email}</span>
 
       {#if syncing}
@@ -95,9 +118,7 @@
         </span>
       {:else if accountBadgeTotal > 0}
         <span
-          class="px-1.5 py-0.5 text-xs font-medium rounded-full {accountBadgeCounts.unread > 0
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground'}"
+          class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground"
         >
           {accountBadgeTotal}
         </span>

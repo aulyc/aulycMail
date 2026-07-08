@@ -50,6 +50,7 @@
       "openInMail": "Open in mail",
       "readonlyHint": "Read-only",
       "labels": {
+        "displayName": "Display name",
         "email": "Email",
         "associatedAccounts": "Associated mailboxes",
         "phone": "Phone",

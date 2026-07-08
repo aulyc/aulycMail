@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount, onDestroy, getContext, setContext, untrack } from 'svelte'
+  import { onMount, onDestroy, getContext, setContext, tick, untrack } from 'svelte'
   import Icon from '@iconify/svelte'
   import type { Editor } from '@tiptap/core'
   import { createComposerEditor } from './composerEditor'
   // @ts-ignore - Wails generated imports
-  import { smtp, account, app } from '../../../../wailsjs/go/models'
+  import { smtp, account, app, contact } from '../../../../wailsjs/go/models'
   // @ts-ignore - Wails runtime for events
   import { EventsOn } from '../../../../wailsjs/runtime/runtime.js'
   import { type ComposerApi, COMPOSER_API_KEY, createMainWindowApi } from '$lib/composerApi'
@@ -83,6 +83,16 @@
     return s
   }
 
+  function formatIdentityLabel(identity: account.Identity | null | undefined): string {
+    if (!identity) return ''
+
+    const email = (identity.email || '').trim()
+    const name = (identity.name || '').trim()
+    if (!name || name.toLowerCase() === email.toLowerCase()) return email
+
+    return `${name} <${email}>`
+  }
+
   // Get API from context, props, or create default main window API
   const contextApi = getContext<ComposerApi | undefined>(COMPOSER_API_KEY)
   const defaultApi = createMainWindowApi()
@@ -121,6 +131,8 @@
   // Track In-Reply-To and References for threading
   let inReplyTo = $state<string | undefined>(undefined)
   let references = $state<string[]>([])
+  let sourceMessageId = $state('')
+  let replyType = $state<'reply' | 'reply-all' | 'forward' | ''>('')
 
   // Attachments
   let attachments = $state<ComposerAttachment[]>([])
@@ -138,11 +150,23 @@
   let isPlainTextMode = $state(getComposerFormat() === 'plain')
   let plainTextContent = $state('')  // Store plain text when in plain text mode
   let plainTextRef = $state<HTMLTextAreaElement | null>(null)  // textarea element (plain text mode)
+  let plainTextScrollTop = $state(0)
+  let plainTextScrollLeft = $state(0)
+  let plainMentionLabels = $state<string[]>([])
+  let composerBodyElement = $state<HTMLDivElement | null>(null)
+  let composerRootElement = $state<HTMLDivElement | null>(null)
+  let fromFieldElement = $state<HTMLDivElement | null>(null)
+  let toFieldElement = $state<HTMLDivElement | null>(null)
+  let ccFieldElement = $state<HTMLDivElement | null>(null)
+  let bccFieldElement = $state<HTMLDivElement | null>(null)
+  let subjectInputElement = $state<HTMLInputElement | null>(null)
   let initialRichBody = ''  // original reply/forward rich body (images restored), for plain->rich reprocess
 
   // Component refs
   let toolbarRef = $state<{ focus: () => void } | null>(null)
   let toInputRef = $state<{ focus: () => void } | null>(null)
+  let ccInputRef = $state<{ focus: () => void } | null>(null)
+  let bccInputRef = $state<{ focus: () => void } | null>(null)
 
   // Draft auto-save state
   let currentDraftId = $state<string | null>(null)
@@ -201,9 +225,46 @@
 
   // Max inline image size (10 MB) — larger files should be added as regular attachments
   const MAX_INLINE_IMAGE_SIZE = 10 * 1024 * 1024
+  const MENTION_SUGGESTION_LIMIT = 100
+  const MENTION_MENU_WIDTH = 288
+  const MENTION_ROW_HEIGHT = 52
+  const MENTION_VISIBLE_ROWS = 4
+  const MENTION_MENU_BORDER_WIDTH = 2
+  const MENTION_MENU_HEIGHT = MENTION_ROW_HEIGHT * MENTION_VISIBLE_ROWS + MENTION_MENU_BORDER_WIDTH
+  const MENTION_VIEWPORT_PADDING = 8
+  const MENTION_ANCHOR_GAP = 6
 
   // Whether remote images are blocked in the composer's quoted content
   let composerImagesBlocked = $state(false)
+
+  type MentionSurface = 'plain' | 'rich'
+  let mentionActive = $state(false)
+  let mentionSurface = $state<MentionSurface>('plain')
+  let mentionQuery = $state('')
+  let mentionStart = $state(0)
+  let mentionEnd = $state(0)
+  let mentionSuggestions = $state<contact.Contact[]>([])
+  let mentionSelectedIndex = $state(0)
+  let mentionKeyboardMode = $state(false)
+  let mentionWindowStart = $state(0)
+  let mentionTop = $state(12)
+  let mentionLeft = $state(12)
+  let mentionSearchTimer: ReturnType<typeof setTimeout> | null = null
+  let mentionSearchSeq = 0
+  let dismissedMentionKey = $state('')
+  let lastMentionPointerX = -1
+  let lastMentionPointerY = -1
+  let composerTextComposing = $state(false)
+  const visibleMentionSuggestions = $derived(mentionSuggestions.slice(mentionWindowStart, mentionWindowStart + MENTION_VISIBLE_ROWS))
+
+  type ComposerFocusTarget = 'from' | 'to' | 'cc' | 'bcc' | 'subject' | 'body'
+
+  $effect(() => {
+    const maxStart = Math.max(0, mentionSuggestions.length - MENTION_VISIBLE_ROWS)
+    if (mentionWindowStart > maxStart) {
+      mentionWindowStart = maxStart
+    }
+  })
 
   // Confirmation dialogs state
   let showEmptySubjectDialog = $state(false)
@@ -242,9 +303,498 @@
     return textMentionsAttachment(combinedText)
   }
 
+  function getMentionLabel(c: contact.Contact): string {
+    return (c.display_name || c.email || '').trim()
+  }
+
+  function getContactEmail(c: contact.Contact): string {
+    return (c.email || '').trim().toLowerCase()
+  }
+
+  function getRecipientEmail(r: smtp.Address): string {
+    return ((r as any)?.address || (r as any)?.email || '').trim().toLowerCase()
+  }
+
+  function hasRecipient(email: string, recipients: smtp.Address[]): boolean {
+    const normalized = email.trim().toLowerCase()
+    return !!normalized && recipients.some((recipient) => getRecipientEmail(recipient) === normalized)
+  }
+
+  function addMentionedContactToRecipients(c: contact.Contact) {
+    const email = getContactEmail(c)
+    if (!email || hasRecipient(email, toRecipients) || hasRecipient(email, ccRecipients)) return
+
+    toRecipients = [
+      ...toRecipients,
+      new smtp.Address({
+        name: (c.display_name || '').trim(),
+        address: (c.email || '').trim(),
+      }),
+    ]
+  }
+
+  function rememberPlainMentionLabel(label: string) {
+    const normalized = label.trim()
+    if (!normalized || plainMentionLabels.includes(normalized)) return
+    plainMentionLabels = [...plainMentionLabels, normalized]
+  }
+
+  type PlainTextSegment = { type: 'text' | 'mention'; text: string }
+
+  function isMentionBoundary(text: string, index: number): boolean {
+    if (index === 0) return true
+    return /[\s([（【{,;，。！？!?]/u.test(text[index - 1] || '')
+  }
+
+  function getPlainTextMentionSegments(text: string): PlainTextSegment[] {
+    if (!text) return []
+
+    const labels = [...plainMentionLabels].sort((a, b) => b.length - a.length)
+    const segments: PlainTextSegment[] = []
+    let buffer = ''
+    let i = 0
+
+    const flush = () => {
+      if (!buffer) return
+      segments.push({ type: 'text', text: buffer })
+      buffer = ''
+    }
+
+    while (i < text.length) {
+      if (text[i] !== '@' || !isMentionBoundary(text, i)) {
+        buffer += text[i]
+        i += 1
+        continue
+      }
+
+      const selectedLabel = labels.find((label) => text.startsWith(`@${label}`, i))
+      if (selectedLabel) {
+        flush()
+        segments.push({ type: 'mention', text: `@${selectedLabel}` })
+        i += selectedLabel.length + 1
+        continue
+      }
+
+      const fallback = text.slice(i).match(/^@([^\s@]{1,40})/u)
+      if (fallback) {
+        flush()
+        segments.push({ type: 'mention', text: fallback[0] })
+        i += fallback[0].length
+        continue
+      }
+
+      buffer += text[i]
+      i += 1
+    }
+
+    flush()
+    return segments
+  }
+
+  const plainTextMentionSegments = $derived(getPlainTextMentionSegments(plainTextContent))
+
+  function setMentionSelectedIndex(index: number, inputMode: 'keyboard' | 'mouse' | 'program' = 'program') {
+    if (mentionSuggestions.length === 0) {
+      mentionSelectedIndex = -1
+      mentionWindowStart = 0
+      return
+    }
+
+    if (inputMode === 'keyboard') mentionKeyboardMode = true
+    if (inputMode === 'mouse') mentionKeyboardMode = false
+    const nextIndex = Math.min(Math.max(index, 0), mentionSuggestions.length - 1)
+    let nextWindowStart = mentionWindowStart
+    if (nextIndex < mentionWindowStart) {
+      nextWindowStart = nextIndex
+    } else if (nextIndex >= mentionWindowStart + MENTION_VISIBLE_ROWS) {
+      nextWindowStart = nextIndex - MENTION_VISIBLE_ROWS + 1
+    }
+    mentionWindowStart = nextWindowStart
+    mentionSelectedIndex = nextIndex
+  }
+
+  function handleMentionPointerMove(e: PointerEvent, index: number) {
+    if (e.clientX === lastMentionPointerX && e.clientY === lastMentionPointerY) return
+    lastMentionPointerX = e.clientX
+    lastMentionPointerY = e.clientY
+    setMentionSelectedIndex(index, 'mouse')
+  }
+
+  function closeMentionSuggestions() {
+    mentionActive = false
+    mentionSuggestions = []
+    mentionSelectedIndex = 0
+    mentionKeyboardMode = false
+    mentionWindowStart = 0
+    mentionQuery = ''
+    if (mentionSearchTimer) {
+      clearTimeout(mentionSearchTimer)
+      mentionSearchTimer = null
+    }
+  }
+
+  function mentionKey(surface: MentionSurface, query: string, start: number, end: number): string {
+    return `${surface}:${start}:${end}:${query}`
+  }
+
+  function findMentionToken(textBeforeCursor: string): { query: string; startOffset: number } | null {
+    const match = textBeforeCursor.match(/(^|[\s([（【{,;，。！？!?])@([^\s@]{0,40})$/u)
+    if (!match) return null
+    const query = match[2] || ''
+    return {
+      query,
+      startOffset: textBeforeCursor.length - query.length - 1,
+    }
+  }
+
+  function filteredMentionResults(results: contact.Contact[], query: string): contact.Contact[] {
+    const needle = query.trim().toLowerCase()
+    if (!needle) return []
+    const seen = new Set<string>()
+    return (results || []).filter((item) => {
+      const email = (item.email || '').trim()
+      const label = getMentionLabel(item)
+      if (!email && !label) return false
+      const key = (email || label).toLowerCase()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return label.toLowerCase().includes(needle) || email.toLowerCase().includes(needle)
+    })
+  }
+
+  function scheduleMentionSearch(query: string) {
+    if (mentionSearchTimer) {
+      clearTimeout(mentionSearchTimer)
+    }
+
+    const normalizedQuery = query.trim()
+    if (!normalizedQuery) {
+      mentionSuggestions = []
+      mentionSelectedIndex = -1
+      mentionWindowStart = 0
+      return
+    }
+
+    const seq = ++mentionSearchSeq
+    mentionSearchTimer = setTimeout(async () => {
+      try {
+        const results = await api.searchContacts(normalizedQuery, MENTION_SUGGESTION_LIMIT)
+        if (seq !== mentionSearchSeq || !mentionActive || mentionQuery !== query) return
+        mentionSuggestions = filteredMentionResults(results, normalizedQuery)
+        setMentionSelectedIndex(mentionSuggestions.length > 0 ? 0 : -1)
+      } catch (err) {
+        if (seq === mentionSearchSeq) {
+          console.error('Failed to search contacts for mention:', err)
+          mentionSuggestions = []
+          mentionSelectedIndex = -1
+          mentionWindowStart = 0
+        }
+      }
+    }, 150)
+  }
+
+  function setMentionPosition(left: number, top: number) {
+    const container = composerBodyElement
+    if (!container) {
+      mentionLeft = left
+      mentionTop = top
+      return
+    }
+    const viewportTop = container.scrollTop
+    const viewportBottom = viewportTop + container.clientHeight
+    const minTop = viewportTop + MENTION_VIEWPORT_PADDING
+    const maxTop = Math.max(minTop, viewportBottom - MENTION_MENU_HEIGHT - MENTION_VIEWPORT_PADDING)
+    const belowTop = top + MENTION_ANCHOR_GAP
+    const aboveTop = top - MENTION_MENU_HEIGHT - MENTION_ANCHOR_GAP
+    const hasRoomBelow = belowTop + MENTION_MENU_HEIGHT <= viewportBottom - MENTION_VIEWPORT_PADDING
+    const hasRoomAbove = aboveTop >= minTop
+    const nextTop = !hasRoomBelow && hasRoomAbove ? aboveTop : Math.min(Math.max(minTop, belowTop), maxTop)
+    const maxLeft = Math.max(MENTION_VIEWPORT_PADDING, container.clientWidth - MENTION_MENU_WIDTH - MENTION_VIEWPORT_PADDING)
+    mentionLeft = Math.min(Math.max(MENTION_VIEWPORT_PADDING, left), maxLeft)
+    mentionTop = nextTop
+  }
+
+  function updatePlainMentionPosition(markerOffset: number) {
+    const textarea = plainTextRef
+    const container = composerBodyElement
+    if (!textarea || !container) return
+
+    const style = getComputedStyle(textarea)
+    const mirror = document.createElement('div')
+    mirror.style.position = 'absolute'
+    mirror.style.visibility = 'hidden'
+    mirror.style.whiteSpace = 'pre-wrap'
+    mirror.style.wordBreak = 'break-word'
+    mirror.style.overflowWrap = 'break-word'
+    mirror.style.boxSizing = style.boxSizing
+    mirror.style.width = `${textarea.clientWidth}px`
+    mirror.style.font = style.font
+    mirror.style.letterSpacing = style.letterSpacing
+    mirror.style.lineHeight = style.lineHeight
+    mirror.style.padding = style.padding
+    mirror.style.border = style.border
+
+    const markerPosition = Math.max(0, Math.min(markerOffset, textarea.value.length))
+    mirror.textContent = textarea.value.slice(0, markerPosition)
+    const marker = document.createElement('span')
+    marker.textContent = textarea.value.slice(markerPosition, markerPosition + 1) || '.'
+    mirror.appendChild(marker)
+    document.body.appendChild(mirror)
+
+    const textareaRect = textarea.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    const lineHeight = Number.parseFloat(style.lineHeight) || 20
+    const left = textareaRect.left - containerRect.left + marker.offsetLeft - textarea.scrollLeft
+    const top = textareaRect.top - containerRect.top + marker.offsetTop - textarea.scrollTop + lineHeight + container.scrollTop
+    mirror.remove()
+    setMentionPosition(left, top)
+  }
+
+  function updatePlainMention() {
+    const textarea = plainTextRef
+    if (!textarea || !isPlainTextMode || composerTextComposing) return
+
+    const cursor = textarea.selectionStart ?? 0
+    const token = findMentionToken(plainTextContent.slice(0, cursor))
+    if (!token || !token.query.trim()) {
+      closeMentionSuggestions()
+      dismissedMentionKey = ''
+      return
+    }
+
+    const shouldSearch =
+      !mentionActive ||
+      mentionSurface !== 'plain' ||
+      mentionQuery !== token.query ||
+      mentionStart !== cursor - token.query.length - 1 ||
+      mentionEnd !== cursor
+    const tokenStart = cursor - token.query.length - 1
+    const currentMentionKey = mentionKey('plain', token.query, tokenStart, cursor)
+    if (!mentionActive && dismissedMentionKey === currentMentionKey) {
+      return
+    }
+    mentionActive = true
+    mentionSurface = 'plain'
+    mentionQuery = token.query
+    mentionStart = tokenStart
+    mentionEnd = cursor
+    updatePlainMentionPosition(tokenStart)
+    if (shouldSearch) {
+      scheduleMentionSearch(token.query)
+    }
+  }
+
+  function updateRichMention() {
+    if (!editor || isPlainTextMode || composerTextComposing) return
+    const { state, view } = editor
+    const { selection } = state
+    if (!selection.empty) {
+      closeMentionSuggestions()
+      dismissedMentionKey = ''
+      return
+    }
+
+    const textBeforeCursor = selection.$from.parent.textBetween(0, selection.$from.parentOffset, undefined, '\ufffc')
+    const token = findMentionToken(textBeforeCursor)
+    if (!token || !token.query.trim()) {
+      closeMentionSuggestions()
+      dismissedMentionKey = ''
+      return
+    }
+
+    const tokenStart = selection.from - token.query.length - 1
+    const coords = view.coordsAtPos(tokenStart)
+    const container = composerBodyElement
+    if (container) {
+      const rect = container.getBoundingClientRect()
+      setMentionPosition(
+        coords.left - rect.left + container.scrollLeft,
+        coords.bottom - rect.top + container.scrollTop
+      )
+    }
+
+    const shouldSearch =
+      !mentionActive ||
+      mentionSurface !== 'rich' ||
+      mentionQuery !== token.query ||
+      mentionStart !== tokenStart ||
+      mentionEnd !== selection.from
+    const currentMentionKey = mentionKey('rich', token.query, tokenStart, selection.from)
+    if (!mentionActive && dismissedMentionKey === currentMentionKey) {
+      return
+    }
+    mentionActive = true
+    mentionSurface = 'rich'
+    mentionQuery = token.query
+    mentionStart = tokenStart
+    mentionEnd = selection.from
+    if (shouldSearch) {
+      scheduleMentionSearch(token.query)
+    }
+  }
+
+  function selectMention(c: contact.Contact) {
+    const label = getMentionLabel(c)
+    if (!label) return
+
+    addMentionedContactToRecipients(c)
+
+    if (mentionSurface === 'plain') {
+      const before = plainTextContent.slice(0, mentionStart)
+      const after = plainTextContent.slice(mentionEnd)
+      const inserted = `@${label}${after.length === 0 || !/^[ \t]/u.test(after) ? ' ' : ''}`
+      rememberPlainMentionLabel(label)
+      plainTextContent = before + inserted + after
+      const nextCursor = before.length + inserted.length
+      setTimeout(() => {
+        plainTextRef?.focus()
+        plainTextRef?.setSelectionRange(nextCursor, nextCursor)
+      }, 0)
+    } else if (editor) {
+      const docSize = editor.state.doc.content.size
+      const before = mentionStart > 1
+        ? editor.state.doc.textBetween(mentionStart - 1, mentionStart, undefined, '\ufffc')
+        : ''
+      const after = mentionEnd < docSize
+        ? editor.state.doc.textBetween(mentionEnd, Math.min(docSize, mentionEnd + 1), undefined, '\ufffc')
+        : ''
+      const content: any[] = []
+      if (mentionStart > 1 && before && !/\s/u.test(before)) {
+        content.push({ type: 'text', text: ' ' })
+      }
+      content.push({ type: 'contactMention', attrs: { label } })
+      if (!after || !/^[ \t]/u.test(after)) {
+        content.push({ type: 'text', text: ' ' })
+      }
+
+      editor
+        .chain()
+        .focus()
+        .deleteRange({ from: mentionStart, to: mentionEnd })
+        .insertContent(content)
+        .run()
+    }
+
+    closeMentionSuggestions()
+    dismissedMentionKey = ''
+    scheduleDraftSave()
+  }
+
+  function handleMentionKeydown(e: KeyboardEvent): boolean {
+    if (e.isComposing) return false
+    if (!mentionActive) return false
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      e.stopPropagation()
+      if (mentionSuggestions.length > 0) {
+        setMentionSelectedIndex(mentionSelectedIndex + 1, 'keyboard')
+      }
+      return true
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      e.stopPropagation()
+      if (mentionSuggestions.length > 0) {
+        setMentionSelectedIndex(mentionSelectedIndex - 1, 'keyboard')
+      }
+      return true
+    }
+    if (e.key === 'Enter' || e.key === 'Tab') {
+      if (mentionSuggestions.length > 0 && mentionSelectedIndex >= 0) {
+        e.preventDefault()
+        e.stopPropagation()
+        selectMention(mentionSuggestions[mentionSelectedIndex])
+        return true
+      }
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      dismissedMentionKey = mentionKey(mentionSurface, mentionQuery, mentionStart, mentionEnd)
+      closeMentionSuggestions()
+      return true
+    }
+    return false
+  }
+
+  function isMentionNavigationKey(key: string): boolean {
+    return key === 'ArrowDown' || key === 'ArrowUp' || key === 'Enter' || key === 'Tab' || key === 'Escape'
+  }
+
+  function handlePlainTextInput(e?: Event) {
+    scheduleDraftSave()
+    if ((e as InputEvent | undefined)?.isComposing || composerTextComposing) return
+    updatePlainMention()
+  }
+
+  function handlePlainTextScroll() {
+    const textarea = plainTextRef
+    if (!textarea) return
+    plainTextScrollTop = textarea.scrollTop
+    plainTextScrollLeft = textarea.scrollLeft
+  }
+
+  function handlePlainTextKeydown(e: KeyboardEvent) {
+    handleMentionKeydown(e)
+  }
+
+  function handleBodyKeydown(e: KeyboardEvent) {
+    handleMentionKeydown(e)
+  }
+
+  function handlePlainTextCursorChange(e?: Event) {
+    if (composerTextComposing) return
+    if (e instanceof KeyboardEvent && isMentionNavigationKey(e.key)) return
+    if (e instanceof KeyboardEvent && e.isComposing) return
+    setTimeout(updatePlainMention, 0)
+  }
+
+  function handleRichEditorUpdate(e?: KeyboardEvent) {
+    if (composerTextComposing) return
+    if (mentionActive && e && isMentionNavigationKey(e.key)) return
+    if (e?.isComposing) return
+    scheduleDraftSave()
+    updateRichMention()
+  }
+
+  function handleComposerCompositionStart() {
+    composerTextComposing = true
+    closeMentionSuggestions()
+    dismissedMentionKey = ''
+  }
+
+  function handleComposerCompositionEnd() {
+    composerTextComposing = false
+    scheduleDraftSave()
+    setTimeout(() => {
+      if (isPlainTextMode) {
+        updatePlainMention()
+      } else {
+        updateRichMention()
+      }
+    }, 0)
+  }
+
+  function handleMentionMenuWheel(e: WheelEvent) {
+    e.stopPropagation()
+  }
+
+  function handleMentionMenuTouchMove(e: TouchEvent) {
+    e.stopPropagation()
+  }
+
+  function handleMentionBlur() {
+    setTimeout(() => {
+      if (!document.activeElement?.closest?.('[data-composer-mention-menu]')) {
+        closeMentionSuggestions()
+      }
+    }, 150)
+  }
+
   // Determine display mode from initialMessage
   function getDisplayMode(): 'new' | 'reply' | 'reply-all' | 'forward' {
     if (!initialMessage) return 'new'
+    if (replyType) return replyType
     if (initialMessage.subject?.startsWith('Fwd:')) return 'forward'
     if (initialMessage.in_reply_to) {
       // reply-all if there are multiple To recipients or any Cc
@@ -415,6 +965,8 @@
       attachments: smtpAttachments,
       in_reply_to: inReplyTo,
       references: references,
+      source_message_id: sourceMessageId,
+      reply_type: replyType,
       request_read_receipt: requestReadReceipt,
     })
   }
@@ -800,6 +1352,11 @@
     // Set threading headers
     inReplyTo = initialMessage.in_reply_to
     references = initialMessage.references || []
+    sourceMessageId = (initialMessage as any).source_message_id || ''
+    const initialReplyType = (initialMessage as any).reply_type || ''
+    replyType = initialReplyType === 'reply' || initialReplyType === 'reply-all' || initialReplyType === 'forward'
+      ? initialReplyType
+      : ''
 
     // Restore attachments and inline images from draft/reply/forward
     // Go []byte is serialized as base64 string via JSON, but TS type says number[]
@@ -1041,13 +1598,95 @@
     input.click()
   }
 
+  function getComposerFocusOrder(): ComposerFocusTarget[] {
+    const order: ComposerFocusTarget[] = ['from', 'to']
+    if (showCc) order.push('cc')
+    if (showBcc) order.push('bcc')
+    order.push('subject', 'body')
+    return order
+  }
+
+  function focusFromField() {
+    const trigger = fromFieldElement?.querySelector<HTMLElement>(
+      'button, [role="combobox"], [tabindex]:not([tabindex="-1"])'
+    )
+    trigger?.focus()
+  }
+
+  function focusComposerBody() {
+    if (isPlainTextMode) {
+      plainTextRef?.focus()
+      return
+    }
+    editor?.commands.focus()
+  }
+
+  function focusComposerTarget(target: ComposerFocusTarget) {
+    switch (target) {
+      case 'from':
+        focusFromField()
+        break
+      case 'to':
+        toInputRef?.focus()
+        break
+      case 'cc':
+        ccInputRef?.focus()
+        break
+      case 'bcc':
+        bccInputRef?.focus()
+        break
+      case 'subject':
+        subjectInputElement?.focus()
+        break
+      case 'body':
+        focusComposerBody()
+        break
+    }
+  }
+
+  function getActiveComposerFocusTarget(): ComposerFocusTarget | null {
+    const active = document.activeElement
+    if (!active) return null
+    if (fromFieldElement?.contains(active)) return 'from'
+    if (toFieldElement?.contains(active)) return 'to'
+    if (ccFieldElement?.contains(active)) return 'cc'
+    if (bccFieldElement?.contains(active)) return 'bcc'
+    if (subjectInputElement === active) return 'subject'
+    if (composerBodyElement?.contains(active)) return 'body'
+    return null
+  }
+
+  function shouldTrapComposerTab(): boolean {
+    return !!composerRootElement &&
+      !showEmptySubjectDialog &&
+      !showMissingAttachmentDialog &&
+      !showFlatpakDndDialog &&
+      !showCloseConfirm
+  }
+
+  function handleComposerTabKeydown(e: KeyboardEvent) {
+    if (!shouldTrapComposerTab()) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const order = getComposerFocusOrder()
+    const activeTarget = getActiveComposerFocusTarget()
+    const activeIndex = activeTarget ? order.indexOf(activeTarget) : -1
+    const nextIndex = e.shiftKey
+      ? (activeIndex <= 0 ? order.length - 1 : activeIndex - 1)
+      : (activeIndex < 0 || activeIndex >= order.length - 1 ? 0 : activeIndex + 1)
+
+    focusComposerTarget(order[nextIndex])
+  }
+
   // Create the TipTap editor on demand. No-op if it already exists or its
   // element isn't mounted yet — it isn't while the composer is in plain text
   // mode, since the editor <div> lives in the {:else} branch.
   function ensureEditor() {
     if (editor || !editorElement) return
     editor = createComposerEditor(editorElement, {
-      onUpdate: scheduleDraftSave,
+      onUpdate: handleRichEditorUpdate,
+      onMentionKeyDown: handleMentionKeydown,
       onPasteImage: handleInlineImageFile,
       onDropImage: handleInlineImageFile,
       onDropFile: handleDroppedFile,
@@ -1093,6 +1732,10 @@
   function handleKeyDown(e: KeyboardEvent) {
     if (e.defaultPrevented) return
 
+    if (e.key === 'Tab') {
+      handleComposerTabKeydown(e)
+      return
+    }
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       handleSend()
@@ -1309,10 +1952,19 @@
     return !!e.dataTransfer?.types.includes('application/x-aulycmail-recipient')
   }
 
+  function hasFileDropPayload(e: DragEvent): boolean {
+    const types = e.dataTransfer?.types
+    return !!types?.includes('Files') || !!types?.includes('text/uri-list')
+  }
+
   function handleDragOver(e: DragEvent) {
-    if (isRecipientChipDrag(e)) return
+    if (isRecipientChipDrag(e) || !hasFileDropPayload(e)) {
+      isDraggingOver = false
+      return
+    }
     e.preventDefault()
     e.stopPropagation()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
     isDraggingOver = true
   }
 
@@ -1327,6 +1979,8 @@
     if (isRecipientChipDrag(e)) return
     e.stopPropagation()
     isDraggingOver = false
+
+    if (!hasFileDropPayload(e)) return
 
     // Already handled by TipTap editor's handleDrop
     if (e.defaultPrevented) return
@@ -1391,11 +2045,16 @@
     }
   }
 
+  function handleWindowDragEnd() {
+    isDraggingOver = false
+  }
+
 </script>
 
-<svelte:window on:keydown={handleKeyDown} />
+<svelte:window on:keydown={handleKeyDown} on:dragend={handleWindowDragEnd} on:drop={handleWindowDragEnd} />
 
 <div
+  bind:this={composerRootElement}
   class="flex flex-col h-full bg-background relative"
   class:ring-2={isDraggingOver}
   class:ring-primary={isDraggingOver}
@@ -1454,55 +2113,33 @@
   <!-- Compose form -->
   <div class="flex-1 flex flex-col min-h-0 overflow-hidden">
     <!-- From -->
-    <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
-      <span class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.from'))}:</span>
-      <div class="flex-1">
+    <div class="flex items-center gap-1 px-4 min-h-[44px] border-b border-border">
+      <span class="text-sm text-muted-foreground w-14 flex-shrink-0">{widenLabel($_('composer.from'))}:</span>
+      <div bind:this={fromFieldElement} class="flex-1">
         <Select.Root value={selectedIdentityId} onValueChange={handleIdentityChange}>
           <Select.Trigger class="h-6 px-0 border-0 bg-transparent shadow-none focus:ring-0">
             <Select.Value placeholder={$_('composer.selectIdentity')}>
               {#if selectedIdentityId}
                 {@const identity = identities.find(i => i.id === selectedIdentityId)}
                 {#if identity}
-                  {@const group = allGroups.find(g => g.account?.id === identity.accountId)}
-                  {#if group?.account?.color}
-                    <span class="inline-block w-2 h-2 rounded-full mr-1.5 flex-shrink-0" style="background-color: {group.account.color}"></span>
-                  {/if}
-                  {identity.name} &lt;{identity.email}&gt;
+                  {formatIdentityLabel(identity)}
                 {/if}
               {/if}
             </Select.Value>
           </Select.Trigger>
           <Select.Content>
-            {#if allGroups.length > 0}
-              <!-- Cross-account: grouped by account -->
-              {#each allGroups as group (group.account?.id)}
-                <Select.Group>
-                  <Select.GroupHeading class="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted-foreground">
-                    {#if group.account?.color}
-                      <span class="inline-block w-2 h-2 rounded-full flex-shrink-0" style="background-color: {group.account.color}"></span>
-                    {/if}
-                    {group.account?.name || group.account?.email}
-                  </Select.GroupHeading>
-                  {#each group.identities || [] as identity (identity.id)}
-                    <Select.Item value={identity.id} label="{identity.name} <{identity.email}>" />
-                  {/each}
-                </Select.Group>
-              {/each}
-            {:else}
-              <!-- Single-account fallback (detached window) -->
-              {#each identities as identity (identity.id)}
-                <Select.Item value={identity.id} label="{identity.name} <{identity.email}>" />
-              {/each}
-            {/if}
+            {#each identities as identity (identity.id)}
+              <Select.Item value={identity.id} label={formatIdentityLabel(identity)} />
+            {/each}
           </Select.Content>
         </Select.Root>
       </div>
     </div>
 
     <!-- To -->
-    <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
-      <span class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.to'))}:</span>
-      <div class="flex-1">
+    <div class="flex items-center gap-1 px-4 min-h-[44px] border-b border-border">
+      <span class="text-sm text-muted-foreground w-14 flex-shrink-0">{widenLabel($_('composer.to'))}:</span>
+      <div bind:this={toFieldElement} class="flex-1">
         <RecipientInput
           bind:this={toInputRef}
           bind:recipients={toRecipients}
@@ -1523,10 +2160,11 @@
 
     <!-- Cc -->
     {#if showCc}
-      <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
-        <span class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.cc'))}:</span>
-        <div class="flex-1">
+      <div class="flex items-center gap-1 px-4 min-h-[44px] border-b border-border">
+        <span class="text-sm text-muted-foreground w-14 flex-shrink-0">{widenLabel($_('composer.cc'))}:</span>
+        <div bind:this={ccFieldElement} class="flex-1">
           <RecipientInput
+            bind:this={ccInputRef}
             bind:recipients={ccRecipients}
             placeholder={$_('composer.addCcRecipients')}
           />
@@ -1536,10 +2174,11 @@
 
     <!-- Bcc -->
     {#if showBcc}
-      <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
-        <span class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.bcc'))}:</span>
-        <div class="flex-1">
+      <div class="flex items-center gap-1 px-4 min-h-[44px] border-b border-border">
+        <span class="text-sm text-muted-foreground w-14 flex-shrink-0">{widenLabel($_('composer.bcc'))}:</span>
+        <div bind:this={bccFieldElement} class="flex-1">
           <RecipientInput
+            bind:this={bccInputRef}
             bind:recipients={bccRecipients}
             placeholder={$_('composer.addBccRecipients')}
           />
@@ -1548,21 +2187,15 @@
     {/if}
 
     <!-- Subject -->
-    <div class="flex items-center gap-2 px-4 min-h-[44px] border-b border-border">
-      <label for="composer-subject" class="text-sm text-muted-foreground w-16 flex-shrink-0">{widenLabel($_('composer.subject'))}:</label>
+    <div class="flex items-center gap-1 px-4 min-h-[44px] border-b border-border">
+      <label for="composer-subject" class="text-sm text-muted-foreground w-14 flex-shrink-0">{widenLabel($_('composer.subject'))}:</label>
       <input
         id="composer-subject"
+        bind:this={subjectInputElement}
         bind:value={subject}
         type="text"
         placeholder={$_('composer.subject')}
         class="flex-1 bg-transparent text-sm focus:outline-none"
-        onkeydown={(e) => {
-          // Tab skips security rows + toolbar and goes directly to body
-          if (e.key === 'Tab' && !e.shiftKey) {
-            e.preventDefault()
-            editor?.commands.focus('start')
-          }
-        }}
       />
     </div>
 
@@ -1591,19 +2224,103 @@
     {/if}
 
     <!-- Editor -->
-    <div class="flex-1 overflow-auto bg-white dark:bg-zinc-900">
+    <div
+      bind:this={composerBodyElement}
+      class="relative flex-1 bg-white dark:bg-zinc-900 {isPlainTextMode ? 'overflow-hidden' : 'overflow-auto'}"
+    >
       <!-- Both surfaces stay mounted; we toggle visibility instead of using
            {#if}/{:else}. Unmounting the editor <div> orphaned the TipTap
            instance, so a later switch back to rich text wrote into a dead
            editor and the body vanished. -->
+      {#if isPlainTextMode}
+        <div
+          aria-hidden="true"
+          class="composer-plain-overlay pointer-events-none absolute inset-0 overflow-hidden p-3 font-mono text-sm text-foreground whitespace-pre-wrap break-words"
+        >
+          <div style="transform: translate({-plainTextScrollLeft}px, {-plainTextScrollTop}px);">
+            {#each plainTextMentionSegments as segment}
+              {#if segment.type === 'mention'}
+                <span class="contact-mention">{segment.text}</span>
+              {:else}
+                {segment.text}
+              {/if}
+            {/each}
+          </div>
+        </div>
+      {/if}
       <textarea
         bind:this={plainTextRef}
         bind:value={plainTextContent}
         placeholder={$_('composer.writePlaceholder')}
-        class="w-full h-full p-3 bg-transparent resize-none focus:outline-none font-mono text-sm {isPlainTextMode ? '' : 'hidden'}"
-        oninput={scheduleDraftSave}
+        class="relative z-10 w-full h-full p-3 bg-transparent resize-none focus:outline-none font-mono text-sm caret-foreground selection:bg-primary/30 placeholder:text-muted-foreground {isPlainTextMode ? 'text-transparent' : 'hidden'}"
+        oninput={handlePlainTextInput}
+        onkeydown={handlePlainTextKeydown}
+        onkeyup={handlePlainTextCursorChange}
+        onmouseup={handlePlainTextCursorChange}
+        oncompositionstart={handleComposerCompositionStart}
+        oncompositionend={handleComposerCompositionEnd}
+        onscroll={handlePlainTextScroll}
+        onblur={handleMentionBlur}
       ></textarea>
-      <div bind:this={editorElement} class="h-full {isPlainTextMode ? 'hidden' : ''}"></div>
+      <div
+        bind:this={editorElement}
+        class="h-full {isPlainTextMode ? 'hidden' : ''}"
+        role="textbox"
+        aria-multiline="true"
+        aria-label={$_('composer.writePlaceholder')}
+        tabindex="-1"
+        onkeydown={handleBodyKeydown}
+        onkeyup={(e) => {
+          if (isMentionNavigationKey(e.key)) return
+          setTimeout(updateRichMention, 0)
+        }}
+        onmouseup={() => setTimeout(updateRichMention, 0)}
+        oncompositionstart={handleComposerCompositionStart}
+        oncompositionend={handleComposerCompositionEnd}
+        onblur={handleMentionBlur}
+      ></div>
+
+      {#if mentionActive && mentionSuggestions.length > 0}
+        <div
+          data-composer-mention-menu
+          role="listbox"
+          tabindex="-1"
+          class="absolute z-50 w-72 overflow-hidden rounded-md border border-border bg-popover shadow-lg"
+          style="left: {mentionLeft}px; top: {mentionTop}px; max-height: {MENTION_MENU_HEIGHT}px; overscroll-behavior: contain;"
+          onwheel={handleMentionMenuWheel}
+          ontouchmove={handleMentionMenuTouchMove}
+        >
+          {#each visibleMentionSuggestions as suggestion, visibleIndex (visibleIndex)}
+            {@const index = mentionWindowStart + visibleIndex}
+            <button
+              type="button"
+              role="option"
+              aria-selected={index === mentionSelectedIndex}
+              data-mention-index={index}
+              class="flex h-[52px] w-full items-center gap-3 px-3 py-2 text-left transition-colors {mentionKeyboardMode ? '' : 'hover:bg-muted'} {index === mentionSelectedIndex ? 'bg-muted' : ''}"
+              onpointermove={(e) => handleMentionPointerMove(e, index)}
+              onmousedown={(e) => {
+                e.preventDefault()
+                selectMention(suggestion)
+              }}
+            >
+              <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                {(getMentionLabel(suggestion) || suggestion.email || '?')[0].toUpperCase()}
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="truncate text-sm font-medium">
+                  {getMentionLabel(suggestion)}
+                </div>
+                {#if suggestion.email && suggestion.email !== getMentionLabel(suggestion)}
+                  <div class="truncate text-xs text-muted-foreground">
+                    {suggestion.email}
+                  </div>
+                {/if}
+              </div>
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
 
     <!-- Attachments List -->

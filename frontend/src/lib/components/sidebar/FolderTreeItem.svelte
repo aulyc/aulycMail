@@ -187,17 +187,17 @@
         </span>
       {/if}
       <span class="flex-1"></span>
-      {#if aggregateUnread > 0}
-        <span
-          class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground"
-        >
-          {aggregateUnread}
-        </span>
-      {:else if draftCount > 0}
+      {#if draftCount > 0}
         <span
           class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-muted text-muted-foreground"
         >
           {draftCount}
+        </span>
+      {:else if aggregateUnread > 0}
+        <span
+          class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground"
+        >
+          {aggregateUnread}
         </span>
       {/if}
     </button>

@@ -150,6 +150,11 @@
       <!-- Fixed contact info — stays put while the mail list scrolls -->
       <div class="flex-shrink-0">
       <dl class="grid grid-cols-[80px_1fr] gap-y-2 gap-x-3 items-baseline">
+        <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.displayName')}</dt>
+        <dd class="m-0 break-words text-foreground">
+          {contact.name || $_('contacts.common.unnamed')}
+        </dd>
+
         <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.email')}</dt>
         <dd class="m-0 break-words">
           {#if contact.emailItems && contact.emailItems.length > 0}

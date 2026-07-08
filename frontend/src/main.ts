@@ -17,17 +17,31 @@ const STARTUP_WINDOW_HEIGHT = 800
 // show → i18n load → backend ready → app mount).
 async function bootstrap(): Promise<void> {
   await waitForRuntime()
-  resetStartupWindowFrame()
+  resetStartupWindowFrame(false)
   WindowShow()
+  await settleStartupWindowFrame()
   await initI18n()
   await waitForBackendReady()
   mount(App, { target: document.getElementById('app')! })
 }
 
-function resetStartupWindowFrame(): void {
+function resetStartupWindowFrame(center = true): void {
   WindowUnmaximise()
   WindowSetSize(STARTUP_WINDOW_WIDTH, STARTUP_WINDOW_HEIGHT)
-  WindowCenter()
+  if (center) {
+    WindowCenter()
+  }
+}
+
+function settleStartupWindowFrame(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        resetStartupWindowFrame()
+        resolve()
+      }, 80)
+    })
+  })
 }
 
 // waitForRuntime resolves when Wails has injected `window.runtime` into the

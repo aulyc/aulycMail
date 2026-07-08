@@ -1,7 +1,8 @@
 /**
  * TipTap editor configuration for the email composer
  */
-import { Editor, Extension } from '@tiptap/core'
+import { Editor, Extension, Node, mergeAttributes } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Underline from '@tiptap/extension-underline'
@@ -120,6 +121,47 @@ const ComposerImage = Image.extend({
   },
 })
 
+const ContactMention = Node.create({
+  name: 'contactMention',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: false,
+
+  addAttributes() {
+    return {
+      label: {
+        default: '',
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-label') || element.textContent?.replace(/^@/, '') || '',
+      },
+    }
+  },
+
+  parseHTML() {
+    return [
+      { tag: 'span[data-contact-mention]' },
+    ]
+  },
+
+  renderHTML({ node }) {
+    const label = node.attrs.label || ''
+    return [
+      'span',
+      mergeAttributes({
+        'data-contact-mention': '',
+        'data-label': label,
+        class: 'contact-mention',
+      }),
+      `@${label}`,
+    ]
+  },
+
+  renderText({ node }) {
+    const label = node.attrs.label || ''
+    return `@${label}`
+  },
+})
+
 /**
  * Extended Table extensions to preserve inline style attributes
  */
@@ -173,6 +215,7 @@ const ExtendedTableHeader = TableHeader.extend({
 
 export interface ComposerEditorHandlers {
   onUpdate?: () => void
+  onMentionKeyDown?: (event: KeyboardEvent) => boolean
   onPasteImage?: (file: File) => void
   onDropImage?: (file: File) => void
   onDropFile?: (file: File) => void
@@ -192,6 +235,7 @@ export function createComposerEditor(
     extensions: [
       StarterKit,
       Underline,
+      ContactMention,
       ExtendedTextStyle,
       ExtendedColor,
       FontSize,
@@ -231,6 +275,40 @@ export function createComposerEditor(
     editorProps: {
       attributes: {
         class: 'composer-editor focus:outline-none min-h-[200px] p-3',
+      },
+      handleKeyDown: (view, event) => {
+        if (handlers.onMentionKeyDown?.(event)) {
+          return true
+        }
+        if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+          const { state } = view
+          const { selection } = state
+          if (selection.empty) {
+            const $from = selection.$from
+            if (event.key === 'ArrowRight') {
+              const nodeAfter = $from.nodeAfter
+              if (nodeAfter?.type.name === 'contactMention') {
+                event.preventDefault()
+                const tr = state.tr
+                  .setSelection(TextSelection.create(state.doc, selection.from + nodeAfter.nodeSize))
+                  .scrollIntoView()
+                view.dispatch(tr)
+                return true
+              }
+            } else {
+              const nodeBefore = $from.nodeBefore
+              if (nodeBefore?.type.name === 'contactMention') {
+                event.preventDefault()
+                const tr = state.tr
+                  .setSelection(TextSelection.create(state.doc, selection.from - nodeBefore.nodeSize))
+                  .scrollIntoView()
+                view.dispatch(tr)
+                return true
+              }
+            }
+          }
+        }
+        return false
       },
       // Handle paste events for images
       handlePaste: (view, event) => {

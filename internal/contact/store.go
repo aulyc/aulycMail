@@ -128,12 +128,39 @@ func (s *Store) Search(query string, limit int) ([]*Contact, error) {
 //     disabled-source records are filtered OUT so they don't surface in the
 //     "All" view but stay invisible under their (disabled/missing) source.
 func (s *Store) searchUnified(query string, limit int) ([]*Contact, error) {
-	pattern := "%" + strings.ToLower(query) + "%"
-	sqlQuery := `
+	normalized := strings.ToLower(strings.TrimSpace(query))
+	if normalized == "" {
+		return []*Contact{}, nil
+	}
+
+	prefixPattern := normalized + "%"
+	nameWordPattern := "% " + normalized + "%"
+	emailDomainPattern := "%@" + normalized + "%"
+	emailDotDomainPattern := "%." + normalized + "%"
+	matchConditions := []string{
+		"LOWER(COALESCE(cr.fn, '')) LIKE ?",
+		"LOWER(COALESCE(cr.fn, '')) LIKE ?",
+		"LOWER(ce.email) LIKE ?",
+		"LOWER(ce.email) LIKE ?",
+		"LOWER(ce.email) LIKE ?",
+		"(LOWER(ce.email) LIKE ? OR LOWER(COALESCE(cr.fn, '')) LIKE ?)",
+	}
+	containsPattern := "%" + normalized + "%"
+	args := []any{
+		prefixPattern,
+		nameWordPattern,
+		prefixPattern,
+		emailDomainPattern,
+		emailDotDomainPattern,
+		containsPattern,
+		containsPattern,
+	}
+
+	sqlQuery := fmt.Sprintf(`
 		SELECT ce.email, COALESCE(cr.fn, ''), cr.source, ce.send_count, ce.last_used, cr.created_at
 		FROM contact_emails ce
 		JOIN contact_records cr ON ce.record_id = cr.id
-		WHERE (LOWER(ce.email) LIKE ? OR LOWER(COALESCE(cr.fn, '')) LIKE ?)
+		WHERE (%s)
 		  AND (
 		    cr.source = 'local'
 		    OR EXISTS (
@@ -143,11 +170,21 @@ func (s *Store) searchUnified(query string, limit int) ([]*Contact, error) {
 		      WHERE crs.record_id = cr.id AND s.enabled = 1 AND ab.enabled = 1
 		    )
 		  )
-		ORDER BY ce.send_count DESC, ce.last_used DESC
+		ORDER BY
+		  CASE
+		    WHEN LOWER(COALESCE(cr.fn, '')) LIKE ? THEN 0
+		    WHEN LOWER(ce.email) LIKE ? THEN 1
+		    WHEN LOWER(COALESCE(cr.fn, '')) LIKE ? THEN 2
+		    WHEN LOWER(ce.email) LIKE ? OR LOWER(ce.email) LIKE ? THEN 3
+		    ELSE 4
+		  END,
+		  ce.send_count DESC,
+		  ce.last_used DESC
 		LIMIT ?
-	`
+	`, strings.Join(matchConditions, " OR "))
 
-	rows, err := s.db.Query(sqlQuery, pattern, pattern, limit)
+	args = append(args, prefixPattern, prefixPattern, nameWordPattern, emailDomainPattern, emailDotDomainPattern, limit)
+	rows, err := s.db.Query(sqlQuery, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to search unified contacts: %w", err)
 	}

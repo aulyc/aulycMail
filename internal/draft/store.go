@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/aulyc/aulycmail/internal/database"
 	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
@@ -39,17 +39,17 @@ func (s *Store) Create(d *Draft) error {
 	query := `
 		INSERT INTO drafts (
 			id, account_id, to_list, cc_list, bcc_list, subject,
-			body_html, body_text, in_reply_to_id, reply_type, references_list,
+			body_html, body_text, in_reply_to_id, source_message_id, reply_type, references_list,
 			identity_id,
 			attachments_data,
 			sync_status, imap_uid, folder_id,
 			last_sync_attempt, sync_error, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := s.db.Exec(query,
 		d.ID, d.AccountID, d.ToList, d.CcList, d.BccList, d.Subject,
-		d.BodyHTML, d.BodyText, nullString(d.InReplyToID), nullString(d.ReplyType), nullString(d.ReferencesList),
+		d.BodyHTML, d.BodyText, nullString(d.InReplyToID), nullString(d.SourceMessageID), nullString(d.ReplyType), nullString(d.ReferencesList),
 		nullString(d.IdentityID),
 		nullBytes(d.AttachmentsData),
 		d.SyncStatus, nullUint32(d.IMAPUID), nullString(d.FolderID),
@@ -74,7 +74,7 @@ func (s *Store) Update(d *Draft) error {
 	query := `
 		UPDATE drafts SET
 			to_list = ?, cc_list = ?, bcc_list = ?, subject = ?,
-			body_html = ?, body_text = ?, in_reply_to_id = ?, reply_type = ?,
+			body_html = ?, body_text = ?, in_reply_to_id = ?, source_message_id = ?, reply_type = ?,
 			references_list = ?, identity_id = ?,
 			attachments_data = ?,
 			sync_status = ?, imap_uid = ?,
@@ -84,7 +84,7 @@ func (s *Store) Update(d *Draft) error {
 
 	_, err := s.db.Exec(query,
 		d.ToList, d.CcList, d.BccList, d.Subject,
-		d.BodyHTML, d.BodyText, nullString(d.InReplyToID), nullString(d.ReplyType),
+		d.BodyHTML, d.BodyText, nullString(d.InReplyToID), nullString(d.SourceMessageID), nullString(d.ReplyType),
 		nullString(d.ReferencesList), nullString(d.IdentityID),
 		nullBytes(d.AttachmentsData),
 		d.SyncStatus, nullUint32(d.IMAPUID),
@@ -107,7 +107,7 @@ func (s *Store) Update(d *Draft) error {
 func (s *Store) Get(id string) (*Draft, error) {
 	query := `
 		SELECT id, account_id, to_list, cc_list, bcc_list, subject,
-			body_html, body_text, in_reply_to_id, reply_type, references_list,
+			body_html, body_text, in_reply_to_id, source_message_id, reply_type, references_list,
 			identity_id,
 			attachments_data,
 			sync_status, imap_uid, folder_id,
@@ -117,14 +117,14 @@ func (s *Store) Get(id string) (*Draft, error) {
 	`
 
 	d := &Draft{}
-	var inReplyToID, replyType, referencesList, identityID, folderID, syncError sql.NullString
+	var inReplyToID, sourceMessageID, replyType, referencesList, identityID, folderID, syncError sql.NullString
 	var imapUID sql.NullInt64
 	var lastSyncAttempt sql.NullTime
 	var attachmentsData []byte
 
 	err := s.db.QueryRow(query, id).Scan(
 		&d.ID, &d.AccountID, &d.ToList, &d.CcList, &d.BccList, &d.Subject,
-		&d.BodyHTML, &d.BodyText, &inReplyToID, &replyType, &referencesList,
+		&d.BodyHTML, &d.BodyText, &inReplyToID, &sourceMessageID, &replyType, &referencesList,
 		&identityID,
 		&attachmentsData,
 		&d.SyncStatus, &imapUID, &folderID,
@@ -138,6 +138,7 @@ func (s *Store) Get(id string) (*Draft, error) {
 	}
 
 	d.InReplyToID = inReplyToID.String
+	d.SourceMessageID = sourceMessageID.String
 	d.ReplyType = replyType.String
 	d.ReferencesList = referencesList.String
 	d.IdentityID = identityID.String
@@ -158,7 +159,7 @@ func (s *Store) Get(id string) (*Draft, error) {
 func (s *Store) GetByIMAPUID(folderID string, imapUID uint32) (*Draft, error) {
 	query := `
 		SELECT id, account_id, to_list, cc_list, bcc_list, subject,
-			body_html, body_text, in_reply_to_id, reply_type, references_list,
+			body_html, body_text, in_reply_to_id, source_message_id, reply_type, references_list,
 			identity_id,
 			attachments_data,
 			sync_status, imap_uid, folder_id,
@@ -168,14 +169,14 @@ func (s *Store) GetByIMAPUID(folderID string, imapUID uint32) (*Draft, error) {
 	`
 
 	d := &Draft{}
-	var inReplyToID, replyType, referencesList, identityID, folderIDVal, syncError sql.NullString
+	var inReplyToID, sourceMessageID, replyType, referencesList, identityID, folderIDVal, syncError sql.NullString
 	var imapUIDVal sql.NullInt64
 	var lastSyncAttempt sql.NullTime
 	var attachmentsData []byte
 
 	err := s.db.QueryRow(query, folderID, imapUID).Scan(
 		&d.ID, &d.AccountID, &d.ToList, &d.CcList, &d.BccList, &d.Subject,
-		&d.BodyHTML, &d.BodyText, &inReplyToID, &replyType, &referencesList,
+		&d.BodyHTML, &d.BodyText, &inReplyToID, &sourceMessageID, &replyType, &referencesList,
 		&identityID,
 		&attachmentsData,
 		&d.SyncStatus, &imapUIDVal, &folderIDVal,
@@ -189,6 +190,7 @@ func (s *Store) GetByIMAPUID(folderID string, imapUID uint32) (*Draft, error) {
 	}
 
 	d.InReplyToID = inReplyToID.String
+	d.SourceMessageID = sourceMessageID.String
 	d.ReplyType = replyType.String
 	d.ReferencesList = referencesList.String
 	d.IdentityID = identityID.String
@@ -220,7 +222,7 @@ func (s *Store) Delete(id string) error {
 func (s *Store) ListByAccount(accountID string) ([]*Draft, error) {
 	query := `
 		SELECT id, account_id, to_list, cc_list, bcc_list, subject,
-			body_html, body_text, in_reply_to_id, reply_type, references_list,
+			body_html, body_text, in_reply_to_id, source_message_id, reply_type, references_list,
 			identity_id,
 			attachments_data,
 			sync_status, imap_uid, folder_id,
@@ -243,7 +245,7 @@ func (s *Store) ListByAccount(accountID string) ([]*Draft, error) {
 func (s *Store) ListPendingSync(accountID string) ([]*Draft, error) {
 	query := `
 		SELECT id, account_id, to_list, cc_list, bcc_list, subject,
-			body_html, body_text, in_reply_to_id, reply_type, references_list,
+			body_html, body_text, in_reply_to_id, source_message_id, reply_type, references_list,
 			identity_id,
 			attachments_data,
 			sync_status, imap_uid, folder_id,
@@ -305,14 +307,14 @@ func (s *Store) scanDrafts(rows *sql.Rows) ([]*Draft, error) {
 
 	for rows.Next() {
 		d := &Draft{}
-		var inReplyToID, replyType, referencesList, identityID, folderID, syncError sql.NullString
+		var inReplyToID, sourceMessageID, replyType, referencesList, identityID, folderID, syncError sql.NullString
 		var imapUID sql.NullInt64
 		var lastSyncAttempt sql.NullTime
 		var attachmentsData []byte
 
 		err := rows.Scan(
 			&d.ID, &d.AccountID, &d.ToList, &d.CcList, &d.BccList, &d.Subject,
-			&d.BodyHTML, &d.BodyText, &inReplyToID, &replyType, &referencesList,
+			&d.BodyHTML, &d.BodyText, &inReplyToID, &sourceMessageID, &replyType, &referencesList,
 			&identityID,
 			&attachmentsData,
 			&d.SyncStatus, &imapUID, &folderID,
@@ -323,6 +325,7 @@ func (s *Store) scanDrafts(rows *sql.Rows) ([]*Draft, error) {
 		}
 
 		d.InReplyToID = inReplyToID.String
+		d.SourceMessageID = sourceMessageID.String
 		d.ReplyType = replyType.String
 		d.ReferencesList = referencesList.String
 		d.IdentityID = identityID.String

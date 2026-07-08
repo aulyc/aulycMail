@@ -1363,4 +1363,24 @@ var migrations = []Migration{
 			WHERE signature_separator = 1 AND signature_separator_style = '';
 		`,
 	},
+	{
+		Version: 44,
+		SQL: `
+			-- Local compose state for source messages. This intentionally lives
+			-- outside messages so IMAP flag refreshes cannot erase app-local
+			-- "has draft" / "sent reply or forward" indicators.
+			ALTER TABLE drafts ADD COLUMN source_message_id TEXT REFERENCES messages(id) ON DELETE SET NULL;
+
+			CREATE TABLE IF NOT EXISTS message_compose_status (
+				source_message_id TEXT PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+				action_type TEXT NOT NULL CHECK (action_type IN ('reply', 'reply-all', 'forward')),
+				status TEXT NOT NULL CHECK (status IN ('draft', 'sent')),
+				draft_id TEXT REFERENCES drafts(id) ON DELETE SET NULL,
+				updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+			);
+
+			CREATE INDEX IF NOT EXISTS idx_message_compose_status_status ON message_compose_status(status);
+			CREATE INDEX IF NOT EXISTS idx_message_compose_status_draft ON message_compose_status(draft_id);
+		`,
+	},
 }

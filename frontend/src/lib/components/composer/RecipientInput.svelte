@@ -6,7 +6,7 @@
 </script>
 
 <script lang="ts">
-  import { getContext } from 'svelte'
+  import { getContext, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   // @ts-ignore - Wails generated imports
   import { smtp, contact } from '../../../../wailsjs/go/models'
@@ -27,6 +27,11 @@
   // Get API from context or create default
   const contextApi = getContext<ComposerApi | undefined>(COMPOSER_API_KEY)
   const api: ComposerApi = contextApi || createMainWindowApi()
+  const SUGGESTION_LIMIT = 100
+  const SUGGESTION_ROW_HEIGHT = 52
+  const SUGGESTION_VISIBLE_ROWS = 4
+  const SUGGESTION_MENU_BORDER_WIDTH = 2
+  const SUGGESTION_MENU_HEIGHT = SUGGESTION_ROW_HEIGHT * SUGGESTION_VISIBLE_ROWS + SUGGESTION_MENU_BORDER_WIDTH
 
   // Use the prop function or fall back to API (evaluated each call to handle prop changes)
   function doSearchContacts(query: string, limit: number) {
@@ -38,50 +43,157 @@
   let suggestions = $state<contact.Contact[]>([])
   let showSuggestions = $state(false)
   let selectedIndex = $state(-1)
-  let inputElement: HTMLInputElement
-  let containerElement: HTMLDivElement
+  let suggestionKeyboardMode = $state(false)
+  let suggestionWindowStart = $state(0)
+  let suggestionsLeft = $state(0)
+  let inputIndex = $state(recipients.length)
+  let inputElement = $state<HTMLInputElement | null>(null)
+  let containerElement = $state<HTMLDivElement | null>(null)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let lastPointerX = -1
+  let lastPointerY = -1
+  let previousRecipientCount = recipients.length
+  let inputComposing = $state(false)
+  const visibleSuggestions = $derived(suggestions.slice(suggestionWindowStart, suggestionWindowStart + SUGGESTION_VISIBLE_ROWS))
+
+  $effect(() => {
+    const count = recipients.length
+    if (inputIndex > recipients.length) {
+      inputIndex = recipients.length
+    } else if (inputIndex === previousRecipientCount && count > previousRecipientCount) {
+      inputIndex = count
+    }
+    previousRecipientCount = count
+  })
+
+  $effect(() => {
+    const maxStart = Math.max(0, suggestions.length - SUGGESTION_VISIBLE_ROWS)
+    if (suggestionWindowStart > maxStart) {
+      suggestionWindowStart = maxStart
+    }
+  })
+
+  function updateSuggestionsPosition() {
+    if (!inputElement || !containerElement) return
+    suggestionsLeft = inputElement.offsetLeft
+  }
 
   // Search contacts as user types
   async function searchContacts(query: string) {
-    if (query.length < 2) {
+    if (query.length < 1) {
       suggestions = []
       showSuggestions = false
       return
     }
 
     try {
-      const results = await doSearchContacts(query, 10)
+      const results = await doSearchContacts(query, SUGGESTION_LIMIT)
       suggestions = results || []
       showSuggestions = suggestions.length > 0
       selectedIndex = -1
+      suggestionKeyboardMode = false
+      suggestionWindowStart = 0
+      updateSuggestionsPosition()
     } catch (err) {
       console.error('Failed to search contacts:', err)
       suggestions = []
+      suggestionWindowStart = 0
     }
   }
 
   function handleInput() {
+    if (inputComposing) return
+    updateSuggestionsPosition()
     // Debounce the search
     if (debounceTimer) {
       clearTimeout(debounceTimer)
     }
     debounceTimer = setTimeout(() => {
-      searchContacts(inputValue)
+      searchContacts(inputValue.trim())
     }, 200)
   }
 
+  function focusInputAt(index: number) {
+    inputIndex = Math.min(Math.max(index, 0), recipients.length)
+    void tick().then(() => {
+      inputElement?.focus()
+      inputElement?.setSelectionRange(inputValue.length, inputValue.length)
+      updateSuggestionsPosition()
+    })
+  }
+
+  function setSelectedIndex(index: number, inputMode: 'keyboard' | 'mouse' | 'program' = 'program') {
+    if (suggestions.length === 0) {
+      selectedIndex = -1
+      suggestionWindowStart = 0
+      return
+    }
+    if (inputMode === 'keyboard') suggestionKeyboardMode = true
+    if (inputMode === 'mouse') suggestionKeyboardMode = false
+    const nextIndex = Math.min(Math.max(index, 0), suggestions.length - 1)
+    let nextWindowStart = suggestionWindowStart
+    if (nextIndex < suggestionWindowStart) {
+      nextWindowStart = nextIndex
+    } else if (nextIndex >= suggestionWindowStart + SUGGESTION_VISIBLE_ROWS) {
+      nextWindowStart = nextIndex - SUGGESTION_VISIBLE_ROWS + 1
+    }
+    suggestionWindowStart = nextWindowStart
+    selectedIndex = nextIndex
+  }
+
+  function handleSuggestionPointerMove(e: PointerEvent, index: number) {
+    if (e.clientX === lastPointerX && e.clientY === lastPointerY) return
+    lastPointerX = e.clientX
+    lastPointerY = e.clientY
+    setSelectedIndex(index, 'mouse')
+  }
+
   function handleKeyDown(e: KeyboardEvent) {
+    if (e.isComposing || inputComposing) return
+
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      if (showSuggestions && selectedIndex < suggestions.length - 1) {
-        selectedIndex++
+      if (showSuggestions && suggestions.length > 0) {
+        setSelectedIndex(selectedIndex + 1, 'keyboard')
       }
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
-      if (showSuggestions && selectedIndex > 0) {
-        selectedIndex--
+      if (showSuggestions && suggestions.length > 0) {
+        setSelectedIndex(selectedIndex <= 0 ? 0 : selectedIndex - 1, 'keyboard')
       }
+    } else if (
+      e.key === 'ArrowLeft' &&
+      inputValue === '' &&
+      (inputElement?.selectionStart ?? 0) === 0 &&
+      inputIndex > 0
+    ) {
+      e.preventDefault()
+      focusInputAt(inputIndex - 1)
+    } else if (
+      e.key === 'ArrowRight' &&
+      inputValue === '' &&
+      (inputElement?.selectionStart ?? 0) === 0 &&
+      inputIndex < recipients.length
+    ) {
+      e.preventDefault()
+      focusInputAt(inputIndex + 1)
+    } else if (e.key === 'Home' && inputValue === '' && inputIndex > 0) {
+      e.preventDefault()
+      focusInputAt(0)
+    } else if (e.key === 'End' && inputValue === '' && inputIndex < recipients.length) {
+      e.preventDefault()
+      focusInputAt(recipients.length)
+    } else if (e.key === 'Backspace' && inputValue === '' && inputIndex > 0) {
+      // Remove the recipient immediately before the caret.
+      e.preventDefault()
+      removeRecipient(inputIndex - 1, inputIndex - 1)
+    } else if (e.key === 'Delete' && inputValue === '' && inputIndex < recipients.length) {
+      // Remove the recipient immediately after the caret.
+      e.preventDefault()
+      removeRecipient(inputIndex, inputIndex)
+    } else if (e.key === 'Delete' && inputValue === '' && inputIndex === recipients.length && recipients.length > 0) {
+      e.preventDefault()
+      removeRecipient(recipients.length - 1, recipients.length - 1)
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (showSuggestions && selectedIndex >= 0) {
@@ -92,9 +204,6 @@
     } else if (e.key === 'Escape') {
       showSuggestions = false
       selectedIndex = -1
-    } else if (e.key === 'Backspace' && inputValue === '' && recipients.length > 0) {
-      // Remove last recipient
-      removeRecipient(recipients.length - 1)
     } else if (e.key === ',' || e.key === ';' || e.key === 'Tab') {
       if (inputValue.trim()) {
         e.preventDefault()
@@ -108,12 +217,26 @@
       name: contact.display_name || '',
       address: contact.email,
     })
-    recipients = [...recipients, address]
+    insertRecipient(address)
     inputValue = ''
     suggestions = []
     showSuggestions = false
     selectedIndex = -1
-    inputElement?.focus()
+    suggestionKeyboardMode = false
+    suggestionWindowStart = 0
+    focusInputAt(inputIndex)
+  }
+
+  function insertRecipient(address: smtp.Address) {
+    const email = (address.address || (address as any).email || '').trim().toLowerCase()
+    if (email && recipients.some(r => (r.address || (r as any).email || '').toLowerCase() === email)) {
+      return
+    }
+    const next = [...recipients]
+    const insertAt = Math.min(Math.max(inputIndex, 0), next.length)
+    next.splice(insertAt, 0, address)
+    recipients = next
+    inputIndex = insertAt + 1
   }
 
   function addRecipient(value: string) {
@@ -135,16 +258,19 @@
         name: name,
         address: email,
       })
-      recipients = [...recipients, address]
+      insertRecipient(address)
       inputValue = ''
       suggestions = []
       showSuggestions = false
+      suggestionWindowStart = 0
+      focusInputAt(inputIndex)
     }
   }
 
-  function removeRecipient(index: number) {
+  function removeRecipient(index: number, nextInputIndex = Math.min(index, recipients.length - 1)) {
     recipients = recipients.filter((_, i) => i !== index)
-    inputElement?.focus()
+    inputIndex = Math.min(Math.max(nextInputIndex, 0), recipients.length)
+    focusInputAt(inputIndex)
   }
 
   // ─── Drag-and-drop: reorder within field, move between To/Cc/Bcc fields ───
@@ -253,23 +379,27 @@
     // a no-op for that path).
     setTimeout(() => {
       showSuggestions = false
+      suggestionWindowStart = 0
       // Auto-commit typed text on blur so the user doesn't have to press
       // Tab/Enter to turn a typed address into a chip. Invalid input is left
       // in the field for the user to fix (addRecipient is a no-op on regex
       // miss).
       if (inputValue.trim()) {
         addRecipient(inputValue.trim())
+      } else if (inputValue) {
+        inputValue = ''
       }
     }, 200)
   }
 
   // Allow parent to focus the input programmatically
   export function focus() {
-    inputElement?.focus()
+    focusInputAt(recipients.length)
   }
 
   function handleFocus() {
-    if (inputValue.length >= 2 && suggestions.length > 0) {
+    updateSuggestionsPosition()
+    if (inputValue.trim().length >= 1 && suggestions.length > 0) {
       showSuggestions = true
     }
   }
@@ -285,66 +415,130 @@
       }
     }
   }
+
+  function handleSlotMouseDown(e: MouseEvent, index: number) {
+    e.preventDefault()
+    focusInputAt(index)
+  }
+
+  function handleCompositionStart() {
+    inputComposing = true
+    showSuggestions = false
+    selectedIndex = -1
+    suggestionWindowStart = 0
+  }
+
+  function handleCompositionEnd() {
+    inputComposing = false
+    void tick().then(() => {
+      handleInput()
+    })
+  }
 </script>
 
 <div bind:this={containerElement} class="relative">
-  <div class="flex flex-wrap items-center gap-1">
-    <!-- Recipient chips -->
-    {#each recipients as recipient, index (recipient.address + ':' + index)}
-      <div
-        role="listitem"
-        draggable="true"
-        ondragstart={(e) => handleChipDragStart(e, index)}
-        ondragend={handleChipDragEnd}
-        ondragenter={(e) => handleDragEnter(e, index)}
-        ondragover={(e) => handleDragOver(e, index)}
-        ondragleave={handleDragLeave}
-        ondrop={(e) => handleDrop(e, index)}
-        class="flex items-center gap-1 px-2 py-0.5 bg-muted rounded-md text-sm transition-opacity cursor-grab {draggingIndex === index ? 'opacity-50' : ''} {dropTargetIndex === index ? 'border-l-2 border-primary -ml-0.5 pl-[7px]' : ''}"
-      >
-        <span>
-          {#if recipient.name}
-            {recipient.name}
-          {:else}
-            {recipient.address || (recipient as any).email || ''}
-          {/if}
-        </span>
+  <div class="flex min-h-6 w-full flex-wrap items-center gap-x-0.5 gap-y-1 py-1" role="list">
+    {#each Array(recipients.length + 1) as _, slotIndex (slotIndex)}
+      {#if dropTargetIndex === slotIndex}
+        <span aria-hidden="true" class="h-6 w-0.5 shrink-0 rounded-full bg-primary"></span>
+      {/if}
+
+      {#if slotIndex === inputIndex}
+        <!-- Input — also a drop target for inserting at the caret position -->
+        <input
+          bind:this={inputElement}
+          bind:value={inputValue}
+          oninput={handleInput}
+          onkeydown={handleKeyDown}
+          onblur={handleBlur}
+          onfocus={handleFocus}
+          onpaste={handlePaste}
+          oncompositionstart={handleCompositionStart}
+          oncompositionend={handleCompositionEnd}
+          ondragenter={(e) => handleDragEnter(e, inputIndex)}
+          ondragover={(e) => handleDragOver(e, inputIndex)}
+          ondragleave={handleDragLeave}
+          ondrop={(e) => handleDrop(e, inputIndex)}
+          type="text"
+          inputmode="email"
+          autocomplete="email"
+          spellcheck="false"
+          placeholder={recipients.length === 0 || inputValue ? placeholder : ''}
+          class="{inputIndex === recipients.length || inputValue ? 'flex-1 min-w-[150px]' : 'w-[6px] min-w-[6px] shrink-0'} h-6 bg-transparent p-0 text-sm leading-6 focus:outline-none"
+        />
+      {:else if slotIndex !== 0}
         <button
-          onclick={() => removeRecipient(index)}
-          class="text-muted-foreground hover:text-foreground"
           type="button"
+          aria-label="Set recipient cursor"
+          tabindex="-1"
+          onmousedown={(e) => handleSlotMouseDown(e, slotIndex)}
+          ondragenter={(e) => handleDragEnter(e, slotIndex)}
+          ondragover={(e) => handleDragOver(e, slotIndex)}
+          ondragleave={handleDragLeave}
+          ondrop={(e) => handleDrop(e, slotIndex)}
+          class="h-6 w-[6px] shrink-0 cursor-text bg-transparent p-0"
+        ></button>
+      {/if}
+
+      {#if slotIndex < recipients.length}
+        {@const recipient = recipients[slotIndex]}
+        <div
+          role="listitem"
+          draggable="true"
+          ondragstart={(e) => handleChipDragStart(e, slotIndex)}
+          ondragend={handleChipDragEnd}
+          ondragenter={(e) => handleDragEnter(e, slotIndex)}
+          ondragover={(e) => handleDragOver(e, slotIndex)}
+          ondragleave={handleDragLeave}
+          ondrop={(e) => handleDrop(e, slotIndex)}
+          class="flex h-6 items-center gap-1 px-2 py-0.5 bg-muted rounded-md text-sm transition-opacity cursor-grab {draggingIndex === slotIndex ? 'opacity-50' : ''}"
         >
-          <Icon icon="mdi:close" class="w-3.5 h-3.5" />
-        </button>
-      </div>
+          <span>
+            {#if recipient.name}
+              {recipient.name}
+            {:else}
+              {recipient.address || (recipient as any).email || ''}
+            {/if}
+          </span>
+          <button
+            onclick={() => removeRecipient(slotIndex)}
+            class="text-muted-foreground hover:text-foreground"
+            type="button"
+          >
+            <Icon icon="mdi:close" class="w-3.5 h-3.5" />
+          </button>
+        </div>
+      {/if}
     {/each}
 
-    <!-- Input — also a drop target for "insert at end" -->
-    <input
-      bind:this={inputElement}
-      bind:value={inputValue}
-      oninput={handleInput}
-      onkeydown={handleKeyDown}
-      onblur={handleBlur}
-      onfocus={handleFocus}
-      onpaste={handlePaste}
-      ondragenter={(e) => handleDragEnter(e, recipients.length)}
-      ondragover={(e) => handleDragOver(e, recipients.length)}
-      ondragleave={handleDragLeave}
-      ondrop={(e) => handleDrop(e, recipients.length)}
-      type="email"
-      {placeholder}
-      class="flex-1 min-w-[150px] bg-transparent text-sm focus:outline-none {dropTargetIndex === recipients.length ? 'border-l-2 border-primary' : ''}"
-    />
+    {#if inputIndex !== recipients.length}
+      <button
+        type="button"
+        aria-label="Set recipient cursor at end"
+        tabindex="-1"
+        onmousedown={(e) => handleSlotMouseDown(e, recipients.length)}
+        ondragenter={(e) => handleDragEnter(e, recipients.length)}
+        ondragover={(e) => handleDragOver(e, recipients.length)}
+        ondragleave={handleDragLeave}
+        ondrop={(e) => handleDrop(e, recipients.length)}
+        class="h-6 min-w-[150px] flex-1 cursor-text bg-transparent p-0"
+      ></button>
+    {/if}
   </div>
 
   <!-- Suggestions dropdown -->
   {#if showSuggestions}
-    <div class="absolute left-0 right-0 top-full mt-1 bg-popover border border-border rounded-md shadow-lg z-50 max-h-60 overflow-auto">
-      {#each suggestions as suggestion, index (suggestion.email + ':' + index)}
+    <div
+      class="absolute top-full mt-1 w-72 overflow-hidden rounded-md border border-border bg-popover shadow-lg z-50"
+      style="left: {suggestionsLeft}px; max-height: {SUGGESTION_MENU_HEIGHT}px;"
+    >
+      {#each visibleSuggestions as suggestion, visibleIndex (visibleIndex)}
+        {@const index = suggestionWindowStart + visibleIndex}
         <button
           onmousedown={() => selectSuggestion(suggestion)}
-          class="w-full px-3 py-2 text-left hover:bg-muted transition-colors flex items-center gap-3 {index === selectedIndex ? 'bg-muted' : ''}"
+          onpointermove={(e) => handleSuggestionPointerMove(e, index)}
+          data-suggestion-index={index}
+          class="flex h-[52px] w-full items-center gap-3 px-3 py-2 text-left transition-colors {suggestionKeyboardMode ? '' : 'hover:bg-muted'} {index === selectedIndex ? 'bg-muted' : ''}"
           type="button"
         >
           <!-- Avatar placeholder -->
@@ -361,11 +555,6 @@
               </div>
             {/if}
           </div>
-          {#if suggestion.send_count > 0}
-            <div class="text-xs text-muted-foreground">
-              {suggestion.send_count}x
-            </div>
-          {/if}
         </button>
       {/each}
     </div>

@@ -225,6 +225,10 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 	if _, err := db.Exec(`ALTER TABLE identities DROP COLUMN signature_separator_style`); err != nil {
 		t.Fatalf("drop identities.signature_separator_style for re-migrate: %v", err)
 	}
+	// Same for v44's local source-message link on drafts.
+	if _, err := db.Exec(`ALTER TABLE drafts DROP COLUMN source_message_id`); err != nil {
+		t.Fatalf("drop drafts.source_message_id for re-migrate: %v", err)
+	}
 
 	// Re-run migrations — migration 32 should rewrite the seeded local- id.
 	if err := db.Migrate(); err != nil {
@@ -386,6 +390,10 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 	// Same for v43's signature separator style on identities.
 	if _, err := db.Exec(`ALTER TABLE identities DROP COLUMN signature_separator_style`); err != nil {
 		t.Fatalf("drop identities.signature_separator_style for re-migrate: %v", err)
+	}
+	// Same for v44's local source-message link on drafts.
+	if _, err := db.Exec(`ALTER TABLE drafts DROP COLUMN source_message_id`); err != nil {
+		t.Fatalf("drop drafts.source_message_id for re-migrate: %v", err)
 	}
 
 	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,

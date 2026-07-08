@@ -76,6 +76,11 @@ type ComposeMessage struct {
 	InReplyTo  string   `json:"in_reply_to,omitempty"` // Message-ID of the message being replied to
 	References []string `json:"references,omitempty"`  // Thread references
 
+	// Local compose context. These are app-only identifiers and are not emitted
+	// into RFC822 headers.
+	SourceMessageID string `json:"source_message_id,omitempty"`
+	ReplyType       string `json:"reply_type,omitempty"`
+
 	// Options
 	RequestReadReceipt bool `json:"request_read_receipt"`
 }

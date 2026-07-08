@@ -115,12 +115,33 @@ type Conversation struct {
 	MessageIDs     []string   `json:"messageIds"`         // Message IDs for context menu actions
 	IsEncrypted    bool       `json:"isEncrypted"`        // Any message has a legacy encrypted-message schema flag
 	Messages       []*Message `json:"messages,omitempty"` // Only populated when fetching full conversation
+	ComposeStatus  string     `json:"composeStatus,omitempty"`
+	ComposeAction  string     `json:"composeAction,omitempty"`
 
 	// For unified inbox view - populated when querying across accounts
 	AccountID    string `json:"accountId,omitempty"`
 	AccountName  string `json:"accountName,omitempty"`
 	AccountColor string `json:"accountColor,omitempty"`
 	FolderID     string `json:"folderId,omitempty"` // The inbox folder ID for this conversation
+}
+
+const (
+	ComposeStatusDraft = "draft"
+	ComposeStatusSent  = "sent"
+
+	ComposeActionReply    = "reply"
+	ComposeActionReplyAll = "reply-all"
+	ComposeActionForward  = "forward"
+)
+
+// NormalizeComposeAction returns a supported compose action or an empty string.
+func NormalizeComposeAction(action string) string {
+	switch action {
+	case ComposeActionReply, ComposeActionReplyAll, ComposeActionForward:
+		return action
+	default:
+		return ""
+	}
 }
 
 // Attachment represents an email attachment

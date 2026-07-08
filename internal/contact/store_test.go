@@ -229,6 +229,47 @@ func TestSearch(t *testing.T) {
 	}
 }
 
+func TestSearchSingleCharacterIncludesContainsMatches(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db.DB)
+
+	contacts := []struct {
+		email, name string
+	}{
+		{"gobysec@baimaohui.net", "Goby"},
+		{"yangjiazhi@baimaohui.net", "yangjiazhi"},
+		{"tom@example.com", "Tom"},
+		{"notify@mail.trae.ai", "Notify"},
+	}
+	for _, c := range contacts {
+		if err := store.AddOrUpdate(c.email, c.name); err != nil {
+			t.Fatalf("AddOrUpdate failed: %v", err)
+		}
+	}
+
+	results, err := store.Search("t", 10)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	emails := make(map[string]bool)
+	for _, r := range results {
+		emails[r.Email] = true
+	}
+	if !emails["tom@example.com"] {
+		t.Error("expected tom@example.com in results")
+	}
+	if !emails["notify@mail.trae.ai"] {
+		t.Error("expected notify@mail.trae.ai in results")
+	}
+	if !emails["gobysec@baimaohui.net"] {
+		t.Error("expected gobysec@baimaohui.net to match because of .net")
+	}
+	if !emails["yangjiazhi@baimaohui.net"] {
+		t.Error("expected yangjiazhi@baimaohui.net to match because of .net")
+	}
+}
+
 func TestSearchEmpty(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db.DB)

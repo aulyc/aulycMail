@@ -731,6 +731,7 @@ export namespace draft {
 	    bodyHtml: string;
 	    bodyText: string;
 	    inReplyToId?: string;
+	    sourceMessageId?: string;
 	    replyType?: string;
 	    referencesList?: string;
 	    identityId?: string;
@@ -757,6 +758,7 @@ export namespace draft {
 	        this.bodyHtml = source["bodyHtml"];
 	        this.bodyText = source["bodyText"];
 	        this.inReplyToId = source["inReplyToId"];
+	        this.sourceMessageId = source["sourceMessageId"];
 	        this.replyType = source["replyType"];
 	        this.referencesList = source["referencesList"];
 	        this.identityId = source["identityId"];
@@ -1008,6 +1010,8 @@ export namespace message {
 	    messageIds: string[];
 	    isEncrypted: boolean;
 	    messages?: Message[];
+	    composeStatus?: string;
+	    composeAction?: string;
 	    accountId?: string;
 	    accountName?: string;
 	    accountColor?: string;
@@ -1031,6 +1035,8 @@ export namespace message {
 	        this.messageIds = source["messageIds"];
 	        this.isEncrypted = source["isEncrypted"];
 	        this.messages = this.convertValues(source["messages"], Message);
+	        this.composeStatus = source["composeStatus"];
+	        this.composeAction = source["composeAction"];
 	        this.accountId = source["accountId"];
 	        this.accountName = source["accountName"];
 	        this.accountColor = source["accountColor"];
@@ -1068,6 +1074,8 @@ export namespace message {
 	    messageIds: string[];
 	    isEncrypted: boolean;
 	    messages?: Message[];
+	    composeStatus?: string;
+	    composeAction?: string;
 	    accountId?: string;
 	    accountName?: string;
 	    accountColor?: string;
@@ -1096,6 +1104,8 @@ export namespace message {
 	        this.messageIds = source["messageIds"];
 	        this.isEncrypted = source["isEncrypted"];
 	        this.messages = this.convertValues(source["messages"], Message);
+	        this.composeStatus = source["composeStatus"];
+	        this.composeAction = source["composeAction"];
 	        this.accountId = source["accountId"];
 	        this.accountName = source["accountName"];
 	        this.accountColor = source["accountColor"];
@@ -1221,6 +1231,8 @@ export namespace smtp {
 	    attachments: Attachment[];
 	    in_reply_to?: string;
 	    references?: string[];
+	    source_message_id?: string;
+	    reply_type?: string;
 	    request_read_receipt: boolean;
 
 	    static createFrom(source: any = {}) {
@@ -1240,6 +1252,8 @@ export namespace smtp {
 	        this.attachments = this.convertValues(source["attachments"], Attachment);
 	        this.in_reply_to = source["in_reply_to"];
 	        this.references = source["references"];
+	        this.source_message_id = source["source_message_id"];
+	        this.reply_type = source["reply_type"];
 	        this.request_read_receipt = source["request_read_receipt"];
 	    }
 

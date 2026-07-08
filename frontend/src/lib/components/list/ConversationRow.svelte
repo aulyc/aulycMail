@@ -163,6 +163,8 @@
   const ownMessageIds = $derived(
     conversation.messageIds || conversation.messages?.map((m) => m.id) || []
   )
+  const composeStatus = $derived((conversation as any).composeStatus || '')
+  const composeAction = $derived((conversation as any).composeAction || '')
 
   // Determine star/read state from this conversation
   const ownIsStarred = $derived(conversation.isStarred ?? false)
@@ -199,6 +201,19 @@
     const payload = JSON.stringify({ messageIds, sourceAccountId: accountId })
     e.dataTransfer.setData('application/x-aulycmail-messages', payload)
     e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function getComposeStatusIcon(status: string, action: string): string {
+    if (status === 'draft') return 'mdi:file-document-edit-outline'
+    if (action === 'reply-all') return 'mdi:reply-all'
+    if (action === 'reply') return 'mdi:reply'
+    if (action === 'forward') return 'mdi:share'
+    return ''
+  }
+
+  function getComposeStatusTitle(status: string, action: string): string {
+    const suffix = action === 'reply-all' ? 'ReplyAll' : action === 'forward' ? 'Forward' : 'Reply'
+    return $_(`messageList.composeStatus${status === 'draft' ? 'Draft' : 'Sent'}${suffix}`)
   }
 </script>
 
@@ -288,6 +303,14 @@
           {#if isNonLocal}
             <span title={$_('search.notSyncedLocally')}>
               <Icon icon="mdi:cloud-outline" class="{densityClasses.icon[density]} text-muted-foreground" />
+            </span>
+          {/if}
+          {#if composeStatus && getComposeStatusIcon(composeStatus, composeAction)}
+            <span title={getComposeStatusTitle(composeStatus, composeAction)}>
+              <Icon
+                icon={getComposeStatusIcon(composeStatus, composeAction)}
+                class="{densityClasses.icon[density]} {composeStatus === 'draft' ? 'text-muted-foreground' : 'text-primary'}"
+              />
             </span>
           {/if}
           {#if conversation.hasAttachments}
