@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -156,6 +157,25 @@ func TestMigrationV42_TrustedCertificatesScopedByHost(t *testing.T) {
 		VALUES ('cert-3', 'fp-shared', 'imap.example.com', 'Subject', 'Issuer')
 	`); err == nil {
 		t.Fatal("expected duplicate host+fingerprint to be rejected")
+	}
+}
+
+func TestMigrationV46_FTSUpdateTriggerIgnoresFlagOnlyUpdates(t *testing.T) {
+	db := openTestDB(t)
+
+	var sql string
+	if err := db.QueryRow(`
+		SELECT sql
+		FROM sqlite_master
+		WHERE type = 'trigger' AND name = 'messages_fts_update'
+	`).Scan(&sql); err != nil {
+		t.Fatalf("read messages_fts_update trigger: %v", err)
+	}
+	if !strings.Contains(sql, "AFTER UPDATE OF subject, from_name, from_email, to_list, cc_list, snippet, body_text ON messages") {
+		t.Fatalf("messages_fts_update should be column-scoped, got:\n%s", sql)
+	}
+	if strings.Contains(sql, "is_read") || strings.Contains(sql, "is_starred") || strings.Contains(sql, "is_deleted") {
+		t.Fatalf("messages_fts_update should not reference flag columns, got:\n%s", sql)
 	}
 }
 

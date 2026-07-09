@@ -6,7 +6,6 @@
   import { message } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
   import { Star, Unstar } from '../../../../wailsjs/go/app/App'
-  import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { toasts } from '$lib/stores/toast'
   import { getAccentBarUnread } from '$lib/stores/settings.svelte'
 
@@ -17,10 +16,8 @@
     checked: boolean
     accountId: string
     folderId: string
-    folderType: string
     selectedMessageIds: string[]  // All message IDs from checked conversations (for multi-select)
-    selectedIsStarred: boolean    // Aggregated star state for multi-select
-    selectedIsRead: boolean       // Aggregated read state for multi-select
+    rowIndex?: number
     showAccountIndicator?: boolean  // Show account color dot in unified inbox view
     accountColor?: string           // Account color for the indicator
     accountName?: string            // Account name for tooltip
@@ -31,9 +28,8 @@
     searchFolderType?: string       // Folder type for icon in search results
     isNonLocal?: boolean            // Show cloud icon for non-local server search results
     onSelect: (e?: MouseEvent) => void
-    onClearSelection: () => void  // Clear multi-select when right-clicking unchecked row
+    onContextMenu?: (e: MouseEvent) => void
     onActionComplete?: (autoSelectNext?: boolean) => void
-    onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
     onOpenDraft?: () => void  // Double-click in the Drafts folder → open the draft in the composer
   }
 
@@ -43,11 +39,9 @@
     selected,
     checked,
     accountId,
-    folderId,
-    folderType,
+    folderId: _folderId,
     selectedMessageIds,
-    selectedIsStarred,
-    selectedIsRead,
+    rowIndex,
     showAccountIndicator = false,
     accountColor = '',
     accountName = '',
@@ -58,9 +52,8 @@
     searchFolderType: _searchFolderType = '',
     isNonLocal = false,
     onSelect,
-    onClearSelection,
+    onContextMenu,
     onActionComplete,
-    onReply,
     onOpenDraft,
   }: Props = $props()
 
@@ -166,30 +159,6 @@
   const composeStatus = $derived((conversation as any).composeStatus || '')
   const composeAction = $derived((conversation as any).composeAction || '')
 
-  // Determine star/read state from this conversation
-  const ownIsStarred = $derived(conversation.isStarred ?? false)
-  const ownIsRead = $derived((conversation.unreadCount || 0) === 0)
-
-  // Context menu state - determines whether to use multi-select or single row
-  let useMultiSelect = $state(false)
-
-  // Handle right-click to determine context menu behavior
-  function handleContextMenu() {
-    if (checked) {
-      // This row is part of multi-select - use all selected message IDs
-      useMultiSelect = true
-    } else {
-      // This row is NOT checked - clear selection and act on this row only
-      onClearSelection()
-      useMultiSelect = false
-    }
-  }
-
-  // Computed values for context menu based on selection state
-  const contextMenuMessageIds = $derived(useMultiSelect ? selectedMessageIds : ownMessageIds)
-  const contextMenuIsStarred = $derived(useMultiSelect ? selectedIsStarred : ownIsStarred)
-  const contextMenuIsRead = $derived(useMultiSelect ? selectedIsRead : ownIsRead)
-
   // Drag start handler: stash messageIds + sourceAccountId in dataTransfer so
   // the folder drop target can move them via MoveToFolder(). If this row is
   // part of the multi-select, drag the whole checked set; otherwise drag just
@@ -217,45 +186,36 @@
   }
 </script>
 
-<MessageContextMenu
-  messageIds={contextMenuMessageIds}
-  {accountId}
-  currentFolderId={folderId}
-  {folderType}
-  isStarred={contextMenuIsStarred}
-  isRead={contextMenuIsRead}
-  {onActionComplete}
-  onReply={useMultiSelect ? undefined : onReply}
-  onOpenChange={(open: boolean) => { if (open) handleContextMenu() }}
+<div
+  data-conversation-row
+  data-row-index={rowIndex}
+  draggable="true"
+  class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
+    ? 'bg-primary/20'
+    : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
+  onclick={(e) => onSelect(e)}
+  ondblclick={() => onOpenDraft?.()}
+  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() }}}
+  ondragstart={handleDragStart}
+  oncontextmenu={onContextMenu}
+  role="button"
+  tabindex="0"
 >
-  <div
-    data-conversation-row
-    draggable="true"
-    class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
-      ? 'bg-primary/20'
-      : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
-    onclick={(e) => onSelect(e)}
-    ondblclick={() => onOpenDraft?.()}
-    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() }}}
-    ondragstart={handleDragStart}
-    role="button"
-    tabindex="0"
-  >
-    <!-- Content -->
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-2 mb-0.5">
-        <!-- Star (before the name; vertically centered with name + date).
+  <!-- Content -->
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-2 mb-0.5">
+      <!-- Star (before the name; vertically centered with name + date).
              -my-1 cancels the button's vertical padding so it doesn't inflate
              the row height — keeps the click target, lifts the line up a touch. -->
-        <button
-          class="flex-shrink-0 p-1 -ml-1 -my-1 rounded hover:bg-muted transition-colors duration-200"
-          onclick={handleStarClick}
-        >
-          <Icon
-            icon={conversation.isStarred ? 'mdi:star' : 'mdi:star-outline'}
-            class="{densityClasses.starIcon[density]} {conversation.isStarred ? 'text-yellow-500' : 'text-muted-foreground'}"
-          />
-        </button>
+      <button
+        class="flex-shrink-0 p-1 -ml-1 -my-1 rounded hover:bg-muted transition-colors duration-200"
+        onclick={handleStarClick}
+      >
+        <Icon
+          icon={conversation.isStarred ? 'mdi:star' : 'mdi:star-outline'}
+          class="{densityClasses.starIcon[density]} {conversation.isStarred ? 'text-yellow-500' : 'text-muted-foreground'}"
+        />
+      </button>
 
         <!-- Account Indicator (for unified inbox) -->
         {#if showAccountIndicator && accountColor}
@@ -361,4 +321,3 @@
       {/if}
     </div>
   </div>
-</MessageContextMenu>

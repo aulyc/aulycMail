@@ -11,6 +11,8 @@ import (
 	"github.com/rs/zerolog"
 )
 
+const healthCheckTimeout = 10 * time.Second
+
 // IsConnectionError checks if an error indicates a dead/broken connection.
 // These errors warrant discarding the connection and getting a new one from the pool.
 func IsConnectionError(err error) bool {
@@ -88,7 +90,19 @@ func (pc *PooledConnection) isHealthyLocked() bool {
 
 	// Send NOOP to verify the connection is actually alive.
 	// This catches closed sockets (e.g., Proton Bridge dropping idle connections).
-	if err := pc.client.client.Noop().Wait(); err != nil {
+	raw := pc.client.client
+	done := make(chan error, 1)
+	go func() {
+		done <- raw.Noop().Wait()
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			return false
+		}
+	case <-time.After(healthCheckTimeout):
+		_ = pc.client.ForceClose()
 		return false
 	}
 	return true
@@ -98,6 +112,7 @@ func (pc *PooledConnection) isHealthyLocked() bool {
 type Pool struct {
 	config      PoolConfig
 	connections map[string][]*PooledConnection // accountID -> connections
+	creating    map[string]int                 // accountID -> in-flight connection attempts
 	waiters     map[string][]chan *PooledConnection
 	mu          sync.Mutex
 	log         zerolog.Logger
@@ -111,6 +126,7 @@ func NewPool(config PoolConfig, getCredentials func(accountID string) (*ClientCo
 	return &Pool{
 		config:         config,
 		connections:    make(map[string][]*PooledConnection),
+		creating:       make(map[string]int),
 		waiters:        make(map[string][]chan *PooledConnection),
 		log:            logging.WithComponent("imap-pool"),
 		getCredentials: getCredentials,
@@ -142,13 +158,18 @@ func (p *Pool) GetConnection(ctx context.Context, accountID string) (*PooledConn
 			continue
 		}
 
-		// Count current connections for this account
-		currentCount := len(p.connections[accountID])
+		// Count current and in-flight connections for this account. In-flight
+		// attempts reserve a slot so concurrent callers cannot stampede past
+		// MaxConnections before their new connections are appended to the pool.
+		currentCount := len(p.connections[accountID]) + p.creating[accountID]
 
 		// Can we create a new one?
 		if currentCount < p.config.MaxConnections {
+			p.creating[accountID]++
 			p.mu.Unlock()
-			return p.createConnection(ctx, accountID)
+			conn, err := p.createConnection(ctx, accountID)
+			p.releaseCreateSlot(accountID)
+			return conn, err
 		}
 
 		// At limit - must wait
@@ -200,6 +221,17 @@ func (p *Pool) GetConnection(ctx context.Context, accountID string) (*PooledConn
 			return nil, fmt.Errorf("timed out waiting for connection from pool")
 		}
 	}
+}
+
+func (p *Pool) releaseCreateSlot(accountID string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.creating[accountID] <= 1 {
+		delete(p.creating, accountID)
+		return
+	}
+	p.creating[accountID]--
 }
 
 // reserveAvailableConnectionLocked marks one idle connection as in-use and
@@ -429,6 +461,7 @@ func (p *Pool) CloseAccount(accountID string) {
 	}
 
 	delete(p.connections, accountID)
+	delete(p.creating, accountID)
 
 	// Notify any waiters that we're closing
 	if waiters, ok := p.waiters[accountID]; ok {

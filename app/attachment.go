@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -92,30 +93,27 @@ func (a *App) DownloadAttachment(attachmentID, savePath string) (string, error) 
 
 	log.Debug().Uint32("uid", msg.UID).Str("folderID", msg.FolderID).Msg("Got message info")
 
-	// Fetch raw message from IMAP
-	raw, err := a.syncEngine.FetchRawMessage(a.ctx, msg.AccountID, msg.FolderID, msg.UID)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to fetch raw message from IMAP")
-		return "", fmt.Errorf("failed to fetch message: %w", err)
-	}
-
-	log.Debug().Int("rawSize", len(raw)).Msg("Fetched raw message from IMAP")
-
-	// Extract attachment content
 	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
-	content, err := downloader.ExtractAttachmentContent(raw, att.Filename)
-	if err != nil {
-		log.Error().Err(err).Str("filename", att.Filename).Msg("Failed to extract attachment content")
-		return "", fmt.Errorf("failed to extract attachment: %w", err)
-	}
+	var localPath string
+	var contentSize int
 
-	log.Debug().Int("contentSize", len(content)).Msg("Extracted attachment content")
+	err = a.withStreamedRawMessage(msg, func(raw io.Reader) error {
+		content, err := downloader.ExtractAttachmentContentFromReader(raw, att.Filename)
+		if err != nil {
+			return fmt.Errorf("failed to extract attachment: %w", err)
+		}
+		contentSize = len(content)
+		log.Debug().Int("contentSize", contentSize).Msg("Extracted attachment content")
 
-	// Save to disk
-	localPath, err := downloader.SaveAttachment(att, content, savePath)
+		localPath, err = downloader.SaveAttachment(att, content, savePath)
+		if err != nil {
+			return fmt.Errorf("failed to save attachment: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		log.Error().Err(err).Str("savePath", savePath).Msg("Failed to save attachment to disk")
-		return "", fmt.Errorf("failed to save attachment: %w", err)
+		log.Error().Err(err).Str("filename", att.Filename).Msg("Failed to download attachment")
+		return "", err
 	}
 
 	// Update attachment record with local path (only for default location)
@@ -125,7 +123,7 @@ func (a *App) DownloadAttachment(attachmentID, savePath string) (string, error) 
 		}
 	}
 
-	log.Info().Str("attachment", att.Filename).Str("path", localPath).Int("size", len(content)).Msg("Attachment downloaded")
+	log.Info().Str("attachment", att.Filename).Str("path", localPath).Int("size", contentSize).Msg("Attachment downloaded")
 	return localPath, nil
 }
 
@@ -357,34 +355,33 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 		return "", fmt.Errorf("message not found: %s", messageID)
 	}
 
-	// Fetch raw message from IMAP
-	raw, err := a.syncEngine.FetchRawMessage(a.ctx, msg.AccountID, msg.FolderID, msg.UID)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch message: %w", err)
-	}
-
-	// Save each attachment
 	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
 	savedCount := 0
 
-	for _, att := range attachments {
-		content, err := downloader.ExtractAttachmentContent(raw, att.Filename)
-		if err != nil {
-			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to extract attachment")
-			continue
-		}
+	err = a.withStreamedRawMessagePath(msg, func(rawPath string) error {
+		for _, att := range attachments {
+			content, err := extractAttachmentFromRawFile(downloader, rawPath, att.Filename)
+			if err != nil {
+				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to extract attachment")
+				continue
+			}
 
-		savePath, err := email.UniqueAttachmentPath(saveDir, att.Filename)
-		if err != nil {
-			log.Warn().Err(err).Str("filename", att.Filename).Msg("Skipping attachment with unsafe filename")
-			continue
+			savePath, err := email.UniqueAttachmentPath(saveDir, att.Filename)
+			if err != nil {
+				log.Warn().Err(err).Str("filename", att.Filename).Msg("Skipping attachment with unsafe filename")
+				continue
+			}
+			_, err = downloader.SaveAttachment(att, content, savePath)
+			if err != nil {
+				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
+				continue
+			}
+			savedCount++
 		}
-		_, err = downloader.SaveAttachment(att, content, savePath)
-		if err != nil {
-			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
-			continue
-		}
-		savedCount++
+		return nil
+	})
+	if err != nil {
+		return "", err
 	}
 
 	log.Info().Int("count", savedCount).Str("folder", saveDir).Msg("Saved all attachments")
@@ -417,34 +414,72 @@ func (a *App) saveAllAttachmentsViaPortal(messageID string, attachments []*messa
 		return "", fmt.Errorf("message not found: %s", messageID)
 	}
 
-	// Fetch raw message from IMAP
-	raw, err := a.syncEngine.FetchRawMessage(a.ctx, msg.AccountID, msg.FolderID, msg.UID)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch message: %w", err)
-	}
-
 	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
 	savedCount := 0
 
-	for i, att := range attachments {
-		if i >= len(savePaths) {
-			break
-		}
+	err = a.withStreamedRawMessagePath(msg, func(rawPath string) error {
+		for i, att := range attachments {
+			if i >= len(savePaths) {
+				break
+			}
 
-		content, err := downloader.ExtractAttachmentContent(raw, att.Filename)
-		if err != nil {
-			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to extract attachment")
-			continue
-		}
+			content, err := extractAttachmentFromRawFile(downloader, rawPath, att.Filename)
+			if err != nil {
+				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to extract attachment")
+				continue
+			}
 
-		_, err = downloader.SaveAttachment(att, content, savePaths[i])
-		if err != nil {
-			log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
-			continue
+			_, err = downloader.SaveAttachment(att, content, savePaths[i])
+			if err != nil {
+				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
+				continue
+			}
+			savedCount++
 		}
-		savedCount++
+		return nil
+	})
+	if err != nil {
+		return "", err
 	}
 
 	log.Info().Int("count", savedCount).Msg("Saved all attachments via portal")
 	return filepath.Dir(savePaths[0]), nil
+}
+
+func (a *App) withStreamedRawMessage(msg *message.Message, use func(io.Reader) error) error {
+	return a.withStreamedRawMessagePath(msg, func(rawPath string) error {
+		file, err := os.Open(rawPath)
+		if err != nil {
+			return fmt.Errorf("failed to open streamed message: %w", err)
+		}
+		defer file.Close()
+		return use(file)
+	})
+}
+
+func (a *App) withStreamedRawMessagePath(msg *message.Message, use func(string) error) error {
+	tmp, err := os.CreateTemp("", "aulycmail-raw-*.eml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp message file: %w", err)
+	}
+	rawPath := tmp.Name()
+	defer os.Remove(rawPath)
+	defer tmp.Close()
+
+	if _, err := a.syncEngine.StreamRawMessage(a.ctx, msg.AccountID, msg.FolderID, msg.UID, tmp); err != nil {
+		return fmt.Errorf("failed to fetch message: %w", err)
+	}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to rewind temp message file: %w", err)
+	}
+	return use(rawPath)
+}
+
+func extractAttachmentFromRawFile(downloader *email.AttachmentDownloader, rawPath, filename string) ([]byte, error) {
+	file, err := os.Open(rawPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open streamed message: %w", err)
+	}
+	defer file.Close()
+	return downloader.ExtractAttachmentContentFromReader(file, filename)
 }

@@ -32,37 +32,39 @@
   }
 </script>
 
-<div>
-  <Label>{$_('contacts.edit.emails')}</Label>
-  <div class="space-y-2">
-    {#each emails as e, i (i)}
-      <div class="flex gap-2 items-start">
-        <div class="flex-1">
-          <Input
-            type="email"
-            bind:value={e.email}
-            placeholder={$_('contacts.edit.emailPlaceholder')}
+<div class="flex items-start gap-4">
+  <Label class="w-20 shrink-0 pt-3">{$_('contacts.edit.emails')}</Label>
+  <div class="min-w-0 flex-1">
+    <div class="space-y-2">
+      {#each emails as e, i (i)}
+        <div class="flex gap-2 items-start">
+          <div class="min-w-0 flex-1">
+            <Input
+              type="email"
+              bind:value={e.email}
+              placeholder={$_('contacts.edit.emailPlaceholder')}
+              disabled={disabled}
+              aria-invalid={errors[`email-${i}`] ? 'true' : undefined}
+            />
+            {#if errors[`email-${i}`]}
+              <p class="text-xs text-destructive mt-1">{errors[`email-${i}`]}</p>
+            {/if}
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onclick={() => remove(i)}
             disabled={disabled}
-            aria-invalid={errors[`email-${i}`] ? 'true' : undefined}
-          />
-          {#if errors[`email-${i}`]}
-            <p class="text-xs text-destructive mt-1">{errors[`email-${i}`]}</p>
-          {/if}
+            aria-label={$_('contacts.edit.removeEmail')}
+          >
+            <Icon icon="mdi:close" class="w-4 h-4" />
+          </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onclick={() => remove(i)}
-          disabled={disabled}
-          aria-label={$_('contacts.edit.removeEmail')}
-        >
-          <Icon icon="mdi:close" class="w-4 h-4" />
-        </Button>
-      </div>
-    {/each}
+      {/each}
+    </div>
+    <Button variant="outline" size="sm" onclick={add} disabled={disabled || atMax} class="mt-2" title={atMax ? maxReason : undefined}>
+      <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
+      {$_('contacts.edit.addEmail')}
+    </Button>
   </div>
-  <Button variant="outline" size="sm" onclick={add} disabled={disabled || atMax} class="mt-2" title={atMax ? maxReason : undefined}>
-    <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-    {$_('contacts.edit.addEmail')}
-  </Button>
 </div>

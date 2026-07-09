@@ -1426,4 +1426,21 @@ var migrations = []Migration{
 				body_download_days = 180;
 		`,
 	},
+	{
+		Version: 46,
+		SQL: `
+			-- Narrow FTS maintenance to columns that are actually indexed.
+			-- Flag-only updates are hot during sync and must not re-tokenize
+			-- subject/body text or rewrite FTS index pages.
+			DROP TRIGGER IF EXISTS messages_fts_update;
+			CREATE TRIGGER messages_fts_update
+			AFTER UPDATE OF subject, from_name, from_email, to_list, cc_list, snippet, body_text ON messages
+			BEGIN
+				INSERT INTO messages_fts(messages_fts, rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text)
+				VALUES ('delete', OLD.rowid, OLD.subject, OLD.from_name, OLD.from_email, OLD.to_list, OLD.cc_list, OLD.snippet, OLD.body_text);
+				INSERT INTO messages_fts(rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text)
+				VALUES (NEW.rowid, NEW.subject, NEW.from_name, NEW.from_email, NEW.to_list, NEW.cc_list, NEW.snippet, NEW.body_text);
+			END;
+		`,
+	},
 }

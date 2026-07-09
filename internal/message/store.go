@@ -688,9 +688,16 @@ func (s *Store) UpdateFlags(id string, isRead, isStarred, isAnswered, isForwarde
 			is_read = ?, is_starred = ?, is_answered = ?, is_forwarded = ?,
 			is_draft = ?, is_deleted = ?
 		WHERE id = ?
+		  AND (
+			is_read != ? OR is_starred != ? OR is_answered != ? OR is_forwarded != ? OR
+			is_draft != ? OR is_deleted != ?
+		  )
 	`
 
-	_, err := s.db.Exec(query, isRead, isStarred, isAnswered, isForwarded, isDraft, isDeleted, id)
+	_, err := s.db.Exec(query,
+		isRead, isStarred, isAnswered, isForwarded, isDraft, isDeleted, id,
+		isRead, isStarred, isAnswered, isForwarded, isDraft, isDeleted,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to update flags: %w", err)
 	}
@@ -705,9 +712,16 @@ func (s *Store) UpdateFlagsByUID(folderID string, uid uint32, isRead, isStarred,
 			is_read = ?, is_starred = ?, is_answered = ?, is_forwarded = ?,
 			is_draft = ?, is_deleted = ?
 		WHERE folder_id = ? AND uid = ?
+		  AND (
+			is_read != ? OR is_starred != ? OR is_answered != ? OR is_forwarded != ? OR
+			is_draft != ? OR is_deleted != ?
+		  )
 	`
 
-	_, err := s.db.Exec(query, isRead, isStarred, isAnswered, isForwarded, isDraft, isDeleted, folderID, uid)
+	_, err := s.db.Exec(query,
+		isRead, isStarred, isAnswered, isForwarded, isDraft, isDeleted, folderID, uid,
+		isRead, isStarred, isAnswered, isForwarded, isDraft, isDeleted,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to update flags by UID: %w", err)
 	}
@@ -744,6 +758,10 @@ func (s *Store) UpdateFlagsByUIDBatch(folderID string, updates []FlagUpdate) err
 			is_read = ?, is_starred = ?, is_answered = ?, is_forwarded = ?,
 			is_draft = ?, is_deleted = ?
 		WHERE folder_id = ? AND uid = ?
+		  AND (
+			is_read != ? OR is_starred != ? OR is_answered != ? OR is_forwarded != ? OR
+			is_draft != ? OR is_deleted != ?
+		  )
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -751,7 +769,10 @@ func (s *Store) UpdateFlagsByUIDBatch(folderID string, updates []FlagUpdate) err
 	defer stmt.Close()
 
 	for _, u := range updates {
-		_, err := stmt.Exec(u.IsRead, u.IsStarred, u.IsAnswered, u.IsForwarded, u.IsDraft, u.IsDeleted, folderID, u.UID)
+		_, err := stmt.Exec(
+			u.IsRead, u.IsStarred, u.IsAnswered, u.IsForwarded, u.IsDraft, u.IsDeleted, folderID, u.UID,
+			u.IsRead, u.IsStarred, u.IsAnswered, u.IsForwarded, u.IsDraft, u.IsDeleted,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to update flags for UID %d: %w", u.UID, err)
 		}

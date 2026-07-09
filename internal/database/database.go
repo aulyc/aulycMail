@@ -57,7 +57,7 @@ func Open(path string) (*DB, error) {
 	// lazily in a pool. Using _pragma in the DSN ensures every new connection gets
 	// the same configuration (busy_timeout, WAL, etc.), preventing SQLITE_BUSY
 	// errors when a pooled connection lacks busy_timeout.
-	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(30000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=cache_size(-64000)", path)
+	dsn := fmt.Sprintf("file:%s?_pragma=busy_timeout(30000)&_pragma=journal_mode(WAL)&_pragma=synchronous(NORMAL)&_pragma=foreign_keys(ON)&_pragma=cache_size(-16000)", path)
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)

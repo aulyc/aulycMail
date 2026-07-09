@@ -63,6 +63,7 @@ func IsRawMessageNotFoundError(err error) bool {
 type RawMessageStreamHandler func(uid uint32, body io.Reader) (int64, error)
 
 const rawMessageFetchIdleTimeout = 2 * time.Minute
+const maxBackgroundRawBodyBytes = 25 * 1024 * 1024
 
 type rawMessageProgressReader struct {
 	reader io.Reader
@@ -210,6 +211,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 		var fetchedUID imap.UID
 		var rawBytes []byte
 		var gotBodySection bool
+		var bodyTooLarge bool
 		var reportedSize int64 // RFC822.SIZE; 0 if server didn't return it
 
 		for {
@@ -232,13 +234,24 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 				// constrain message size, and partial reads corrupt raw .eml data.
 				if data.Literal != nil {
 					var err error
-					rawBytes, err = io.ReadAll(data.Literal)
+					rawBytes, err = io.ReadAll(io.LimitReader(data.Literal, maxBackgroundRawBodyBytes+1))
 					if err != nil {
 						e.log.Warn().
 							Err(err).
 							Uint32("uid", uint32(fetchedUID)).
 							Msg("Failed to read body literal, continuing with partial data")
 						// Keep whatever we got (may be partial)
+					}
+					if len(rawBytes) > maxBackgroundRawBodyBytes {
+						if _, drainErr := io.Copy(io.Discard, data.Literal); drainErr != nil {
+							e.log.Warn().Err(drainErr).Uint32("uid", uint32(fetchedUID)).Msg("Failed to drain oversized body literal")
+						}
+						bodyTooLarge = true
+						rawBytes = nil
+						e.log.Warn().
+							Uint32("uid", uint32(fetchedUID)).
+							Int64("maxBytes", maxBackgroundRawBodyBytes).
+							Msg("Skipping oversized message body during background sync")
 					}
 				} else {
 					e.log.Warn().
@@ -268,6 +281,9 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 		}
 
 		if len(rawBytes) == 0 {
+			if bodyTooLarge {
+				continue
+			}
 			e.log.Warn().Uint32("uid", uid).Str("messageID", messageID).Msg("Empty message body — deleting ghost message")
 			if delErr := e.messageStore.Delete(messageID); delErr != nil {
 				e.log.Warn().Err(delErr).Str("messageID", messageID).Msg("Failed to delete ghost message")
@@ -649,11 +665,16 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 		// Build batch using hybrid byte + count limits
 		var batchIDs []string
 		var batchBytes int64
+		var oversizedIDs []string
 
 		for _, msg := range candidates {
 			msgSize := int64(msg.Size)
 			if msgSize <= 0 {
 				msgSize = 10 * 1024 // Assume 10KB for messages with unknown size
+			}
+			if msgSize > maxBackgroundRawBodyBytes {
+				oversizedIDs = append(oversizedIDs, msg.ID)
+				continue
 			}
 
 			// Check if adding this message would exceed limits
@@ -667,8 +688,22 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 			batchIDs = append(batchIDs, msg.ID)
 			batchBytes += msgSize
 		}
+		if len(oversizedIDs) > 0 {
+			e.log.Warn().
+				Int("count", len(oversizedIDs)).
+				Int64("maxBytes", maxBackgroundRawBodyBytes).
+				Msg("Skipping oversized message bodies during background sync")
+			if err := e.messageStore.MarkBodyFailed(oversizedIDs); err != nil {
+				e.log.Warn().Err(err).Int("count", len(oversizedIDs)).Msg("Failed to mark oversized bodies as skipped")
+			} else {
+				failed += len(oversizedIDs)
+			}
+		}
 
 		if len(batchIDs) == 0 {
+			if len(oversizedIDs) > 0 {
+				continue
+			}
 			e.log.Warn().Msg("No messages selected for batch")
 			break
 		}

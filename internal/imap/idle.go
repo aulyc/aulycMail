@@ -187,8 +187,18 @@ func (ic *IdleConnection) run(ctx context.Context) {
 				ic.log.Error().
 					Err(err).
 					Int("attempts", attempts).
-					Msg("Max reconnection attempts reached, giving up")
-				return
+					Dur("backoff", ic.config.MaxReconnectBackoff).
+					Msg("Max reconnection attempts reached, backing off before retry")
+				select {
+				case <-time.After(ic.config.MaxReconnectBackoff):
+					attempts = 0
+					backoff = ic.config.ReconnectBackoff
+					continue
+				case <-ctx.Done():
+					return
+				case <-ic.stopCh:
+					return
+				}
 			}
 
 			ic.log.Warn().

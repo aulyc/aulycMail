@@ -27,22 +27,10 @@
   const { onSelect }: Props = $props()
 
   let refreshing = $state(false)
-  let expandedAccounts = $state<Record<string, boolean>>({})
   let accountGroups = $derived(contactAccountGroups.groups)
-
-  const roleItems = $derived.by(() => [
-    { role: 'sender', label: $_('contacts.sidebar.roleSender'), icon: 'mdi:email-arrow-left-outline', countKey: 'senderCount' },
-    { role: 'recipient', label: $_('contacts.sidebar.roleRecipient'), icon: 'mdi:email-arrow-right-outline', countKey: 'recipientCount' },
-    { role: 'cc', label: $_('contacts.sidebar.roleCc'), icon: 'mdi:email-multiple-outline', countKey: 'ccCount' },
-    { role: 'bcc', label: $_('contacts.sidebar.roleBcc'), icon: 'mdi:email-off-outline', countKey: 'bccCount' },
-  ] as const)
 
   function accountSourceID(accountID: string): string {
     return `account:${accountID}`
-  }
-
-  function accountRoleSourceID(accountID: string, role: string): string {
-    return `account:${accountID}:${role}`
   }
 
   onMount(() => {
@@ -77,11 +65,7 @@
   type SidebarItem = {
     id: string
     label: string
-    icon?: string
-    depth: 0 | 1
     count?: number
-    expandable?: boolean
-    expanded?: boolean
     accountID?: string
     accountIndex?: number
   }
@@ -91,34 +75,16 @@
     const builtins: SidebarItem[] = [{
       id: '',
       label: $_('contacts.sidebar.all'),
-      depth: 0,
     }]
 
     for (const [accountIndex, account] of accountGroups.entries()) {
-      const expanded = expandedAccounts[account.accountId] === true
       builtins.push({
         id: accountSourceID(account.accountId),
         label: account.email || account.name || $_('contacts.common.unnamed'),
-        depth: 0,
         count: account.count,
-        expandable: true,
-        expanded,
         accountID: account.accountId,
         accountIndex,
       })
-      if (expanded) {
-        for (const roleItem of roleItems) {
-          builtins.push({
-            id: accountRoleSourceID(account.accountId, roleItem.role),
-            label: roleItem.label,
-            icon: roleItem.icon,
-            depth: 1,
-            count: account[roleItem.countKey],
-            accountID: account.accountId,
-            accountIndex,
-          })
-        }
-      }
     }
 
     return [{ items: builtins }]
@@ -127,16 +93,6 @@
   function pick(id: string) {
     selectSource(id)
     onSelect()
-  }
-
-  function toggleItem(it: SidebarItem, e: MouseEvent) {
-    e.stopPropagation()
-    if (it.accountID) {
-      expandedAccounts = {
-        ...expandedAccounts,
-        [it.accountID]: !(expandedAccounts[it.accountID] === true),
-      }
-    }
   }
 
   function sidebarAccountColor(it: SidebarItem): string {
@@ -173,32 +129,19 @@
       class="flex items-center gap-2 mx-2 py-1.5 pr-2 text-sm rounded-md text-left transition-colors cursor-pointer select-none {active
         ? 'bg-primary/10 text-primary font-medium'
         : 'text-foreground hover:bg-muted/50'}"
-      style="padding-left: {it.depth === 0 ? 0.75 : 1.5}rem"
+      style="padding-left: 0.75rem"
       onclick={() => pick(it.id)}
     >
-      {#if it.depth === 0 && it.accountID}
+      {#if it.accountID}
         <span
           class="w-2 h-2 rounded-full flex-shrink-0"
           style="background-color: {sidebarAccountColor(it)}"
           aria-hidden="true"
         ></span>
-      {:else if it.icon}
-        <Icon icon={it.icon} class="w-4 h-4 flex-shrink-0" />
       {/if}
       <span class="truncate min-w-0 flex-1">{it.label}</span>
       {#if it.count !== undefined}
         <span class="text-xs text-muted-foreground flex-shrink-0">{it.count}</span>
-      {/if}
-      {#if it.expandable}
-        <button
-          type="button"
-          class="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground flex-shrink-0"
-          aria-label={it.expanded ? $_('contacts.sidebar.collapse') : $_('contacts.sidebar.expand')}
-          title={it.expanded ? $_('contacts.sidebar.collapse') : $_('contacts.sidebar.expand')}
-          onclick={(e) => toggleItem(it, e)}
-        >
-          <Icon icon={it.expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'} class="w-4 h-4" />
-        </button>
       {/if}
     </div>
   {/snippet}

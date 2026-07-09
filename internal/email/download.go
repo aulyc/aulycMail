@@ -30,9 +30,13 @@ func NewAttachmentDownloader(attachmentsDir string) *AttachmentDownloader {
 
 // ExtractAttachmentContent extracts the content of a specific attachment from raw email bytes
 func (d *AttachmentDownloader) ExtractAttachmentContent(raw []byte, targetFilename string) ([]byte, error) {
-	reader := bytes.NewReader(raw)
+	return d.ExtractAttachmentContentFromReader(bytes.NewReader(raw), targetFilename)
+}
 
-	entity, err := gomessage.Read(reader)
+// ExtractAttachmentContentFromReader extracts one attachment without requiring
+// callers to keep the whole raw message in memory.
+func (d *AttachmentDownloader) ExtractAttachmentContentFromReader(raw io.Reader, targetFilename string) ([]byte, error) {
+	entity, err := gomessage.Read(raw)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse message: %w", err)
 	}

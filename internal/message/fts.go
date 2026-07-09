@@ -122,11 +122,14 @@ func (f *FTSIndexer) IndexFolder(ctx context.Context, folderID string) error {
 			return nil
 		}
 
-		// Message count changed, need to re-index
 		logging.Info().Str("folderID", folderID).
 			Int("previousCount", status.TotalCount).
 			Int("currentCount", currentCount).
-			Msg("Message count changed, re-indexing folder")
+			Msg("Message count changed, supplementing FTS index")
+		if err := f.supplementCompleteFolderIndex(ctx, folderID, status.TotalCount, currentCount); err != nil {
+			return err
+		}
+		return nil
 	}
 
 	// Get total message count for this folder
@@ -192,16 +195,6 @@ func (f *FTSIndexer) IndexFolder(ctx context.Context, folderID string) error {
 				return fmt.Errorf("failed to scan message: %w", err)
 			}
 
-			// Check if already in FTS index (use INSERT OR REPLACE pattern)
-			// First delete if exists, then insert
-			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO messages_fts(messages_fts, rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text)
-				SELECT 'delete', ?, ?, ?, ?, ?, ?, ?, ?
-				WHERE EXISTS (SELECT 1 FROM messages_fts WHERE rowid = ?)
-			`, rowid, subject.String, fromName.String, fromEmail.String, toList.String, ccList.String, snippet.String, bodyText.String, rowid); err != nil {
-				logging.Debug().Err(err).Int64("rowid", rowid).Msg("FTS pre-delete failed (row may not exist)")
-			}
-
 			_, err = tx.ExecContext(ctx, `
 				INSERT OR IGNORE INTO messages_fts(rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text)
 				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -251,6 +244,127 @@ func (f *FTSIndexer) IndexFolder(ctx context.Context, folderID string) error {
 	}
 
 	logging.Info().Str("folderID", folderID).Int("indexed", indexed).Msg("FTS indexing completed for folder")
+	return nil
+}
+
+func (f *FTSIndexer) supplementCompleteFolderIndex(ctx context.Context, folderID string, previousCount, currentCount int) error {
+	if currentCount <= previousCount {
+		if err := f.updateIndexStatus(ctx, folderID, currentCount, currentCount, true); err != nil {
+			return fmt.Errorf("failed to refresh index status: %w", err)
+		}
+		return nil
+	}
+
+	// INSERT/DELETE triggers normally keep FTS current after the first backfill.
+	// When a complete folder grows, only touch the newly appended rowid tail
+	// instead of scanning and rewriting the whole mailbox on startup.
+	const batchSize = 200
+	toProcess := currentCount - previousCount
+	processed := 0
+
+	if err := f.updateIndexStatus(ctx, folderID, previousCount, currentCount, false); err != nil {
+		logging.Warn().Err(err).Str("folderID", folderID).Msg("Failed to initialize FTS supplement status")
+	}
+
+	for processed < toProcess {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		limit := batchSize
+		if remaining := toProcess - processed; remaining < limit {
+			limit = remaining
+		}
+
+		rows, err := f.db.QueryContext(ctx, `
+			SELECT rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text
+			FROM (
+				SELECT m.rowid AS rowid, m.subject, m.from_name, m.from_email, m.to_list, m.cc_list, m.snippet, m.body_text
+				FROM messages m
+				WHERE m.folder_id = ?
+				ORDER BY m.rowid DESC
+				LIMIT ? OFFSET ?
+			)
+			ORDER BY rowid
+		`, folderID, limit, processed)
+		if err != nil {
+			return fmt.Errorf("failed to get messages for FTS supplement: %w", err)
+		}
+
+		tx, err := f.db.BeginTx(ctx, nil)
+		if err != nil {
+			rows.Close()
+			return fmt.Errorf("failed to begin FTS supplement transaction: %w", err)
+		}
+
+		batchCount := 0
+		for rows.Next() {
+			var rowid int64
+			var subject, fromName, fromEmail, toList, ccList, snippet, bodyText sql.NullString
+
+			if err := rows.Scan(&rowid, &subject, &fromName, &fromEmail, &toList, &ccList, &snippet, &bodyText); err != nil {
+				rows.Close()
+				_ = tx.Rollback()
+				return fmt.Errorf("failed to scan message for FTS supplement: %w", err)
+			}
+
+			if _, err := tx.ExecContext(ctx, `
+				INSERT OR IGNORE INTO messages_fts(rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			`, rowid, subject.String, fromName.String, fromEmail.String, toList.String, ccList.String, snippet.String, bodyText.String); err != nil {
+				rows.Close()
+				_ = tx.Rollback()
+				return fmt.Errorf("failed to supplement FTS index: %w", err)
+			}
+
+			batchCount++
+		}
+		rows.Close()
+
+		if err := tx.Commit(); err != nil {
+			return fmt.Errorf("failed to commit FTS supplement batch: %w", err)
+		}
+
+		if batchCount == 0 {
+			break
+		}
+
+		processed += batchCount
+		indexed := previousCount + processed
+		if indexed > currentCount {
+			indexed = currentCount
+		}
+
+		if err := f.updateIndexStatus(ctx, folderID, indexed, currentCount, false); err != nil {
+			logging.Warn().Err(err).Str("folderID", folderID).Msg("Failed to update FTS supplement status")
+		}
+
+		if f.onProgress != nil {
+			f.onProgress(folderID, indexed, currentCount)
+		}
+
+		logging.Debug().
+			Str("folderID", folderID).
+			Int("indexed", indexed).
+			Int("total", currentCount).
+			Msg("FTS supplement progress")
+
+		if processed < toProcess {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
+	if err := f.updateIndexStatus(ctx, folderID, currentCount, currentCount, true); err != nil {
+		return fmt.Errorf("failed to mark FTS supplement complete: %w", err)
+	}
+
+	if f.onComplete != nil {
+		f.onComplete(folderID)
+	}
+
+	logging.Info().Str("folderID", folderID).Int("indexed", processed).Msg("FTS supplement completed for folder")
 	return nil
 }
 

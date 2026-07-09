@@ -17,7 +17,7 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { _ } from '$lib/i18n'
-  import { isDialogGuardActive } from '$lib/stores/dialogGuard'
+  import { isDialogGuardActive, onDialogGuardChange } from '$lib/stores/dialogGuard'
   import { getDarkMailContent } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
 
@@ -110,7 +110,6 @@
   // Debounce timer for refreshConversation (coalesces rapid sync events)
   let refreshTimer: ReturnType<typeof setTimeout> | null = null
   let pendingRefresh: { tid: string; fid: string } | null = null
-  let dialogGuardInterval: ReturnType<typeof setInterval> | null = null
 
   // Event listener cleanup functions
   let cleanupFunctions: (() => void)[] = []
@@ -303,14 +302,15 @@
       window.removeEventListener('keydown', handleKeyDown)
     })
 
-    // Flush deferred refreshes once dialogs close
-    dialogGuardInterval = setInterval(() => {
-      if (pendingRefresh && !isDialogGuardActive()) {
-        const { tid, fid } = pendingRefresh
-        pendingRefresh = null
-        scheduleRefresh(tid, fid)
-      }
-    }, 500)
+    cleanupFunctions.push(
+      onDialogGuardChange((active) => {
+        if (pendingRefresh && !active) {
+          const { tid, fid } = pendingRefresh
+          pendingRefresh = null
+          scheduleRefresh(tid, fid)
+        }
+      })
+    )
   })
 
   onDestroy(() => {
@@ -323,7 +323,6 @@
       clearTimeout(refreshTimer)
       refreshTimer = null
     }
-    if (dialogGuardInterval) clearInterval(dialogGuardInterval)
     // Clean up all event listeners
     cleanupFunctions.forEach(cleanup => cleanup())
   })

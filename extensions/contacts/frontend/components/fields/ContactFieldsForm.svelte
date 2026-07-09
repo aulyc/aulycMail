@@ -45,34 +45,38 @@
   }: Props = $props()
 </script>
 
-<div class="space-y-5">
+<div class="space-y-4">
   <!-- Display name -->
-  <div>
-    <Label for="cf-name">{$_('contacts.edit.name')}</Label>
-    <Input
-      id="cf-name"
-      type="text"
-      bind:value={nameInput}
-      disabled={saving}
-      aria-invalid={errors.name ? 'true' : undefined}
-    />
-    {#if errors.name}
-      <p class="text-xs text-destructive mt-1">{errors.name}</p>
-    {/if}
+  <div class="flex items-start gap-4">
+    <Label for="cf-name" class="w-20 shrink-0 pt-3">{$_('contacts.edit.name')}</Label>
+    <div class="min-w-0 flex-1">
+      <Input
+        id="cf-name"
+        type="text"
+        bind:value={nameInput}
+        disabled={saving}
+        aria-invalid={errors.name ? 'true' : undefined}
+      />
+      {#if errors.name}
+        <p class="text-xs text-destructive mt-1">{errors.name}</p>
+      {/if}
+    </div>
   </div>
 
   <!-- Emails -->
   <EmailsField bind:emails errors={errors} disabled={saving} />
 
   <!-- Note -->
-  <div>
-    <Label for="cf-note">{$_('contacts.edit.note')}</Label>
-    <textarea
-      id="cf-note"
-      bind:value={noteInput}
-      disabled={saving}
-      rows={3}
-      class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
-    ></textarea>
+  <div class="flex items-start gap-4">
+    <Label for="cf-note" class="w-20 shrink-0 pt-3">{$_('contacts.edit.note')}</Label>
+    <div class="min-w-0 flex-1">
+      <textarea
+        id="cf-note"
+        bind:value={noteInput}
+        disabled={saving}
+        rows={3}
+        class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-y"
+      ></textarea>
+    </div>
   </div>
 </div>

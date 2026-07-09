@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy, getContext, setContext, tick, untrack } from 'svelte'
+  import { onMount, onDestroy, getContext, setContext, untrack } from 'svelte'
   import Icon from '@iconify/svelte'
   import type { Editor } from '@tiptap/core'
   import { createComposerEditor } from './composerEditor'
@@ -2238,7 +2238,7 @@
           class="composer-plain-overlay pointer-events-none absolute inset-0 overflow-hidden p-3 font-mono text-sm text-foreground whitespace-pre-wrap break-words"
         >
           <div style="transform: translate({-plainTextScrollLeft}px, {-plainTextScrollTop}px);">
-            {#each plainTextMentionSegments as segment}
+            {#each plainTextMentionSegments as segment, index (index)}
               {#if segment.type === 'mention'}
                 <span class="contact-mention">{segment.text}</span>
               {:else}

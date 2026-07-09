@@ -10,6 +10,7 @@
   import { toasts } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
+  import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   // @ts-ignore - wailsjs path
   import { message } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
@@ -17,7 +18,7 @@
   import { getMessageListDensity, getMessageListSortOrder, setMessageListSortOrder } from '$lib/stores/settings.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { getLayoutMode, hideViewer } from '$lib/stores/layout.svelte'
-  import { isDialogGuardActive } from '$lib/stores/dialogGuard'
+  import { isDialogGuardActive, onDialogGuardChange } from '$lib/stores/dialogGuard'
 
   interface Props {
     accountId?: string | null
@@ -36,6 +37,31 @@
     isFlashing?: boolean
     showFolderToggle?: boolean
     onToggleSidebar?: () => void
+  }
+
+  type MessageListDensity = 'micro' | 'compact' | 'standard' | 'large'
+  type VirtualRow<T> = { item: T; index: number }
+  type VirtualWindow<T> = {
+    rows: VirtualRow<T>[]
+    topHeight: number
+    bottomHeight: number
+  }
+  type RowContextMenuState = {
+    messageIds: string[]
+    accountId: string
+    folderId: string
+    folderType: string
+    isStarred: boolean
+    isRead: boolean
+    allowReply: boolean
+  }
+
+  const VIRTUAL_OVERSCAN = 8
+  const ROW_HEIGHT_BY_DENSITY: Record<MessageListDensity, number> = {
+    micro: 66,
+    compact: 80,
+    standard: 94,
+    large: 120,
   }
 
   let {
@@ -252,16 +278,15 @@
     // Check initial FTS index status for current folder
     checkFTSIndexStatus()
 
-    // Flush deferred reloads once dialogs close
-    dialogGuardInterval = setInterval(() => {
-      if (pendingReload && !isDialogGuardActive()) {
-        pendingReload = false
-        scheduleReload()
-      }
-    }, 500)
+    eventUnsubscribers.push(
+      onDialogGuardChange((active) => {
+        if (pendingReload && !active) {
+          pendingReload = false
+          scheduleReload()
+        }
+      })
+    )
   })
-
-  let dialogGuardInterval: ReturnType<typeof setInterval> | null = null
 
   onDestroy(() => {
     eventUnsubscribers.forEach(unsubscribe => unsubscribe())
@@ -269,9 +294,7 @@
     if (reloadTimer) clearTimeout(reloadTimer)
     if (syncReloadTimer) clearTimeout(syncReloadTimer)
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
-    if (dialogGuardInterval) clearInterval(dialogGuardInterval)
   })
-
   // Check FTS index status for current folder
   async function checkFTSIndexStatus() {
     if (!folderId) return
@@ -320,6 +343,8 @@
     prevFolderId = currentFolder
     loadGeneration++ // Invalidate any in-flight loads from the previous folder (#200)
     offset = 0
+    listContainerRef?.scrollTo({ top: 0 })
+    listScrollTop = 0
     checkedThreadIds = new Set()
     lastClickedIndex = null
     // Clear search state when folder changes
@@ -959,9 +984,80 @@
 
   // Reference to the list container for scrolling
   let listContainerRef = $state<HTMLDivElement | null>(null)
+  let listViewportHeight = $state(0)
+  let listScrollTop = $state(0)
+
+  const rowHeight = $derived(
+    ROW_HEIGHT_BY_DENSITY[getMessageListDensity() as MessageListDensity] ?? ROW_HEIGHT_BY_DENSITY.standard
+  )
 
   // Reference to the "Load more" button for keyboard navigation
   let loadMoreButtonRef = $state<HTMLButtonElement | null>(null)
+
+  let rowContextMenu = $state<RowContextMenuState>({
+    messageIds: [],
+    accountId: '',
+    folderId: '',
+    folderType: '',
+    isStarred: false,
+    isRead: true,
+    allowReply: false,
+  })
+
+  function handleListScroll() {
+    listScrollTop = listContainerRef?.scrollTop ?? 0
+  }
+
+  function getVirtualWindow<T>(items: T[]): VirtualWindow<T> {
+    if (items.length === 0) {
+      return { rows: [], topHeight: 0, bottomHeight: 0 }
+    }
+
+    const viewport = listViewportHeight || 600
+    const visibleCount = Math.ceil(viewport / rowHeight) + VIRTUAL_OVERSCAN * 2
+    const maxStart = Math.max(0, items.length - visibleCount)
+    const start = Math.min(maxStart, Math.max(0, Math.floor(listScrollTop / rowHeight) - VIRTUAL_OVERSCAN))
+    const end = Math.min(items.length, start + visibleCount)
+
+    return {
+      rows: items.slice(start, end).map((item, offset) => ({
+        item,
+        index: start + offset,
+      })),
+      topHeight: start * rowHeight,
+      bottomHeight: (items.length - end) * rowHeight,
+    }
+  }
+
+  function getConversationMessageIds(conversation: any): string[] {
+    return conversation.messageIds || conversation.messages?.map((m: any) => m.id) || []
+  }
+
+  function prepareRowContextMenu(conversation: any, rowAccountId: string, rowFolderId: string, useMultiSelect: boolean) {
+    if (useMultiSelect) {
+      rowContextMenu = {
+        messageIds: selectedMessageIds,
+        accountId: rowAccountId,
+        folderId: rowFolderId,
+        folderType,
+        isStarred: !selectedHasUnstarred,
+        isRead: !selectedHasUnread,
+        allowReply: false,
+      }
+      return
+    }
+
+    clearSelection()
+    rowContextMenu = {
+      messageIds: getConversationMessageIds(conversation),
+      accountId: rowAccountId,
+      folderId: rowFolderId,
+      folderType,
+      isStarred: conversation.isStarred ?? false,
+      isRead: (conversation.unreadCount || 0) === 0,
+      allowReply: true,
+    }
+  }
 
   // Get current selected index
   function getSelectedIndex(): number {
@@ -1212,12 +1308,17 @@
   }
 
   // Open context menu for the currently selected conversation row
-  export function openContextMenu() {
+  export async function openContextMenu() {
     if (!selectedThreadId || !listContainerRef) return
     const index = activeList.findIndex(c => c.threadId === selectedThreadId)
     if (index < 0) return
-    const rows = listContainerRef.querySelectorAll('[data-conversation-row]')
-    const row = rows[index] as HTMLElement | undefined
+    let row = listContainerRef.querySelector(`[data-conversation-row][data-row-index="${index}"]`) as HTMLElement | null
+    if (!row) {
+      listContainerRef.scrollTop = Math.max(0, index * rowHeight)
+      listScrollTop = listContainerRef.scrollTop
+      await tick()
+      row = listContainerRef.querySelector(`[data-conversation-row][data-row-index="${index}"]`) as HTMLElement | null
+    }
     if (!row) return
     const rect = row.getBoundingClientRect()
     row.dispatchEvent(new MouseEvent('contextmenu', {
@@ -1303,10 +1404,33 @@
   function scrollToIndex(index: number, block: 'start' | 'center' | 'end' | 'nearest' = 'nearest') {
     if (!listContainerRef) return
 
-    const rows = listContainerRef.querySelectorAll('[data-conversation-row]')
-    const row = rows[index] as HTMLElement | undefined
-    if (row) {
-      row.scrollIntoView({ block, behavior: 'smooth' })
+    const targetTop = index * rowHeight
+    const targetBottom = targetTop + rowHeight
+    const viewportTop = listContainerRef.scrollTop
+    const viewportBottom = viewportTop + listContainerRef.clientHeight
+    let scrollTop = viewportTop
+
+    switch (block) {
+      case 'start':
+        scrollTop = targetTop
+        break
+      case 'center':
+        scrollTop = targetTop - (listContainerRef.clientHeight - rowHeight) / 2
+        break
+      case 'end':
+        scrollTop = targetBottom - listContainerRef.clientHeight
+        break
+      case 'nearest':
+        if (targetTop < viewportTop) {
+          scrollTop = targetTop
+        } else if (targetBottom > viewportBottom) {
+          scrollTop = targetBottom - listContainerRef.clientHeight
+        }
+        break
+    }
+
+    if (scrollTop !== viewportTop) {
+      listContainerRef.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' })
     }
   }
 </script>
@@ -1541,7 +1665,12 @@
   {/if}
 
   <!-- Conversation List -->
-  <div bind:this={listContainerRef} class="flex-1 overflow-y-auto scrollbar-thin">
+  <div
+    bind:this={listContainerRef}
+    bind:clientHeight={listViewportHeight}
+    class="flex-1 overflow-y-auto scrollbar-thin"
+    onscroll={handleListScroll}
+  >
     {#if loading && conversations.length === 0 && !isSearchMode}
       <div class="flex items-center justify-center h-32">
         <Icon icon="mdi:loading" class="w-6 h-6 animate-spin text-muted-foreground" />
@@ -1595,27 +1724,42 @@
               {$_('search.localSearch')}
             </button>
           </div>
-          {#each serverSearchResults as result, index (result.threadId + '-' + index)}
-            {@const resultAccountId = result.accountId || accountId}
-            {@const resultFolderId = result.folderId || folderId}
-            <ConversationRow
-              conversation={result}
-              density={getMessageListDensity()}
-              selected={isRowSelected(result.threadId)}
-              checked={checkedThreadIds.has(result.threadId)}
-              accountId={resultAccountId}
-              folderId={resultFolderId}
-              {folderType}
-              {selectedMessageIds}
-              selectedIsStarred={!selectedHasUnstarred}
-              selectedIsRead={!selectedHasUnread}
-              isNonLocal={result._isLocal === false}
-              onSelect={(e) => selectConversation(result.threadId, index, e)}
-              onClearSelection={clearSelection}
-              onActionComplete={handleActionComplete}
-              {onReply}
-            />
-          {/each}
+          {@const serverWindow = getVirtualWindow(serverSearchResults)}
+          <MessageContextMenu
+            messageIds={rowContextMenu.messageIds}
+            accountId={rowContextMenu.accountId}
+            currentFolderId={rowContextMenu.folderId}
+            folderType={rowContextMenu.folderType}
+            isStarred={rowContextMenu.isStarred}
+            isRead={rowContextMenu.isRead}
+            onActionComplete={handleActionComplete}
+            onReply={rowContextMenu.allowReply ? onReply : undefined}
+          >
+            <div>
+              <div aria-hidden="true" style="height: {serverWindow.topHeight}px"></div>
+              {#each serverWindow.rows as row (row.item.threadId + '-' + row.index)}
+                {@const result = row.item}
+                {@const index = row.index}
+                {@const resultAccountId = result.accountId || accountId || ''}
+                {@const resultFolderId = result.folderId || folderId || ''}
+                <ConversationRow
+                  conversation={result}
+                  density={getMessageListDensity()}
+                  selected={isRowSelected(result.threadId)}
+                  checked={checkedThreadIds.has(result.threadId)}
+                  accountId={resultAccountId}
+                  folderId={resultFolderId}
+                  rowIndex={index}
+                  {selectedMessageIds}
+                  isNonLocal={result._isLocal === false}
+                  onSelect={(e?: MouseEvent) => selectConversation(result.threadId, index, e)}
+                  onContextMenu={() => prepareRowContextMenu(result, resultAccountId, resultFolderId, checkedThreadIds.has(result.threadId))}
+                  onActionComplete={handleActionComplete}
+                />
+              {/each}
+              <div aria-hidden="true" style="height: {serverWindow.bottomHeight}px"></div>
+            </div>
+          </MessageContextMenu>
 
           <!-- Show all results button (when results are capped) -->
           {#if serverSearchCount < serverSearchTotalCount}
@@ -1660,36 +1804,53 @@
             </button>
           {/if}
         </div>
-        {#each searchResults as result, index (result.threadId + '-' + index)}
-          {@const resultAccountId = result.accountId || accountId}
-          {@const resultFolderId = result.folderId || folderId}
-          {@const resultAccountColor = result.accountColor || ''}
-          {@const resultAccountName = result.accountName || ''}
-          <ConversationRow
-            conversation={result}
-            density={getMessageListDensity()}
-            selected={isRowSelected(result.threadId)}
-            checked={checkedThreadIds.has(result.threadId)}
-            accountId={isUnifiedView ? resultAccountId : accountId!}
-            folderId={isUnifiedView ? resultFolderId : folderId!}
-            {folderType}
-            {selectedMessageIds}
-            selectedIsStarred={!selectedHasUnstarred}
-            selectedIsRead={!selectedHasUnread}
-            showAccountIndicator={isUnifiedView}
-            accountColor={resultAccountColor}
-            accountName={resultAccountName}
-            highlightedSubject={result.highlightedSubject}
-            highlightedSnippet={result.highlightedSnippet}
-            highlightedFromName={result.highlightedFromName}
-            searchFolderName={result.folderName}
-            searchFolderType={result.folderType}
-            onSelect={(e) => selectConversation(result.threadId, index, e)}
-            onClearSelection={clearSelection}
-            onActionComplete={handleActionComplete}
-            {onReply}
-          />
-        {/each}
+        {@const searchWindow = getVirtualWindow(searchResults)}
+        <MessageContextMenu
+          messageIds={rowContextMenu.messageIds}
+          accountId={rowContextMenu.accountId}
+          currentFolderId={rowContextMenu.folderId}
+          folderType={rowContextMenu.folderType}
+          isStarred={rowContextMenu.isStarred}
+          isRead={rowContextMenu.isRead}
+          onActionComplete={handleActionComplete}
+          onReply={rowContextMenu.allowReply ? onReply : undefined}
+        >
+          <div>
+            <div aria-hidden="true" style="height: {searchWindow.topHeight}px"></div>
+            {#each searchWindow.rows as row (row.item.threadId + '-' + row.index)}
+              {@const result = row.item}
+              {@const index = row.index}
+              {@const resultAccountId = result.accountId || accountId || ''}
+              {@const resultFolderId = result.folderId || folderId || ''}
+              {@const resolvedAccountId = isUnifiedView ? resultAccountId : accountId!}
+              {@const resolvedFolderId = isUnifiedView ? resultFolderId : folderId!}
+              {@const resultAccountColor = result.accountColor || ''}
+              {@const resultAccountName = result.accountName || ''}
+              <ConversationRow
+                conversation={result}
+                density={getMessageListDensity()}
+                selected={isRowSelected(result.threadId)}
+                checked={checkedThreadIds.has(result.threadId)}
+                accountId={resolvedAccountId}
+                folderId={resolvedFolderId}
+                rowIndex={index}
+                {selectedMessageIds}
+                showAccountIndicator={isUnifiedView}
+                accountColor={resultAccountColor}
+                accountName={resultAccountName}
+                highlightedSubject={result.highlightedSubject}
+                highlightedSnippet={result.highlightedSnippet}
+                highlightedFromName={result.highlightedFromName}
+                searchFolderName={result.folderName}
+                searchFolderType={result.folderType}
+                onSelect={(e?: MouseEvent) => selectConversation(result.threadId, index, e)}
+                onContextMenu={() => prepareRowContextMenu(result, resolvedAccountId, resolvedFolderId, checkedThreadIds.has(result.threadId))}
+                onActionComplete={handleActionComplete}
+              />
+            {/each}
+            <div aria-hidden="true" style="height: {searchWindow.bottomHeight}px"></div>
+          </div>
+        </MessageContextMenu>
 
         <!-- Load more search results -->
         {#if searchResults.length < searchTotalCount}
@@ -1729,34 +1890,51 @@
         </button>
       </div>
     {:else}
-      {#each conversations as conv, index (conv.threadId + '-' + (conv.accountId || accountId || ''))}
-        {@const convAccountId = (conv as any).accountId || accountId}
-        {@const convFolderId = (conv as any).folderId || folderId}
-        {@const convAccountColor = (conv as any).accountColor || ''}
-        {@const convAccountName = (conv as any).accountName || ''}
-        <ConversationRow
-          conversation={conv}
-          density={getMessageListDensity()}
-          selected={isRowSelected(conv.threadId)}
-          checked={checkedThreadIds.has(conv.threadId)}
-          accountId={isUnifiedView ? convAccountId : accountId!}
-          folderId={isUnifiedView ? convFolderId : folderId!}
-          {folderType}
-          {selectedMessageIds}
-          selectedIsStarred={!selectedHasUnstarred}
-          selectedIsRead={!selectedHasUnread}
-          showAccountIndicator={isUnifiedView}
-          accountColor={convAccountColor}
-          accountName={convAccountName}
-          onSelect={(e) => selectConversation(conv.threadId, index, e)}
-          onClearSelection={clearSelection}
-          onActionComplete={handleActionComplete}
-          {onReply}
-          onOpenDraft={folderType === 'drafts' && conv.messageIds?.[0]
-            ? () => onOpenDraft?.(conv.messageIds[0])
-            : undefined}
-        />
-      {/each}
+      {@const conversationWindow = getVirtualWindow(conversations)}
+      <MessageContextMenu
+        messageIds={rowContextMenu.messageIds}
+        accountId={rowContextMenu.accountId}
+        currentFolderId={rowContextMenu.folderId}
+        folderType={rowContextMenu.folderType}
+        isStarred={rowContextMenu.isStarred}
+        isRead={rowContextMenu.isRead}
+        onActionComplete={handleActionComplete}
+        onReply={rowContextMenu.allowReply ? onReply : undefined}
+      >
+        <div>
+          <div aria-hidden="true" style="height: {conversationWindow.topHeight}px"></div>
+          {#each conversationWindow.rows as row (row.item.threadId + '-' + row.index)}
+            {@const conv = row.item}
+            {@const index = row.index}
+            {@const convAccountId = (conv as any).accountId || accountId || ''}
+            {@const convFolderId = (conv as any).folderId || folderId || ''}
+            {@const resolvedAccountId = isUnifiedView ? convAccountId : accountId!}
+            {@const resolvedFolderId = isUnifiedView ? convFolderId : folderId!}
+            {@const convAccountColor = (conv as any).accountColor || ''}
+            {@const convAccountName = (conv as any).accountName || ''}
+            <ConversationRow
+              conversation={conv}
+              density={getMessageListDensity()}
+              selected={isRowSelected(conv.threadId)}
+              checked={checkedThreadIds.has(conv.threadId)}
+              accountId={resolvedAccountId}
+              folderId={resolvedFolderId}
+              rowIndex={index}
+              {selectedMessageIds}
+              showAccountIndicator={isUnifiedView}
+              accountColor={convAccountColor}
+              accountName={convAccountName}
+              onSelect={(e?: MouseEvent) => selectConversation(conv.threadId, index, e)}
+              onContextMenu={() => prepareRowContextMenu(conv, resolvedAccountId, resolvedFolderId, checkedThreadIds.has(conv.threadId))}
+              onActionComplete={handleActionComplete}
+              onOpenDraft={folderType === 'drafts' && conv.messageIds?.[0]
+                ? () => onOpenDraft?.(conv.messageIds[0])
+                : undefined}
+            />
+          {/each}
+          <div aria-hidden="true" style="height: {conversationWindow.bottomHeight}px"></div>
+        </div>
+      </MessageContextMenu>
 
       <!-- Load more button for pagination -->
       {#if conversations.length < totalCount}
