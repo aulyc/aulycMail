@@ -30,8 +30,8 @@ NOTARY_PROFILE ?=
 # - suppress duplicate libobjc linker noise from multiple Objective-C packages
 # - link UniformTypeIdentifiers explicitly for Wails' macOS file dialog code
 # - use one deployment target across cgo objects and the final link
-# - silence Wails' macOS 15+ NSToolbar deprecation warning until upstream moves
-#   off setShowsBaselineSeparator:
+# - silence Wails' macOS 15+ NSToolbar deprecation warning until Wails removes
+#   its use of setShowsBaselineSeparator:
 DARWIN_LINK_WARN_ENV :=
 ifeq ($(shell uname -s),Darwin)
 DARWIN_MIN_VERSION := 11.0

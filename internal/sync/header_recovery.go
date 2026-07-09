@@ -30,7 +30,7 @@ func (e *Engine) recoverFailedHeaderBatch(ctx context.Context, client *imapclien
 	e.log.Info().
 		Int("count", len(missingUIDs)).
 		Str("account", accountID).
-		Msg("Recovering header batch without ENVELOPE (envelope parse failed upstream)")
+		Msg("Recovering header batch without ENVELOPE (ENVELOPE parsing failed)")
 
 	uidSet := imap.UIDSet{}
 	for _, uid := range missingUIDs {

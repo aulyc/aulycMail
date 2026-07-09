@@ -1,6 +1,6 @@
 # BUILD
 
-macOS-only slim build. (Linux/Windows/Flatpak targets have been removed from this fork.)
+macOS-only desktop build. Build and install flows in this repository target macOS.
 
 ### 🔨 Building from Source (macOS)
 ---
