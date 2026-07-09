@@ -35,7 +35,7 @@
     /** Title text rendered as <h2> when not in search mode. */
     label: string
     /** Optional count badge rendered after the label. Null/undefined hides it. */
-    count?: number | null
+    count?: number | string | null
     /** When true, the title + count area is replaced by the search snippet. */
     searchMode?: boolean
     /** Rendered in place of the title when searchMode is true. */

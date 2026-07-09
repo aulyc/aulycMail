@@ -8,6 +8,7 @@ import (
 	"github.com/aulyc/aulycmail/internal/folder"
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
+	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // RefreshContactsFromMail re-scans every stored message across all accounts and
@@ -36,6 +37,16 @@ func (a *App) RefreshContactsFromMail() (int, error) {
 		}
 	}
 
+	total := 0
+	if err := a.db.DB.QueryRow(`
+		SELECT COUNT(*)
+		FROM messages m
+		JOIN folders f ON m.folder_id = f.id
+	`).Scan(&total); err != nil {
+		log.Warn().Err(err).Msg("Failed to count messages for contact refresh progress")
+	}
+	a.emitContactRefreshProgress("scanning", 0, total)
+
 	rows, err := a.db.DB.Query(`
 		SELECT m.from_email, m.from_name,
 		       COALESCE(m.to_list, ''), COALESCE(m.cc_list, ''), COALESCE(m.bcc_list, ''),
@@ -44,6 +55,7 @@ func (a *App) RefreshContactsFromMail() (int, error) {
 		JOIN folders f ON m.folder_id = f.id
 	`)
 	if err != nil {
+		a.emitContactRefreshProgress("error", 0, total)
 		return 0, fmt.Errorf("query messages: %w", err)
 	}
 	defer rows.Close()
@@ -86,10 +98,29 @@ func (a *App) RefreshContactsFromMail() (int, error) {
 				_ = a.contactStore.AddOrUpdateWithRole(fromEmail, fromName, contact.RoleSender)
 			}
 		}
+		if count%50 == 0 {
+			a.emitContactRefreshProgress("scanning", count, total)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		a.emitContactRefreshProgress("error", count, total)
+		return count, fmt.Errorf("scan messages: %w", err)
 	}
 
+	a.emitContactRefreshProgress("complete", count, total)
 	log.Info().Int("messages", count).Msg("Refreshed contacts from mail")
 	return count, nil
+}
+
+func (a *App) emitContactRefreshProgress(phase string, scanned, total int) {
+	if a.ctx == nil {
+		return
+	}
+	wailsRuntime.EventsEmit(a.ctx, "contacts:refreshProgress", map[string]interface{}{
+		"phase":   phase,
+		"scanned": scanned,
+		"total":   total,
+	})
 }
 
 // ============================================================================

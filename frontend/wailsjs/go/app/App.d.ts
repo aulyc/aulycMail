@@ -26,6 +26,8 @@ export function CancelFolderSync(arg1:string,arg2:string):Promise<void>;
 
 export function ChooseBackupDirectory():Promise<string>;
 
+export function Contacts_BrowseContacts(arg1:string,arg2:string,arg3:number,arg4:number):Promise<v1.ContactBrowseResult>;
+
 export function Contacts_CreateContact(arg1:v1.ContactCreateInput):Promise<string>;
 
 export function Contacts_DeleteLocalContact(arg1:string):Promise<void>;

@@ -948,6 +948,7 @@ These methods live in `extensions/<name>/backend/bridge.go` and surface on `App`
 ```ts
 // extensions/contacts/frontend/stores/contactsView.svelte.ts
 import {
+  Contacts_BrowseContacts        as BrowseContacts,
   Contacts_ListContactsForBrowse as ListContactsForBrowse,
   Contacts_GetContactDetail     as GetContactDetail,
   Contacts_UpdateContact        as UpdateContact,
@@ -960,6 +961,7 @@ Currently bound by the Contacts extension's bridge (all gate on `extension_conta
 | Method | Purpose |
 |---|---|
 | `App.Contacts_ListContactsForBrowse(query, sourceID string, limit, offset int) ([]v1.Contact, error)` | Browse listing — wraps `extcontacts.API.ListContacts`. Returns `nil` when Contacts is disabled. |
+| `App.Contacts_BrowseContacts(query, sourceID string, limit, offset int) (v1.ContactBrowseResult, error)` | Contacts-pane paged listing plus the full total for the same source/search filter. |
 | `App.Contacts_GetContactDetail(emailOrID string) (*v1.Contact, error)` | Single-contact detail load. |
 | `App.Contacts_CreateContact(input v1.ContactCreateInput) (string, error)` | Create new contact in the local store (`local:manual`). |
 | `App.Contacts_UpdateContact(id string, patch v1.ContactPatch) error` | Multi-field patch update against the local store. |

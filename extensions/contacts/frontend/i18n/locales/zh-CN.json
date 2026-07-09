@@ -27,6 +27,10 @@
       "idle": "联系人",
       "settings": "联系人设置"
     },
+    "status": {
+      "refreshing": "正在刷新联系人…",
+      "refreshingProgress": "正在刷新联系人 {scanned}/{total}"
+    },
     "list": {
       "header": "联系人",
       "label": "联系人",

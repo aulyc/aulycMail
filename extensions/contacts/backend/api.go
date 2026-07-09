@@ -181,8 +181,36 @@ func (a *API) ListContacts(filter coreapi.ContactFilter) ([]coreapi.Contact, err
 	if a.localStore == nil {
 		return nil, nil
 	}
+	records, err := a.localStore.ListRecords(contactRecordFilter(filter))
+	if err != nil {
+		return nil, fmt.Errorf("contacts.ListContacts: %w", err)
+	}
+	return contactsFromRecords(records), nil
+}
+
+// BrowseContacts returns the current page plus the full count for the same
+// source/search filter so the UI can distinguish "shown" from "total".
+func (a *API) BrowseContacts(filter coreapi.ContactFilter) (coreapi.ContactBrowseResult, error) {
+	if a.localStore == nil {
+		return coreapi.ContactBrowseResult{}, nil
+	}
+	recordFilter := contactRecordFilter(filter)
+	records, err := a.localStore.ListRecords(recordFilter)
+	if err != nil {
+		return coreapi.ContactBrowseResult{}, fmt.Errorf("contacts.ListContacts: %w", err)
+	}
+	recordFilter.Limit = 0
+	recordFilter.Offset = 0
+	total, err := a.localStore.CountRecords(recordFilter)
+	if err != nil {
+		return coreapi.ContactBrowseResult{}, fmt.Errorf("contacts.ListContacts count: %w", err)
+	}
+	return coreapi.ContactBrowseResult{Items: contactsFromRecords(records), Total: total}, nil
+}
+
+func contactRecordFilter(filter coreapi.ContactFilter) contact.RecordFilter {
 	scope := browseScopeFromSourceID(filter.SourceID)
-	records, err := a.localStore.ListRecords(contact.RecordFilter{
+	return contact.RecordFilter{
 		Source:    "local",
 		Kind:      scope.kind,
 		Role:      scope.role,
@@ -190,15 +218,15 @@ func (a *API) ListContacts(filter coreapi.ContactFilter) ([]coreapi.Contact, err
 		Query:     filter.Query,
 		Limit:     filter.Limit,
 		Offset:    filter.Offset,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("contacts.ListContacts: %w", err)
 	}
+}
+
+func contactsFromRecords(records []*contact.Record) []coreapi.Contact {
 	out := make([]coreapi.Contact, 0, len(records))
 	for _, rec := range records {
 		out = append(out, fromRecord(rec))
 	}
-	return out, nil
+	return out
 }
 
 func (a *API) ListAccountGroups() ([]coreapi.ContactAccountGroup, error) {

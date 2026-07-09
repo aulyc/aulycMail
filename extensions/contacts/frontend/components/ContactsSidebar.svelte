@@ -8,6 +8,12 @@
     contactAccountGroups,
     loadContactAccountGroups,
   } from '$extensions/contacts/frontend/stores/contactAccountGroups.svelte'
+  import {
+    beginContactRefresh,
+    completeContactRefresh,
+    failContactRefresh,
+    initContactRefreshEvents,
+  } from '$extensions/contacts/frontend/stores/contactRefresh.svelte'
   import { toasts } from '$lib/stores/toast'
   // @ts-ignore - wailsjs bindings
   import { RefreshContactsFromMail } from '$wailsjs/go/app/App'
@@ -38,6 +44,7 @@
   }
 
   onMount(() => {
+    initContactRefreshEvents()
     void loadContactAccountGroups()
   })
 
@@ -46,12 +53,15 @@
   async function runRefresh() {
     if (refreshing) return
     refreshing = true
+    beginContactRefresh()
     try {
       const count = await RefreshContactsFromMail()
       await loadContactAccountGroups({ force: true })
       await reloadContacts()
+      completeContactRefresh(count)
       toasts.success($_('contacts.toast.refreshed', { values: { count } }))
     } catch (err) {
+      failContactRefresh()
       toasts.error((err as Error)?.message ?? String(err))
     } finally {
       refreshing = false

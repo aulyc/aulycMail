@@ -4,7 +4,7 @@
 
 // @ts-ignore - wailsjs bindings
 import {
-  Contacts_ListContactsForBrowse as ListContactsForBrowse,
+  Contacts_BrowseContacts as BrowseContacts,
   Contacts_GetContactDetail as GetContactDetail,
   Contacts_UpdateContact as UpdateContact,
   Contacts_DeleteLocalContact as DeleteLocalContact,
@@ -30,6 +30,7 @@ let selectedSourceId = $state<string>('')
 let searchQuery = $state<string>('')
 let selectedContactId = $state<string | null>(null)
 let contacts = $state<v1.Contact[]>([])
+let total = $state<number>(0)
 let detail = $state<v1.Contact | null>(null)
 let loading = $state<boolean>(false)
 let listResetSignal = $state(0)
@@ -48,6 +49,9 @@ export const contactsView = {
   },
   get contacts(): v1.Contact[] {
     return contacts
+  },
+  get total(): number {
+    return total
   },
   get detail(): v1.Contact | null {
     return detail
@@ -86,14 +90,16 @@ export async function reloadContacts(limit = 200, offset = 0): Promise<void> {
   const seq = ++contactsLoadSeq
   loading = true
   try {
-    const result = await ListContactsForBrowse(searchQuery, selectedSourceId, limit, offset) || []
+    const result = await BrowseContacts(searchQuery, selectedSourceId, limit, offset)
     if (seq === contactsLoadSeq) {
-      contacts = result
+      contacts = result?.items || []
+      total = result?.total ?? contacts.length
     }
   } catch (err) {
     console.error('Failed to list contacts for browse:', err)
     if (seq === contactsLoadSeq) {
       contacts = []
+      total = 0
     }
   } finally {
     if (seq === contactsLoadSeq) {

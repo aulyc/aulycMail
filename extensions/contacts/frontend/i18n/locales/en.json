@@ -27,6 +27,10 @@
       "idle": "Contacts",
       "settings": "Contact settings"
     },
+    "status": {
+      "refreshing": "Refreshing contacts…",
+      "refreshingProgress": "Refreshing contacts {scanned}/{total}"
+    },
     "list": {
       "header": "Contacts",
       "label": "Contacts",

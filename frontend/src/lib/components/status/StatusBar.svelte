@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
   import Icon from '@iconify/svelte'
   import { formatDistanceToNow } from 'date-fns'
   import { _ } from '$lib/i18n'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
   import { toasts, type Toast } from '$lib/stores/toast'
+  import { contactRefresh, initContactRefreshEvents } from '$extensions/contacts/frontend/stores/contactRefresh.svelte'
 
   const toastIcons = {
     success: 'mdi:check-circle',
@@ -22,7 +24,26 @@
 
   let latestToast = $derived<Toast | null>($toasts[$toasts.length - 1] ?? null)
 
+  onMount(() => {
+    initContactRefreshEvents()
+  })
+
   let syncStatus = $derived.by<{ accountName: string | null; label: string; percentage: number | null }>(() => {
+    if (contactRefresh.active) {
+      const scanned = contactRefresh.total > 0
+        ? Math.min(contactRefresh.scanned, contactRefresh.total)
+        : contactRefresh.scanned
+      return {
+        accountName: null,
+        label: contactRefresh.total > 0
+          ? $_('contacts.status.refreshingProgress', {
+            values: { scanned, total: contactRefresh.total },
+          })
+          : $_('contacts.status.refreshing'),
+        percentage: contactRefresh.percentage,
+      }
+    }
+
     if (accountStore.isAnySyncing) {
       const syncingAccount = accountStore.accounts.find((account) => account.syncing)
       if (syncingAccount) {

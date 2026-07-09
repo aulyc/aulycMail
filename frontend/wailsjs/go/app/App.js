@@ -30,6 +30,10 @@ export function ChooseBackupDirectory() {
   return window['go']['app']['App']['ChooseBackupDirectory']();
 }
 
+export function Contacts_BrowseContacts(arg1, arg2, arg3, arg4) {
+  return window['go']['app']['App']['Contacts_BrowseContacts'](arg1, arg2, arg3, arg4);
+}
+
 export function Contacts_CreateContact(arg1) {
   return window['go']['app']['App']['Contacts_CreateContact'](arg1);
 }

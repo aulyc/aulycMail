@@ -944,42 +944,9 @@ func (s *Store) loadRecordSubTables(rec *Record) error {
 // Contacts pane. The filter scopes by source/kind/source_ref and supports a
 // case-insensitive name/email substring query.
 func (s *Store) ListRecords(filter RecordFilter) ([]*Record, error) {
-	conds := []string{}
-	args := []any{}
+	where, args := recordFilterWhere(filter)
 
-	if filter.Source != "" {
-		conds = append(conds, `cr.source = ?`)
-		args = append(args, filter.Source)
-	}
-	if filter.Kind != "" {
-		conds = append(conds, `cr.kind = ?`)
-		args = append(args, filter.Kind)
-	}
-	if filter.AccountID == "" {
-		if col := roleColumn(filter.Role); col != "" {
-			// col is a whitelisted literal from roleColumn — safe to interpolate.
-			conds = append(conds, `cr.`+col+` = 1`)
-		}
-	}
-	if filter.AccountID != "" {
-		conds = append(conds, accountRecordExistsSQL(filter.Role))
-		args = append(args, filter.AccountID)
-	}
-	if filter.SourceRef != "" {
-		conds = append(conds, `cr.source_ref = ?`)
-		args = append(args, filter.SourceRef)
-	}
-	if filter.Query != "" {
-		// Match on fn OR any email belonging to the record.
-		pattern := "%" + strings.ToLower(filter.Query) + "%"
-		conds = append(conds, `(LOWER(COALESCE(cr.fn, '')) LIKE ? OR cr.id IN (SELECT record_id FROM contact_emails WHERE LOWER(email) LIKE ?))`)
-		args = append(args, pattern, pattern)
-	}
-
-	query := `SELECT cr.id FROM contact_records cr`
-	if len(conds) > 0 {
-		query += ` WHERE ` + strings.Join(conds, ` AND `)
-	}
+	query := `SELECT cr.id FROM contact_records cr` + where
 	query += ` ORDER BY COALESCE(cr.fn, '') ASC, cr.id ASC`
 	if filter.Limit > 0 {
 		query += fmt.Sprintf(" LIMIT %d", filter.Limit)
@@ -1016,6 +983,58 @@ func (s *Store) ListRecords(filter RecordFilter) ([]*Record, error) {
 		records = append(records, rec)
 	}
 	return records, nil
+}
+
+// CountRecords returns the number of contact records matching the same scope
+// and search filters used by ListRecords. Limit and offset are ignored.
+func (s *Store) CountRecords(filter RecordFilter) (int, error) {
+	where, args := recordFilterWhere(filter)
+
+	var count int
+	query := `SELECT COUNT(DISTINCT cr.id) FROM contact_records cr` + where
+	if err := s.db.QueryRow(query, args...).Scan(&count); err != nil {
+		return 0, fmt.Errorf("failed to count records: %w", err)
+	}
+	return count, nil
+}
+
+func recordFilterWhere(filter RecordFilter) (string, []any) {
+	conds := []string{}
+	args := []any{}
+
+	if filter.Source != "" {
+		conds = append(conds, `cr.source = ?`)
+		args = append(args, filter.Source)
+	}
+	if filter.Kind != "" {
+		conds = append(conds, `cr.kind = ?`)
+		args = append(args, filter.Kind)
+	}
+	if filter.AccountID == "" {
+		if col := roleColumn(filter.Role); col != "" {
+			// col is a whitelisted literal from roleColumn — safe to interpolate.
+			conds = append(conds, `cr.`+col+` = 1`)
+		}
+	}
+	if filter.AccountID != "" {
+		conds = append(conds, accountRecordExistsSQL(filter.Role))
+		args = append(args, filter.AccountID)
+	}
+	if filter.SourceRef != "" {
+		conds = append(conds, `cr.source_ref = ?`)
+		args = append(args, filter.SourceRef)
+	}
+	if filter.Query != "" {
+		// Match on fn OR any email belonging to the record.
+		pattern := "%" + strings.ToLower(filter.Query) + "%"
+		conds = append(conds, `(LOWER(COALESCE(cr.fn, '')) LIKE ? OR cr.id IN (SELECT record_id FROM contact_emails WHERE LOWER(email) LIKE ?))`)
+		args = append(args, pattern, pattern)
+	}
+
+	if len(conds) > 0 {
+		return ` WHERE ` + strings.Join(conds, ` AND `), args
+	}
+	return "", args
 }
 
 // ListAccountAssociations returns every enabled mail account plus the number of

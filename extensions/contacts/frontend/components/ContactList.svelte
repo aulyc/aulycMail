@@ -199,12 +199,18 @@
     if (sel === 'local:collected') return $_('contacts.sidebar.localCollected')
     return $_('contacts.list.header')
   })
+
+  const headerCount = $derived.by(() => {
+    const shown = contactsView.contacts.length
+    const total = contactsView.total
+    return total > shown ? `${shown}/${total}` : total
+  })
 </script>
 
 <div class="flex-shrink-0 min-h-0 flex flex-col border-r border-border bg-background" style="width: {listWidth}px">
   <ListHeader
     label={headerLabel}
-    count={contactsView.contacts.length}
+    count={headerCount}
     searchMode={showSearch}
   >
     {#snippet search()}

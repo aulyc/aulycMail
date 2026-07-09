@@ -160,6 +160,13 @@ type ContactAccountGroup struct {
 	BccCount       int    `json:"bccCount"`
 }
 
+// ContactBrowseResult is the paged Contacts-pane list result. Items contains
+// the current page; Total is the full count for the same source/search filter.
+type ContactBrowseResult struct {
+	Items []Contact `json:"items"`
+	Total int       `json:"total"`
+}
+
 // ContactEmail is one email on a Contact, with its TYPE and primary flag.
 type ContactEmail struct {
 	Email     string `json:"email"`

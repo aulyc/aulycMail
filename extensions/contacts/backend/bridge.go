@@ -183,6 +183,24 @@ func (b *ContactsBridge) Contacts_ListContactsForBrowse(query, sourceID string, 
 	})
 }
 
+// Contacts_BrowseContacts returns a paged list and the full total for the
+// current source/search filter. The older Contacts_ListContactsForBrowse method
+// stays array-shaped for existing lightweight search callers.
+func (b *ContactsBridge) Contacts_BrowseContacts(query, sourceID string, limit, offset int) (coreapi.ContactBrowseResult, error) {
+	if !b.gateEnabled() {
+		return coreapi.ContactBrowseResult{}, nil
+	}
+	if err := b.ensureInit(); err != nil {
+		return coreapi.ContactBrowseResult{}, err
+	}
+	return b.api.BrowseContacts(coreapi.ContactFilter{
+		Query:    query,
+		SourceID: sourceID,
+		Limit:    limit,
+		Offset:   offset,
+	})
+}
+
 // Contacts_GetContactAccountGroups returns the enabled mail accounts that back
 // the Contacts sidebar tree, including per-role counts for each account.
 func (b *ContactsBridge) Contacts_GetContactAccountGroups() ([]coreapi.ContactAccountGroup, error) {
