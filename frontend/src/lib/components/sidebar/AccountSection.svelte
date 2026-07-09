@@ -4,6 +4,7 @@
   import { account, folder } from '../../../../wailsjs/go/models'
   import FolderTreeItem from './FolderTreeItem.svelte'
   import { _ } from '$lib/i18n'
+  import { getAccountColor } from '$lib/utils/accountColor'
 
   interface Props {
     account: account.Account
@@ -48,23 +49,6 @@
 
   function selectFolder(f: folder.Folder) {
     onFolderSelect?.(acc.id, f.id, f.path, f.name, f.type)
-  }
-
-  const defaultAccountColors = [
-    '#3B82F6',
-    '#10B981',
-    '#F59E0B',
-    '#EF4444',
-    '#8B5CF6',
-    '#EC4899',
-    '#06B6D4',
-    '#F97316',
-  ]
-
-  function getAccountColor(targetAccount: account.Account): string {
-    if (targetAccount.color) return targetAccount.color
-    const index = Math.max(0, targetAccount.orderIndex || 0)
-    return defaultAccountColors[index % defaultAccountColors.length]
   }
 
   function sumAccountBadgeCounts(trees: folder.FolderTree[]): { unread: number; drafts: number } {

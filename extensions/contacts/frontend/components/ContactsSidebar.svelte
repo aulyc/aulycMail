@@ -3,6 +3,8 @@
   import { _ } from 'svelte-i18n'
   import Icon from '@iconify/svelte'
   import SourceSidebar from '$lib/components/kit/SourceSidebar.svelte'
+  import { accountStore } from '$lib/stores/accounts.svelte'
+  import { getAccountColor } from '$lib/utils/accountColor'
   import { contactsView, selectSource, reloadContacts } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import {
     contactAccountGroups,
@@ -81,6 +83,7 @@
     expandable?: boolean
     expanded?: boolean
     accountID?: string
+    accountIndex?: number
   }
 
   // Reactive — re-runs when locale changes because $_ is referenced inside.
@@ -91,7 +94,7 @@
       depth: 0,
     }]
 
-    for (const account of accountGroups) {
+    for (const [accountIndex, account] of accountGroups.entries()) {
       const expanded = expandedAccounts[account.accountId] === true
       builtins.push({
         id: accountSourceID(account.accountId),
@@ -101,6 +104,7 @@
         expandable: true,
         expanded,
         accountID: account.accountId,
+        accountIndex,
       })
       if (expanded) {
         for (const roleItem of roleItems) {
@@ -111,6 +115,7 @@
             depth: 1,
             count: account[roleItem.countKey],
             accountID: account.accountId,
+            accountIndex,
           })
         }
       }
@@ -132,6 +137,11 @@
         [it.accountID]: !(expandedAccounts[it.accountID] === true),
       }
     }
+  }
+
+  function sidebarAccountColor(it: SidebarItem): string {
+    const found = accountStore.accounts.find(item => item.account.id === it.accountID)?.account
+    return getAccountColor(found ?? { orderIndex: it.accountIndex ?? 0 })
   }
 </script>
 
@@ -166,7 +176,13 @@
       style="padding-left: {it.depth === 0 ? 0.75 : 1.5}rem"
       onclick={() => pick(it.id)}
     >
-      {#if it.icon}
+      {#if it.depth === 0 && it.accountID}
+        <span
+          class="w-2 h-2 rounded-full flex-shrink-0"
+          style="background-color: {sidebarAccountColor(it)}"
+          aria-hidden="true"
+        ></span>
+      {:else if it.icon}
         <Icon icon={it.icon} class="w-4 h-4 flex-shrink-0" />
       {/if}
       <span class="truncate min-w-0 flex-1">{it.label}</span>

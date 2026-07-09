@@ -29,7 +29,7 @@
   import { loadSettings, getThemeMode } from '$lib/stores/settings.svelte'
   import { loadImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
   import { initTheme, applyThemeFromMode, handleSystemThemeEvent, handleMediaQueryChange } from '$lib/stores/theme.svelte'
-  import { loadUIState, saveUIState, getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
+  import { DEFAULT_LIST_WIDTH, DEFAULT_SIDEBAR_WIDTH, loadUIState, saveUIState, getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
   import { setPendingDeepLink } from '$lib/stores/extensionDeepLink.svelte'
   import {
     type FocusablePane,
@@ -733,8 +733,8 @@
 
   // Pane sizing — fixed widths (no dragging). Restored from saved state on
   // mount; the sidebar and list columns are not user-resizable.
-  let sidebarWidth = $state(280)
-  let listWidth = $state(420)
+  let sidebarWidth = $state(DEFAULT_SIDEBAR_WIDTH)
+  let listWidth = $state(DEFAULT_LIST_WIDTH)
 
   // Window minimum width so the viewer's toolbar always fits. The viewer gets
   // (window − rail − sidebar − list), so the floor leaves VIEWER_MIN for it.

@@ -25,12 +25,26 @@ export interface UIState {
 }
 
 // Pane width constraints
+export const DEFAULT_SIDEBAR_WIDTH = 336
+export const DEFAULT_LIST_WIDTH = 420
+
 const SIDEBAR_MIN = 180
 const SIDEBAR_MAX = 400
 // Min wide enough that the list header ("INBOX (1234 封未读)") plus the toolbar
 // icons fit on one line with a 4-digit unread count and no wrapping.
 const LIST_MIN = 360
 const LIST_MAX = 600
+// Previous builds persisted these non-resizable sidebar defaults. Treat them
+// as old defaults so existing installs get the wider 120% sidebar too.
+const LEGACY_SIDEBAR_DEFAULTS = new Set([240, 280])
+
+function normalizeSidebarWidth(value?: number): number {
+  const width = value || DEFAULT_SIDEBAR_WIDTH
+  if (LEGACY_SIDEBAR_DEFAULTS.has(width)) {
+    return DEFAULT_SIDEBAR_WIDTH
+  }
+  return clamp(width, SIDEBAR_MIN, SIDEBAR_MAX)
+}
 
 // Default state
 const defaultState: UIState = {
@@ -41,8 +55,8 @@ const defaultState: UIState = {
   selectedThreadId: null,
   selectedConversationAccountId: null,
   selectedConversationFolderId: null,
-  sidebarWidth: 280,
-  listWidth: 420,
+  sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+  listWidth: DEFAULT_LIST_WIDTH,
   expandedAccounts: {},
   unifiedInboxExpanded: true,
   collapsedFolders: {},
@@ -83,8 +97,8 @@ export async function loadUIState(): Promise<UIState> {
         selectedConversationAccountId: state.selectedConversationAccountId || null,
         selectedConversationFolderId: state.selectedConversationFolderId || null,
         // Validate and clamp pane widths
-        sidebarWidth: clamp(state.sidebarWidth || 280, SIDEBAR_MIN, SIDEBAR_MAX),
-        listWidth: clamp(state.listWidth || 420, LIST_MIN, LIST_MAX),
+        sidebarWidth: normalizeSidebarWidth(state.sidebarWidth),
+        listWidth: clamp(state.listWidth || DEFAULT_LIST_WIDTH, LIST_MIN, LIST_MAX),
         // Sidebar expand/collapse states
         expandedAccounts: state.expandedAccounts || {},
         unifiedInboxExpanded: state.unifiedInboxExpanded !== false, // default true
