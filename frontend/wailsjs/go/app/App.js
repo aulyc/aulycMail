@@ -142,6 +142,10 @@ export function GetAutostart() {
   return window['go']['app']['App']['GetAutostart']();
 }
 
+export function GetBackupRunState() {
+  return window['go']['app']['App']['GetBackupRunState']();
+}
+
 export function GetBackupSettings() {
   return window['go']['app']['App']['GetBackupSettings']();
 }
@@ -572,6 +576,10 @@ export function ShowWindow() {
 
 export function Star(arg1) {
   return window['go']['app']['App']['Star'](arg1);
+}
+
+export function StartEmailBackup(arg1) {
+  return window['go']['app']['App']['StartEmailBackup'](arg1);
 }
 
 export function SubscribeAllFolders(arg1) {

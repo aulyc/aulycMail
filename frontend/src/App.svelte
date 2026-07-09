@@ -283,6 +283,35 @@
       showBackupViewer = false
       showAbout = true
     })
+    EventsOn('backup:progress', (data: BackupProgress) => {
+      if (data.phase === 'done') {
+        const missing = data.missing ?? 0
+        addToast({
+          type: data.failed > 0 ? 'warning' : 'success',
+          message: missing > 0
+            ? $_('settingsBackup.backupCompleteWithMissing', {
+              values: {
+                exported: data.exported,
+                skipped: data.skipped,
+                missing,
+                failed: data.failed,
+              },
+            })
+            : $_('settingsBackup.backupComplete', {
+              values: {
+                exported: data.exported,
+                skipped: data.skipped,
+                failed: data.failed,
+              },
+            }),
+        })
+      } else if (data.phase === 'error') {
+        addToast({
+          type: 'error',
+          message: data.message ? `${$_('settingsBackup.backupFailed')}: ${data.message}` : $_('settingsBackup.backupFailed'),
+        })
+      }
+    })
 
     // Notification clicks (from Go), the Contacts related-mail list (via
     // EventsEmit), and the search overlay all route conversation-open through
@@ -628,6 +657,15 @@
     bcc?: string[]
     subject?: string
     body?: string
+  }
+
+  interface BackupProgress {
+    phase: string
+    exported: number
+    skipped: number
+    missing?: number
+    failed: number
+    message?: string
   }
 
   function handleMailtoData(data: MailtoData) {

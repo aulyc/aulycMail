@@ -65,6 +65,112 @@ func TestUniqueNonEmptyStrings(t *testing.T) {
 	}
 }
 
+func TestGroupBackupMessageRowsPreservesGroupAndRowOrder(t *testing.T) {
+	rows := []backupMessageRow{
+		{AccountID: "a1", FolderID: "inbox", UID: 1},
+		{AccountID: "a1", FolderID: "sent", UID: 2},
+		{AccountID: "a1", FolderID: "inbox", UID: 3},
+		{AccountID: "a2", FolderID: "inbox", UID: 4},
+	}
+
+	groups := groupBackupMessageRows(rows)
+	if len(groups) != 3 {
+		t.Fatalf("group count mismatch: %d", len(groups))
+	}
+	if groups[0].AccountID != "a1" || groups[0].FolderID != "inbox" {
+		t.Fatalf("first group mismatch: %#v", groups[0])
+	}
+	if got := backupRowUIDs(groups[0].Rows); !reflect.DeepEqual(got, []uint32{1, 3}) {
+		t.Fatalf("first group UIDs mismatch: %#v", got)
+	}
+	if groups[1].AccountID != "a1" || groups[1].FolderID != "sent" {
+		t.Fatalf("second group mismatch: %#v", groups[1])
+	}
+	if groups[2].AccountID != "a2" || groups[2].FolderID != "inbox" {
+		t.Fatalf("third group mismatch: %#v", groups[2])
+	}
+}
+
+func TestBackupRowsByUIDIgnoresZeroUID(t *testing.T) {
+	rows := []backupMessageRow{
+		{UID: 0, Subject: "missing"},
+		{UID: 10, Subject: "ten"},
+		{UID: 11, Subject: "eleven"},
+	}
+
+	got := backupRowsByUID(rows)
+	if len(got) != 2 {
+		t.Fatalf("UID map size mismatch: %d", len(got))
+	}
+	if got[10].Subject != "ten" || got[11].Subject != "eleven" {
+		t.Fatalf("UID map contents mismatch: %#v", got)
+	}
+}
+
+func TestBackupRunTrackerBlocksConcurrentStarts(t *testing.T) {
+	var tracker backupRunTracker
+	if !tracker.start("2026-07-08T00:00:00Z") {
+		t.Fatal("expected first backup start to succeed")
+	}
+	if tracker.start("2026-07-08T00:00:01Z") {
+		t.Fatal("expected second backup start to be rejected while running")
+	}
+
+	state := tracker.snapshot()
+	if !state.Running {
+		t.Fatal("expected tracker to report running")
+	}
+	if state.StartedAt != "2026-07-08T00:00:00Z" {
+		t.Fatalf("startedAt changed unexpectedly: %q", state.StartedAt)
+	}
+	if state.Progress == nil || state.Progress.Phase != "running" {
+		t.Fatalf("running progress missing: %#v", state.Progress)
+	}
+}
+
+func TestBackupRunTrackerFinishPreservesLastProgress(t *testing.T) {
+	var tracker backupRunTracker
+	if !tracker.start("2026-07-08T00:00:00Z") {
+		t.Fatal("expected backup start to succeed")
+	}
+	tracker.update(BackupProgress{Phase: "running", Current: 3, Total: 10})
+	tracker.finish(BackupProgress{Phase: "done", Current: 10, Total: 10, Exported: 7, Skipped: 3})
+
+	state := tracker.snapshot()
+	if state.Running {
+		t.Fatal("expected tracker to stop running after finish")
+	}
+	if state.Progress == nil || state.Progress.Phase != "done" {
+		t.Fatalf("done progress missing: %#v", state.Progress)
+	}
+	if state.Progress.Exported != 7 || state.Progress.Skipped != 3 {
+		t.Fatalf("finish counts were not preserved: %#v", state.Progress)
+	}
+}
+
+func TestBackupDoneProgressIncludesMissingCount(t *testing.T) {
+	progress := backupDoneProgress(&BackupRunResult{
+		Total:    10,
+		Exported: 7,
+		Skipped:  2,
+		Missing:  1,
+	})
+	if progress.Missing != 1 {
+		t.Fatalf("missing count was not preserved: %#v", progress)
+	}
+}
+
+func TestFormatBackupRunResultIncludesMissingOnlyWhenPresent(t *testing.T) {
+	withMissing := formatBackupRunResult(backupIndexRun{Exported: 7, Skipped: 2, Missing: 1})
+	if !strings.Contains(withMissing, "1 missing") {
+		t.Fatalf("expected missing count in result: %s", withMissing)
+	}
+	withoutMissing := formatBackupRunResult(backupIndexRun{Exported: 7, Skipped: 3})
+	if strings.Contains(withoutMissing, "missing") {
+		t.Fatalf("did not expect missing count in result: %s", withoutMissing)
+	}
+}
+
 func TestBackupIndexRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	hasAttachments := true
@@ -260,5 +366,22 @@ func TestWriteBackupFileFromStreamRemovesPartialOnError(t *testing.T) {
 	}
 	if _, statErr := os.Stat(path + ".tmp"); !errors.Is(statErr, os.ErrNotExist) {
 		t.Fatalf("expected temp backup file to be removed, stat err: %v", statErr)
+	}
+}
+
+func TestWriteBackupFileFromReaderRejectsEmptyContent(t *testing.T) {
+	dir := t.TempDir()
+
+	written, err := writeBackupFileFromReader(dir, "eml/user@example.com/INBOX/message.eml", strings.NewReader(""))
+	if err == nil {
+		t.Fatal("expected empty reader to fail")
+	}
+	if written != 0 {
+		t.Fatalf("written size mismatch: got %d", written)
+	}
+
+	path := filepath.Join(dir, "eml", "user@example.com", "INBOX", "message.eml")
+	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+		t.Fatalf("expected empty backup file to be removed, stat err: %v", statErr)
 	}
 }

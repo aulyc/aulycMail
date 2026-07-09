@@ -3,8 +3,10 @@ package sync
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"sync/atomic"
 	"time"
 
 	imapPkg "github.com/aulyc/aulycmail/internal/imap"
@@ -37,6 +39,42 @@ type ProcessedBody struct {
 type RawMessageStreamResult struct {
 	BytesWritten int64
 	ReportedSize int64
+}
+
+// RawMessageNotFoundError means the server did not return a requested UID from
+// the selected mailbox. The local DB can still contain stale rows until a sync
+// reconciles them.
+type RawMessageNotFoundError struct {
+	UID uint32
+}
+
+func (e RawMessageNotFoundError) Error() string {
+	return fmt.Sprintf("message not found: UID %d", e.UID)
+}
+
+func IsRawMessageNotFoundError(err error) bool {
+	var notFound RawMessageNotFoundError
+	return errors.As(err, &notFound)
+}
+
+// RawMessageStreamHandler streams one raw RFC822 literal to its destination.
+// The handler must fully consume body unless it returns an error; the caller
+// drains any remaining literal data so the IMAP stream stays aligned.
+type RawMessageStreamHandler func(uid uint32, body io.Reader) (int64, error)
+
+const rawMessageFetchIdleTimeout = 2 * time.Minute
+
+type rawMessageProgressReader struct {
+	reader io.Reader
+	mark   func()
+}
+
+func (r rawMessageProgressReader) Read(p []byte) (int, error) {
+	n, err := r.reader.Read(p)
+	if n > 0 && r.mark != nil {
+		r.mark()
+	}
+	return n, err
 }
 
 // FetchMessageBody fetches the body for a single message on-demand.
@@ -870,7 +908,7 @@ func (e *Engine) FetchRawMessage(ctx context.Context, accountID, folderID string
 	msg := fetchCmd.Next()
 	if msg == nil {
 		fetchCmd.Close()
-		return nil, fmt.Errorf("message not found: UID %d", uid)
+		return nil, RawMessageNotFoundError{UID: uid}
 	}
 
 	// Extract body section from streamed message
@@ -971,14 +1009,236 @@ func (e *Engine) StreamRawMessage(ctx context.Context, accountID, folderID strin
 	if copyErr != nil {
 		return result, fmt.Errorf("failed to stream message body: %w", copyErr)
 	}
-	if !gotBodySection || result.BytesWritten == 0 {
-		return result, fmt.Errorf("message body not found: UID %d", uid)
+	if err := rawMessageStreamError(gotBodySection, result, uid); err != nil {
+		return result, err
 	}
-	if result.ReportedSize > 0 && result.BytesWritten != result.ReportedSize {
-		return result, fmt.Errorf("message size mismatch: server reported %d bytes, wrote %d bytes", result.ReportedSize, result.BytesWritten)
+	if rawMessageSizeMismatch(result) {
+		e.log.Warn().
+			Uint32("uid", uid).
+			Int64("reportedSize", result.ReportedSize).
+			Int64("bytesWritten", result.BytesWritten).
+			Msg("Raw message size differs from RFC822.SIZE; keeping streamed backup data")
 	}
 
 	return result, nil
+}
+
+// StreamRawMessages streams full raw RFC822 content for multiple UIDs from a
+// single selected mailbox. It keeps per-message failures isolated so backup can
+// continue after a corrupt, missing, or transiently unavailable message.
+func (e *Engine) StreamRawMessages(ctx context.Context, accountID, folderID string, uids []uint32, handle RawMessageStreamHandler) (map[uint32]*RawMessageStreamResult, map[uint32]error, error) {
+	results := make(map[uint32]*RawMessageStreamResult)
+	failures := make(map[uint32]error)
+	if len(uids) == 0 {
+		return results, failures, nil
+	}
+	if handle == nil {
+		return nil, nil, errors.New("raw message stream handler is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return results, failures, err
+	}
+
+	f, err := e.folderStore.Get(folderID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get folder: %w", err)
+	}
+	if f == nil {
+		return nil, nil, fmt.Errorf("folder not found: %s", folderID)
+	}
+
+	conn, err := e.pool.GetConnection(ctx, accountID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get connection: %w", err)
+	}
+	defer e.pool.Release(conn)
+
+	activity := make(chan struct{}, 1)
+	done := make(chan struct{})
+	var timedOut atomic.Bool
+	markActivity := func() {
+		select {
+		case activity <- struct{}{}:
+		default:
+		}
+	}
+	go func() {
+		timer := time.NewTimer(rawMessageFetchIdleTimeout)
+		defer timer.Stop()
+		for {
+			select {
+			case <-activity:
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
+				timer.Reset(rawMessageFetchIdleTimeout)
+			case <-timer.C:
+				timedOut.Store(true)
+				e.log.Warn().
+					Str("account", accountID).
+					Str("folder", f.Path).
+					Dur("timeout", rawMessageFetchIdleTimeout).
+					Msg("Raw message batch fetch stalled; discarding IMAP connection")
+				e.pool.Discard(conn)
+				return
+			case <-done:
+				return
+			}
+		}
+	}()
+	defer close(done)
+	markActivity()
+
+	if _, err := conn.Client().SelectMailbox(ctx, f.Path); err != nil {
+		return nil, nil, fmt.Errorf("failed to select mailbox: %w", err)
+	}
+
+	uidSet := imap.UIDSet{}
+	requested := make(map[uint32]bool, len(uids))
+	for _, uid := range uids {
+		if uid == 0 || requested[uid] {
+			continue
+		}
+		requested[uid] = true
+		uidSet.AddNum(imap.UID(uid))
+	}
+	if len(requested) == 0 {
+		return results, failures, nil
+	}
+
+	fetchOptions := &imap.FetchOptions{
+		UID:        true,
+		RFC822Size: true,
+		BodySection: []*imap.FetchItemBodySection{
+			{
+				Specifier: imap.PartSpecifierNone,
+				Peek:      true,
+			},
+		},
+	}
+	fetchCmd := conn.Client().RawClient().Fetch(uidSet, fetchOptions)
+	seen := make(map[uint32]bool, len(requested))
+
+	for {
+		if err := ctx.Err(); err != nil {
+			fetchCmd.Close()
+			return results, failures, err
+		}
+
+		msg := fetchCmd.Next()
+		if msg == nil {
+			break
+		}
+		markActivity()
+
+		result := &RawMessageStreamResult{}
+		var fetchedUID imap.UID
+		var gotBodySection bool
+		var bodyErr error
+		var bodyArrivedBeforeUID bool
+
+		for {
+			item := msg.Next()
+			if item == nil {
+				break
+			}
+
+			switch data := item.(type) {
+			case imapclient.FetchItemDataUID:
+				markActivity()
+				fetchedUID = data.UID
+			case imapclient.FetchItemDataRFC822Size:
+				markActivity()
+				result.ReportedSize = data.Size
+			case imapclient.FetchItemDataBodySection:
+				if data.Literal == nil {
+					continue
+				}
+				markActivity()
+				gotBodySection = true
+				uid := uint32(fetchedUID)
+				if uid == 0 {
+					bodyArrivedBeforeUID = true
+					_, _ = io.Copy(io.Discard, data.Literal)
+					continue
+				}
+
+				result.BytesWritten, bodyErr = handle(uid, rawMessageProgressReader{
+					reader: data.Literal,
+					mark:   markActivity,
+				})
+				if bodyErr != nil {
+					_, _ = io.Copy(io.Discard, data.Literal)
+				}
+			}
+		}
+
+		uid := uint32(fetchedUID)
+		if uid == 0 {
+			e.log.Warn().Msg("Received raw message without UID in batch response")
+			continue
+		}
+		if !requested[uid] {
+			e.log.Warn().Uint32("uid", uid).Msg("Received unexpected UID in raw batch response")
+			continue
+		}
+		seen[uid] = true
+
+		if bodyArrivedBeforeUID {
+			failures[uid] = fmt.Errorf("message body arrived before UID: UID %d", uid)
+			continue
+		}
+		if bodyErr != nil {
+			failures[uid] = fmt.Errorf("failed to stream message body: %w", bodyErr)
+			continue
+		}
+		if err := rawMessageStreamError(gotBodySection, result, uid); err != nil {
+			failures[uid] = err
+			continue
+		}
+		if rawMessageSizeMismatch(result) {
+			e.log.Warn().
+				Uint32("uid", uid).
+				Int64("reportedSize", result.ReportedSize).
+				Int64("bytesWritten", result.BytesWritten).
+				Msg("Raw message size differs from RFC822.SIZE; keeping streamed backup data")
+		}
+
+		results[uid] = result
+	}
+
+	if err := fetchCmd.Close(); err != nil {
+		e.log.Warn().
+			Err(err).
+			Int("fetched", len(results)).
+			Int("requested", len(requested)).
+			Msg("Raw batch fetch close error, keeping partial backup results")
+	}
+	if timedOut.Load() {
+		return results, failures, fmt.Errorf("raw message batch fetch stalled for %s", rawMessageFetchIdleTimeout)
+	}
+
+	for uid := range requested {
+		if !seen[uid] {
+			failures[uid] = RawMessageNotFoundError{UID: uid}
+		}
+	}
+
+	return results, failures, nil
+}
+
+func rawMessageStreamError(gotBodySection bool, result *RawMessageStreamResult, uid uint32) error {
+	if result == nil || !gotBodySection || result.BytesWritten == 0 {
+		return fmt.Errorf("message body not found: UID %d", uid)
+	}
+	return nil
+}
+
+func rawMessageSizeMismatch(result *RawMessageStreamResult) bool {
+	return result != nil && result.ReportedSize > 0 && result.BytesWritten != result.ReportedSize
 }
 
 // buildMessageFromStreamedData constructs a Message from streamed IMAP data.

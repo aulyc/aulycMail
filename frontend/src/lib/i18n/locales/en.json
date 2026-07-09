@@ -414,8 +414,9 @@
     "indexedMessages": "{count} messages indexed",
     "directoryChangedHint": "The same directory exports incrementally; changing directories starts a full export.",
     "startBackup": "Start backup",
-    "backupRunning": "Backing up...",
+    "backupRunning": "Backing up in background...",
     "progressCounts": "Exported {exported}, skipped {skipped}, failed {failed}",
+    "progressCountsWithMissing": "Exported {exported}, skipped {skipped}, missing {missing}, failed {failed}",
     "settingsSaved": "Backup settings saved",
     "loadFailed": "Failed to load backup settings",
     "saveFailed": "Failed to save backup settings",
@@ -423,7 +424,10 @@
     "openDirectoryFailed": "Failed to open backup directory",
     "selectDirectoryFirst": "Choose a backup directory first",
     "selectMailboxFirst": "Select at least one mailbox",
+    "backupAlreadyRunning": "A backup is already running. Wait for it to finish.",
+    "backupStartedInBackground": "Backup started in the background",
     "backupComplete": "Backup complete: exported {exported}, skipped {skipped}, failed {failed}",
+    "backupCompleteWithMissing": "Backup complete: exported {exported}, skipped {skipped}, missing {missing}, failed {failed}",
     "backupFailed": "Backup failed"
   },
   "backupViewer": {

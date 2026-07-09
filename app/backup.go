@@ -18,6 +18,7 @@ import (
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/platform"
 	"github.com/aulyc/aulycmail/internal/settings"
+	mailSync "github.com/aulyc/aulycmail/internal/sync"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -26,9 +27,14 @@ const (
 	backupScopeSelected = "selected"
 
 	backupIndexVersion = 1
+
+	backupRawFetchBatchSize = 10
 )
 
-var emailBackupMu sync.Mutex
+var (
+	errEmailBackupAlreadyRunning = errors.New("email backup is already running")
+	emailBackupJob               backupRunTracker
+)
 
 // BackupSettings is the persisted backup preference exposed to the frontend.
 type BackupSettings struct {
@@ -62,6 +68,7 @@ type BackupRunResult struct {
 	Total      int    `json:"total"`
 	Exported   int    `json:"exported"`
 	Skipped    int    `json:"skipped"`
+	Missing    int    `json:"missing"`
 	Failed     int    `json:"failed"`
 	ReportPath string `json:"reportPath,omitempty"`
 }
@@ -75,8 +82,73 @@ type BackupProgress struct {
 	Total        int    `json:"total"`
 	Exported     int    `json:"exported"`
 	Skipped      int    `json:"skipped"`
+	Missing      int    `json:"missing"`
 	Failed       int    `json:"failed"`
 	Message      string `json:"message,omitempty"`
+}
+
+// BackupRunState is the process-local state for an in-flight backup run.
+type BackupRunState struct {
+	Running   bool            `json:"running"`
+	StartedAt string          `json:"startedAt,omitempty"`
+	Progress  *BackupProgress `json:"progress,omitempty"`
+}
+
+type backupRunTracker struct {
+	mu        sync.Mutex
+	running   bool
+	startedAt string
+	progress  *BackupProgress
+}
+
+func (t *backupRunTracker) start(startedAt string) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.running {
+		return false
+	}
+	t.running = true
+	t.startedAt = startedAt
+	t.progress = &BackupProgress{
+		Phase:   "running",
+		Current: 0,
+		Total:   0,
+		Message: "开始备份",
+	}
+	return true
+}
+
+func (t *backupRunTracker) update(progress BackupProgress) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	next := progress
+	t.progress = &next
+}
+
+func (t *backupRunTracker) finish(progress BackupProgress) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	t.running = false
+	next := progress
+	t.progress = &next
+}
+
+func (t *backupRunTracker) snapshot() BackupRunState {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	state := BackupRunState{
+		Running:   t.running,
+		StartedAt: t.startedAt,
+	}
+	if t.progress != nil {
+		progress := *t.progress
+		state.Progress = &progress
+	}
+	return state
 }
 
 type backupIndex struct {
@@ -110,6 +182,7 @@ type backupIndexRun struct {
 	Total      int    `json:"total"`
 	Exported   int    `json:"exported"`
 	Skipped    int    `json:"skipped"`
+	Missing    int    `json:"missing,omitempty"`
 	Failed     int    `json:"failed"`
 }
 
@@ -123,8 +196,9 @@ type backupFailure struct {
 
 type backupReport struct {
 	backupIndexRun
-	Directory string          `json:"directory"`
-	Failures  []backupFailure `json:"failures,omitempty"`
+	Directory       string          `json:"directory"`
+	MissingMessages []backupFailure `json:"missingMessages,omitempty"`
+	Failures        []backupFailure `json:"failures,omitempty"`
 }
 
 type backupMessageRow struct {
@@ -142,6 +216,12 @@ type backupMessageRow struct {
 	DateRaw        string
 	Size           int
 	HasAttachments bool
+}
+
+type backupMessageGroup struct {
+	AccountID string
+	FolderID  string
+	Rows      []backupMessageRow
 }
 
 // GetBackupSettings returns the persisted backup settings.
@@ -297,20 +377,81 @@ func (a *App) GetBackupStatus(directory string) (*BackupStatus, error) {
 	if idx.LastRun != nil {
 		status.LastRunAt = idx.LastRun.FinishedAt
 		status.LastRunMode = idx.LastRun.Mode
-		status.LastRunResult = fmt.Sprintf("%d exported, %d skipped, %d failed", idx.LastRun.Exported, idx.LastRun.Skipped, idx.LastRun.Failed)
+		status.LastRunResult = formatBackupRunResult(*idx.LastRun)
 	}
 	return status, nil
+}
+
+// GetBackupRunState returns the current in-process backup run state.
+func (a *App) GetBackupRunState() BackupRunState {
+	return emailBackupJob.snapshot()
+}
+
+// StartEmailBackup starts a background backup and returns immediately. Progress
+// and completion are emitted through backup:progress and recoverable via
+// GetBackupRunState.
+func (a *App) StartEmailBackup(options BackupRunOptions) (BackupRunState, error) {
+	startedAt := time.Now().UTC().Format(time.RFC3339)
+	if !emailBackupJob.start(startedAt) {
+		return emailBackupJob.snapshot(), errEmailBackupAlreadyRunning
+	}
+	a.emitBackupProgress(BackupProgress{Phase: "running", Current: 0, Total: 0, Message: "开始备份"})
+
+	go func() {
+		defer recoverPanic("app.backup", "email backup")
+		defer func() {
+			if r := recover(); r != nil {
+				a.finishBackupProgress(BackupProgress{
+					Phase:   "error",
+					Message: "backup worker crashed",
+				})
+				panic(r)
+			}
+		}()
+
+		result, err := a.runEmailBackup(options, startedAt)
+		if err != nil {
+			a.finishBackupProgress(BackupProgress{
+				Phase:   "error",
+				Message: err.Error(),
+			})
+			return
+		}
+		a.finishBackupProgress(backupDoneProgress(result))
+	}()
+
+	return emailBackupJob.snapshot(), nil
 }
 
 // RunEmailBackup exports selected accounts to standard .eml files. Existing
 // entries in .aulycmail-backup/index.json are skipped, so rerunning against the
 // same directory is incremental. A different directory without an index starts
 // as a full backup.
-func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error) {
-	emailBackupMu.Lock()
-	defer emailBackupMu.Unlock()
-
+func (a *App) RunEmailBackup(options BackupRunOptions) (result *BackupRunResult, err error) {
 	startedAt := time.Now().UTC().Format(time.RFC3339)
+	if !emailBackupJob.start(startedAt) {
+		return nil, errEmailBackupAlreadyRunning
+	}
+	a.emitBackupProgress(BackupProgress{Phase: "running", Current: 0, Total: 0, Message: "开始备份"})
+	defer func() {
+		if err == nil {
+			return
+		}
+		a.finishBackupProgress(BackupProgress{
+			Phase:   "error",
+			Message: err.Error(),
+		})
+	}()
+
+	result, err = a.runEmailBackup(options, startedAt)
+	if err != nil {
+		return nil, err
+	}
+	a.finishBackupProgress(backupDoneProgress(result))
+	return result, nil
+}
+
+func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*BackupRunResult, error) {
 	if strings.TrimSpace(options.Directory) == "" {
 		options.Directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
 	}
@@ -361,12 +502,12 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error)
 		Total:     len(rows),
 	}
 	failures := make([]backupFailure, 0)
-	emit := func(progress BackupProgress) {
-		wailsRuntime.EventsEmit(a.ctx, "backup:progress", progress)
-	}
-	emit(BackupProgress{Phase: "running", Total: len(rows), Message: "开始备份"})
+	missing := make([]backupFailure, 0)
+	a.emitBackupProgress(BackupProgress{Phase: "running", Total: len(rows), Message: "开始备份"})
 
-	for i, row := range rows {
+	pendingRows := make([]backupMessageRow, 0, len(rows))
+	processed := 0
+	for _, row := range rows {
 		select {
 		case <-a.ctx.Done():
 			return nil, a.ctx.Err()
@@ -379,70 +520,141 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error)
 			existing.HasAttachments = boolPtr(row.HasAttachments)
 			idx.Messages[key] = existing
 			result.Skipped++
-			emit(BackupProgress{
+			processed++
+			a.emitBackupProgress(BackupProgress{
 				Phase:        "running",
 				AccountEmail: row.AccountEmail,
 				FolderPath:   row.FolderPath,
-				Current:      i + 1,
+				Current:      processed,
 				Total:        len(rows),
 				Exported:     result.Exported,
 				Skipped:      result.Skipped,
+				Missing:      result.Missing,
 				Failed:       result.Failed,
 			})
 			continue
 		}
 
-		relPath := backupMessageRelativePath(row)
-		written, err := writeBackupFileFromStream(directory, relPath, func(w io.Writer) (int64, error) {
-			streamResult, err := a.syncEngine.StreamRawMessage(a.ctx, row.AccountID, row.FolderID, row.UID, w)
-			if err != nil {
-				return 0, err
+		pendingRows = append(pendingRows, row)
+	}
+
+	for _, group := range groupBackupMessageRows(pendingRows) {
+		for offset := 0; offset < len(group.Rows); offset += backupRawFetchBatchSize {
+			select {
+			case <-a.ctx.Done():
+				return nil, a.ctx.Err()
+			default:
 			}
-			return streamResult.BytesWritten, nil
-		})
-		if err != nil {
-			result.Failed++
-			failures = append(failures, backupFailureFromRow(row, err))
-			emit(BackupProgress{
-				Phase:        "running",
-				AccountEmail: row.AccountEmail,
-				FolderPath:   row.FolderPath,
-				Current:      i + 1,
-				Total:        len(rows),
-				Exported:     result.Exported,
-				Skipped:      result.Skipped,
-				Failed:       result.Failed,
-				Message:      err.Error(),
-			})
-			continue
-		}
 
-		idx.Messages[key] = backupIndexMessage{
-			AccountID:      row.AccountID,
-			AccountEmail:   row.AccountEmail,
-			FolderID:       row.FolderID,
-			FolderPath:     row.FolderPath,
-			UIDValidity:    row.UIDValidity,
-			UID:            row.UID,
-			MessageID:      row.MessageID,
-			Subject:        row.Subject,
-			Date:           row.DateRaw,
-			EMLPath:        relPath,
-			Size:           backupFileSizeInt(written),
-			HasAttachments: boolPtr(row.HasAttachments),
-			ExportedAt:     time.Now().UTC().Format(time.RFC3339),
+			end := offset + backupRawFetchBatchSize
+			if end > len(group.Rows) {
+				end = len(group.Rows)
+			}
+			chunk := group.Rows[offset:end]
+			rowsByUID := backupRowsByUID(chunk)
+			streamResults, streamFailures, err := a.syncEngine.StreamRawMessages(a.ctx, group.AccountID, group.FolderID, backupRowUIDs(chunk), func(uid uint32, body io.Reader) (int64, error) {
+				row, ok := rowsByUID[uid]
+				if !ok {
+					return 0, fmt.Errorf("unexpected backup UID: %d", uid)
+				}
+				return writeBackupFileFromReader(directory, backupMessageRelativePath(row), body)
+			})
+			if err != nil {
+				for _, row := range chunk {
+					result.Failed++
+					failures = append(failures, backupFailureFromRow(row, err))
+					processed++
+					a.emitBackupProgress(BackupProgress{
+						Phase:        "running",
+						AccountEmail: row.AccountEmail,
+						FolderPath:   row.FolderPath,
+						Current:      processed,
+						Total:        len(rows),
+						Exported:     result.Exported,
+						Skipped:      result.Skipped,
+						Missing:      result.Missing,
+						Failed:       result.Failed,
+						Message:      err.Error(),
+					})
+				}
+				continue
+			}
+
+			for _, row := range chunk {
+				key := backupMessageKey(row)
+				relPath := backupMessageRelativePath(row)
+				streamResult, ok := streamResults[row.UID]
+				err := streamFailures[row.UID]
+				if err == nil && !ok {
+					err = mailSync.RawMessageNotFoundError{UID: row.UID}
+				}
+				if err != nil {
+					if mailSync.IsRawMessageNotFoundError(err) {
+						result.Missing++
+						missing = append(missing, backupFailureFromRow(row, err))
+						processed++
+						a.emitBackupProgress(BackupProgress{
+							Phase:        "running",
+							AccountEmail: row.AccountEmail,
+							FolderPath:   row.FolderPath,
+							Current:      processed,
+							Total:        len(rows),
+							Exported:     result.Exported,
+							Skipped:      result.Skipped,
+							Missing:      result.Missing,
+							Failed:       result.Failed,
+							Message:      err.Error(),
+						})
+						continue
+					}
+					result.Failed++
+					failures = append(failures, backupFailureFromRow(row, err))
+					processed++
+					a.emitBackupProgress(BackupProgress{
+						Phase:        "running",
+						AccountEmail: row.AccountEmail,
+						FolderPath:   row.FolderPath,
+						Current:      processed,
+						Total:        len(rows),
+						Exported:     result.Exported,
+						Skipped:      result.Skipped,
+						Missing:      result.Missing,
+						Failed:       result.Failed,
+						Message:      err.Error(),
+					})
+					continue
+				}
+
+				idx.Messages[key] = backupIndexMessage{
+					AccountID:      row.AccountID,
+					AccountEmail:   row.AccountEmail,
+					FolderID:       row.FolderID,
+					FolderPath:     row.FolderPath,
+					UIDValidity:    row.UIDValidity,
+					UID:            row.UID,
+					MessageID:      row.MessageID,
+					Subject:        row.Subject,
+					Date:           row.DateRaw,
+					EMLPath:        relPath,
+					Size:           backupFileSizeInt(streamResult.BytesWritten),
+					HasAttachments: boolPtr(row.HasAttachments),
+					ExportedAt:     time.Now().UTC().Format(time.RFC3339),
+				}
+				result.Exported++
+				processed++
+				a.emitBackupProgress(BackupProgress{
+					Phase:        "running",
+					AccountEmail: row.AccountEmail,
+					FolderPath:   row.FolderPath,
+					Current:      processed,
+					Total:        len(rows),
+					Exported:     result.Exported,
+					Skipped:      result.Skipped,
+					Missing:      result.Missing,
+					Failed:       result.Failed,
+				})
+			}
 		}
-		result.Exported++
-		emit(BackupProgress{
-			Phase:        "running",
-			AccountEmail: row.AccountEmail,
-			FolderPath:   row.FolderPath,
-			Current:      i + 1,
-			Total:        len(rows),
-			Exported:     result.Exported,
-			Skipped:      result.Skipped,
-			Failed:       result.Failed,
-		})
 	}
 
 	run := backupIndexRun{
@@ -452,6 +664,7 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error)
 		Total:      result.Total,
 		Exported:   result.Exported,
 		Skipped:    result.Skipped,
+		Missing:    result.Missing,
 		Failed:     result.Failed,
 	}
 	idx.Version = backupIndexVersion
@@ -462,25 +675,50 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (*BackupRunResult, error)
 		return nil, err
 	}
 	reportPath, err := saveBackupReport(directory, backupReport{
-		backupIndexRun: run,
-		Directory:      directory,
-		Failures:       failures,
+		backupIndexRun:  run,
+		Directory:       directory,
+		MissingMessages: missing,
+		Failures:        failures,
 	})
 	if err != nil {
 		return nil, err
 	}
 	result.ReportPath = reportPath
 
-	emit(BackupProgress{
+	return result, nil
+}
+
+func (a *App) emitBackupProgress(progress BackupProgress) {
+	emailBackupJob.update(progress)
+	wailsRuntime.EventsEmit(a.ctx, "backup:progress", progress)
+}
+
+func (a *App) finishBackupProgress(progress BackupProgress) {
+	emailBackupJob.finish(progress)
+	wailsRuntime.EventsEmit(a.ctx, "backup:progress", progress)
+}
+
+func backupDoneProgress(result *BackupRunResult) BackupProgress {
+	if result == nil {
+		return BackupProgress{Phase: "done", Message: "备份完成"}
+	}
+	return BackupProgress{
 		Phase:    "done",
-		Current:  len(rows),
-		Total:    len(rows),
+		Current:  result.Total,
+		Total:    result.Total,
 		Exported: result.Exported,
 		Skipped:  result.Skipped,
+		Missing:  result.Missing,
 		Failed:   result.Failed,
 		Message:  "备份完成",
-	})
-	return result, nil
+	}
+}
+
+func formatBackupRunResult(run backupIndexRun) string {
+	if run.Missing > 0 {
+		return fmt.Sprintf("%d exported, %d skipped, %d missing, %d failed", run.Exported, run.Skipped, run.Missing, run.Failed)
+	}
+	return fmt.Sprintf("%d exported, %d skipped, %d failed", run.Exported, run.Skipped, run.Failed)
 }
 
 func (a *App) resolveBackupAccounts(scope string, selectedIDs []string) ([]*account.Account, error) {
@@ -591,6 +829,47 @@ func (a *App) listBackupMessages(accountIDs []string) ([]backupMessageRow, error
 		return nil, fmt.Errorf("failed to iterate backup messages: %w", err)
 	}
 	return messages, nil
+}
+
+func groupBackupMessageRows(rows []backupMessageRow) []backupMessageGroup {
+	groups := make([]backupMessageGroup, 0)
+	indexByKey := make(map[string]int)
+	for _, row := range rows {
+		key := row.AccountID + "\x00" + row.FolderID
+		index, ok := indexByKey[key]
+		if !ok {
+			index = len(groups)
+			indexByKey[key] = index
+			groups = append(groups, backupMessageGroup{
+				AccountID: row.AccountID,
+				FolderID:  row.FolderID,
+			})
+		}
+		groups[index].Rows = append(groups[index].Rows, row)
+	}
+	return groups
+}
+
+func backupRowUIDs(rows []backupMessageRow) []uint32 {
+	uids := make([]uint32, 0, len(rows))
+	for _, row := range rows {
+		if row.UID == 0 {
+			continue
+		}
+		uids = append(uids, row.UID)
+	}
+	return uids
+}
+
+func backupRowsByUID(rows []backupMessageRow) map[uint32]backupMessageRow {
+	byUID := make(map[uint32]backupMessageRow, len(rows))
+	for _, row := range rows {
+		if row.UID == 0 {
+			continue
+		}
+		byUID[row.UID] = row
+	}
+	return byUID
 }
 
 func normalizeBackupScope(scope string) string {
@@ -763,6 +1042,39 @@ func writeBackupFileFromStream(baseDir, relPath string, write func(io.Writer) (i
 	if closeErr != nil {
 		_ = os.Remove(tmp)
 		return written, fmt.Errorf("failed to close temp file: %w", closeErr)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return written, fmt.Errorf("failed to replace file: %w", err)
+	}
+	return written, nil
+}
+
+func writeBackupFileFromReader(baseDir, relPath string, reader io.Reader) (int64, error) {
+	path := filepath.Join(baseDir, filepath.FromSlash(relPath))
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return 0, fmt.Errorf("failed to create backup folder: %w", err)
+	}
+
+	tmp := path + ".tmp"
+	file, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return 0, fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	written, copyErr := io.Copy(file, reader)
+	closeErr := file.Close()
+	if copyErr != nil {
+		_ = os.Remove(tmp)
+		return written, fmt.Errorf("failed to stream backup file: %w", copyErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmp)
+		return written, fmt.Errorf("failed to close temp file: %w", closeErr)
+	}
+	if written == 0 {
+		_ = os.Remove(tmp)
+		return written, errors.New("message body not found")
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)

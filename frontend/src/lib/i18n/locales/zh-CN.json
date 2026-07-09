@@ -414,8 +414,9 @@
     "indexedMessages": "已索引 {count} 封邮件",
     "directoryChangedHint": "同一目录按索引增量导出；更换目录会重新完整导出。",
     "startBackup": "开始备份",
-    "backupRunning": "正在备份...",
+    "backupRunning": "后台备份中...",
     "progressCounts": "新增 {exported}，跳过 {skipped}，失败 {failed}",
+    "progressCountsWithMissing": "新增 {exported}，跳过 {skipped}，未找到 {missing}，失败 {failed}",
     "settingsSaved": "备份设置已保存",
     "loadFailed": "加载备份设置失败",
     "saveFailed": "保存备份设置失败",
@@ -423,7 +424,10 @@
     "openDirectoryFailed": "打开备份目录失败",
     "selectDirectoryFirst": "请先选择备份目录",
     "selectMailboxFirst": "请至少选择一个邮箱",
+    "backupAlreadyRunning": "备份正在运行，请等待当前任务完成",
+    "backupStartedInBackground": "备份已在后台开始",
     "backupComplete": "备份完成：新增 {exported}，跳过 {skipped}，失败 {failed}",
+    "backupCompleteWithMissing": "备份完成：新增 {exported}，跳过 {skipped}，未找到 {missing}，失败 {failed}",
     "backupFailed": "备份失败"
   },
   "backupViewer": {

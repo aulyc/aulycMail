@@ -82,6 +82,8 @@ export function GetAutoDetectedFolders(arg1:string):Promise<Record<string, strin
 
 export function GetAutostart():Promise<boolean>;
 
+export function GetBackupRunState():Promise<app.BackupRunState>;
+
 export function GetBackupSettings():Promise<app.BackupSettings>;
 
 export function GetBackupStatus(arg1:string):Promise<app.BackupStatus>;
@@ -297,6 +299,8 @@ export function SetThemeMode(arg1:string):Promise<void>;
 export function ShowWindow():Promise<void>;
 
 export function Star(arg1:Array<string>):Promise<void>;
+
+export function StartEmailBackup(arg1:app.BackupRunOptions):Promise<app.BackupRunState>;
 
 export function SubscribeAllFolders(arg1:string):Promise<void>;
 
