@@ -21,6 +21,97 @@ func openTestDB(t *testing.T) *DB {
 	return db
 }
 
+func openTestDBAtMigration(t *testing.T, version int) *DB {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "test.db")
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`); err != nil {
+		_ = db.Close()
+		t.Fatalf("create migrations table: %v", err)
+	}
+	for _, m := range migrations {
+		if m.Version > version {
+			break
+		}
+		if err := db.applyMigration(m); err != nil {
+			_ = db.Close()
+			t.Fatalf("apply migration %d: %v", m.Version, err)
+		}
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
+
+func applyMigrationsAfter(t *testing.T, db *DB, version int) {
+	t.Helper()
+	for _, m := range migrations {
+		if m.Version <= version {
+			continue
+		}
+		if err := db.applyMigration(m); err != nil {
+			t.Fatalf("apply migration %d: %v", m.Version, err)
+		}
+	}
+}
+
+func applyMigrationVersion(t *testing.T, db *DB, version int) {
+	t.Helper()
+	for _, m := range migrations {
+		if m.Version == version {
+			if err := db.applyMigration(m); err != nil {
+				t.Fatalf("apply migration %d: %v", m.Version, err)
+			}
+			return
+		}
+	}
+	t.Fatalf("migration %d not found", version)
+}
+
+func tableExists(t *testing.T, db *DB, name string) bool {
+	t.Helper()
+	var count int
+	if err := db.QueryRow(`
+		SELECT COUNT(*)
+		FROM sqlite_master
+		WHERE type = 'table' AND name = ?
+	`, name).Scan(&count); err != nil {
+		t.Fatalf("check table %s: %v", name, err)
+	}
+	return count > 0
+}
+
+func columnExists(t *testing.T, db *DB, table, column string) bool {
+	t.Helper()
+	rows, err := db.Query(`PRAGMA table_info(` + table + `)`)
+	if err != nil {
+		t.Fatalf("read table info for %s: %v", table, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, typ string
+		var defaultValue sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &defaultValue, &pk); err != nil {
+			t.Fatalf("scan table info for %s: %v", table, err)
+		}
+		if name == column {
+			return true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterate table info for %s: %v", table, err)
+	}
+	return false
+}
+
 func TestOpen(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "test.db")
 	db, err := Open(path)
@@ -95,7 +186,7 @@ func TestCheckpoint(t *testing.T) {
 // migration: oauth_tokens uses composite PK (account_id, client_config_id) so
 // old databases with multiple token rows still migrate deterministically.
 func TestMigrationV29_OAuthCompositeKey(t *testing.T) {
-	db := openTestDB(t)
+	db := openTestDBAtMigration(t, 29)
 
 	// Insert a test account row (oauth_tokens.account_id FK to accounts.id).
 	// Schema defaults handle most columns; only NOT NULL non-default fields are explicit.
@@ -179,17 +270,112 @@ func TestMigrationV46_FTSUpdateTriggerIgnoresFlagOnlyUpdates(t *testing.T) {
 	}
 }
 
+func TestMigrationV47_DropsLegacyRemoteContactSchema(t *testing.T) {
+	db := openTestDBAtMigration(t, 46)
+
+	if _, err := db.Exec(`
+		INSERT INTO accounts (id, name, email, imap_host, smtp_host, username, encrypted_access_token, encrypted_refresh_token)
+		VALUES ('acct-1', 'Test', 'user@example.com', 'imap.example.com', 'smtp.example.com', 'user@example.com', 'old-access', 'old-refresh');
+
+		INSERT INTO contact_records (id, source, kind, fn, created_at, updated_at)
+		VALUES ('local-rec', 'local', 'manual', 'Local', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+		INSERT INTO contact_emails (record_id, email, is_primary)
+		VALUES ('local-rec', 'local@example.com', 1);
+
+		INSERT INTO contact_sources (id, name, type, url, username, enabled, sync_interval)
+		VALUES ('src-1', 'Remote', 'carddav', 'https://example.com/dav', 'user', 1, 60);
+		INSERT INTO contact_source_addressbooks (id, source_id, path, name, enabled)
+		VALUES ('ab-1', 'src-1', '/contacts/', 'Contacts', 1);
+		INSERT INTO contact_source_oauth (source_id, provider, expires_at, scopes, client_config_id)
+		VALUES ('src-1', 'google', CURRENT_TIMESTAMP, '[]', 'google-extensions');
+		INSERT INTO contact_records (id, source, source_ref, fn, vcard_raw, created_at, updated_at)
+		VALUES ('remote-rec', 'carddav', 'ab-1', 'Remote', 'BEGIN:VCARD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+		INSERT INTO contact_emails (record_id, email, is_primary)
+		VALUES ('remote-rec', 'remote@example.com', 1);
+		INSERT INTO carddav_record_state (record_id, addressbook_id, href, etag)
+		VALUES ('remote-rec', 'ab-1', '/contacts/remote.vcf', 'etag');
+
+		INSERT INTO oauth_tokens (account_id, client_config_id, provider, expires_at, scopes, encrypted_access_token, encrypted_refresh_token)
+		VALUES ('acct-1', 'google-mail', 'google', CURRENT_TIMESTAMP, '[]', 'token-access', 'token-refresh');
+		INSERT INTO extension_secrets (extension, key, encrypted_value, created_at)
+		VALUES ('contacts', 'token', 'secret', 1);
+		CREATE TABLE user_oauth_clients (id TEXT PRIMARY KEY);
+		CREATE TABLE user_oauth_slot_aliases (id TEXT PRIMARY KEY);
+		INSERT INTO user_oauth_clients (id) VALUES ('client-1');
+		INSERT INTO user_oauth_slot_aliases (id) VALUES ('alias-1');
+		INSERT INTO settings (key, value)
+		VALUES ('oauth_active_choice:google-mail', 'custom');
+	`); err != nil {
+		t.Fatalf("seed legacy schema: %v", err)
+	}
+
+	if err := db.Migrate(); err != nil {
+		t.Fatalf("migrate to v47: %v", err)
+	}
+
+	for _, table := range []string{
+		"carddav_record_state",
+		"contact_source_oauth",
+		"contact_source_addressbooks",
+		"contact_sources",
+		"oauth_tokens",
+		"extension_secrets",
+		"user_oauth_clients",
+		"user_oauth_slot_aliases",
+	} {
+		if tableExists(t, db, table) {
+			t.Fatalf("legacy table %s should be dropped", table)
+		}
+	}
+
+	for _, col := range []string{"encrypted_access_token", "encrypted_refresh_token"} {
+		if columnExists(t, db, "accounts", col) {
+			t.Fatalf("accounts.%s should be dropped", col)
+		}
+	}
+	for _, col := range []string{"source_ref", "vcard_raw"} {
+		if columnExists(t, db, "contact_records", col) {
+			t.Fatalf("contact_records.%s should be dropped", col)
+		}
+	}
+
+	var localCount, remoteCount, oauthSettings int
+	if err := db.QueryRow(`
+		SELECT COUNT(*)
+		FROM contact_records cr
+		JOIN contact_emails ce ON ce.record_id = cr.id
+		WHERE cr.id = 'local-rec' AND cr.source = 'local' AND ce.email = 'local@example.com'
+	`).Scan(&localCount); err != nil {
+		t.Fatalf("count local contact: %v", err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM contact_records WHERE source <> 'local'`).Scan(&remoteCount); err != nil {
+		t.Fatalf("count remote contacts: %v", err)
+	}
+	if err := db.QueryRow(`SELECT COUNT(*) FROM settings WHERE key LIKE 'oauth_active_choice:%'`).Scan(&oauthSettings); err != nil {
+		t.Fatalf("count oauth settings: %v", err)
+	}
+	if localCount != 1 {
+		t.Fatalf("local contact should survive v47, got %d", localCount)
+	}
+	if remoteCount != 0 {
+		t.Fatalf("remote contacts should be removed by v47, got %d", remoteCount)
+	}
+	if oauthSettings != 0 {
+		t.Fatalf("oauth_active_choice settings should be removed by v47, got %d", oauthSettings)
+	}
+}
+
 // TestMigrationV32_LocalRecordIDsRewrittenToUUIDs verifies that migration 32
 // transforms "local-<email>" record IDs into canonical UUIDv4s while keeping
 // the contact_emails references intact. Simulates the upgrade path for a user
 // who applied migration 31 (id format was "local-X@Y") and is now upgrading
 // to the schema that uses UUIDs.
 func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
-	db := openTestDB(t)
+	db := openTestDBAtMigration(t, 31)
 
 	// Seed legacy v31-shape data: a local record with the "local-<email>"
-	// synthetic id. Delete the migration 32 marker so it re-applies and
-	// rewrites this row.
+	// synthetic id. Migrate() then applies v32+ in order, including the final
+	// v47 local-only schema cleanup.
 	if _, err := db.Exec(`
 		INSERT INTO contact_records (id, source, kind, fn)
 		VALUES ('local-alice@example.com', 'local', 'collected', 'Alice')
@@ -201,62 +387,6 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 		VALUES ('local-alice@example.com', 'alice@example.com', 5, 1)
 	`); err != nil {
 		t.Fatalf("seed contact_emails: %v", err)
-	}
-	// Clear v32 AND any later markers so Migrate() sees v32 as pending.
-	// Migrate compares against MAX(version), so leaving a later marker
-	// (e.g., v33) would cause v32 to be skipped on the re-run.
-	if _, err := db.Exec(`DELETE FROM migrations WHERE version >= 32`); err != nil {
-		t.Fatalf("clear migration 32+ markers: %v", err)
-	}
-	// Drop v34's photo columns so its re-application's ADD COLUMNs don't
-	// collide. SQLite supports DROP COLUMN since 3.35; modernc.org/sqlite
-	// is well past that.
-	for _, col := range []string{"photo_data", "photo_media_type", "photo_url"} {
-		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop %s for re-migrate: %v", col, err)
-		}
-	}
-	// Drop v36's legacy oauth_tokens fallback columns for the same reason —
-	// re-running v36 ADDs them again.
-	for _, col := range []string{"encrypted_access_token", "encrypted_refresh_token"} {
-		if _, err := db.Exec(`ALTER TABLE oauth_tokens DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop oauth_tokens.%s for re-migrate: %v", col, err)
-		}
-	}
-	// Drop v37's SMTP-receive-only / SMTP-creds columns + v38's
-	// reply_forward_identity_id on accounts so the re-application's ADD
-	// COLUMNs don't collide.
-	for _, col := range []string{"no_outgoing_server", "smtp_username", "encrypted_smtp_password", "reply_forward_identity_id"} {
-		if _, err := db.Exec(`ALTER TABLE accounts DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop accounts.%s for re-migrate: %v", col, err)
-		}
-	}
-	// Same for v39's body_failed on messages.
-	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN body_failed`); err != nil {
-		t.Fatalf("drop messages.body_failed for re-migrate: %v", err)
-	}
-	// And v40's collected-role flags + v41's split Cc/Bcc flags on contact_records.
-	for _, col := range []string{"collected_sender", "collected_recipient", "collected_ccbcc", "collected_cc", "collected_bcc"} {
-		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop contact_records.%s for re-migrate: %v", col, err)
-		}
-	}
-	// Same for v43's signature separator style on identities.
-	if _, err := db.Exec(`ALTER TABLE identities DROP COLUMN signature_separator_style`); err != nil {
-		t.Fatalf("drop identities.signature_separator_style for re-migrate: %v", err)
-	}
-	// Same for v44's local source-message link on drafts.
-	if _, err := db.Exec(`ALTER TABLE drafts DROP COLUMN source_message_id`); err != nil {
-		t.Fatalf("drop drafts.source_message_id for re-migrate: %v", err)
-	}
-	// Same for v45's split sync settings.
-	for _, col := range []string{"local_retention_days", "sync_strategy", "full_check_interval_days", "body_download_policy", "body_download_days"} {
-		if _, err := db.Exec(`ALTER TABLE accounts DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop accounts.%s for re-migrate: %v", col, err)
-		}
-	}
-	if _, err := db.Exec(`ALTER TABLE folders DROP COLUMN last_full_sync`); err != nil {
-		t.Fatalf("drop folders.last_full_sync for re-migrate: %v", err)
 	}
 
 	// Re-run migrations — migration 32 should rewrite the seeded local- id.
@@ -309,7 +439,7 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 // orphans AND wires the new FK so future addressbook deletes cascade to
 // state rows automatically.
 func TestMigrationV33_AddsAddressbookFK(t *testing.T) {
-	db := openTestDB(t)
+	db := openTestDBAtMigration(t, 33)
 
 	// Seed a source + addressbook + record so we have a row to chain through.
 	if _, err := db.Exec(`
@@ -367,72 +497,7 @@ func TestMigrationV33_AddsAddressbookFK(t *testing.T) {
 // then re-running migration 33 — which must pre-clean orphans before the
 // table rebuild's INSERT.
 func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
-	db := openTestDB(t)
-
-	// Roll back the v33 schema: drop the FK by rebuilding the table without
-	// it. This mimics what an install at v32 would have looked like.
-	if _, err := db.Exec(`
-		PRAGMA foreign_keys = OFF;
-		DROP TABLE carddav_record_state;
-		CREATE TABLE carddav_record_state (
-			record_id       TEXT PRIMARY KEY REFERENCES contact_records(id) ON DELETE CASCADE,
-			addressbook_id  TEXT NOT NULL,
-			href            TEXT NOT NULL UNIQUE,
-			etag            TEXT,
-			synced_at       DATETIME
-		);
-		CREATE INDEX idx_carddav_record_state_addressbook
-			ON carddav_record_state(addressbook_id);
-		DELETE FROM migrations WHERE version >= 33;
-		PRAGMA foreign_keys = ON;
-	`); err != nil {
-		t.Fatalf("rewind to v32 schema: %v", err)
-	}
-	// Drop v34's photo columns so re-application's ADD COLUMNs don't collide.
-	for _, col := range []string{"photo_data", "photo_media_type", "photo_url"} {
-		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop %s for re-migrate: %v", col, err)
-		}
-	}
-	// Same for v36's legacy oauth_tokens fallback columns.
-	for _, col := range []string{"encrypted_access_token", "encrypted_refresh_token"} {
-		if _, err := db.Exec(`ALTER TABLE oauth_tokens DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop oauth_tokens.%s for re-migrate: %v", col, err)
-		}
-	}
-	// Same for v37 + v38's accounts columns.
-	for _, col := range []string{"no_outgoing_server", "smtp_username", "encrypted_smtp_password", "reply_forward_identity_id"} {
-		if _, err := db.Exec(`ALTER TABLE accounts DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop accounts.%s for re-migrate: %v", col, err)
-		}
-	}
-	// And v39's body_failed on messages.
-	if _, err := db.Exec(`ALTER TABLE messages DROP COLUMN body_failed`); err != nil {
-		t.Fatalf("drop messages.body_failed for re-migrate: %v", err)
-	}
-	// And v40's collected-role flags + v41's split Cc/Bcc flags on contact_records.
-	for _, col := range []string{"collected_sender", "collected_recipient", "collected_ccbcc", "collected_cc", "collected_bcc"} {
-		if _, err := db.Exec(`ALTER TABLE contact_records DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop contact_records.%s for re-migrate: %v", col, err)
-		}
-	}
-	// Same for v43's signature separator style on identities.
-	if _, err := db.Exec(`ALTER TABLE identities DROP COLUMN signature_separator_style`); err != nil {
-		t.Fatalf("drop identities.signature_separator_style for re-migrate: %v", err)
-	}
-	// Same for v44's local source-message link on drafts.
-	if _, err := db.Exec(`ALTER TABLE drafts DROP COLUMN source_message_id`); err != nil {
-		t.Fatalf("drop drafts.source_message_id for re-migrate: %v", err)
-	}
-	// Same for v45's split sync settings.
-	for _, col := range []string{"local_retention_days", "sync_strategy", "full_check_interval_days", "body_download_policy", "body_download_days"} {
-		if _, err := db.Exec(`ALTER TABLE accounts DROP COLUMN ` + col); err != nil {
-			t.Fatalf("drop accounts.%s for re-migrate: %v", col, err)
-		}
-	}
-	if _, err := db.Exec(`ALTER TABLE folders DROP COLUMN last_full_sync`); err != nil {
-		t.Fatalf("drop folders.last_full_sync for re-migrate: %v", err)
-	}
+	db := openTestDBAtMigration(t, 32)
 
 	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,
 	// this insert succeeds because the FK isn't there.
@@ -458,11 +523,10 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 		t.Fatalf("seed orphan record: %v", err)
 	}
 
-	// Re-run migrations; v33 should pre-clean both before rebuilding the
-	// table with the FK.
-	if err := db.Migrate(); err != nil {
-		t.Fatalf("re-migrate: %v", err)
-	}
+	// Apply just v33; it should pre-clean both rows before rebuilding the table
+	// with the FK. Later v47 removes this legacy sidecar entirely, so this test
+	// stops at the migration that owns the behavior.
+	applyMigrationVersion(t, db, 33)
 
 	var stateCount, recordCount int
 	if err := db.QueryRow(`SELECT COUNT(*) FROM carddav_record_state WHERE record_id = 'zombie-rec'`).Scan(&stateCount); err != nil {
@@ -564,27 +628,7 @@ func TestMigrationV34_AddsPhotoColumns(t *testing.T) {
 // record_id; a plain INSERT tripped PRIMARY KEY(record_id, email) and rolled the
 // whole startup migration back. INSERT OR IGNORE dedupes instead.
 func TestMigration31_DuplicateCardDAVEmailDoesNotFailMigration(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "test.db")
-	db, err := Open(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { db.Close() })
-
-	// applyMigration records into the migrations table, which Migrate() normally
-	// creates first — make it here since we drive applyMigration directly.
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS migrations (version INTEGER PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)`); err != nil {
-		t.Fatalf("create migrations table: %v", err)
-	}
-
-	// Build the pre-unification (v30) schema so the legacy tables exist.
-	for _, m := range migrations {
-		if m.Version <= 30 {
-			if err := db.applyMigration(m); err != nil {
-				t.Fatalf("apply migration %d: %v", m.Version, err)
-			}
-		}
-	}
+	db := openTestDBAtMigration(t, 30)
 
 	// Seed one CardDAV vCard (single href) whose old schema fanned the SAME
 	// address out across two rows — the exact #289 trigger.
@@ -598,14 +642,9 @@ func TestMigration31_DuplicateCardDAVEmailDoesNotFailMigration(t *testing.T) {
 		t.Fatalf("seed legacy carddav_contacts: %v", err)
 	}
 
-	// Apply migration 31 and everything after — must NOT fail on the duplicate.
-	for _, m := range migrations {
-		if m.Version > 30 {
-			if err := db.applyMigration(m); err != nil {
-				t.Fatalf("migration %d failed on duplicate CardDAV email (#289): %v", m.Version, err)
-			}
-		}
-	}
+	// Apply v31 first so we can assert the backfill dedupes before the final
+	// local-only cleanup removes remote rows.
+	applyMigrationVersion(t, db, 31)
 
 	// The duplicate collapsed to exactly one contact_emails row.
 	var n int
@@ -614,5 +653,15 @@ func TestMigration31_DuplicateCardDAVEmailDoesNotFailMigration(t *testing.T) {
 	}
 	if n != 1 {
 		t.Fatalf("want 1 deduped contact_emails row, got %d", n)
+	}
+
+	// Later migrations must still complete, and v47 intentionally discards the
+	// remaining remote-contact rows.
+	applyMigrationsAfter(t, db, 31)
+	if err := db.QueryRow(`SELECT COUNT(*) FROM contact_emails WHERE email = 'dup@example.com'`).Scan(&n); err != nil {
+		t.Fatalf("count contact_emails after v47: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("want remote contact_emails removed by v47, got %d", n)
 	}
 }

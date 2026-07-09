@@ -301,7 +301,7 @@ Contacts namespaces its keys under `contacts.*`:
 
 - **Error/failure messages**: Use clean, translated messages. Do not include raw error details or `{error}` interpolation tokens in failure messages — keep them user-friendly (e.g., `"Failed to save."` not `"Failed to save: {error}"`).
 - **Placeholder tokens**: `{placeholder}` tokens are used for dynamic values. Common tokens include:
-  - `{name}` — account or contact source name
+  - `{name}` — account, contact, or folder name
   - `{email}` / `{emails}` — email address(es)
   - `{count}` — numeric count (messages, attachments, etc.)
   - `{mode}` — composer mode (reply, forward, etc.)

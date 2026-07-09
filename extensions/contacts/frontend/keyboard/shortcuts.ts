@@ -16,11 +16,8 @@ import { noMods, ctrlOrMeta } from '$lib/keyboard/shortcuts'
 export const CONTACT_EDIT = (e: KeyboardEvent): boolean =>
   e.key === 'e' && noMods(e)
 
-/** `Ctrl/Cmd+N` — open the new-contact dialog, pre-targeted to the
- *  sidebar-focused addressbook (the dialog's own `autoFillFromSidebar`
- *  reads `contactsView.selectedSourceId` and falls back to local when
- *  the focused source isn't writable). Routed by the rail-pane shortcut
- *  registry before App.svelte's mail-domain switch — only fires when
+/** `Ctrl/Cmd+N` — open the local new-contact dialog. Routed by the rail-pane
+ *  shortcut registry before App.svelte's mail-domain switch — only fires when
  *  contacts is the active rail. */
 export const CONTACT_NEW = (e: KeyboardEvent): boolean =>
   e.key.toLowerCase() === 'n' && ctrlOrMeta(e) && !e.shiftKey && !e.altKey

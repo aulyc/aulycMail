@@ -1703,7 +1703,6 @@ export namespace v1 {
 	}
 	export class ContactCreateInput {
 	    sourceId?: string;
-	    addressbookId?: string;
 	    email: string;
 	    name?: string;
 	    nickname?: string;
@@ -1726,7 +1725,6 @@ export namespace v1 {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.sourceId = source["sourceId"];
-	        this.addressbookId = source["addressbookId"];
 	        this.email = source["email"];
 	        this.name = source["name"];
 	        this.nickname = source["nickname"];

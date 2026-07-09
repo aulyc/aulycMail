@@ -8,10 +8,9 @@ import (
 // fromLocal converts a core contact.Contact into the API-surface Contact.
 //
 // Core contacts are keyed by email, so we use the email itself as the ID. The
-// Source field (e.g. "aulycmail", "vcard", "carddav") becomes SourceID
-// for search results where the user hasn't picked a specific source. Used by
-// the autocomplete-style per-email row paths; multi-field fromRecord is the
-// path the Contacts pane uses for its list + detail views.
+// local Source field becomes SourceID for autocomplete-style per-email row
+// paths; multi-field fromRecord is the path the Contacts pane uses for its list
+// + detail views.
 func fromLocal(c *contact.Contact) coreapi.Contact {
 	updated := c.LastUsed
 	if updated.IsZero() {
@@ -26,17 +25,14 @@ func fromLocal(c *contact.Contact) coreapi.Contact {
 	}
 }
 
-// fromRecord converts a contact.Record (the multi-field record-shape used by
-// Phase 2b.2.a's unified schema) into the API-surface coreapi.Contact. One
-// Contact per record, with all sub-tables surfaced through the rich
-// Emails/Phones/Addresses/URLs/IMPPs/Categories slices.
+// fromRecord converts a local contact.Record into the API-surface
+// coreapi.Contact. One Contact per record, with all sub-tables surfaced through
+// the rich Emails/Phones/Addresses/URLs/IMPPs/Categories slices.
 //
 // SourceID semantics:
 //   - For local records: returns the legacy-mapped Source value ("aulycmail") so
 //     the ContactDetail.svelte gate `sourceId === 'aulycmail'` keeps working for
 //     Edit/Delete on local contacts.
-//   - For legacy CardDAV records: returns the addressbook-or-source id from
-//     rec.SourceRef when available.
 func fromRecord(rec *contact.Record) coreapi.Contact {
 	if rec == nil {
 		return coreapi.Contact{Emails: []string{}}
@@ -59,9 +55,7 @@ func fromRecord(rec *contact.Record) coreapi.Contact {
 		UpdatedAt:      rec.UpdatedAt,
 	}
 
-	// Source mapping: 'local' → 'aulycmail' (legacy compat for the detail-pane
-	// gate). 'carddav' stays as 'carddav' or is overridden by the caller when
-	// it knows a specific source id.
+	// Source mapping: 'local' → 'aulycmail' for the detail-pane edit/delete gate.
 	out.SourceID = rec.Source
 	if rec.Source == "local" {
 		out.SourceID = "aulycmail"

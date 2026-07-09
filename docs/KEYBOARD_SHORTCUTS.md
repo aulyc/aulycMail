@@ -240,12 +240,12 @@ Pane-local navigation (Up/Down/J/K, Enter, Space, Alt+H/L for pane cycling, Alt+
 
 **Sidebar navigation (works from any pane)**
 
-Mirrors mail's "Folder Navigation" shortcuts. These fire regardless of which contacts pane currently has keyboard focus — so you can scroll through addressbooks while the list or detail pane is focused.
+Mirrors mail's "Folder Navigation" shortcuts. These fire regardless of which contacts pane currently has keyboard focus, so you can move through contact groups while the list or detail pane is focused.
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+Up` / `Alt+K` | Move to previous source / addressbook in the sidebar |
-| `Alt+Down` / `Alt+J` | Move to next source / addressbook in the sidebar |
+| `Alt+Up` / `Alt+K` | Move to previous group in the sidebar |
+| `Alt+Down` / `Alt+J` | Move to next group in the sidebar |
 
 **Pane cycling**
 

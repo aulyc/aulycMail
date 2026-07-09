@@ -126,7 +126,7 @@
   let showAccountDialog = $state(false)
   let editingAccount = $state<account.Account | null>(null)
 
-  // Load accounts and contact sources on mount
+  // Load accounts on mount
   onMount(() => {
     // Load accounts, then trigger comprehensive sync on launch
     accountStore.load().then(async () => {

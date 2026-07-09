@@ -573,7 +573,7 @@ func TestCreate_GeneratesUUID(t *testing.T) {
 }
 
 // Regression for #278: a contact that lists the same address twice (e.g. an
-// MS365 export, or two case variants normalizing to the same value) must not
+// CSV/vCard import, or two case variants normalizing to the same value) must not
 // fail the record on the contact_emails PRIMARY KEY(record_id, email).
 func TestUpsertRecord_DuplicateEmailDeduped(t *testing.T) {
 	db := openTestDB(t)
@@ -581,7 +581,8 @@ func TestUpsertRecord_DuplicateEmailDeduped(t *testing.T) {
 
 	rec := &Record{
 		ID:     "rec-dup",
-		Source: "carddav",
+		Source: "local",
+		Kind:   "manual",
 		Fn:     "Dup Dave",
 		Emails: []RecordEmail{
 			{Email: "dave@example.com"},

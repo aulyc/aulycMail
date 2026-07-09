@@ -13,6 +13,8 @@ Each section below covers a single released-to-released schema transition with a
 
 Each rollback section lists the **data lost on rollback** for that migration. This is inherent: if the newer schema added columns that the older schema doesn't have, those values are dropped when you go back. Anything else round-trips losslessly.
 
+Current builds at schema v47 also perform a one-way cleanup of the removed remote-contact/OAuth/extension-secret schema. After a DB reaches v47, the SQLite tables and columns for CardDAV contacts, OAuth tokens, and extension secrets are gone; use a DB backup from before v47 if you need to inspect that historical data.
+
 ## What you need
 
 - The aulycmail DB file. Default path:
@@ -88,7 +90,7 @@ If the issue persists, open a GitHub issue with the SQL error output and the ver
 - **Migration 33** (Phase 2b.2.b.1 follow-up): Added a missing `FOREIGN KEY ... ON DELETE CASCADE` from `carddav_record_state.addressbook_id` to `contact_source_addressbooks(id)`. Closes the privacy gap where deleting a contacts provider left record + state zombies in the local DB. Pre-step cleans any pre-existing orphans so the FK rebuild succeeds.
 - **Migration 34** (Phase 2b.2.b.2): First-class PHOTO field support — adds `photo_data`, `photo_media_type`, `photo_url` columns to `contact_records` so the vCard parser/builder can extract and emit PHOTO natively. Before v34, photos round-tripped opaquely via `vcard_raw` but were never displayed.
 - **Migration 35**: Adds the historical `extension_secrets` table. The extension runtime was later slimmed back to the built-in Contacts pane, but the rollback still drops this table when returning to v30.
-- **Migration 36** (legacy OAuth token fallback columns): Adds `encrypted_access_token` and `encrypted_refresh_token` columns to the legacy `oauth_tokens` table. Current aulycmail builds no longer use OAuth, but the columns remain part of the schema history for databases that already migrated through v36.
+- **Migration 36** (legacy OAuth token fallback columns): Adds `encrypted_access_token` and `encrypted_refresh_token` columns to the legacy `oauth_tokens` table. Current aulycmail builds no longer use OAuth; migration 47 later drops this legacy table entirely.
 - **Migration 37** (Per-account "No outgoing server" + separate SMTP credentials): Adds `no_outgoing_server` (INTEGER, default 0), `smtp_username` (TEXT, default `''`), and `encrypted_smtp_password` (TEXT, nullable) columns to the `accounts` table. Lets users mark an account as receive-only (hidden from the composer's From dropdown, send attempts blocked), and lets Generic-provider accounts authenticate SMTP with credentials separate from IMAP. The keyring carries the separate SMTP password under `<accountID>:smtp` when set; `encrypted_smtp_password` is the AES-fallback companion for systems without an OS keyring.
 - **Migration 38** (Per-account "Reply/Forward with" identity preference): Adds `reply_forward_identity_id` (TEXT, default `''`) to the `accounts` table. For receive-only accounts (the v37 feature), lets the user pick a specific identity from another sendable account to pre-select in the composer when replying or forwarding messages received here. Empty value falls back to the user's default sending account, then to the first available identity. Sendable accounts ignore the column entirely.
 - **Migration 39** (Persistent body-parse-failed flag): Adds `body_failed` (INTEGER, default 0) to the `messages` table. Set to 1 when a body fetch+parse produced no usable content (and the message isn't encrypted, which legitimately has empty plaintext until view-time decryption). Replaces an in-memory cap on parse retries that reset every sync session — so an unparseable message used to be re-fetched from IMAP on every cycle, forever (issue #240). The body-fetch queue now excludes any row with `body_failed = 1`. A future parser improvement can re-queue previously-skipped messages via a one-line `UPDATE messages SET body_failed = 0 WHERE …` migration.
@@ -108,15 +110,13 @@ Migrations 31 through 39 ship together in 0.3.0 — no real-world DB will ever s
 - **Per-account "Reply/Forward with" identity preference** (v38). The `reply_forward_identity_id` column is dropped. v0.2.5 has no concept of receive-only accounts (that's the v37 feature this preference depends on), so the dropped value wouldn't have applied under v0.2.5 anyway — there's no behavior change. On re-upgrade to v0.3.0, accounts that had this preference set will revert to the empty default (i.e., the composer will use the user's default sending account when replying/forwarding on a receive-only account); the user re-picks the identity in the account's Server tab.
 - **Persistent body-parse-failed flag** (v39). The `body_failed` column is dropped. Effect under v0.2.5: every message that v0.3.0 had marked unparseable will be subject to v0.2.5's old (unbounded) re-fetch behavior — the same state the user was in before #240 was fixed. Bounded only by message count, not by sync cycles. On re-upgrade to v0.3.0, those messages will be re-attempted up to one time and re-flagged via the new persistence path; transient, self-correcting.
 
-**Legacy OAuth Credentials picker leftover state (inert, not cleaned by the rollback)**:
+**Legacy OAuth Credentials picker leftover state**:
 
-Pre-removal v0.3.0 builds had an OAuth Credentials picker that accumulated state in three places the rollback SQL doesn't touch. All three are inert under v0.2.5 and under current post-removal builds — the code doesn't read them — so leaving them in place is safe. They're listed here in case you want a fully clean state:
+Pre-removal v0.3.0 builds had an OAuth Credentials picker that accumulated state in three places the rollback SQL doesn't touch because the script targets v39 → v30. Current v47 forward migration removes all three from SQLite. If you are manually maintaining an older v39-v46 DB and want the same cleanup, run:
 
-- The `user_oauth_clients` table (on-demand, created when the user first saved a Custom client_id+secret). The table itself stays; rows stay. Current builds don't read it.
-- The `user_oauth_slot_aliases` table (on-demand, created when the user first picks the "aulycmail - <provider>" alias option). Same treatment.
+- The `user_oauth_clients` table (on-demand, created when the user first saved a Custom client_id+secret).
+- The `user_oauth_slot_aliases` table (on-demand, created when the user first picked an alias option).
 - Per-slot rows in the existing `settings` table with key `oauth_active_choice:<slot_id>` (introduced post-v0.3.0-build1). These encoded the user's explicit picker selection independent of which credentials/alias rows happened to exist.
-
-Optional cleanup (run only if you want zero leftover OAuth picker state in the DB):
 
 ```sql
 DROP TABLE IF EXISTS user_oauth_clients;

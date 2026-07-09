@@ -103,7 +103,6 @@
 
     return v1.ContactCreateInput.createFrom({
       sourceId: LOCAL_VALUE,
-      addressbookId: '',
       email: primaryEmail,
       name: nameInput.trim(),
       note: noteInput.trim(),

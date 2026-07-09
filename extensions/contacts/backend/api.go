@@ -11,9 +11,9 @@ import (
 )
 
 // Source IDs for aulycmail's single local contact store. There are no remote
-// sources — every contact lives in the local unified contact-record schema.
+// sources — every contact lives in the local contact-record schema.
 //
-// The local store distinguishes entries by `contacts.kind`:
+// The local store distinguishes entries by `contact_records.kind`:
 //   - manual    → entries the user added via the Add Contact UI
 //   - collected → auto-collected from mail (senders/recipients/cc-bcc)
 //
@@ -35,8 +35,9 @@ const (
 	SourceIDAccountPrefix = "account:"
 )
 
-// localKindFromSourceID returns the `contacts.kind` filter value for a local
-// sub-source ID, or "" for the parent "local" / empty (= no filter, return both).
+// localKindFromSourceID returns the `contact_records.kind` filter value for a
+// local sub-source ID, or "" for the parent "local" / empty (= no filter,
+// return both).
 func localKindFromSourceID(id string) string {
 	switch id {
 	case SourceIDLocalManual:

@@ -117,16 +117,8 @@ func (s *Store) Search(query string, limit int) ([]*Contact, error) {
 	return unified, nil
 }
 
-// searchUnified queries the unified contact_records + contact_emails tables.
+// searchUnified queries the local contact_records + contact_emails tables.
 // Returns one *Contact per matching (record, email) pair.
-//
-// Visibility rules (match the legacy carddav-search bridge's behavior):
-//   - Local records (source='local') are always visible.
-//   - CardDAV records are visible only when their carddav_record_state row
-//     resolves to an ENABLED addressbook under an ENABLED source. Orphaned
-//     records (state row missing, addressbook deleted, source deleted) or
-//     disabled-source records are filtered OUT so they don't surface in the
-//     "All" view but stay invisible under their (disabled/missing) source.
 func (s *Store) searchUnified(query string, limit int) ([]*Contact, error) {
 	normalized := strings.ToLower(strings.TrimSpace(query))
 	if normalized == "" {
@@ -161,15 +153,7 @@ func (s *Store) searchUnified(query string, limit int) ([]*Contact, error) {
 		FROM contact_emails ce
 		JOIN contact_records cr ON ce.record_id = cr.id
 		WHERE (%s)
-		  AND (
-		    cr.source = 'local'
-		    OR EXISTS (
-		      SELECT 1 FROM carddav_record_state crs
-		      JOIN contact_source_addressbooks ab ON ab.id = crs.addressbook_id
-		      JOIN contact_sources s ON s.id = ab.source_id
-		      WHERE crs.record_id = cr.id AND s.enabled = 1 AND ab.enabled = 1
-		    )
-		  )
+		  AND cr.source = 'local'
 		ORDER BY
 		  CASE
 		    WHEN LOWER(COALESCE(cr.fn, '')) LIKE ? THEN 0
@@ -211,7 +195,7 @@ func (s *Store) searchUnified(query string, limit int) ([]*Contact, error) {
 	return contacts, nil
 }
 
-// mapSourceForLegacy maps the unified `source` column values onto the legacy
+// mapSourceForLegacy maps the contact_records `source` column onto the legacy
 // Contact.Source string. Older callers expect "aulycmail" for local contacts;
 // preserving the mapping keeps those callers unchanged.
 func mapSourceForLegacy(source string) string {
@@ -516,9 +500,8 @@ func (s *Store) Create(email, displayName string) error {
 	}
 
 	now := time.Now()
-	// Record id is a UUID, NOT derived from email (matches CardDAV — vCard
-	// UID semantics). The email goes in contact_emails as a fully-editable
-	// sub-row.
+	// Record id is a UUID, NOT derived from email. The email goes in
+	// contact_emails as a fully-editable sub-row.
 	recordID := uuid.New().String()
 	if _, err := s.db.Exec(`
 		INSERT INTO contact_records (id, source, kind, fn, created_at, updated_at)
@@ -544,9 +527,8 @@ func (s *Store) Create(email, displayName string) error {
 
 // DeleteRecord removes a contact record by ID. Cascades to contact_emails and
 // all sub-tables via FK ON DELETE CASCADE. Used by the extension API when the
-// caller has a record id (UUID — both local and CardDAV records share the
-// vCard-UID identity shape as of migration 32). The older Delete(email)
-// method stays for back-compat with mail-side callers.
+// caller has a record id (UUID). The older Delete(email) method stays for
+// back-compat with mail-side callers.
 func (s *Store) DeleteRecord(id string) error {
 	if id == "" {
 		return nil
@@ -630,8 +612,8 @@ func (s *Store) Get(email string) (*Contact, error) {
 }
 
 // Delete removes the email's contact_emails row. If the parent record is empty
-// AND local-collected, the record is also deleted; manual and CardDAV records
-// survive (so the user can re-link emails). Public signature preserved.
+// AND local-collected, the record is also deleted; manual records survive so the
+// user can re-link emails. Public signature preserved.
 func (s *Store) Delete(email string) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
@@ -691,9 +673,7 @@ func (s *Store) List(limit int) ([]*Contact, error) {
 // filter. Valid kinds: "manual" (user-added), "collected" (auto-collected).
 // Public signature preserved.
 //
-// Returns local-source rows only (records with source='local'). Legacy
-// carddav records remain in the unified tables but are not returned by this
-// autocomplete-style API.
+// Returns local-source rows only (records with source='local').
 func (s *Store) ListByKind(kind string, limit int) ([]*Contact, error) {
 	args := []any{}
 	query := `
@@ -785,12 +765,12 @@ func (s *Store) GetRecord(id string) (*Record, error) {
 	}
 
 	row := s.db.QueryRow(`
-		SELECT id, source, COALESCE(kind, ''), COALESCE(source_ref, ''),
+		SELECT id, source, COALESCE(kind, ''),
 		       COALESCE(fn, ''), COALESCE(n_given, ''), COALESCE(n_family, ''),
 		       COALESCE(org, ''), COALESCE(title, ''), COALESCE(note, ''),
 		       COALESCE(bday, ''), COALESCE(nickname, ''),
 		       COALESCE(photo_data, ''), COALESCE(photo_media_type, ''), COALESCE(photo_url, ''),
-		       COALESCE(vcard_raw, ''), created_at, updated_at
+		       created_at, updated_at
 		FROM contact_records
 		WHERE id = ?
 	`, id)
@@ -798,12 +778,12 @@ func (s *Store) GetRecord(id string) (*Record, error) {
 	rec := &Record{}
 	var createdAt, updatedAt sql.NullTime
 	err := row.Scan(
-		&rec.ID, &rec.Source, &rec.Kind, &rec.SourceRef,
+		&rec.ID, &rec.Source, &rec.Kind,
 		&rec.Fn, &rec.NGiven, &rec.NFamily,
 		&rec.Org, &rec.Title, &rec.Note,
 		&rec.Bday, &rec.Nickname,
 		&rec.PhotoData, &rec.PhotoMediaType, &rec.PhotoURL,
-		&rec.VCardRaw, &createdAt, &updatedAt,
+		&createdAt, &updatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -941,7 +921,7 @@ func (s *Store) loadRecordSubTables(rec *Record) error {
 
 // ListRecords returns contact records matching the filter, with sub-table data
 // populated for each. Records are ordered by fn ASC for stable display in the
-// Contacts pane. The filter scopes by source/kind/source_ref and supports a
+// Contacts pane. The filter scopes by source/kind and supports a
 // case-insensitive name/email substring query.
 func (s *Store) ListRecords(filter RecordFilter) ([]*Record, error) {
 	where, args := recordFilterWhere(filter)
@@ -1019,10 +999,6 @@ func recordFilterWhere(filter RecordFilter) (string, []any) {
 	if filter.AccountID != "" {
 		conds = append(conds, accountRecordExistsSQL(filter.Role))
 		args = append(args, filter.AccountID)
-	}
-	if filter.SourceRef != "" {
-		conds = append(conds, `cr.source_ref = ?`)
-		args = append(args, filter.SourceRef)
 	}
 	if filter.Query != "" {
 		// Match on fn OR any email belonging to the record.
@@ -1163,7 +1139,7 @@ func (s *Store) UpsertRecord(rec *Record) error {
 // Semantics:
 //   - If rec.ID is empty, returns an error (caller must assign).
 //   - Record row is INSERT-or-UPDATE on (id). All scalar fields (fn, n_*,
-//     org, title, note, bday, nickname, vcard_raw) are written verbatim.
+//     org, title, note, bday, nickname) are written verbatim.
 //   - Sub-tables (contact_emails, contact_phones, contact_addresses,
 //     contact_urls, contact_impps, contact_categories) are REPLACED wholesale:
 //     existing rows for this record are deleted, then re-inserted from the
@@ -1171,15 +1147,15 @@ func (s *Store) UpsertRecord(rec *Record) error {
 //     though current callers are local-only.
 //   - For contact_emails: send_count + last_used + name_overridden are
 //     PRESERVED across the replace when a matching email exists.
-//
-// Does NOT touch carddav_record_state — the caller handles that sidecar.
-// Works the same for source='local' contacts (no sidecar in that case).
 func UpsertRecordTx(tx DBOrTx, rec *Record) error {
 	if rec == nil {
 		return fmt.Errorf("UpsertRecordTx: nil record")
 	}
 	if rec.Source == "" {
 		return fmt.Errorf("UpsertRecordTx: source is required")
+	}
+	if rec.Source != "local" {
+		return fmt.Errorf("UpsertRecordTx: source must be local")
 	}
 	if rec.ID == "" {
 		return fmt.Errorf("UpsertRecordTx: id is required")
@@ -1194,13 +1170,12 @@ func UpsertRecordTx(tx DBOrTx, rec *Record) error {
 	// Upsert the record row.
 	if _, err := tx.Exec(`
 		INSERT INTO contact_records
-			(id, source, kind, source_ref, fn, n_given, n_family, org, title, note, bday, nickname,
-			 photo_data, photo_media_type, photo_url, vcard_raw, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			(id, source, kind, fn, n_given, n_family, org, title, note, bday, nickname,
+			 photo_data, photo_media_type, photo_url, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			source = excluded.source,
 			kind = excluded.kind,
-			source_ref = excluded.source_ref,
 			fn = excluded.fn,
 			n_given = excluded.n_given,
 			n_family = excluded.n_family,
@@ -1212,13 +1187,11 @@ func UpsertRecordTx(tx DBOrTx, rec *Record) error {
 			photo_data = excluded.photo_data,
 			photo_media_type = excluded.photo_media_type,
 			photo_url = excluded.photo_url,
-			vcard_raw = excluded.vcard_raw,
 			updated_at = excluded.updated_at
 	`,
-		rec.ID, rec.Source, nullableString(rec.Kind), nullableString(rec.SourceRef),
+		rec.ID, rec.Source, nullableString(rec.Kind),
 		rec.Fn, rec.NGiven, rec.NFamily, rec.Org, rec.Title, rec.Note, rec.Bday, rec.Nickname,
 		nullableString(rec.PhotoData), nullableString(rec.PhotoMediaType), nullableString(rec.PhotoURL),
-		nullableString(rec.VCardRaw),
 		rec.CreatedAt, rec.UpdatedAt,
 	); err != nil {
 		return fmt.Errorf("upsert contact_records: %w", err)

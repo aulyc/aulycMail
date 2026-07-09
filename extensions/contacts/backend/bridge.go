@@ -173,7 +173,7 @@ func (b *ContactsBridge) Contacts_UpdateContact(idOrEmail string, patch coreapi.
 	return err
 }
 
-// Contacts_DeleteLocalContact removes a contact from the local unified store.
+// Contacts_DeleteLocalContact removes a contact from the local contact store.
 // It is idempotent on missing records.
 //
 // Note: there's a separate top-level `App.DeleteContact` from the older

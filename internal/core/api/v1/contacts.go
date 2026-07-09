@@ -57,9 +57,6 @@ type ContactPhoto struct {
 //   - anything else                   → rejected. Remote contact sources are
 //     not implemented.
 //
-// AddressbookID is retained for old API shape compatibility. It is ignored by
-// the local-only implementation.
-//
 // Rich-field support: when any of the optional rich fields below is set,
 // the create dispatchers route through recordFromCreateInput which mirrors
 // ContactPatch's shape onto a new contact.Record. Email + Name remain the
@@ -72,10 +69,9 @@ type ContactPhoto struct {
 // such ambiguity (omitting means empty, providing means set), so plain
 // slices are used.
 type ContactCreateInput struct {
-	SourceID      string `json:"sourceId,omitempty"`
-	AddressbookID string `json:"addressbookId,omitempty"`
-	Email         string `json:"email"`
-	Name          string `json:"name,omitempty"`
+	SourceID string `json:"sourceId,omitempty"`
+	Email    string `json:"email"`
+	Name     string `json:"name,omitempty"`
 
 	// Optional rich fields, mirroring ContactPatch's field set. When
 	// Emails is supplied (non-empty), it REPLACES the implicit single

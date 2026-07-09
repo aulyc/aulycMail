@@ -327,9 +327,8 @@ var migrations = []Migration{
 	{
 		Version: 9,
 		SQL: `
-			-- Legacy reserved: OAuth token metadata table. OAuth support was
-			-- removed (password auth only); table retained for schema
-			-- compatibility with existing databases.
+			-- Historical OAuth token metadata table. Keep it in the migration
+			-- chain so old databases can upgrade in order; v47 removes it.
 			CREATE TABLE oauth_tokens (
 				account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
 				provider TEXT NOT NULL,  -- 'google', 'microsoft'
@@ -481,12 +480,12 @@ var migrations = []Migration{
 	{
 		Version: 17,
 		SQL: `
-			-- Legacy reserved: account linkage for removed remote contact sources.
-			-- OAuth support was removed; column retained for schema compatibility.
+			-- Historical account linkage for removed remote contact sources.
+			-- Kept for old upgrade paths; v47 removes contact_sources.
 			ALTER TABLE contact_sources ADD COLUMN account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE;
 
-			-- Legacy reserved: OAuth metadata for standalone contact sources.
-			-- OAuth support was removed; table retained for schema compatibility.
+			-- Historical OAuth metadata for standalone contact sources. Kept for
+			-- old upgrade paths; v47 removes this table.
 			CREATE TABLE contact_source_oauth (
 				source_id TEXT PRIMARY KEY REFERENCES contact_sources(id) ON DELETE CASCADE,
 				provider TEXT NOT NULL,  -- 'google', 'microsoft'
@@ -708,11 +707,11 @@ var migrations = []Migration{
 	{
 		Version: 29,
 		SQL: `
-			-- Legacy reserved: multi-config OAuth token shape.
+			-- Historical multi-config OAuth token shape.
 			--
-			-- OAuth support was removed, but old databases can still contain
-			-- oauth_tokens/contact_source_oauth rows. This migration keeps the
-			-- historical table shape stable so existing DBs continue to migrate.
+			-- Old databases can still contain oauth_tokens/contact_source_oauth
+			-- rows here. v47 removes those legacy tables after the full upgrade
+			-- path has succeeded.
 			--
 			-- For backward compatibility: existing rows are backfilled to the old
 			-- mail config ids before the composite primary key rebuild.
@@ -753,8 +752,9 @@ var migrations = []Migration{
 			-- Legacy reserved: write capability flag for contact sources.
 			--
 			-- contact_sources.writable: explicit per-source write capability flag.
-			-- Remote contact sources are currently unimplemented; the column is
-			-- retained so older DBs with contact_sources rows still migrate.
+			-- Remote contact sources were removed. The column remains in this
+			-- migration only so older DBs with contact_sources rows still migrate
+			-- before v47 removes the legacy tables.
 			--
 			-- Note: contacts.name_overridden is added by contact.Store.ensureTable
 			-- (lazy schema) since the contacts table isn't part of the migration
@@ -1194,10 +1194,9 @@ var migrations = []Migration{
 	{
 		Version: 35,
 		SQL: `
-			-- Historical reserved table for extension-scoped secrets. The
-			-- extension runtime was later slimmed back to the built-in
-			-- Contacts pane; the table remains for schema compatibility with
-			-- databases that already ran this migration.
+			-- Historical table for extension-scoped secrets. The extension runtime
+			-- was later slimmed back to the built-in Contacts pane; v47 removes
+			-- this table after old databases have passed this point.
 			--
 			-- This table tracks ALL extension secret keys regardless of
 			-- where the value actually lives. The encrypted_value column
@@ -1222,12 +1221,9 @@ var migrations = []Migration{
 	{
 		Version: 36,
 		SQL: `
-			-- Legacy reserved: per-(account, client_config) encrypted fallback
-			-- columns for removed OAuth token support.
-			--
-			-- OAuth code no longer reads or writes oauth_tokens. The columns stay
-			-- in migrations so databases that already passed through v36 keep a
-			-- consistent schema version history.
+			-- Historical per-(account, client_config) encrypted fallback columns
+			-- for removed OAuth token support. v47 drops oauth_tokens after old
+			-- databases have passed this point.
 
 			ALTER TABLE oauth_tokens ADD COLUMN encrypted_access_token TEXT;
 			ALTER TABLE oauth_tokens ADD COLUMN encrypted_refresh_token TEXT;
@@ -1439,6 +1435,32 @@ var migrations = []Migration{
 				INSERT INTO messages_fts(rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text)
 				VALUES (NEW.rowid, NEW.subject, NEW.from_name, NEW.from_email, NEW.to_list, NEW.cc_list, NEW.snippet, NEW.body_text);
 			END;
+		`,
+	},
+	{
+		Version: 47,
+		SQL: `
+			-- Remove legacy remote-contact, OAuth, and extension-secret schema.
+			-- Current Contacts is local-only; remote records and token metadata are
+			-- intentionally discarded.
+			DELETE FROM contact_records WHERE source <> 'local';
+			UPDATE contact_records SET source = 'local';
+
+			DROP INDEX IF EXISTS idx_contact_records_source_ref;
+			DROP TABLE IF EXISTS carddav_record_state;
+			DROP TABLE IF EXISTS contact_source_oauth;
+			DROP TABLE IF EXISTS contact_source_addressbooks;
+			DROP TABLE IF EXISTS contact_sources;
+			DROP TABLE IF EXISTS oauth_tokens;
+			DROP TABLE IF EXISTS extension_secrets;
+			DROP TABLE IF EXISTS user_oauth_clients;
+			DROP TABLE IF EXISTS user_oauth_slot_aliases;
+			DELETE FROM settings WHERE key LIKE 'oauth_active_choice:%';
+
+			ALTER TABLE accounts DROP COLUMN encrypted_access_token;
+			ALTER TABLE accounts DROP COLUMN encrypted_refresh_token;
+			ALTER TABLE contact_records DROP COLUMN source_ref;
+			ALTER TABLE contact_records DROP COLUMN vcard_raw;
 		`,
 	},
 }

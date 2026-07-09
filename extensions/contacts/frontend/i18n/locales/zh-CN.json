@@ -78,8 +78,6 @@
       "sourceLabel": "保存到",
       "sourcePlaceholder": "选择一个来源",
       "localOption": "本地联系人",
-      "addressbookLabel": "通讯录",
-      "addressbookPlaceholder": "选择一个通讯录",
       "errorEmailRequired": "电子邮件为必填项。",
       "errorEmailInvalid": "请输入有效的电子邮件地址。",
       "errorEmailExists": "已存在使用此电子邮件的联系人。"

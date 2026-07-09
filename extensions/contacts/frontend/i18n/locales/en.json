@@ -78,8 +78,6 @@
       "sourceLabel": "Save to",
       "sourcePlaceholder": "Select a source",
       "localOption": "Local contacts",
-      "addressbookLabel": "Address book",
-      "addressbookPlaceholder": "Select an address book",
       "errorEmailRequired": "Email is required.",
       "errorEmailInvalid": "Enter a valid email address.",
       "errorEmailExists": "A contact with this email already exists."
