@@ -7,30 +7,19 @@ import "context"
 // ClickHandler is called when a notification is clicked
 type ClickHandler func(data NotificationData)
 
-// NotificationData contains the context for a notification click. Mail
-// notifications populate AccountID/FolderID/ThreadID; extension notifications
-// fired via coreapi.Notifications populate ExtensionID + Path. The dispatcher
-// in app/ routes based on which fields are set — extension-routed clicks
-// switch the rail tab and emit a path-scoped event; mail clicks fall through
-// to the existing mail navigation flow.
+// NotificationData contains the context for a notification click.
 type NotificationData struct {
-	// Mail-routed fields
 	AccountID string
 	FolderID  string
 	ThreadID  string
-
-	// Extension-routed fields (set by coreapi.Notifications consumers).
-	// Both empty = mail-routed click.
-	ExtensionID string
-	Path        string
 }
 
 // Notification represents a desktop notification to be shown
 type Notification struct {
-	Title   string
-	Body    string
-	Icon    string
-	Data    NotificationData
+	Title string
+	Body  string
+	Icon  string
+	Data  NotificationData
 }
 
 // Notifier provides cross-platform notification support with click handling

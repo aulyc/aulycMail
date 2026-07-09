@@ -30,7 +30,6 @@
   import { loadImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
   import { initTheme, applyThemeFromMode, handleSystemThemeEvent, handleMediaQueryChange } from '$lib/stores/theme.svelte'
   import { DEFAULT_LIST_WIDTH, DEFAULT_SIDEBAR_WIDTH, loadUIState, saveUIState, getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
-  import { setPendingDeepLink } from '$lib/stores/extensionDeepLink.svelte'
   import {
     type FocusablePane,
     getFocusedPane,
@@ -143,7 +142,7 @@
   let showTermsDialog = $state(false)
 
   // Settings dialog — hosted at app level so the rail's gear opens it from
-  // any view (mail or an extension pane), not just the mail sidebar.
+  // any view (Mail or Contacts), not just the mail sidebar.
   let showSettings = $state(false)
   let showAbout = $state(false)
   let showSyncLog = $state(false)
@@ -319,17 +318,6 @@
     EventsOn('notification:clicked', openMailConversation)
     EventsOn('mail:openConversation', openMailConversation)
 
-    // Generic extension-routed notification clicks. The host switches the
-    // rail tab here AND stashes the path in a pending-deep-link buffer.
-    // The target extension's pane drains the buffer on mount (it isn't
-    // mounted yet at the moment we set the tab). Extension-specific path
-    // parsing lives in each extension's own pane component.
-    EventsOn('extension:open', (data: { extensionId: string; path: string }) => {
-      if (!data.extensionId) return
-      if (data.path) setPendingDeepLink(data.extensionId, data.path)
-      setActiveExtension(data.extensionId)
-    })
-
     // Listen for window show requests (from single-instance activation, notification clicks)
     EventsOn('window:show', () => {
       window.focus()
@@ -384,7 +372,7 @@
     // Load persisted UI state
     const uiState = await loadUIState()
 
-    // Load extension registry (enabled extensions, rail tabs) so the rail can
+    // Load built-in rail pane registry so the rail can
     // render synchronously when the layout mounts.
     await refreshExtensionRegistry()
     preloadContactAccountGroups()
@@ -806,13 +794,12 @@
     // (especially Ctrl+A) should target dialog inputs, not the background.
     if (isDialogGuardActive()) return
 
-    // Extension shortcut dispatch: when the active rail pane is NOT mail, let
-    // the extension's registered shortcuts run first. dispatchExtensionShortcut
+    // Rail-pane shortcut dispatch: when the active rail pane is not Mail, let
+    // that pane's registered shortcuts run first. dispatchExtensionShortcut
     // returns true when a handler matched — in that case we treat the event as
     // handled and skip mail's downstream dispatch. Skipped while typing in an
-    // input element (consistent with mail's inInput guard below) so extension
-    // shortcuts don't fire from inside text fields. See [[extension-sdk-pattern]]
-    // and frontend/src/lib/stores/extensionShortcuts.svelte.ts.
+    // input element (consistent with mail's inInput guard below) so Contacts
+    // shortcuts don't fire from inside text fields.
     if (!inInput && dispatchExtensionShortcut(e)) {
       e.preventDefault()
       e.stopPropagation()
@@ -841,12 +828,12 @@
     // Handle Ctrl/Cmd shortcuts.
     //
     // Layout: GLOBAL cases first (fire regardless of which rail pane is active),
-    // then a guard that returns when an extension is the active rail pane, then
-    // MAIL-DOMAIN cases (fire only on mail). The kit's components (extension UI)
+    // then a guard that returns when Contacts is the active rail pane, then
+    // MAIL-DOMAIN cases (fire only on mail). The kit's components (Contacts UI)
     // handle their own list/sidebar shortcuts via local tabindex+keydown +
     // stopPropagation, so those events never reach this handler in the first
     // place. The guard catches the case where Ctrl+R / Ctrl+K / etc. fire
-    // with no kit pane DOM-focused but an extension is the active rail pane —
+    // with no kit pane DOM-focused but Contacts is the active rail pane —
     // we don't want those acting on the (hidden) mail UI.
     const isMailActive = () => getActiveExtension() === 'mail'
     if (e.ctrlKey || e.metaKey) {
@@ -863,7 +850,7 @@
           return
         case 'tab':
         case '`': {
-          // Cycle through rail items: Mail + enabled extensions.
+          // Cycle through rail items: Mail + built-in non-mail panes.
           // Ctrl+Tab        → forward
           // Ctrl+`          → backward
           // (Ctrl+Shift+Tab is intercepted by webkit2gtk before the
@@ -882,17 +869,16 @@
       }
 
       // Below: MAIL-DOMAIN Ctrl/Cmd shortcuts. Guarded so they no-op when an
-      // extension is the active rail pane (otherwise Ctrl+R would silently
+      // Contacts is the active rail pane (otherwise Ctrl+R would silently
       // reply to the hidden mail thread while the user is browsing contacts).
       if (!isMailActive()) return
 
       // MAIL-DOMAIN Ctrl/Cmd cases (guarded above).
       switch (e.key.toLowerCase()) {
         case 'n':
-          // Ctrl/Cmd+N — new mail composer. Mail-domain only: when an
-          // extension rail is active (e.g., calendar), that extension's
-          // shortcut registry handles Ctrl+N before we reach the global
-          // switch, opening its own "new X" dialog.
+          // Ctrl/Cmd+N — new mail composer. Mail-domain only: when Contacts
+          // is active, its shortcut registry handles Ctrl+N before we reach
+          // the global switch, opening the new-contact dialog.
           e.preventDefault()
           handleCompose()
           return
@@ -1055,7 +1041,7 @@
 
       // Pane focus cycling (shared predicate — kit's pane components react to
       // the same focusedPane store, so cycling works uniformly across mail
-      // and extensions).
+      // and Contacts.
       if (KEY.PANE_FOCUS_PREV(e)) {
         e.preventDefault()
         if (isResponsive()) {
@@ -1093,7 +1079,7 @@
 
       // Sidebar item navigation (Alt+Up/Down/J/K). Dispatches to mail's
       // concrete ref when mail is active; otherwise to the kit pane that
-      // registered as 'sidebar' via registerPaneNav. This way extensions
+      // registered as 'sidebar' via registerPaneNav. This way Contacts
       // get the same "global Alt+J/K navigates the sidebar regardless of
       // which pane is currently DOM-focused" behavior mail has.
       if (KEY.SIDEBAR_PREV(e)) {
@@ -1168,7 +1154,7 @@
     // Mail-domain: these run for the mail UI's focused pane. The kit's
     // components handle their own list/sidebar navigation via local
     // keydown + stopPropagation (so the events never reach this handler).
-    // Guard for safety in case an event slips through while an extension
+    // Guard for safety in case an event slips through while Contacts
     // is the active rail pane.
     if (KEY.LIST_PREV(e) || KEY.LIST_PREV_CHECK(e)) {
       if (!isMailActive()) return
@@ -1438,9 +1424,9 @@
       <ContactsPane />
     {/if}
 
-    <!-- Mail layout is ALWAYS mounted; only its visibility is toggled when an
-         extension takes over the pane. Unmounting+remounting the mail tree on
-         every extension switch was leaking state (zombie listeners) and pinning
+    <!-- Mail layout is ALWAYS mounted; only its visibility is toggled when
+         Contacts takes over the pane. Unmounting+remounting the mail tree on
+         every rail switch was leaking state (zombie listeners) and pinning
          the main thread on the second mount. display:contents keeps the flex
          children as direct flex items so the layout doesn't shift. -->
     <div style:display={getActiveExtension() === 'mail' ? 'contents' : 'none'}>

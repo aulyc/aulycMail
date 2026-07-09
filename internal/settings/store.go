@@ -37,20 +37,6 @@ const (
 	KeyBackupSelectedAccountIDs  = "backup_selected_account_ids"
 )
 
-// Extension enable/disable keys. Format: extension_<name>_enabled.
-// Contacts is currently the only built-in extension and is always enabled;
-// the reserved key remains for schema compatibility with earlier settings.
-const (
-	KeyExtensionContactsEnabled = "extension_contacts_enabled"
-)
-
-// AllExtensionKeys is the list of all known first-party extension names. Add
-// a new extension's name here when its enable/disable key is reserved above.
-// IsExtensionEnabled currently treats these built-ins as enabled.
-var AllExtensionKeys = []string{
-	"contacts",
-}
-
 // Density values for message list
 const (
 	DensityMicro    = "micro"
@@ -165,26 +151,6 @@ func (s *Store) Set(key, value string) error {
 
 	s.log.Debug().Str("key", key).Str("value", value).Msg("Setting updated")
 	return nil
-}
-
-// IsExtensionEnabled returns whether the given first-party extension is
-// enabled. Unknown / not-yet-set extensions return (false, nil) — the
-// app should treat "not present in settings" as disabled.
-func (s *Store) IsExtensionEnabled(_ string) (bool, error) {
-	// Contacts is the only built-in feature and is permanently enabled — there
-	// is no extension enable/disable concept anymore.
-	return true, nil
-}
-
-// SetExtensionEnabled writes the enable/disable flag for the given first-party
-// extension. The Wails-bound App method that wraps this is the only entry
-// point the frontend uses to toggle extensions on/off.
-func (s *Store) SetExtensionEnabled(name string, enabled bool) error {
-	v := "false"
-	if enabled {
-		v = "true"
-	}
-	return s.Set("extension_"+name+"_enabled", v)
 }
 
 // GetReadReceiptResponsePolicy returns the current read receipt response policy

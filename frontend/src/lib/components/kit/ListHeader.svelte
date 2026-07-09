@@ -1,27 +1,27 @@
 <script lang="ts">
-  // ListHeader — canonical toolbar bar for kit-based 3-column extension panes.
+  // ListHeader — canonical toolbar bar for kit-based 3-column rail panes.
   // Lives at the top of the list column (above ListPane) and owns:
   //
   //   1. The toolbar wrapper styling (border, padding, flex layout) so every
-  //      extension's list column renders with the same visual rhythm as mail's
+  //      the pane's list column renders with the same visual rhythm as mail's
   //      MessageList toolbar.
-  //   2. The leading <ResponsiveSidebarToggle /> — auto-included so extensions
+  //   2. The leading <ResponsiveSidebarToggle /> — auto-included so panes
   //      don't have to remember to place a hamburger toggle for narrow mode.
   //   3. The title <h2> + optional count badge layout matching mail.
   //   4. A search-mode swap: when `searchMode` is true, the title area is
   //      replaced by the consumer's `search` snippet (so the consumer can
   //      provide its own search input with bindings, refs, and clear-button
   //      handling that the kit can't generically own).
-  //   5. A trailing `actions` snippet for per-extension toolbar buttons (sort,
+  //   5. A trailing `actions` snippet for pane-local toolbar buttons (sort,
   //      add, etc.) sitting at the right edge.
   //
   // What the kit does NOT own:
-  //   - The label VALUE (extension knows about sources/folders/categories;
+  //   - The label VALUE (consumer knows about sources/folders/categories;
   //     kit just renders whatever string the consumer passes).
-  //   - The search input markup, state, and keyboard handling (per-extension
+  //   - The search input markup, state, and keyboard handling (pane-local
   //     concerns — clear button, debounce, focus management).
   //   - The action buttons themselves (sort orders, add behavior, etc. are
-  //     extension-specific).
+  //     concerns).
   //
   // Mail-side `MessageList.svelte` doesn't (yet) use this primitive — it
   // predates the kit. If mail ever adopts the kit, this primitive is shaped

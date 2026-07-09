@@ -54,12 +54,11 @@ Build and install flows in this repository are maintained for macOS only.
 - Basic removal of tracking elements in mail content
 - WYSIWYG detachable composer powered by [TipTap Editor](https://github.com/ueberdosis/tiptap)
 - WYSIWYG signatures powered by [TipTap Editor](https://github.com/ueberdosis/tiptap)
-- Local contacts and autocomplete through the built-in Contacts extension
+- Local contacts and autocomplete through the built-in Contacts pane
 - Basic local and IMAP search
 - Notifications that focus the related e-mail when clicked
 - Auto-sync when the system wakes from sleep
 - Multiple color themes
-- First-party extension system with bundled Contacts extension
 - [Keyboard Shortcuts](docs/KEYBOARD_SHORTCUTS.md)
 
 ## Installation
@@ -70,7 +69,6 @@ Build and install flows in this repository are maintained for macOS only.
 
 - [Official Documentation](https://github.com/aulyc/aulycmail)
 - [Build Guide](docs/BUILD.md)
-- [Extension Guide](docs/EXTENSIONS.md)
 - [Security Policy](SECURITY.md)
 
 ## Tech Stack

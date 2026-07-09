@@ -9,7 +9,7 @@
 
   interface Props {
     // Opens the app Settings dialog. Wired by App.svelte so the gear works
-    // from every view (mail + any extension pane).
+    // from every view (Mail + non-mail rail panes).
     onOpenSettings?: () => void
     // Opens the sync/connection log dialog.
     onOpenLog?: () => void
@@ -17,7 +17,7 @@
 
   const { onOpenSettings, onOpenLog }: Props = $props()
 
-  // Mail is always present and always first; extensions follow in their
+  // Mail is always present and always first; built-in panes follow in their
   // registered Order. The rail always renders now — it hosts the global
   // Settings gear at the bottom, so it must be reachable from every view.
   let active = $derived(getActiveExtension())
@@ -42,7 +42,7 @@
 
 <nav
   class="flex flex-col items-stretch w-12 flex-shrink-0 bg-muted/30 border-r border-border pt-2"
-  aria-label="Active extension"
+  aria-label="Active rail pane"
 >
   <RailButton
     icon="mdi:email"
@@ -89,7 +89,7 @@
     {/if}
   </button>
 
-  <!-- Settings — pinned to the bottom, available from mail AND extension views. -->
+  <!-- Settings — pinned to the bottom, available from Mail and Contacts. -->
   <button
     class="mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
     type="button"

@@ -1,4 +1,4 @@
-// Contacts extension i18n registration.
+// Contacts pane i18n registration.
 //
 // Auto-discovered by core's initI18n() via import.meta.glob — DO NOT add a
 // manual import to frontend/src/lib/i18n/index.ts for new locales. Just add
@@ -6,7 +6,7 @@
 //
 // svelte-i18n merges loaders per-locale: core ships its keys, this file ships
 // the contacts.* namespace. No key collisions as long as namespaces stay
-// distinct. See docs/EXTENSIONS.md § Extension i18n for the contract.
+// distinct.
 
 import { register } from 'svelte-i18n'
 

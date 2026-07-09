@@ -36,16 +36,15 @@
 --   - 34: first-class PHOTO field support — adds photo_data, photo_media_type,
 --     photo_url columns to contact_records so the parser/builder land vCard
 --     PHOTOs natively (no longer just round-tripping via vcard_raw).
---   - 35: extension_secrets table — shared keyring + AES fallback for the
---     coreapi.Storage.Secrets surface. First consumer is the Calendar
---     extension (1B) for CalDAV passwords. Rolling back drops the table;
---     keyring-stored entries are orphaned (the OS keyring is not touched by
---     this SQL — clear them manually if needed).
+--   - 35: historical extension_secrets table. The extension runtime was later
+--     slimmed back to the built-in Contacts pane, but rolling back to v30 still
+--     drops the table; keyring-stored entries are orphaned (the OS keyring is
+--     not touched by this SQL — clear them manually if needed).
 --   - 36: per-(account, client_config) encrypted fallback for OAuth tokens —
 --     adds encrypted_access_token and encrypted_refresh_token columns to
---     oauth_tokens so non-mail slots (google-contacts, google-calendar,
---     microsoft-contacts, microsoft-calendar) work without an OS keyring.
---     Rolling back drops those columns. The extension-slot rows themselves
+--     oauth_tokens so historical non-mail OAuth slots also had encrypted
+--     fallback storage when no OS keyring was available.
+--     Rolling back drops those columns. The non-mail rows themselves
 --     (where client_config_id != 'google-mail' / 'microsoft-mail') are also
 --     deleted, because v0.2.5's OAuth code doesn't understand them and would
 --     pick one of them at random when looking up the account's provider.

@@ -1,11 +1,11 @@
 <script lang="ts">
   // ResponsiveSidebarToggle — drop-in hamburger button for kit-based 3-column
-  // extension panes. Renders nothing when not narrow; renders an mdi:dock-left
+  // rail panes. Renders nothing when not narrow; renders an mdi:dock-left
   // icon button when narrow that fires showSidebar() on click.
   //
   // Mirrors mail's pattern at App.svelte:1452-1453 (showFolderToggle +
   // onToggleSidebar) but keeps the gating, icon choice, label, and store
-  // access inside the kit so every extension consumer just composes:
+  // access inside the kit so every pane consumer just composes:
   //
   //   <ResponsiveSidebarToggle />
   //

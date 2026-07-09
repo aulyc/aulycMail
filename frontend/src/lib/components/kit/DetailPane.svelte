@@ -9,7 +9,7 @@
   import { _ } from 'svelte-i18n'
   import { isPaneFlashing, type FocusablePane } from '$lib/stores/keyboard.svelte'
   // Self-managed responsive (mobile + tablet) behavior — read the layout
-  // store directly so consumers (extension panes) never forward responsive
+  // store directly so pane consumers never forward responsive
   // props. At medium (≤1024px) and narrow (≤767px) the detail pane renders
   // as an overlay AND a back-arrow button is injected at the start of the
   // header (calls hideViewer to return to the list). Matches mail's

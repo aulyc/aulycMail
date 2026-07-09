@@ -1,14 +1,3 @@
-// Package ui is the host-side implementation of coreapi.UI. Extensions
-// register rail tabs, settings tabs, context-menu items, and inbox views here;
-// the frontend reads back the rail registrations via
-// the Wails-bound List* methods in app/extension_ui.go.
-//
-// Phase 2a wires RegisterRailTab, rendered by ExtensionRail.svelte. The other
-// three registration types (settings tab, context menu, inbox view) accept
-// registrations but no consumer reads them yet — they are reserved for Phase 3+.
-//
-// All Register* methods return an Unregister func the caller invokes to
-// remove the registration. This makes it safe for extensions to be
-// disabled at runtime: the host invokes the returned func and the
-// frontend's next List* query no longer sees the entry.
+// Package ui stores built-in rail pane registrations. The frontend reads the
+// rail entries through the Wails-bound methods in app/extension_ui.go.
 package ui

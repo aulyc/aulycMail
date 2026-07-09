@@ -10,22 +10,22 @@ import (
 func TestRegistry_RegisterRailTab_OrdersByOrder(t *testing.T) {
 	r := NewRegistry()
 	if _, err := r.RegisterRailTab(coreapi.RailTabRequest{
-		ExtensionID: "calendar", Label: "Calendar", Component: "CalendarPane", Order: 20,
-	}); err != nil {
-		t.Fatalf("register calendar: %v", err)
-	}
-	if _, err := r.RegisterRailTab(coreapi.RailTabRequest{
-		ExtensionID: "contacts", Label: "Contacts", Component: "ContactsPane", Order: 10,
+		ExtensionID: "contacts", Label: "Contacts", Component: "ContactsPane", Order: 20,
 	}); err != nil {
 		t.Fatalf("register contacts: %v", err)
+	}
+	if _, err := r.RegisterRailTab(coreapi.RailTabRequest{
+		ExtensionID: "notes", Label: "Notes", Component: "NotesPane", Order: 10,
+	}); err != nil {
+		t.Fatalf("register notes: %v", err)
 	}
 
 	tabs := r.ListRailTabs()
 	if len(tabs) != 2 {
 		t.Fatalf("expected 2 tabs, got %d", len(tabs))
 	}
-	if tabs[0].ExtensionID != "contacts" || tabs[1].ExtensionID != "calendar" {
-		t.Fatalf("expected contacts, calendar — got %s, %s", tabs[0].ExtensionID, tabs[1].ExtensionID)
+	if tabs[0].ExtensionID != "notes" || tabs[1].ExtensionID != "contacts" {
+		t.Fatalf("expected notes, contacts; got %s, %s", tabs[0].ExtensionID, tabs[1].ExtensionID)
 	}
 }
 
@@ -62,34 +62,6 @@ func TestRegistry_Unregister_RemovesEntry(t *testing.T) {
 	unreg()
 	if got := r.ListRailTabs(); len(got) != 0 {
 		t.Fatalf("expected 0 after unregister, got %d", len(got))
-	}
-}
-
-func TestRegistry_ContextMenuItems_TargetFilter(t *testing.T) {
-	r := NewRegistry()
-	for _, target := range []coreapi.ContextMenuTarget{
-		coreapi.ContextMenuMessageRow,
-		coreapi.ContextMenuMessageRow,
-		coreapi.ContextMenuContactRow,
-	} {
-		if _, err := r.RegisterContextMenuItem(coreapi.ContextMenuRequest{
-			ExtensionID: "x", Target: target, Label: "L", HandlerID: "h",
-		}); err != nil {
-			t.Fatalf("register: %v", err)
-		}
-	}
-
-	msg := r.ListContextMenuItems(coreapi.ContextMenuMessageRow)
-	if len(msg) != 2 {
-		t.Fatalf("expected 2 message-row items, got %d", len(msg))
-	}
-	contact := r.ListContextMenuItems(coreapi.ContextMenuContactRow)
-	if len(contact) != 1 {
-		t.Fatalf("expected 1 contact-row item, got %d", len(contact))
-	}
-	all := r.ListContextMenuItems("")
-	if len(all) != 3 {
-		t.Fatalf("expected 3 total, got %d", len(all))
 	}
 }
 

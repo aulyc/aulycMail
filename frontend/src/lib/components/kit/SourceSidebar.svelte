@@ -1,5 +1,5 @@
 <script lang="ts" generics="T extends { id: string }">
-  // SourceSidebar — sectioned left sidebar primitive for extensions.
+  // SourceSidebar — sectioned left sidebar primitive for Contacts-style panes.
   // Owns keyboard navigation (Up/Down/J/K within sidebar) via tabindex+focus.
   // Selection state managed by consumer via selectedId + onSelect.
   //
@@ -7,9 +7,7 @@
   // DOM focus when the slot matches so Alt+H/L cycling routes here.
   //
   // Visual chrome (container styling + responsive overlay + back button +
-  // title) is delegated to kit `SidebarFrame`. Future cross-extension settings
-  // (sidebar density, font-size) wire into SidebarFrame; SourceSidebar
-  // consumers inherit them automatically.
+  // title) is delegated to kit `SidebarFrame`.
 
   import { type Snippet, onMount } from 'svelte'
   import SidebarFrame from './SidebarFrame.svelte'

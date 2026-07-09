@@ -1,6 +1,5 @@
-// Extension registry — frontend cache of enabled extensions and rail tabs.
-// Loaded once at app startup; refresh() re-pulls from the
-// backend after Settings toggles an extension or after an account is added.
+// Rail-pane registry — frontend cache of built-in non-mail panes and tabs.
+// Loaded once at app startup; refresh() re-pulls the backend registrations.
 //
 // IMPORTANT: read access goes through plain exported FUNCTIONS, not via an
 // object with getters. Svelte 5's reactivity tracker doesn't reliably see
@@ -25,9 +24,8 @@ export function getRailTabs(): v1.RailTabRequest[] {
   return railTabs
 }
 
-// Rail renders when there's at least one enabled extension to switch between
-// Mail and. (Mail is always-on but not in enabledExtensions, so one enabled
-// extension = two rail items: Mail + that extension.)
+// Rail renders when there's at least one built-in non-mail pane to switch
+// between Mail and. Mail is always-on but not in enabledExtensions.
 export function isRailVisible(): boolean {
   return enabledExtensions.length >= 1
 }

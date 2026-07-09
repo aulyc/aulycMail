@@ -1,20 +1,19 @@
-// Extension-shortcut registry.
+// Rail-pane shortcut registry.
 //
-// Extensions register their pane-local keyboard shortcuts here at component
+// Non-mail rail panes register pane-local keyboard shortcuts here at component
 // mount; the host's global key handler (App.svelte's handleGlobalKeyDown)
 // dispatches via dispatchExtensionShortcut whenever the active rail pane is
-// NOT mail. This mirrors how mail dispatches its own switch-case shortcuts
-// from the same global handler — extensions get a symmetric path.
+// not Mail.
 //
 // The handler always returns true/false from dispatch so the global key
 // handler knows whether to continue down its mail-side branch. Predicates
-// live in the extension's own
+// live beside the pane under
 // `extensions/<name>/frontend/keyboard/shortcuts.ts` file (with shared
 // helpers imported from `$lib/keyboard/shortcuts`).
 //
 // Lifetime: callers register at onMount and call the returned Unregister at
 // onDestroy. The registry is window-global (single module-level map) — fine
-// for now since only one extension can be the active rail pane at a time.
+// for now since only one non-mail pane can be active at a time.
 
 import { getActiveExtension } from './uiState.svelte'
 
@@ -27,17 +26,17 @@ interface Registration {
   handler: ShortcutHandler
 }
 
-// Indexed by extensionId → ordered list of registrations.
+// Indexed by rail pane id → ordered list of registrations.
 const registry = new Map<string, Registration[]>()
 
 /**
- * Register a keyboard shortcut scoped to an extension. The shortcut only
+ * Register a keyboard shortcut scoped to a rail pane. The shortcut only
  * fires via dispatchExtensionShortcut when `getActiveExtension() === extensionId`.
  *
  * Returns an Unregister function — call it from onDestroy / the component's
  * cleanup to avoid stale handlers piling up across mount/unmount cycles.
  *
- * Multiple shortcuts per extension are supported; they're evaluated in
+ * Multiple shortcuts per pane are supported; they're evaluated in
  * registration order, first match wins.
  */
 export function registerExtensionShortcut(
@@ -63,7 +62,7 @@ export function registerExtensionShortcut(
 }
 
 /**
- * Dispatch a keyboard event to the currently-active extension's registered
+ * Dispatch a keyboard event to the currently-active non-mail pane's registered
  * shortcuts. Called from App.svelte's global key handler.
  *
  * Returns true when a handler ran (caller should treat the event as handled —

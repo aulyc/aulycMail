@@ -1,11 +1,10 @@
 <script lang="ts">
   // ConfirmDialog — kit-facing wrapper around the host's confirm-dialog primitive.
   //
-  // Extensions consume THIS component (`$lib/components/kit/ConfirmDialog.svelte`)
+  // Contacts consumes THIS component (`$lib/components/kit/ConfirmDialog.svelte`)
   // instead of reaching into the host's `ui/` namespace
-  // (`$lib/components/ui/confirm-dialog/...`). Insulates extensions from the
-  // host's choice of underlying primitives (bits-ui today, possibly something
-  // else tomorrow) and keeps the SDK surface stable.
+  // (`$lib/components/ui/confirm-dialog/...`). Keeps the pane insulated from
+  // the host's choice of underlying primitives.
   //
   // API mirrors the host primitive verbatim so passing props through is
   // mechanical. If the host adds new props, surface them here too.

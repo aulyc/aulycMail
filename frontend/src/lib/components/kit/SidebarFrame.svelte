@@ -1,21 +1,15 @@
 <script lang="ts">
-  // SidebarFrame — kit primitive owning the chrome shared between all
-  // extension sidebars (kit `SourceSidebar` and any custom-row extension
-  // sidebars like Calendar's). Captures container styling, responsive
-  // overlay behavior (slide-in + back button in narrow mode), optional
-  // title, scrollable body slot, and optional sticky footer slot.
+  // SidebarFrame — kit primitive owning sidebar chrome for Contacts-style
+  // panes. Captures container styling, responsive overlay behavior (slide-in +
+  // back button in narrow mode), optional title, scrollable body slot, and
+  // optional sticky footer slot.
   //
-  // Why this primitive exists: it's the single hook for upcoming
-  // cross-extension sidebar settings (density, font-size variants) — when
-  // those settings ship, the density-aware classes live here and all
-  // consumers (calendar directly, contacts via SourceSidebar composition,
-  // future extensions) inherit automatically.
+  // Why this primitive exists: Contacts uses the same responsive sidebar
+  // mechanics as Mail while keeping the pane implementation compact.
   //
   // Layout model: title stays non-scrolling at the top; body fills the
   // remaining vertical space with its own overflow-y-auto; optional footer
-  // stays pinned at the bottom. This split is intrinsic — it's what lets
-  // consumers like Calendar pin a sync/settings strip at the bottom while
-  // the calendar list scrolls in the middle.
+  // stays pinned at the bottom.
 
   import { type Snippet } from 'svelte'
   import Icon from '@iconify/svelte'

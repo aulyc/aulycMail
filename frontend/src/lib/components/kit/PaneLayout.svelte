@@ -1,5 +1,5 @@
 <script lang="ts">
-  // PaneLayout — outer flex container for kit-based extension panes that
+  // PaneLayout — outer flex container for kit-based non-mail rail panes that
   // composes SourceSidebar + ListPane + DetailPane (or any subset). Provides:
   //
   //   1. A 'relative' positioning context so the kit primitives' absolute-
@@ -12,7 +12,7 @@
   // scrim is always rendered in narrow mode; the `-visible` modifier turns
   // it on when the sidebar overlay is open.
   //
-  // Extensions don't need to import the layout store, manage scrim state,
+  // Pane consumers don't need to import the layout store, manage scrim state,
   // or wire pane-class merging — that all lives in the kit primitives
   // themselves. ContactsPane.svelte is the canonical consumer.
 
