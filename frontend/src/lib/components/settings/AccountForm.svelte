@@ -10,14 +10,17 @@
     detectProvider,
     getCustomProvider,
     securityOptions,
-    syncPeriodOptions,
+    localRetentionOptions,
+    syncStrategyOptions,
+    fullCheckIntervalOptions,
+    bodyDownloadOptions,
     syncIntervalOptions,
     type EmailProvider,
   } from '$lib/config/providers'
   // @ts-ignore - wailsjs path
   import { account, certificate, app, folder } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
-  import { GetAccountFoldersForMapping, GetAutoDetectedFolders, GetIdentities, AcceptCertificate, GetAllAccountIdentities, GetTrustedCertificates, RemoveTrustedCertificate, GetFolders, SubscribeFolder, UnsubscribeFolder, SubscribeAllFolders } from '../../../../wailsjs/go/app/App'
+  import { GetAccountFoldersForMapping, GetAutoDetectedFolders, GetIdentities, AcceptCertificate, GetAllAccountIdentities, GetTrustedCertificates, RemoveTrustedCertificate, GetFolders, SubscribeFolder, UnsubscribeFolder, SubscribeAllFolders, ClearOfflineBodyCache } from '../../../../wailsjs/go/app/App'
   import CertificateDialog from './CertificateDialog.svelte'
   import ConnectionTestDialog from './ConnectionTestDialog.svelte'
   import AccountIdentityTab from './account/AccountIdentityTab.svelte'
@@ -73,7 +76,10 @@
   // fell back to it). Used to mirror IMAP host edits into SMTP host for manual
   // setup until the user edits SMTP directly.
   const isGenericProvider = $derived(selectedProvider?.id === 'custom' || selectedProvider?.id === 'generic')
-  let syncPeriodDays = $state<string>('180')
+  let localRetentionDays = $state<string>('0')
+  let syncStrategy = $state<string>('incremental')
+  let fullCheckIntervalDays = $state<string>('7')
+  let bodyDownloadPolicy = $state<string>('on_demand')
   let syncInterval = $state<string>('30') // Default: 30 minutes
   let syncAllFolders = $state(false)
   let syncFoldersEnabled = $state(false)
@@ -92,10 +98,26 @@
     return securityOptions.find(opt => opt.value === value)?.label || value
   }
 
-  function getSyncPeriodLabel(value: string): string {
+  function getLocalRetentionLabel(value: string): string {
     const numValue = Number(value)
-    const option = syncPeriodOptions.find(opt => opt.value === numValue)
+    const option = localRetentionOptions.find(opt => opt.value === numValue)
     return option ? $_(option.labelKey) : `${value} days`
+  }
+
+  function getSyncStrategyLabel(value: string): string {
+    const option = syncStrategyOptions.find(opt => opt.value === value)
+    return option ? $_(option.labelKey) : value
+  }
+
+  function getFullCheckIntervalLabel(value: string): string {
+    const numValue = Number(value)
+    const option = fullCheckIntervalOptions.find(opt => opt.value === numValue)
+    return option ? $_(option.labelKey) : `${value} days`
+  }
+
+  function getBodyDownloadLabel(value: string): string {
+    const option = bodyDownloadOptions.find(opt => opt.value === value)
+    return option ? $_(option.labelKey) : value
   }
 
   function getSyncIntervalLabel(value: string): string {
@@ -155,6 +177,9 @@
   let trustedCerts = $state<certificate.CertificateInfo[]>([])
   let confirmRemoveFingerprint = $state<string | null>(null)
   let showRemoveConfirm = $state(false)
+  let showClearOfflineBodyCacheConfirm = $state(false)
+  let clearingOfflineBodyCache = $state(false)
+  let offlineBodyCacheStatus = $state<{ kind: 'success' | 'error'; message: string } | null>(null)
 
   // SMTP authentication is hardcoded to "same as incoming server": there is
   // no separate-SMTP-credentials UI anymore. Force the hidden values empty so
@@ -277,6 +302,27 @@
     confirmRemoveFingerprint = null
   }
 
+  async function confirmClearOfflineBodyCache() {
+    if (!editAccount) return
+    clearingOfflineBodyCache = true
+    offlineBodyCacheStatus = null
+    try {
+      const result = await ClearOfflineBodyCache(editAccount.id)
+      offlineBodyCacheStatus = {
+        kind: 'success',
+        message: $_('account.offlineBodyCacheCleared', { values: { count: result?.bodiesCleared ?? 0 } }),
+      }
+    } catch (err) {
+      console.error('Failed to clear offline body cache:', err)
+      offlineBodyCacheStatus = {
+        kind: 'error',
+        message: $_('account.offlineBodyCacheClearFailed'),
+      }
+    } finally {
+      clearingOfflineBodyCache = false
+    }
+  }
+
   function formatFingerprint(fp: string): string {
     if (!fp) return ''
     const parts: string[] = []
@@ -321,7 +367,14 @@
       smtpUsername = editAccount.smtpUsername || ''
       smtpPassword = ''
       replyForwardIdentityID = editAccount.replyForwardIdentityId || ''
-      syncPeriodDays = String(editAccount.syncPeriodDays)
+      // @ts-ignore - new sync fields are present after Wails bindings regenerate
+      localRetentionDays = String(editAccount.localRetentionDays ?? editAccount.syncPeriodDays ?? 0)
+      // @ts-ignore - new sync fields are present after Wails bindings regenerate
+      syncStrategy = editAccount.syncStrategy || 'incremental'
+      // @ts-ignore - new sync fields are present after Wails bindings regenerate
+      fullCheckIntervalDays = String(editAccount.fullCheckIntervalDays ?? 7)
+      // @ts-ignore - new sync fields are present after Wails bindings regenerate
+      bodyDownloadPolicy = editAccount.bodyDownloadPolicy || 'on_demand'
       // @ts-ignore - syncInterval from backend
       syncInterval = String(editAccount.syncInterval ?? 30)
       syncAllFolders = editAccount.syncAllFolders || false
@@ -450,7 +503,12 @@
       smtpPassword,
       replyForwardIdentityId: replyForwardIdentityID,
       authType: 'password',
-      syncPeriodDays: Number(syncPeriodDays),
+      syncPeriodDays: Number(localRetentionDays),
+      localRetentionDays: Number(localRetentionDays),
+      syncStrategy,
+      fullCheckIntervalDays: Number(fullCheckIntervalDays),
+      bodyDownloadPolicy,
+      bodyDownloadDays: 180,
       syncInterval: Number(syncInterval),
       syncAllFolders,
       syncFoldersEnabled,
@@ -847,20 +905,101 @@
 
           <!-- Sync settings (label + control on one row) -->
           <div class="flex items-center justify-between gap-4">
-            <Label>{$_('account.syncPeriod')}</Label>
-            <Select.Root bind:value={syncPeriodDays}>
+            <Label>{$_('account.localRetention')}</Label>
+            <Select.Root bind:value={localRetentionDays}>
               <Select.Trigger class="w-48 shrink-0">
                 <Select.Value placeholder="Select">
-                  {getSyncPeriodLabel(syncPeriodDays)}
+                  {getLocalRetentionLabel(localRetentionDays)}
                 </Select.Value>
               </Select.Trigger>
               <Select.Content>
-                {#each syncPeriodOptions as opt (opt.value)}
+                {#each localRetentionOptions as opt (opt.value)}
                   <Select.Item value={String(opt.value)} label={$_(opt.labelKey)} />
                 {/each}
               </Select.Content>
             </Select.Root>
           </div>
+
+          <div class="flex items-center justify-between gap-4">
+            <Label>{$_('account.syncStrategy')}</Label>
+            <Select.Root bind:value={syncStrategy}>
+              <Select.Trigger class="w-48 shrink-0">
+                <Select.Value placeholder="Select">
+                  {getSyncStrategyLabel(syncStrategy)}
+                </Select.Value>
+              </Select.Trigger>
+              <Select.Content>
+                {#each syncStrategyOptions as opt (opt.value)}
+                  <Select.Item value={opt.value} label={$_(opt.labelKey)} />
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
+
+          {#if syncStrategy === 'incremental'}
+            <div class="flex items-center justify-between gap-4">
+              <Label>{$_('account.fullCheckInterval')}</Label>
+              <Select.Root bind:value={fullCheckIntervalDays}>
+                <Select.Trigger class="w-48 shrink-0">
+                  <Select.Value placeholder="Select">
+                    {getFullCheckIntervalLabel(fullCheckIntervalDays)}
+                  </Select.Value>
+                </Select.Trigger>
+                <Select.Content>
+                  {#each fullCheckIntervalOptions as opt (opt.value)}
+                    <Select.Item value={String(opt.value)} label={$_(opt.labelKey)} />
+                  {/each}
+                </Select.Content>
+              </Select.Root>
+            </div>
+          {/if}
+
+          <div class="flex items-center justify-between gap-4">
+            <Label>{$_('account.bodyDownload')}</Label>
+            <Select.Root bind:value={bodyDownloadPolicy}>
+              <Select.Trigger class="w-48 shrink-0">
+                <Select.Value placeholder="Select">
+                  {getBodyDownloadLabel(bodyDownloadPolicy)}
+                </Select.Value>
+              </Select.Trigger>
+              <Select.Content>
+                {#each bodyDownloadOptions as opt (opt.value)}
+                  <Select.Item value={opt.value} label={$_(opt.labelKey)} />
+                {/each}
+              </Select.Content>
+            </Select.Root>
+          </div>
+
+          {#if editAccount}
+            <div class="flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <Label>{$_('account.offlineBodyCache')}</Label>
+                {#if offlineBodyCacheStatus}
+                  <p
+                    class="mt-1 truncate text-xs {offlineBodyCacheStatus.kind === 'error' ? 'text-destructive' : 'text-muted-foreground'}"
+                    title={offlineBodyCacheStatus.message}
+                  >
+                    {offlineBodyCacheStatus.message}
+                  </p>
+                {/if}
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                class="w-48 shrink-0"
+                onclick={() => showClearOfflineBodyCacheConfirm = true}
+                disabled={clearingOfflineBodyCache || submitting}
+              >
+                {#if clearingOfflineBodyCache}
+                  <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
+                {:else}
+                  <Icon icon="mdi:database-remove-outline" class="w-4 h-4 mr-2" />
+                {/if}
+                {$_('account.clearOfflineBodyCache')}
+              </Button>
+            </div>
+          {/if}
 
           <div class="flex items-center justify-between gap-4">
             <Label>{$_('account.checkNewMail')}</Label>
@@ -1239,4 +1378,15 @@
   description={$_('account.removeTrustedCertDescription')}
   confirmLabel={$_('common.remove')}
   onConfirm={confirmRemoveCert}
+/>
+
+<ConfirmDialog
+  bind:open={showClearOfflineBodyCacheConfirm}
+  title={$_('account.clearOfflineBodyCache')}
+  description={$_('account.clearOfflineBodyCacheDescription')}
+  confirmLabel={$_('account.clearOfflineBodyCache')}
+  cancelLabel={$_('common.cancel')}
+  variant="destructive"
+  loading={clearingOfflineBodyCache}
+  onConfirm={confirmClearOfflineBodyCache}
 />

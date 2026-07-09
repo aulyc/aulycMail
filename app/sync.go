@@ -11,6 +11,7 @@ import (
 	"github.com/aulyc/aulycmail/internal/certificate"
 	"github.com/aulyc/aulycmail/internal/folder"
 	"github.com/aulyc/aulycmail/internal/logging"
+	syncengine "github.com/aulyc/aulycmail/internal/sync"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -62,13 +63,10 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get account: %w", err)
 	}
-	syncPeriodDays := 30 // default (0 means all messages)
-	if acc != nil {
-		syncPeriodDays = acc.SyncPeriodDays
-	}
+	syncOptions := syncengine.MessageSyncOptionsFromAccount(acc)
 
 	// Use ctx (not a.ctx) for sync operations so they can be cancelled
-	err = a.syncEngine.SyncMessages(ctx, accountID, folderID, syncPeriodDays)
+	err = a.syncEngine.SyncMessagesWithOptions(ctx, accountID, folderID, syncOptions)
 	if err != nil {
 		// Check if this was a cancellation
 		if ctx.Err() != nil {
@@ -112,6 +110,21 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 		})
 	}
 	a.refreshUnreadBadges()
+
+	bodyFetch := syncengine.BodyFetchOptionsFromAccount(acc)
+	if !bodyFetch.Enabled {
+		a.syncMu.Lock()
+		if currentCancel, exists := a.syncContexts[syncKey]; exists && fmt.Sprintf("%p", currentCancel) == fmt.Sprintf("%p", cancel) {
+			delete(a.syncContexts, syncKey)
+		}
+		a.syncMu.Unlock()
+
+		wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+			"accountId": accountID,
+			"folderId":  folderID,
+		})
+		return nil
+	}
 
 	// Start background body fetching (emits progress events for "bodies" phase)
 	// Pass ctx so body fetch can also be cancelled
@@ -164,7 +177,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 				"folderId":  folderID,
 			})
 		}
-	}(ctx, syncPeriodDays, cancel, syncKey)
+	}(ctx, bodyFetch.Days, cancel, syncKey)
 
 	return nil
 }

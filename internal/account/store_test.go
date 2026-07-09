@@ -97,11 +97,31 @@ func TestAccountConfigValidate(t *testing.T) {
 			name: "defaults applied for sync settings",
 			modify: func(c *AccountConfig) {
 				c.SyncPeriodDays = -1
+				c.LocalRetentionDays = -1
+				c.SyncStrategy = "unknown"
+				c.FullCheckIntervalDays = -1
+				c.BodyDownloadPolicy = "unknown"
+				c.BodyDownloadDays = 0
 				c.SyncInterval = -1
 			},
 			checkFunc: func(t *testing.T, c *AccountConfig) {
 				if c.SyncPeriodDays != 30 {
 					t.Errorf("SyncPeriodDays = %d, want 30", c.SyncPeriodDays)
+				}
+				if c.LocalRetentionDays != DefaultLocalRetentionDays {
+					t.Errorf("LocalRetentionDays = %d, want %d", c.LocalRetentionDays, DefaultLocalRetentionDays)
+				}
+				if c.SyncStrategy != SyncStrategyIncremental {
+					t.Errorf("SyncStrategy = %q, want %q", c.SyncStrategy, SyncStrategyIncremental)
+				}
+				if c.FullCheckIntervalDays != DefaultFullCheckIntervalDays {
+					t.Errorf("FullCheckIntervalDays = %d, want %d", c.FullCheckIntervalDays, DefaultFullCheckIntervalDays)
+				}
+				if c.BodyDownloadPolicy != DefaultBodyDownloadPolicy {
+					t.Errorf("BodyDownloadPolicy = %q, want %q", c.BodyDownloadPolicy, DefaultBodyDownloadPolicy)
+				}
+				if c.BodyDownloadDays != DefaultBodyDownloadRecentDays {
+					t.Errorf("BodyDownloadDays = %d, want %d", c.BodyDownloadDays, DefaultBodyDownloadRecentDays)
 				}
 				if c.SyncInterval != 30 {
 					t.Errorf("SyncInterval = %d, want 30", c.SyncInterval)

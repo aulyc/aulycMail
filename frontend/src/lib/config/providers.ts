@@ -180,17 +180,41 @@ export const securityOptions = [
 ] as const
 
 /**
- * Common sync period options (in days)
+ * Local retention options (in days, 0 = keep all)
  */
-export const syncPeriodOptions = [
-  { value: 7,   label: '1 week',       labelKey: 'account.sync1week' },
-  { value: 14,  label: '2 weeks',      labelKey: 'account.sync2weeks' },
-  { value: 30,  label: '1 month',      labelKey: 'account.sync1month' },
-  { value: 60,  label: '2 months',     labelKey: 'account.sync2months' },
-  { value: 90,  label: '3 months',     labelKey: 'account.sync3months' },
-  { value: 180, label: '6 months',     labelKey: 'account.sync6months' },
-  { value: 365, label: '1 year',       labelKey: 'account.sync1year' },
-  { value: 0,   label: 'All messages', labelKey: 'account.syncAllMessages' },
+export const localRetentionOptions = [
+  { value: 0,   label: 'All messages', labelKey: 'account.keepAllMessages' },
+  { value: 365, label: '1 year',       labelKey: 'account.keep1year' },
+  { value: 180, label: '6 months',     labelKey: 'account.keep6months' },
+  { value: 90,  label: '3 months',     labelKey: 'account.keep3months' },
+  { value: 30,  label: '1 month',      labelKey: 'account.keep1month' },
+] as const
+
+/**
+ * Daily sync strategy options
+ */
+export const syncStrategyOptions = [
+  { value: 'incremental', label: 'Smart incremental sync', labelKey: 'account.syncStrategyIncremental' },
+  { value: 'full',        label: 'Full validation every time', labelKey: 'account.syncStrategyFull' },
+] as const
+
+/**
+ * Full validation frequency options (in days, 0 = manual only)
+ */
+export const fullCheckIntervalOptions = [
+  { value: 7,  label: 'Weekly',     labelKey: 'account.fullCheckWeekly' },
+  { value: 1,  label: 'Daily',      labelKey: 'account.fullCheckDaily' },
+  { value: 30, label: 'Monthly',    labelKey: 'account.fullCheckMonthly' },
+  { value: 0,  label: 'Manual only', labelKey: 'account.fullCheckManual' },
+] as const
+
+/**
+ * Offline message body background save options.
+ */
+export const bodyDownloadOptions = [
+  { value: 'on_demand', label: 'Load on demand', labelKey: 'account.bodyDownloadOnDemand' },
+  { value: 'recent',    label: 'Save recent 6 months', labelKey: 'account.bodyDownloadRecent' },
+  { value: 'all',       label: 'Save all message bodies', labelKey: 'account.bodyDownloadAll' },
 ] as const
 
 /**

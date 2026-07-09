@@ -22,6 +22,20 @@ const (
 	AuthPassword AuthType = "password"
 )
 
+const (
+	SyncStrategyIncremental = "incremental"
+	SyncStrategyFull        = "full"
+
+	BodyDownloadOnDemand = "on_demand"
+	BodyDownloadRecent   = "recent"
+	BodyDownloadAll      = "all"
+
+	DefaultLocalRetentionDays     = 0
+	DefaultFullCheckIntervalDays  = 7
+	DefaultBodyDownloadPolicy     = BodyDownloadOnDemand
+	DefaultBodyDownloadRecentDays = 180
+)
+
 func normalizeAuthType(authType AuthType) AuthType {
 	switch authType {
 	case "", AuthPassword:
@@ -30,6 +44,30 @@ func normalizeAuthType(authType AuthType) AuthType {
 		// Legacy/unknown values, including the removed "oauth2", are treated as
 		// password accounts so old databases do not enter a removed auth path.
 		return AuthPassword
+	}
+}
+
+func normalizeSyncStrategy(strategy string) string {
+	switch strings.TrimSpace(strategy) {
+	case "", SyncStrategyIncremental:
+		return SyncStrategyIncremental
+	case SyncStrategyFull:
+		return SyncStrategyFull
+	default:
+		return SyncStrategyIncremental
+	}
+}
+
+func normalizeBodyDownloadPolicy(policy string) string {
+	switch strings.TrimSpace(policy) {
+	case "", BodyDownloadOnDemand:
+		return BodyDownloadOnDemand
+	case BodyDownloadRecent:
+		return BodyDownloadRecent
+	case BodyDownloadAll:
+		return BodyDownloadAll
+	default:
+		return BodyDownloadOnDemand
 	}
 }
 
@@ -88,10 +126,15 @@ type Account struct {
 	Color      string `json:"color"` // Hex color for account identification in unified inbox
 
 	// Sync settings
-	SyncPeriodDays     int  `json:"syncPeriodDays"`
-	SyncInterval       int  `json:"syncInterval"`       // Minutes between polls (0 = manual only)
-	SyncAllFolders     bool `json:"syncAllFolders"`     // Sync all folders instead of just subscribed ones
-	SyncFoldersEnabled bool `json:"syncFoldersEnabled"` // User opted into folder sync management
+	SyncPeriodDays        int    `json:"syncPeriodDays"`        // Legacy compatibility: old combined retention/body window.
+	LocalRetentionDays    int    `json:"localRetentionDays"`    // 0 = keep all local mail.
+	SyncStrategy          string `json:"syncStrategy"`          // incremental or full.
+	FullCheckIntervalDays int    `json:"fullCheckIntervalDays"` // 0 = manual only.
+	BodyDownloadPolicy    string `json:"bodyDownloadPolicy"`    // on_demand, recent, all.
+	BodyDownloadDays      int    `json:"bodyDownloadDays"`      // Used when BodyDownloadPolicy == recent.
+	SyncInterval          int    `json:"syncInterval"`          // Minutes between polls (0 = manual only)
+	SyncAllFolders        bool   `json:"syncAllFolders"`        // Sync all folders instead of just subscribed ones
+	SyncFoldersEnabled    bool   `json:"syncFoldersEnabled"`    // User opted into folder sync management
 
 	// Read receipt settings
 	// Controls whether to request read receipts when sending emails
@@ -239,10 +282,15 @@ type AccountConfig struct {
 
 	Color string `json:"color"` // Hex color for account identification
 
-	SyncPeriodDays     int  `json:"syncPeriodDays"`
-	SyncInterval       int  `json:"syncInterval"`       // Minutes between polls (0 = manual only)
-	SyncAllFolders     bool `json:"syncAllFolders"`     // Sync all folders instead of just subscribed ones
-	SyncFoldersEnabled bool `json:"syncFoldersEnabled"` // User opted into folder sync management
+	SyncPeriodDays        int    `json:"syncPeriodDays"`        // Legacy compatibility: old combined retention/body window.
+	LocalRetentionDays    int    `json:"localRetentionDays"`    // 0 = keep all local mail.
+	SyncStrategy          string `json:"syncStrategy"`          // incremental or full.
+	FullCheckIntervalDays int    `json:"fullCheckIntervalDays"` // 0 = manual only.
+	BodyDownloadPolicy    string `json:"bodyDownloadPolicy"`    // on_demand, recent, all.
+	BodyDownloadDays      int    `json:"bodyDownloadDays"`      // Used when BodyDownloadPolicy == recent.
+	SyncInterval          int    `json:"syncInterval"`          // Minutes between polls (0 = manual only)
+	SyncAllFolders        bool   `json:"syncAllFolders"`        // Sync all folders instead of just subscribed ones
+	SyncFoldersEnabled    bool   `json:"syncFoldersEnabled"`    // User opted into folder sync management
 
 	// Read receipt settings
 	ReadReceiptRequestPolicy string `json:"readReceiptRequestPolicy"`
@@ -292,6 +340,17 @@ func (c *AccountConfig) Validate() error {
 	c.AuthType = normalizeAuthType(c.AuthType)
 	if c.SyncPeriodDays < 0 {
 		c.SyncPeriodDays = 30
+	}
+	if c.LocalRetentionDays < 0 {
+		c.LocalRetentionDays = DefaultLocalRetentionDays
+	}
+	c.SyncStrategy = normalizeSyncStrategy(c.SyncStrategy)
+	if c.FullCheckIntervalDays < 0 {
+		c.FullCheckIntervalDays = DefaultFullCheckIntervalDays
+	}
+	c.BodyDownloadPolicy = normalizeBodyDownloadPolicy(c.BodyDownloadPolicy)
+	if c.BodyDownloadDays <= 0 {
+		c.BodyDownloadDays = DefaultBodyDownloadRecentDays
 	}
 	// SyncInterval: 0 is valid (manual only), negative means use default
 	if c.SyncInterval < 0 {

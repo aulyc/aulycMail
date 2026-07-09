@@ -17,15 +17,22 @@ import (
 	"github.com/emersion/go-imap/v2/imapclient"
 )
 
-// SyncMessages synchronizes messages for a folder with incremental sync support.
-// syncPeriodDays determines how far back to sync (0 = all messages).
+// SyncMessages synchronizes messages for a folder using the legacy combined
+// sync-period setting. New account-level paths should call SyncMessagesWithOptions.
+func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, syncPeriodDays int) error {
+	return e.SyncMessagesWithOptions(ctx, accountID, folderID, LegacyMessageSyncOptions(syncPeriodDays))
+}
+
+// SyncMessagesWithOptions synchronizes messages for a folder with incremental
+// sync support. options.RetentionDays determines the local retention window
+// (0 = keep all local messages).
 // Messages are fetched in two phases: headers first (fast), then bodies (background).
 //
-// SyncMessages serializes work per account+folder so manual sync, scheduler,
+// SyncMessagesWithOptions serializes work per account+folder so manual sync, scheduler,
 // IDLE-triggered sync, and sent-folder refresh cannot mutate the same local
 // folder at the same time. App.SyncFolder still adds UI-facing debounce,
 // cancellation, and completion events around this engine-level invariant.
-func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, syncPeriodDays int) error {
+func (e *Engine) SyncMessagesWithOptions(ctx context.Context, accountID, folderID string, options MessageSyncOptions) error {
 	// Check context at start
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -49,7 +56,9 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 	e.log.Debug().
 		Str("account", accountID).
 		Str("folder", f.Path).
-		Int("syncPeriodDays", syncPeriodDays).
+		Int("retentionDays", options.RetentionDays).
+		Str("strategy", options.Strategy).
+		Int("fullCheckIntervalDays", options.FullCheckIntervalDays).
 		Msg("Syncing messages (incremental)")
 
 	// Get a connection from the pool
@@ -102,11 +111,11 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 
 	// Calculate sync date cutoff
 	var sinceDate time.Time
-	if syncPeriodDays > 0 {
-		sinceDate = time.Now().AddDate(0, 0, -syncPeriodDays)
+	if options.RetentionDays > 0 {
+		sinceDate = time.Now().AddDate(0, 0, -options.RetentionDays)
 		e.log.Debug().
 			Time("sinceDate", sinceDate).
-			Int("syncPeriodDays", syncPeriodDays).
+			Int("retentionDays", options.RetentionDays).
 			Msg("Using date-based sync filter")
 
 		// Delete local messages older than sync period
@@ -137,12 +146,16 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 	// Emit "messages" phase - fetching message list from server (UID SEARCH)
 	e.emitProgress(accountID, folderID, 0, 0, "messages")
 
-	// Fetch UIDs from server (filtered by date if syncPeriodDays > 0)
+	// Fetch UIDs from server. Full validations can be date-filtered by local
+	// retention; incremental cycles only ask for UIDs above the local high-water mark.
 	var remoteUIDs []uint32
-	if syncPeriodDays > 0 {
+	didFullUIDSearch := shouldRunFullUIDSearch(f, options, uidValidityChanged, len(localUIDs), time.Now())
+	if didFullUIDSearch && options.RetentionDays > 0 {
 		remoteUIDs, err = e.fetchUIDsSince(ctx, conn.Client().RawClient(), sinceDate)
-	} else {
+	} else if didFullUIDSearch {
 		remoteUIDs, err = e.fetchAllUIDs(ctx, conn.Client().RawClient())
+	} else {
+		remoteUIDs, err = e.fetchIncrementalUIDs(ctx, conn.Client().RawClient(), f, localUIDs, mailbox.UIDNext)
 	}
 	if err != nil {
 		e.log.Error().Err(err).Str("folder", f.Path).Msg("Failed to fetch UIDs from server - aborting sync to prevent data loss")
@@ -158,7 +171,7 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 	// SAFEGUARD: If remote returns empty but we have local messages, something is wrong
 	// This could be a network issue, server error, or connection problem
 	// Do NOT delete local messages in this case (unless we're using date filtering)
-	if len(remoteUIDs) == 0 && len(localUIDs) > 0 && syncPeriodDays == 0 {
+	if didFullUIDSearch && len(remoteUIDs) == 0 && len(localUIDs) > 0 && options.RetentionDays == 0 {
 		e.log.Warn().
 			Str("folder", f.Path).
 			Int("localCount", len(localUIDs)).
@@ -195,7 +208,7 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 
 	// SAFEGUARD: Warn if we're about to delete a large percentage of messages
 	// This could indicate a problem with the sync rather than actual deletions
-	if len(localUIDs) > 10 && len(deletedUIDs) > len(localUIDs)/2 && syncPeriodDays == 0 {
+	if didFullUIDSearch && len(localUIDs) > 10 && len(deletedUIDs) > len(localUIDs)/2 && options.RetentionDays == 0 {
 		e.log.Warn().
 			Str("folder", f.Path).
 			Int("localCount", len(localUIDs)).
@@ -361,6 +374,9 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 	now := time.Now()
 	f.UIDValidity = mailbox.UIDValidity
 	f.UIDNext = mailbox.UIDNext
+	if didFullUIDSearch {
+		f.LastFullSync = &now
+	}
 	// Pin modseq when flag sync didn't fully succeed — advancing the
 	// baseline after a partial failure silently skips whatever the failed
 	// cycle missed. See nextModSeq in condstore.go.
@@ -578,6 +594,79 @@ func (e *Engine) fetchAllUIDs(ctx context.Context, client *imapclient.Client) ([
 			uids = append(uids, uint32(uid))
 		}
 
+		return uids, nil
+	}
+}
+
+func (e *Engine) fetchIncrementalUIDs(ctx context.Context, client *imapclient.Client, f *folder.Folder, localUIDs []uint32, mailboxUIDNext uint32) ([]uint32, error) {
+	remoteUIDs := append([]uint32(nil), localUIDs...)
+	if f.UIDNext > 0 && mailboxUIDNext > 0 && mailboxUIDNext <= f.UIDNext {
+		e.log.Debug().
+			Str("folder", f.Path).
+			Uint32("storedUIDNext", f.UIDNext).
+			Uint32("mailboxUIDNext", mailboxUIDNext).
+			Msg("Skipping UID SEARCH; mailbox UIDNEXT unchanged")
+		return remoteUIDs, nil
+	}
+
+	highestUID := uint32(0)
+	for _, uid := range localUIDs {
+		if uid > highestUID {
+			highestUID = uid
+		}
+	}
+	if highestUID == 0 {
+		return e.fetchAllUIDs(ctx, client)
+	}
+
+	newUIDs, err := e.fetchUIDsAfter(ctx, client, highestUID)
+	if err != nil {
+		return nil, err
+	}
+	remoteUIDs = append(remoteUIDs, newUIDs...)
+	return remoteUIDs, nil
+}
+
+// fetchUIDsAfter fetches UIDs greater than highestUID from the currently
+// selected mailbox. It is the fast path for daily incremental sync.
+func (e *Engine) fetchUIDsAfter(ctx context.Context, client *imapclient.Client, highestUID uint32) ([]uint32, error) {
+	start := imap.UID(highestUID + 1)
+	uidSet := imap.UIDSet{}
+	uidSet.AddRange(start, imap.UID(0))
+
+	e.log.Debug().Uint32("highestUID", highestUID).Msg("Fetching UIDs after local high-water mark")
+
+	searchCmd := client.UIDSearch(&imap.SearchCriteria{
+		UID:     []imap.UIDSet{uidSet},
+		NotFlag: []imap.Flag{imap.FlagDeleted},
+	}, nil)
+
+	type searchResult struct {
+		data *imap.SearchData
+		err  error
+	}
+	resultCh := make(chan searchResult, 1)
+	go func() {
+		data, err := searchCmd.Wait()
+		resultCh <- searchResult{data, err}
+	}()
+
+	select {
+	case <-ctx.Done():
+		e.log.Debug().Msg("Incremental UID search cancelled by context")
+		return nil, ctx.Err()
+	case result := <-resultCh:
+		if result.err != nil {
+			e.log.Error().Err(result.err).Msg("Incremental UID search command failed")
+			return nil, fmt.Errorf("incremental UID search failed: %w", result.err)
+		}
+
+		var uids []uint32
+		for _, uid := range result.data.AllUIDs() {
+			uids = append(uids, uint32(uid))
+		}
+
+		e.log.Debug().Int("count", len(uids)).Msg("Fetched incremental UIDs")
 		return uids, nil
 	}
 }

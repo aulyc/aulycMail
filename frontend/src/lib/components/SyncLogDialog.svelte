@@ -30,12 +30,16 @@
     return `${y}-${m}-${day}`
   }
 
+  function handleOpenAutoFocus(e: Event) {
+    e.preventDefault()
+  }
+
   const entries = $derived(syncLog.entries)
   const filtered = $derived(filterDate ? entries.filter((e) => dateKey(e.time) === filterDate) : entries)
 </script>
 
 <Dialog.Root bind:open onOpenChange={(v) => { if (!v) onClose?.() }}>
-  <Dialog.Content class="max-w-2xl w-[min(90vw,720px)] [&>button]:hidden">
+  <Dialog.Content class="max-w-2xl w-[min(90vw,720px)] [&>button]:hidden" onOpenAutoFocus={handleOpenAutoFocus}>
     <!-- Header: title + date filter + clear + close all on one row -->
     <div class="flex items-center gap-2">
       <Icon icon="mdi:history" class="w-4 h-4 text-foreground flex-shrink-0" />
@@ -74,7 +78,7 @@
     </div>
 
     <!-- Fixed-height, scrolling body -->
-    <div class="h-[55vh] overflow-y-auto scrollbar-thin border-y border-border">
+    <div class="h-[55vh] overflow-y-auto scrollbar-thin border-y border-border pr-5 [scrollbar-gutter:stable]">
       {#if filtered.length === 0}
         <div class="h-full flex items-center justify-center text-sm text-muted-foreground">
           {$_('syncLog.empty')}
@@ -90,7 +94,7 @@
               <div class="flex-1 min-w-0">
                 <div class="flex items-baseline gap-2 min-w-0">
                   <span class="text-sm text-foreground truncate flex-1 min-w-0">{e.target}</span>
-                  <span class="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{formatMessageDate(e.time)}</span>
+                  <span class="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0 tabular-nums">{formatMessageDate(e.time)}</span>
                 </div>
                 <div class="text-xs {e.level === 'error' ? 'text-destructive' : 'text-muted-foreground'}">
                   {e.level === 'error' ? $_('syncLog.failed') : e.level === 'success' ? $_('syncLog.succeeded') : ''}

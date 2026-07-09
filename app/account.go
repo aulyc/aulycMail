@@ -112,8 +112,13 @@ func (a *App) UpdateAccount(id string, config account.AccountConfig) (*account.A
 		}
 	}
 
-	// Check if sync period changed
-	syncPeriodChanged := existingAcc.SyncPeriodDays != config.SyncPeriodDays
+	// Check if any sync behavior changed
+	syncSettingsChanged := existingAcc.SyncPeriodDays != config.SyncPeriodDays ||
+		existingAcc.LocalRetentionDays != config.LocalRetentionDays ||
+		existingAcc.SyncStrategy != config.SyncStrategy ||
+		existingAcc.FullCheckIntervalDays != config.FullCheckIntervalDays ||
+		existingAcc.BodyDownloadPolicy != config.BodyDownloadPolicy ||
+		existingAcc.BodyDownloadDays != config.BodyDownloadDays
 
 	acc, err := a.accountStore.Update(id, &config)
 	if err != nil {
@@ -144,13 +149,15 @@ func (a *App) UpdateAccount(id string, config account.AccountConfig) (*account.A
 		}
 	}
 
-	// If sync period changed, cancel any running sync and trigger a new one
-	if syncPeriodChanged && a.syncScheduler != nil {
+	// If sync settings changed, cancel any running sync and trigger a new one
+	if syncSettingsChanged && a.syncScheduler != nil {
 		log.Info().
 			Str("account_id", id).
-			Int("old_sync_period", existingAcc.SyncPeriodDays).
-			Int("new_sync_period", config.SyncPeriodDays).
-			Msg("Sync period changed, cancelling current sync and triggering new sync")
+			Int("old_local_retention_days", existingAcc.LocalRetentionDays).
+			Int("new_local_retention_days", config.LocalRetentionDays).
+			Str("old_sync_strategy", existingAcc.SyncStrategy).
+			Str("new_sync_strategy", config.SyncStrategy).
+			Msg("Sync settings changed, cancelling current sync and triggering new sync")
 
 		a.syncScheduler.CancelSync(id)
 		// Small delay to allow cancellation to complete

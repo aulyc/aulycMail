@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/aulyc/aulycmail/internal/database"
 	"github.com/aulyc/aulycmail/internal/logging"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
@@ -30,7 +30,7 @@ func (s *Store) List(accountID string) ([]*Folder, error) {
 	query := `
 		SELECT id, account_id, name, path, folder_type, parent_id,
 		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, subscribed
+		       total_count, unread_count, last_sync, last_full_sync, subscribed
 		FROM folders
 		WHERE account_id = ?
 		ORDER BY name
@@ -46,14 +46,14 @@ func (s *Store) List(accountID string) ([]*Folder, error) {
 	for rows.Next() {
 		f := &Folder{}
 		var parentID sql.NullString
-		var lastSync sql.NullTime
+		var lastSync, lastFullSync sql.NullTime
 		var uidValidity, uidNext sql.NullInt64
 		var highestModSeq sql.NullInt64
 
 		err := rows.Scan(
 			&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
 			&uidValidity, &uidNext, &highestModSeq,
-			&f.TotalCount, &f.UnreadCount, &lastSync, &f.Subscribed,
+			&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan folder: %w", err)
@@ -64,6 +64,9 @@ func (s *Store) List(accountID string) ([]*Folder, error) {
 		}
 		if lastSync.Valid {
 			f.LastSync = &lastSync.Time
+		}
+		if lastFullSync.Valid {
+			f.LastFullSync = &lastFullSync.Time
 		}
 		if uidValidity.Valid {
 			f.UIDValidity = uint32(uidValidity.Int64)
@@ -86,21 +89,21 @@ func (s *Store) Get(id string) (*Folder, error) {
 	query := `
 		SELECT id, account_id, name, path, folder_type, parent_id,
 		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, subscribed
+		       total_count, unread_count, last_sync, last_full_sync, subscribed
 		FROM folders
 		WHERE id = ?
 	`
 
 	f := &Folder{}
 	var parentID sql.NullString
-	var lastSync sql.NullTime
+	var lastSync, lastFullSync sql.NullTime
 	var uidValidity, uidNext sql.NullInt64
 	var highestModSeq sql.NullInt64
 
 	err := s.db.QueryRow(query, id).Scan(
 		&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
 		&uidValidity, &uidNext, &highestModSeq,
-		&f.TotalCount, &f.UnreadCount, &lastSync, &f.Subscribed,
+		&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -114,6 +117,9 @@ func (s *Store) Get(id string) (*Folder, error) {
 	}
 	if lastSync.Valid {
 		f.LastSync = &lastSync.Time
+	}
+	if lastFullSync.Valid {
+		f.LastFullSync = &lastFullSync.Time
 	}
 	if uidValidity.Valid {
 		f.UIDValidity = uint32(uidValidity.Int64)
@@ -133,21 +139,21 @@ func (s *Store) GetByPath(accountID, path string) (*Folder, error) {
 	query := `
 		SELECT id, account_id, name, path, folder_type, parent_id,
 		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, subscribed
+		       total_count, unread_count, last_sync, last_full_sync, subscribed
 		FROM folders
 		WHERE account_id = ? AND path = ?
 	`
 
 	f := &Folder{}
 	var parentID sql.NullString
-	var lastSync sql.NullTime
+	var lastSync, lastFullSync sql.NullTime
 	var uidValidity, uidNext sql.NullInt64
 	var highestModSeq sql.NullInt64
 
 	err := s.db.QueryRow(query, accountID, path).Scan(
 		&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
 		&uidValidity, &uidNext, &highestModSeq,
-		&f.TotalCount, &f.UnreadCount, &lastSync, &f.Subscribed,
+		&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -161,6 +167,9 @@ func (s *Store) GetByPath(accountID, path string) (*Folder, error) {
 	}
 	if lastSync.Valid {
 		f.LastSync = &lastSync.Time
+	}
+	if lastFullSync.Valid {
+		f.LastFullSync = &lastFullSync.Time
 	}
 	if uidValidity.Valid {
 		f.UIDValidity = uint32(uidValidity.Int64)
@@ -184,8 +193,8 @@ func (s *Store) Create(f *Folder) error {
 	query := `
 		INSERT INTO folders (id, account_id, name, path, folder_type, parent_id,
 		                     uid_validity, uid_next, highest_mod_seq,
-		                     total_count, unread_count, last_sync, subscribed)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		                     total_count, unread_count, last_sync, last_full_sync, subscribed)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	var parentID interface{}
@@ -197,11 +206,15 @@ func (s *Store) Create(f *Folder) error {
 	if f.LastSync != nil {
 		lastSync = f.LastSync
 	}
+	var lastFullSync interface{}
+	if f.LastFullSync != nil {
+		lastFullSync = f.LastFullSync
+	}
 
 	_, err := s.db.Exec(query,
 		f.ID, f.AccountID, f.Name, f.Path, f.Type, parentID,
 		f.UIDValidity, f.UIDNext, f.HighestModSeq,
-		f.TotalCount, f.UnreadCount, lastSync, f.Subscribed,
+		f.TotalCount, f.UnreadCount, lastSync, lastFullSync, f.Subscribed,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create folder: %w", err)
@@ -228,6 +241,7 @@ func (s *Store) Update(f *Folder) error {
 			total_count = ?,
 			unread_count = ?,
 			last_sync = ?,
+			last_full_sync = ?,
 			subscribed = ?
 		WHERE id = ?
 	`
@@ -241,11 +255,15 @@ func (s *Store) Update(f *Folder) error {
 	if f.LastSync != nil {
 		lastSync = f.LastSync
 	}
+	var lastFullSync interface{}
+	if f.LastFullSync != nil {
+		lastFullSync = f.LastFullSync
+	}
 
 	_, err := s.db.Exec(query,
 		f.Name, f.Type, parentID,
 		f.UIDValidity, f.UIDNext, f.HighestModSeq,
-		f.TotalCount, f.UnreadCount, lastSync, f.Subscribed,
+		f.TotalCount, f.UnreadCount, lastSync, lastFullSync, f.Subscribed,
 		f.ID,
 	)
 	if err != nil {
@@ -327,7 +345,7 @@ func (s *Store) GetByType(accountID string, folderType Type) (*Folder, error) {
 	query := `
 		SELECT id, account_id, name, path, folder_type, parent_id,
 		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, subscribed
+		       total_count, unread_count, last_sync, last_full_sync, subscribed
 		FROM folders
 		WHERE account_id = ? AND folder_type = ?
 		LIMIT 1
@@ -335,14 +353,14 @@ func (s *Store) GetByType(accountID string, folderType Type) (*Folder, error) {
 
 	f := &Folder{}
 	var parentID sql.NullString
-	var lastSync sql.NullTime
+	var lastSync, lastFullSync sql.NullTime
 	var uidValidity, uidNext sql.NullInt64
 	var highestModSeq sql.NullInt64
 
 	err := s.db.QueryRow(query, accountID, folderType).Scan(
 		&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
 		&uidValidity, &uidNext, &highestModSeq,
-		&f.TotalCount, &f.UnreadCount, &lastSync, &f.Subscribed,
+		&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -356,6 +374,9 @@ func (s *Store) GetByType(accountID string, folderType Type) (*Folder, error) {
 	}
 	if lastSync.Valid {
 		f.LastSync = &lastSync.Time
+	}
+	if lastFullSync.Valid {
+		f.LastFullSync = &lastFullSync.Time
 	}
 	if uidValidity.Valid {
 		f.UIDValidity = uint32(uidValidity.Int64)
@@ -376,7 +397,7 @@ func (s *Store) ListSubscribed(accountID string) ([]*Folder, error) {
 	query := `
 		SELECT id, account_id, name, path, folder_type, parent_id,
 		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, subscribed
+		       total_count, unread_count, last_sync, last_full_sync, subscribed
 		FROM folders
 		WHERE account_id = ? AND (subscribed = 1 OR folder_type IN ('inbox', 'drafts', 'sent'))
 		ORDER BY name
@@ -392,14 +413,14 @@ func (s *Store) ListSubscribed(accountID string) ([]*Folder, error) {
 	for rows.Next() {
 		f := &Folder{}
 		var parentID sql.NullString
-		var lastSync sql.NullTime
+		var lastSync, lastFullSync sql.NullTime
 		var uidValidity, uidNext sql.NullInt64
 		var highestModSeq sql.NullInt64
 
 		err := rows.Scan(
 			&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
 			&uidValidity, &uidNext, &highestModSeq,
-			&f.TotalCount, &f.UnreadCount, &lastSync, &f.Subscribed,
+			&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan folder: %w", err)
@@ -410,6 +431,9 @@ func (s *Store) ListSubscribed(accountID string) ([]*Folder, error) {
 		}
 		if lastSync.Valid {
 			f.LastSync = &lastSync.Time
+		}
+		if lastFullSync.Valid {
+			f.LastFullSync = &lastFullSync.Time
 		}
 		if uidValidity.Valid {
 			f.UIDValidity = uint32(uidValidity.Int64)

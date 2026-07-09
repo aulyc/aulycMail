@@ -72,18 +72,20 @@ export function formatRelativeDateTime(date: Date): string {
 export function formatMessageDate(date: Date): string {
   const t = get(_)
   const locale = getCurrentDateFnsLocale()
+  const time = format(date, 'HH:mm', { locale })
+  const isZh = locale?.code === 'zh-CN'
 
   if (isToday(date)) {
-    return t('date.todayAt', { values: { time: format(date, 'h:mm a', { locale }) } })
+    return t('date.todayAt', { values: { time } })
   }
 
   if (isYesterday(date)) {
-    return t('date.yesterdayAt', { values: { time: format(date, 'h:mm a', { locale }) } })
+    return t('date.yesterdayAt', { values: { time } })
   }
 
   if (isThisYear(date)) {
-    return format(date, 'MMM d \'at\' h:mm a', { locale })
+    return format(date, isZh ? 'M月d日 HH:mm' : 'MMM d \'at\' HH:mm', { locale })
   }
 
-  return format(date, 'MMM d, yyyy \'at\' h:mm a', { locale })
+  return format(date, isZh ? 'yyyy年M月d日 HH:mm' : 'MMM d, yyyy \'at\' HH:mm', { locale })
 }

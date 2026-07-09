@@ -30,6 +30,10 @@ export function ChooseBackupDirectory() {
   return window['go']['app']['App']['ChooseBackupDirectory']();
 }
 
+export function ClearOfflineBodyCache(arg1) {
+  return window['go']['app']['App']['ClearOfflineBodyCache'](arg1);
+}
+
 export function Contacts_BrowseContacts(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['Contacts_BrowseContacts'](arg1, arg2, arg3, arg4);
 }

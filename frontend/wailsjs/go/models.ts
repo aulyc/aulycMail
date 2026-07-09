@@ -20,6 +20,11 @@ export namespace account {
 	    orderIndex: number;
 	    color: string;
 	    syncPeriodDays: number;
+	    localRetentionDays: number;
+	    syncStrategy: string;
+	    fullCheckIntervalDays: number;
+	    bodyDownloadPolicy: string;
+	    bodyDownloadDays: number;
 	    syncInterval: number;
 	    syncAllFolders: boolean;
 	    syncFoldersEnabled: boolean;
@@ -59,6 +64,11 @@ export namespace account {
 	        this.orderIndex = source["orderIndex"];
 	        this.color = source["color"];
 	        this.syncPeriodDays = source["syncPeriodDays"];
+	        this.localRetentionDays = source["localRetentionDays"];
+	        this.syncStrategy = source["syncStrategy"];
+	        this.fullCheckIntervalDays = source["fullCheckIntervalDays"];
+	        this.bodyDownloadPolicy = source["bodyDownloadPolicy"];
+	        this.bodyDownloadDays = source["bodyDownloadDays"];
 	        this.syncInterval = source["syncInterval"];
 	        this.syncAllFolders = source["syncAllFolders"];
 	        this.syncFoldersEnabled = source["syncFoldersEnabled"];
@@ -94,6 +104,11 @@ export namespace account {
 	    password: string;
 	    color: string;
 	    syncPeriodDays: number;
+	    localRetentionDays: number;
+	    syncStrategy: string;
+	    fullCheckIntervalDays: number;
+	    bodyDownloadPolicy: string;
+	    bodyDownloadDays: number;
 	    syncInterval: number;
 	    syncAllFolders: boolean;
 	    syncFoldersEnabled: boolean;
@@ -131,6 +146,11 @@ export namespace account {
 	        this.password = source["password"];
 	        this.color = source["color"];
 	        this.syncPeriodDays = source["syncPeriodDays"];
+	        this.localRetentionDays = source["localRetentionDays"];
+	        this.syncStrategy = source["syncStrategy"];
+	        this.fullCheckIntervalDays = source["fullCheckIntervalDays"];
+	        this.bodyDownloadPolicy = source["bodyDownloadPolicy"];
+	        this.bodyDownloadDays = source["bodyDownloadDays"];
 	        this.syncInterval = source["syncInterval"];
 	        this.syncAllFolders = source["syncAllFolders"];
 	        this.syncFoldersEnabled = source["syncFoldersEnabled"];
@@ -677,6 +697,22 @@ export namespace app {
 	        this.body = source["body"];
 	    }
 	}
+	export class OfflineBodyCacheClearResult {
+	    folders: number;
+	    bodiesCleared: number;
+	    attachmentsDeleted: number;
+
+	    static createFrom(source: any = {}) {
+	        return new OfflineBodyCacheClearResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.folders = source["folders"];
+	        this.bodiesCleared = source["bodiesCleared"];
+	        this.attachmentsDeleted = source["attachmentsDeleted"];
+	    }
+	}
 
 }
 
@@ -855,6 +891,7 @@ export namespace folder {
 	    totalCount: number;
 	    unreadCount: number;
 	    lastSync?: string;
+	    lastFullSync?: string;
 	    subscribed: boolean;
 
 	    static createFrom(source: any = {}) {
@@ -875,6 +912,7 @@ export namespace folder {
 	        this.totalCount = source["totalCount"];
 	        this.unreadCount = source["unreadCount"];
 	        this.lastSync = source["lastSync"];
+	        this.lastFullSync = source["lastFullSync"];
 	        this.subscribed = source["subscribed"];
 	    }
 	}

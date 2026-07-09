@@ -229,6 +229,15 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 	if _, err := db.Exec(`ALTER TABLE drafts DROP COLUMN source_message_id`); err != nil {
 		t.Fatalf("drop drafts.source_message_id for re-migrate: %v", err)
 	}
+	// Same for v45's split sync settings.
+	for _, col := range []string{"local_retention_days", "sync_strategy", "full_check_interval_days", "body_download_policy", "body_download_days"} {
+		if _, err := db.Exec(`ALTER TABLE accounts DROP COLUMN ` + col); err != nil {
+			t.Fatalf("drop accounts.%s for re-migrate: %v", col, err)
+		}
+	}
+	if _, err := db.Exec(`ALTER TABLE folders DROP COLUMN last_full_sync`); err != nil {
+		t.Fatalf("drop folders.last_full_sync for re-migrate: %v", err)
+	}
 
 	// Re-run migrations — migration 32 should rewrite the seeded local- id.
 	if err := db.Migrate(); err != nil {
@@ -394,6 +403,15 @@ func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
 	// Same for v44's local source-message link on drafts.
 	if _, err := db.Exec(`ALTER TABLE drafts DROP COLUMN source_message_id`); err != nil {
 		t.Fatalf("drop drafts.source_message_id for re-migrate: %v", err)
+	}
+	// Same for v45's split sync settings.
+	for _, col := range []string{"local_retention_days", "sync_strategy", "full_check_interval_days", "body_download_policy", "body_download_days"} {
+		if _, err := db.Exec(`ALTER TABLE accounts DROP COLUMN ` + col); err != nil {
+			t.Fatalf("drop accounts.%s for re-migrate: %v", col, err)
+		}
+	}
+	if _, err := db.Exec(`ALTER TABLE folders DROP COLUMN last_full_sync`); err != nil {
+		t.Fatalf("drop folders.last_full_sync for re-migrate: %v", err)
 	}
 
 	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,

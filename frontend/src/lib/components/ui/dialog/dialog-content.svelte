@@ -8,6 +8,7 @@
   interface Props {
     class?: string
     children?: Snippet
+    onOpenAutoFocus?: (e: Event) => void
     /** Prevent focus from returning to trigger element on close */
     preventCloseAutoFocus?: boolean
     /** Handler for clicks/touches outside the dialog. Call e.preventDefault()
@@ -15,7 +16,7 @@
     onInteractOutside?: (e: Event) => void
   }
 
-  let { class: className, children, preventCloseAutoFocus = false, onInteractOutside }: Props = $props()
+  let { class: className, children, onOpenAutoFocus, preventCloseAutoFocus = false, onInteractOutside }: Props = $props()
 
   function handleCloseAutoFocus(e: Event) {
     if (preventCloseAutoFocus) {
@@ -28,6 +29,7 @@
   <DialogOverlay />
   <div class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
     <DialogPrimitive.Content
+      {onOpenAutoFocus}
       onCloseAutoFocus={handleCloseAutoFocus}
       onInteractOutside={onInteractOutside}
       class={cn(

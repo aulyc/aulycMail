@@ -1383,4 +1383,47 @@ var migrations = []Migration{
 			CREATE INDEX IF NOT EXISTS idx_message_compose_status_draft ON message_compose_status(draft_id);
 		`,
 	},
+	{
+		Version: 45,
+		SQL: `
+			-- Split the old "sync period" into explicit retention, daily sync,
+			-- full-check, and body-download settings.
+			--
+			-- local_retention_days:
+			--   0 keeps all local messages for archive/backup; positive values
+			--   preserve the old "delete local messages older than N days" behavior.
+			--
+			-- sync_strategy:
+			--   incremental performs fast UIDNEXT/highest-UID checks between
+			--   scheduled full validations; full preserves the old every-sync
+			--   complete UID SEARCH behavior.
+			--
+			-- body_download_policy:
+			--   on_demand skips background body downloads; recent downloads only
+			--   body_download_days; all downloads every missing body.
+			ALTER TABLE accounts ADD COLUMN local_retention_days INTEGER NOT NULL DEFAULT 0;
+			ALTER TABLE accounts ADD COLUMN sync_strategy TEXT NOT NULL DEFAULT 'incremental';
+			ALTER TABLE accounts ADD COLUMN full_check_interval_days INTEGER NOT NULL DEFAULT 7;
+			ALTER TABLE accounts ADD COLUMN body_download_policy TEXT NOT NULL DEFAULT 'on_demand';
+			ALTER TABLE accounts ADD COLUMN body_download_days INTEGER NOT NULL DEFAULT 180;
+			ALTER TABLE folders ADD COLUMN last_full_sync DATETIME;
+
+			-- Existing accounts keep their local-retention behavior from the old
+			-- combined setting. Body-download behavior maps old "all" to all
+			-- content; limited old windows move to the new fixed recent window.
+			UPDATE accounts
+			SET local_retention_days = CASE
+				WHEN sync_period_days < 0 THEN 30
+				ELSE sync_period_days
+			END;
+
+			UPDATE accounts
+			SET
+				body_download_policy = CASE
+					WHEN sync_period_days = 0 THEN 'all'
+					ELSE 'recent'
+				END,
+				body_download_days = 180;
+		`,
+	},
 }

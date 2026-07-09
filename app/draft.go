@@ -168,39 +168,59 @@ func (ops *draftOps) saveDraftToDB(accountID string, localDraft *draft.Draft, ms
 	return localDraft, nil
 }
 
+func (ops *draftOps) latestDraft(d *draft.Draft) *draft.Draft {
+	if d == nil {
+		return nil
+	}
+	if fresh, err := ops.draftStore.Get(d.ID); err == nil && fresh != nil {
+		return fresh
+	}
+	return d
+}
+
+func (ops *draftOps) deleteDraftFromIMAP(ctx context.Context, d *draft.Draft, draftsFolder *folder.Folder) {
+	log := logging.WithComponent("draft")
+
+	if d == nil || draftsFolder == nil || !d.IsSynced() {
+		return
+	}
+
+	poolConn, err := ops.imapPool.GetConnection(ctx, d.AccountID)
+	if err != nil {
+		log.Warn().Err(err).Str("draftID", d.ID).Msg("Failed to get IMAP connection for draft delete")
+		return
+	}
+	defer ops.imapPool.Release(poolConn)
+
+	conn := poolConn.Client()
+	if _, err := conn.SelectMailbox(ctx, draftsFolder.Path); err != nil {
+		log.Warn().Err(err).Str("path", draftsFolder.Path).Msg("Failed to select Drafts mailbox for draft delete")
+		return
+	}
+	if err := conn.DeleteMessageByUID(goImap.UID(d.IMAPUID)); err != nil {
+		log.Warn().Err(err).Uint32("uid", d.IMAPUID).Msg("Failed to delete draft from IMAP")
+	}
+}
+
 // deleteDraftCore deletes a draft from IMAP (if synced), cleans up the message
 // row, and removes the draft from the local database. Returns the drafts folder
-// (non-nil if the draft was synced) so callers can emit events and trigger syncs.
+// when it can be resolved so callers can emit events and trigger syncs.
 func (ops *draftOps) deleteDraftCore(ctx context.Context, d *draft.Draft) (*folder.Folder, error) {
 	log := logging.WithComponent("draft")
 
 	// Re-read from DB to get latest sync state (IMAPUID may have been updated
 	// by a background sync goroutine since the caller obtained this draft object)
-	if fresh, err := ops.draftStore.Get(d.ID); err == nil && fresh != nil {
-		d = fresh
-	}
+	d = ops.latestDraft(d)
 
-	var draftsFolder *folder.Folder
-	if d.IsSynced() {
-		draftsFolder, _ = ops.getSpecialFolder(d.AccountID, folder.TypeDrafts)
-		if draftsFolder != nil {
-			poolConn, err := ops.imapPool.GetConnection(ctx, d.AccountID)
-			if err == nil {
-				defer ops.imapPool.Release(poolConn)
-				conn := poolConn.Client()
-				if _, err := conn.SelectMailbox(ctx, draftsFolder.Path); err == nil {
-					if err := conn.DeleteMessageByUID(goImap.UID(d.IMAPUID)); err != nil {
-						log.Warn().Err(err).Uint32("uid", d.IMAPUID).Msg("Failed to delete draft from IMAP")
-					}
-				}
-			}
+	draftsFolder, _ := ops.getSpecialFolder(d.AccountID, folder.TypeDrafts)
+	if d.IsSynced() && draftsFolder != nil {
+		ops.deleteDraftFromIMAP(ctx, d, draftsFolder)
 
-			// Clean up the message row that syncDraftToIMAP's SyncFolder may have created.
-			// Done directly because the post-delete SyncFolder may be debounced (500ms)
-			// if a recent draft sync just ran.
-			if err := ops.messageStore.DeleteByUID(draftsFolder.ID, d.IMAPUID); err != nil {
-				log.Warn().Err(err).Uint32("uid", d.IMAPUID).Str("folderID", draftsFolder.ID).Msg("Failed to clean up draft message row")
-			}
+		// Clean up the message row that syncDraftToIMAP's SyncFolder may have created.
+		// Done directly because the post-delete SyncFolder may be debounced (500ms)
+		// if a recent draft sync just ran.
+		if err := ops.messageStore.DeleteByUID(draftsFolder.ID, d.IMAPUID); err != nil {
+			log.Warn().Err(err).Uint32("uid", d.IMAPUID).Str("folderID", draftsFolder.ID).Msg("Failed to clean up draft message row")
 		}
 	}
 
@@ -210,6 +230,27 @@ func (ops *draftOps) deleteDraftCore(ctx context.Context, d *draft.Draft) (*fold
 	}
 
 	return draftsFolder, nil
+}
+
+// deleteDraftLocalCore removes local draft state immediately. Any remote IMAP
+// deletion can happen afterward in a background goroutine.
+func (ops *draftOps) deleteDraftLocalCore(d *draft.Draft) (*folder.Folder, *draft.Draft, error) {
+	log := logging.WithComponent("draft")
+
+	d = ops.latestDraft(d)
+	draftsFolder, _ := ops.getSpecialFolder(d.AccountID, folder.TypeDrafts)
+
+	if d.IsSynced() && draftsFolder != nil {
+		if err := ops.messageStore.DeleteByUID(draftsFolder.ID, d.IMAPUID); err != nil {
+			log.Warn().Err(err).Uint32("uid", d.IMAPUID).Str("folderID", draftsFolder.ID).Msg("Failed to clean up draft message row")
+		}
+	}
+
+	if err := ops.draftStore.Delete(d.ID); err != nil {
+		return draftsFolder, d, fmt.Errorf("failed to delete draft: %w", err)
+	}
+
+	return draftsFolder, d, nil
 }
 
 // syncToIMAP syncs a draft to the IMAP server. The emitStatus callback lets each
@@ -346,9 +387,8 @@ func (ops *draftOps) toComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 // Draft API - Exposed to frontend via Wails bindings
 // ============================================================================
 
-// cancelDraftSync cancels any in-flight syncDraftToIMAP goroutine for the given draft
-// and waits for it to finish. This prevents the race where DeleteDraft runs while
-// a background goroutine is still uploading the draft to IMAP.
+// cancelDraftSync signals any in-flight syncDraftToIMAP goroutine for the given
+// draft to stop. The goroutine cleans up any orphaned IMAP APPEND on its own.
 func (a *App) cancelDraftSync(draftID string) {
 	a.syncMu.Lock()
 	cancel, hasCancel := a.draftSyncContexts[draftID]
@@ -511,12 +551,13 @@ func (a *App) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 	return a.draftOps.toComposeMessage(d)
 }
 
-// DeleteDraft deletes a draft from local DB and IMAP
+// DeleteDraft discards a draft from local state immediately, then removes any
+// synced remote draft in the background so the UI does not wait on IMAP.
 func (a *App) DeleteDraft(draftID string) error {
 	log := logging.WithComponent("app")
 
-	// Cancel any in-flight IMAP sync goroutine and wait for it to finish.
-	// This ensures the goroutine can't upload the draft after we delete it.
+	// Cancel any in-flight IMAP sync goroutine. The sync path re-checks local
+	// draft existence and cleans up orphaned APPENDs if cancellation lands late.
 	a.cancelDraftSync(draftID)
 
 	// Get the draft to find IMAP UID (re-read after cancel to get latest state)
@@ -528,31 +569,44 @@ func (a *App) DeleteDraft(draftID string) error {
 		return nil // Already deleted
 	}
 
-	draftsFolder, err := a.draftOps.deleteDraftCore(a.ctx, d)
+	draftsFolder, deletedDraft, err := a.draftOps.deleteDraftLocalCore(d)
 	if err != nil {
 		return err
 	}
-	if err := a.messageStore.ClearComposeDraft(d.SourceMessageID, d.ID); err != nil {
-		log.Warn().Err(err).Str("draftID", d.ID).Msg("Failed to clear source message draft marker")
+	if err := a.messageStore.ClearComposeDraft(deletedDraft.SourceMessageID, deletedDraft.ID); err != nil {
+		log.Warn().Err(err).Str("draftID", deletedDraft.ID).Msg("Failed to clear source message draft marker")
 	}
-	a.emitSourceMessageUpdated(d.SourceMessageID)
+	a.emitSourceMessageUpdated(deletedDraft.SourceMessageID)
 
-	// Notify frontend to refresh the message list for this folder
 	if draftsFolder != nil {
+		nextTotal := draftsFolder.TotalCount
+		if deletedDraft.IsSynced() && nextTotal > 0 {
+			nextTotal--
+		}
+		if err := a.folderStore.UpdateCounts(draftsFolder.ID, nextTotal, draftsFolder.UnreadCount); err != nil {
+			log.Warn().Err(err).Str("folderID", draftsFolder.ID).Msg("Failed to update Drafts count after local delete")
+		}
+
+		// Notify frontend immediately so the Drafts list and total-count badge
+		// reflect the discarded draft before the remote IMAP delete completes.
 		wailsRuntime.EventsEmit(a.ctx, "messages:updated", map[string]interface{}{
-			"accountId": d.AccountID,
+			"accountId": deletedDraft.AccountID,
+			"folderId":  draftsFolder.ID,
+		})
+		wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+			"accountId": deletedDraft.AccountID,
 			"folderId":  draftsFolder.ID,
 		})
 	}
 
-	// Sync the Drafts folder so the message list and sidebar counts update
-	if draftsFolder != nil {
-		accountID := d.AccountID
-		folderID := draftsFolder.ID
+	if draftsFolder != nil && deletedDraft.IsSynced() {
+		draftSnapshot := *deletedDraft
+		folderSnapshot := *draftsFolder
 		go func() {
-			defer recoverPanic("app.draft", "sync drafts folder after delete")
-			if err := a.SyncFolder(accountID, folderID); err != nil {
-				log.Warn().Err(err).Str("folderID", folderID).Msg("Failed to sync Drafts folder after draft delete")
+			defer recoverPanic("app.draft", "delete remote draft after local discard")
+			a.draftOps.deleteDraftFromIMAP(a.ctx, &draftSnapshot, &folderSnapshot)
+			if err := a.SyncFolder(draftSnapshot.AccountID, folderSnapshot.ID); err != nil {
+				log.Warn().Err(err).Str("folderID", folderSnapshot.ID).Msg("Failed to sync Drafts folder after draft delete")
 			}
 		}()
 	}

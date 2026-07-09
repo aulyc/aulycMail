@@ -97,12 +97,11 @@
       class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors {isHeaderFocused ? 'bg-muted ring-1 ring-primary/50' : ''}"
       data-sidebar-item="account-header"
       data-account-id={acc.id}
+      type="button"
+      aria-expanded={isExpanded}
+      aria-label={isExpanded ? $_('sidebar.collapseAccount', { values: { account: acc.name || acc.email } }) : $_('sidebar.expandAccount', { values: { account: acc.name || acc.email } })}
       onclick={toggleExpanded}
     >
-      <Icon
-        icon={isExpanded ? 'mdi:chevron-down' : 'mdi:chevron-right'}
-        class="w-4 h-4 text-muted-foreground"
-      />
       <span
         class="w-2 h-2 rounded-full flex-shrink-0"
         style="background-color: {accountColor}"

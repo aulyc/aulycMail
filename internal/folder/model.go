@@ -39,8 +39,9 @@ type Folder struct {
 	UnreadCount int `json:"unreadCount"`
 
 	// Sync state
-	LastSync   *time.Time `json:"lastSync,omitempty" ts_type:"string"`
-	Subscribed bool       `json:"subscribed"` // IMAP subscription state
+	LastSync     *time.Time `json:"lastSync,omitempty" ts_type:"string"`
+	LastFullSync *time.Time `json:"lastFullSync,omitempty" ts_type:"string"`
+	Subscribed   bool       `json:"subscribed"` // IMAP subscription state
 }
 
 // IsSpecial returns true if this is a special folder (inbox, sent, etc.)

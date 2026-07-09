@@ -265,8 +265,8 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account) {
 	// Get current message count before sync
 	previousCount := inbox.TotalCount
 
-	// Sync messages (use account's sync period setting)
-	if err := s.engine.SyncMessages(ctx, acc.ID, inbox.ID, acc.SyncPeriodDays); err != nil {
+	// Sync messages (use account's retention + daily sync strategy settings)
+	if err := s.engine.SyncMessagesWithOptions(ctx, acc.ID, inbox.ID, MessageSyncOptionsFromAccount(acc)); err != nil {
 		if ctx.Err() != nil {
 			s.log.Info().Str("account", acc.Name).Msg("Sync cancelled during message sync")
 			// Notify completion even on cancel so frontend clears progress
@@ -354,7 +354,7 @@ func (s *Scheduler) syncAdditionalFolders(ctx context.Context, acc *account.Acco
 			defer wg.Done()
 			defer func() { <-sem }()
 
-			if syncErr := s.engine.SyncMessages(ctx, acc.ID, f.ID, acc.SyncPeriodDays); syncErr != nil {
+			if syncErr := s.engine.SyncMessagesWithOptions(ctx, acc.ID, f.ID, MessageSyncOptionsFromAccount(acc)); syncErr != nil {
 				if ctx.Err() == nil {
 					s.log.Warn().Err(syncErr).Str("folder", f.Path).Msg("Failed to sync additional folder")
 				}
@@ -487,8 +487,8 @@ func (s *Scheduler) SyncAccountInboxBlocking(accountID string) (*NewMailInfo, er
 	// Get current message count before sync
 	previousCount := inbox.TotalCount
 
-	// Sync messages (use account's sync period setting)
-	if err := s.engine.SyncMessages(ctx, acc.ID, inbox.ID, acc.SyncPeriodDays); err != nil {
+	// Sync messages (use account's retention + daily sync strategy settings)
+	if err := s.engine.SyncMessagesWithOptions(ctx, acc.ID, inbox.ID, MessageSyncOptionsFromAccount(acc)); err != nil {
 		if ctx.Err() != nil {
 			s.log.Info().Str("account", acc.Name).Msg("Sync cancelled during message sync")
 			return nil, ctx.Err()

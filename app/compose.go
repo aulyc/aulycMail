@@ -21,6 +21,7 @@ import (
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/aulyc/aulycmail/internal/smtp"
+	syncengine "github.com/aulyc/aulycmail/internal/sync"
 	goImap "github.com/emersion/go-imap/v2"
 	"github.com/rs/zerolog"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
@@ -390,21 +391,21 @@ func (a *App) syncSentFolder(accountID string) error {
 		return nil
 	}
 
-	// Get account to determine sync period
+	// Get account to determine sync and body download policies
 	acc, _ := a.accountStore.Get(accountID)
-	syncPeriodDays := 30 // default
-	if acc != nil {
-		syncPeriodDays = acc.SyncPeriodDays
-	}
+	syncOptions := syncengine.MessageSyncOptionsFromAccount(acc)
+	bodyFetch := syncengine.BodyFetchOptionsFromAccount(acc)
 
 	// Sync progress feedback rides on the syncEngine's sync:progress callback (see app.go:438)
-	if err := a.syncEngine.SyncMessages(a.ctx, accountID, sentFolder.ID, syncPeriodDays); err != nil {
+	if err := a.syncEngine.SyncMessagesWithOptions(a.ctx, accountID, sentFolder.ID, syncOptions); err != nil {
 		log.Warn().Err(err).Str("folderID", sentFolder.ID).Msg("Failed to sync Sent folder")
 	}
 
 	// Also fetch bodies
-	if err := a.syncEngine.FetchBodiesInBackground(a.ctx, accountID, sentFolder.ID, syncPeriodDays); err != nil {
-		log.Warn().Err(err).Str("folderID", sentFolder.ID).Msg("Failed to fetch bodies for Sent folder")
+	if bodyFetch.Enabled {
+		if err := a.syncEngine.FetchBodiesInBackground(a.ctx, accountID, sentFolder.ID, bodyFetch.Days); err != nil {
+			log.Warn().Err(err).Str("folderID", sentFolder.ID).Msg("Failed to fetch bodies for Sent folder")
+		}
 	}
 
 	// Emit synced event
