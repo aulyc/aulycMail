@@ -41,6 +41,7 @@
       "sortAsc": "排序：A → Z",
       "sortDesc": "排序：Z → A",
       "addTooltip": "添加联系人",
+      "loadMore": "加载更多联系人（剩余 {remaining} 个）",
       "emptySearch": "没有符合搜索条件的联系人。",
       "empty": "没有联系人。"
     },

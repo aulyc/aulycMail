@@ -41,6 +41,7 @@
       "sortAsc": "Sort: A → Z",
       "sortDesc": "Sort: Z → A",
       "addTooltip": "Add contact",
+      "loadMore": "Load more contacts ({remaining} remaining)",
       "emptySearch": "No contacts match your search.",
       "empty": "No contacts."
     },

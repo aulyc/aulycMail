@@ -21,6 +21,8 @@ import type { v1 } from '$wailsjs/go/models'
 // in next" decisions on user actions.
 import { isResponsive, showViewer, hideSidebar } from '$lib/stores/layout.svelte'
 
+export const CONTACTS_PAGE_SIZE = 200
+
 // Source ID values the sidebar can dispatch:
 //   ""                  → all local contacts
 //   "local"             → all local contacts (manual + collected)
@@ -33,6 +35,7 @@ let contacts = $state<v1.Contact[]>([])
 let total = $state<number>(0)
 let detail = $state<v1.Contact | null>(null)
 let loading = $state<boolean>(false)
+let loadingMore = $state<boolean>(false)
 let listResetSignal = $state(0)
 let selectedContactScrollTopSignal = $state(0)
 let contactsLoadSeq = 0
@@ -58,6 +61,15 @@ export const contactsView = {
   },
   get loading(): boolean {
     return loading
+  },
+  get loadingMore(): boolean {
+    return loadingMore
+  },
+  get hasMore(): boolean {
+    return contacts.length < total
+  },
+  get remaining(): number {
+    return Math.max(0, total - contacts.length)
   },
   get listResetSignal(): number {
     return listResetSignal
@@ -86,9 +98,10 @@ export function setSearchQuery(q: string): void {
   searchQuery = q
 }
 
-export async function reloadContacts(limit = 200, offset = 0): Promise<void> {
+export async function reloadContacts(limit = CONTACTS_PAGE_SIZE, offset = 0): Promise<void> {
   const seq = ++contactsLoadSeq
   loading = true
+  loadingMore = false
   try {
     const result = await BrowseContacts(searchQuery, selectedSourceId, limit, offset)
     if (seq === contactsLoadSeq) {
@@ -104,6 +117,29 @@ export async function reloadContacts(limit = 200, offset = 0): Promise<void> {
   } finally {
     if (seq === contactsLoadSeq) {
       loading = false
+    }
+  }
+}
+
+export async function loadMoreContacts(limit = CONTACTS_PAGE_SIZE): Promise<void> {
+  if (loading || loadingMore || contacts.length >= total) return
+
+  const seq = ++contactsLoadSeq
+  const offset = contacts.length
+  loadingMore = true
+  try {
+    const result = await BrowseContacts(searchQuery, selectedSourceId, limit, offset)
+    if (seq === contactsLoadSeq) {
+      const existing = new Set(contacts.map(c => c.id))
+      const next = (result?.items || []).filter(c => !existing.has(c.id))
+      contacts = [...contacts, ...next]
+      total = result?.total ?? total
+    }
+  } catch (err) {
+    console.error('Failed to load more contacts for browse:', err)
+  } finally {
+    if (seq === contactsLoadSeq) {
+      loadingMore = false
     }
   }
 }

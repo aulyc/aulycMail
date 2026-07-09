@@ -18,7 +18,7 @@
   import ListPane from '$lib/components/kit/ListPane.svelte'
   import ListRow from '$lib/components/kit/ListRow.svelte'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
-  import { contactsView, reloadContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   // Canonical list toolbar — owns hamburger placement, title styling, count
   // badge, search-mode swap. Extension just supplies label/count + per-extension
@@ -293,6 +293,21 @@
       </p>
     {/snippet}
   </ListPane>
+
+  {#if contactsView.hasMore}
+    <div class="shrink-0 border-t border-border bg-muted/20 px-4 py-3">
+      <button
+        class="w-full text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded px-2 py-1.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:no-underline"
+        onclick={() => loadMoreContacts()}
+        disabled={contactsView.loading || contactsView.loadingMore}
+        type="button"
+      >
+        {contactsView.loadingMore
+          ? $_('common.loading')
+          : $_('contacts.list.loadMore', { values: { remaining: contactsView.remaining } })}
+      </button>
+    </div>
+  {/if}
 </div>
 
 <ConfirmDialog

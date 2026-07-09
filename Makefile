@@ -7,7 +7,8 @@
 
 .PHONY: all build dev dev-race generate clean test lint lint-go lint-frontend \
         fmt frontend-deps frontend-update normalize-wails-bindings install uninstall \
-        install-darwin quit-running-darwin launch-darwin uninstall-darwin help
+        dmg release-dmg install-dmg install-release-dmg install-darwin \
+        quit-running-darwin launch-darwin uninstall-darwin help
 
 # Go module path
 MODULE := github.com/aulyc/aulycmail
@@ -20,6 +21,10 @@ BUILD_TAGS := webkit2_41
 GO_BUILD_TAGS := desktop,$(BUILD_TAGS),wv2runtime.download,production
 APP_BUNDLE := build/bin/aulycmail.app
 APP_BINARY := build/bin/aulycmail
+DMG_PATH := dist/aulycmail.dmg
+DMG_VOLUME_NAME ?= aulycmail Installer
+SIGN_IDENTITY ?=
+NOTARY_PROFILE ?=
 
 # Darwin cgo/linker flags keep build output actionable with current Xcode SDKs:
 # - suppress duplicate libobjc linker noise from multiple Objective-C packages
@@ -105,6 +110,36 @@ generate:
 # whitespace-only diffs.
 normalize-wails-bindings:
 	@tools/normalize_wails_bindings.sh
+
+# Package the current app bundle as a drag-to-Applications DMG. Pass
+# SIGN_IDENTITY to sign the staged app and DMG, and NOTARY_PROFILE to notarize.
+dmg:
+	@./tools/package_macos_dmg.sh --output "$(DMG_PATH)" \
+		--volume-name "$(DMG_VOLUME_NAME)" \
+		$(if $(SIGN_IDENTITY),--sign "$(SIGN_IDENTITY)") \
+		$(if $(NOTARY_PROFILE),--notary-profile "$(NOTARY_PROFILE)")
+
+# Build, Developer ID sign, notarize, and staple a GitHub-release DMG.
+release-dmg: build
+	@if [ -z "$(SIGN_IDENTITY)" ]; then \
+		echo 'SIGN_IDENTITY is required, e.g. make release-dmg SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=aulycmail-notary'; \
+		exit 1; \
+	fi
+	@if [ -z "$(NOTARY_PROFILE)" ]; then \
+		echo 'NOTARY_PROFILE is required, e.g. NOTARY_PROFILE=aulycmail-notary'; \
+		exit 1; \
+	fi
+	@./tools/package_macos_dmg.sh --output "$(DMG_PATH)" \
+		--volume-name "$(DMG_VOLUME_NAME)" \
+		--sign "$(SIGN_IDENTITY)" \
+		--notary-profile "$(NOTARY_PROFILE)"
+
+# Install the current signed/notarized DMG into /Applications and launch it.
+install-dmg: quit-running-darwin
+	@./tools/install_macos_dmg.sh --dmg "$(DMG_PATH)"
+
+# Build a signed/notarized release DMG, then install that DMG locally.
+install-release-dmg: release-dmg install-dmg
 
 ## Code Quality
 
@@ -229,9 +264,13 @@ help:
 	@echo "  make dev          - Run in development mode with hot reload"
 	@echo "  make dev-race     - Run in development mode with race detector"
 	@echo "  make generate     - Generate Wails TypeScript bindings"
+	@echo "  make dmg          - Package the current app bundle as a drag-to-Applications DMG"
+	@echo "  make release-dmg  - Build, Developer ID sign, notarize, and staple a release DMG"
 	@echo ""
 	@echo "Installation:"
 	@echo "  make install      - Build, install, and launch aulycmail from /Applications"
+	@echo "  make install-dmg  - Install dist/aulycmail.dmg into /Applications"
+	@echo "  make install-release-dmg - Build signed DMG, install it, and launch aulycmail"
 	@echo "  make uninstall    - Uninstall aulycmail from /Applications"
 	@echo ""
 	@echo "Code Quality:"
