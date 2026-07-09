@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -13,15 +12,13 @@ import (
 	stdruntime "runtime"
 	"sort"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/aulyc/aulycmail/internal/email"
 	"github.com/aulyc/aulycmail/internal/platform"
 	"github.com/aulyc/aulycmail/internal/settings"
+	mailSync "github.com/aulyc/aulycmail/internal/sync"
 	gomessage "github.com/emersion/go-message"
-	msgcharset "github.com/emersion/go-message/charset"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
-	"golang.org/x/text/encoding/htmlindex"
 )
 
 const backupViewerDefaultLimit = 50
@@ -168,12 +165,13 @@ func (a *App) SaveBackupViewerAttachmentAs(directory, key string, attachmentInde
 	if err != nil {
 		return "", err
 	}
-	raw, err := os.ReadFile(emlPath)
+	file, err := os.Open(emlPath)
 	if err != nil {
 		return "", err
 	}
+	defer file.Close()
 
-	detail, err := parseBackupViewerEML(key, entry, bytes.NewReader(raw))
+	detail, err := parseBackupViewerEML(key, entry, file)
 	if err != nil {
 		return "", err
 	}
@@ -182,7 +180,10 @@ func (a *App) SaveBackupViewerAttachmentAs(directory, key string, attachmentInde
 	}
 	attachment := detail.Attachments[attachmentIndex]
 
-	content, err := email.NewAttachmentDownloader(a.paths.AttachmentsPath()).ExtractAttachmentContent(raw, attachment.Filename)
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to rewind backup message: %w", err)
+	}
+	content, err := email.NewAttachmentDownloader(a.paths.AttachmentsPath()).ExtractAttachmentContentFromReader(file, attachment.Filename)
 	if err != nil {
 		return "", fmt.Errorf("failed to extract backup attachment: %w", err)
 	}
@@ -529,7 +530,7 @@ func parseBackupViewerEntity(entity *gomessage.Entity, parsed *backupViewerParse
 		return nil
 	}
 
-	decoded := decodeBackupBody(raw, contentParams["charset"])
+	decoded := mailSync.DecodeTextCharset(raw, contentParams["charset"])
 	switch contentType {
 	case "text/html":
 		if parsed.html == "" {
@@ -572,7 +573,7 @@ func decodeBackupHeader(value string) string {
 	if value == "" {
 		return ""
 	}
-	decoder := &mime.WordDecoder{CharsetReader: backupCharsetReader}
+	decoder := &mime.WordDecoder{CharsetReader: mailSync.CharsetReader}
 	decoded, err := decoder.DecodeHeader(value)
 	if err != nil {
 		return value
@@ -599,34 +600,4 @@ func parseBackupAddressHeader(value string) []string {
 		out = append(out, fmt.Sprintf("%s <%s>", name, address.Address))
 	}
 	return out
-}
-
-func decodeBackupBody(raw []byte, charsetName string) string {
-	charsetName = strings.Trim(strings.TrimSpace(charsetName), `"`)
-	if charsetName == "" || strings.EqualFold(charsetName, "utf-8") || strings.EqualFold(charsetName, "us-ascii") {
-		if utf8.Valid(raw) {
-			return string(raw)
-		}
-	}
-	reader, err := backupCharsetReader(charsetName, bytes.NewReader(raw))
-	if err == nil {
-		if decoded, readErr := io.ReadAll(reader); readErr == nil {
-			return string(decoded)
-		}
-	}
-	return string(raw)
-}
-
-func backupCharsetReader(charsetName string, reader io.Reader) (io.Reader, error) {
-	if charsetName == "" {
-		return reader, nil
-	}
-	if decoded, err := msgcharset.Reader(charsetName, reader); err == nil {
-		return decoded, nil
-	}
-	encoding, err := htmlindex.Get(charsetName)
-	if err != nil {
-		return nil, fmt.Errorf("unknown charset: %s", charsetName)
-	}
-	return encoding.NewDecoder().Reader(reader), nil
 }

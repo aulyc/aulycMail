@@ -59,17 +59,6 @@
   background: hsl(var(--muted-foreground) / 0.4);
 }
 
-/* Disable text selection on UI elements */
-.no-select {
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Wails window drag */
-.wails-drag {
-  --wails-draggable: drag;
-}
-
 /* Search highlight styling */
 mark {
   background-color: hsl(var(--primary) / 0.25);

@@ -57,6 +57,23 @@ func IsRawMessageNotFoundError(err error) bool {
 	return errors.As(err, &notFound)
 }
 
+// RawMessageTooLargeError means a caller asked for a raw message as []byte but
+// the message exceeds the in-memory safety cap. Backup/export paths should use
+// StreamRawMessage instead.
+type RawMessageTooLargeError struct {
+	UID        uint32
+	LimitBytes int64
+}
+
+func (e RawMessageTooLargeError) Error() string {
+	return fmt.Sprintf("message too large to load into memory: UID %d exceeds %d bytes", e.UID, e.LimitBytes)
+}
+
+func IsRawMessageTooLargeError(err error) bool {
+	var tooLarge RawMessageTooLargeError
+	return errors.As(err, &tooLarge)
+}
+
 // RawMessageStreamHandler streams one raw RFC822 literal to its destination.
 // The handler must fully consume body unless it returns an error; the caller
 // drains any remaining literal data so the IMAP stream stays aligned.
@@ -76,6 +93,18 @@ func (r rawMessageProgressReader) Read(p []byte) (int, error) {
 		r.mark()
 	}
 	return n, err
+}
+
+func readRawMessageLiteralWithLimit(uid uint32, literal io.Reader, limitBytes int64) ([]byte, error) {
+	rawBytes, err := io.ReadAll(io.LimitReader(literal, limitBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(rawBytes)) > limitBytes {
+		_, _ = io.Copy(io.Discard, literal)
+		return nil, RawMessageTooLargeError{UID: uid, LimitBytes: limitBytes}
+	}
+	return rawBytes, nil
 }
 
 // FetchMessageBody fetches the body for a single message on-demand.
@@ -955,7 +984,7 @@ func (e *Engine) FetchRawMessage(ctx context.Context, accountID, folderID string
 
 		if data, ok := item.(imapclient.FetchItemDataBodySection); ok {
 			if data.Literal != nil {
-				rawBytes, err = io.ReadAll(data.Literal)
+				rawBytes, err = readRawMessageLiteralWithLimit(uid, data.Literal, maxBackgroundRawBodyBytes)
 				if err != nil {
 					fetchCmd.Close()
 					return nil, fmt.Errorf("failed to read message body: %w", err)

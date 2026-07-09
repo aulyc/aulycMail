@@ -10,8 +10,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	msgcharset "github.com/emersion/go-message/charset"
 	"github.com/aulyc/aulycmail/internal/logging"
+	msgcharset "github.com/emersion/go-message/charset"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding/htmlindex"
 )
@@ -128,6 +128,30 @@ func decodeCharset(content []byte, declaredCharset string) string {
 	return string(decoded)
 }
 
+// DecodeTextCharset converts text content from the declared charset to UTF-8.
+// It shares the mail sync parser's charset detection and fallback logic so
+// read-only viewers do not grow their own MIME decoding behavior.
+func DecodeTextCharset(content []byte, declaredCharset string) string {
+	return decodeCharset(content, strings.Trim(strings.TrimSpace(declaredCharset), `"`))
+}
+
+// CharsetReader returns a reader that decodes MIME encoded-word/header content
+// for the named charset.
+func CharsetReader(charsetName string, r io.Reader) (io.Reader, error) {
+	charsetName = strings.Trim(strings.TrimSpace(charsetName), `"`)
+	if charsetName == "" {
+		return r, nil
+	}
+	if reader, err := msgcharset.Reader(charsetName, r); err == nil {
+		return reader, nil
+	}
+	enc, err := htmlindex.Get(charsetName)
+	if err != nil {
+		return nil, fmt.Errorf("unknown charset: %s", charsetName)
+	}
+	return enc.NewDecoder().Reader(r), nil
+}
+
 // looksLikeGibberish checks if a string appears to be misencoded text
 // by looking for telltale signs of encoding problems
 func looksLikeGibberish(s string) bool {
@@ -240,18 +264,7 @@ func decodeMIMEWord(s string) string {
 	}
 	// Use mime.WordDecoder with charset fallback support
 	dec := &mime.WordDecoder{
-		CharsetReader: func(charsetName string, r io.Reader) (io.Reader, error) {
-			// First try the go-message charset package
-			if reader, err := msgcharset.Reader(charsetName, r); err == nil {
-				return reader, nil
-			}
-			// Fall back to htmlindex for broader charset support (GB2312, GBK, Big5, etc.)
-			enc, err := htmlindex.Get(charsetName)
-			if err != nil {
-				return nil, fmt.Errorf("unknown charset: %s", charsetName)
-			}
-			return enc.NewDecoder().Reader(r), nil
-		},
+		CharsetReader: CharsetReader,
 	}
 	decoded, err := dec.DecodeHeader(s)
 	if err != nil {

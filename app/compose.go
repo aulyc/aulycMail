@@ -656,26 +656,24 @@ func (a *App) fetchForwardAttachments(log zerolog.Logger, msg *message.Message, 
 		return
 	}
 
-	// Fetch raw message from IMAP once for all attachments
-	raw, fetchErr := a.syncEngine.FetchRawMessage(a.ctx, msg.AccountID, msg.FolderID, msg.UID)
-	if fetchErr != nil {
-		log.Warn().Err(fetchErr).Msg("Failed to fetch raw message for forward attachments (offline?)")
-		return
-	}
-
 	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
-	for _, att := range regularAtts {
-		content, extractErr := downloader.ExtractAttachmentContent(raw, att.Filename)
-		if extractErr != nil {
-			log.Warn().Err(extractErr).Str("filename", att.Filename).Msg("Failed to extract attachment for forward")
-			continue
+	if err := a.withStreamedRawMessagePath(msg, func(rawPath string) error {
+		for _, att := range regularAtts {
+			content, extractErr := extractAttachmentFromRawFile(downloader, rawPath, att.Filename)
+			if extractErr != nil {
+				log.Warn().Err(extractErr).Str("filename", att.Filename).Msg("Failed to extract attachment for forward")
+				continue
+			}
+			*attachments = append(*attachments, smtp.Attachment{
+				Content:     content,
+				ContentType: att.ContentType,
+				Filename:    att.Filename,
+				Inline:      false,
+			})
 		}
-		*attachments = append(*attachments, smtp.Attachment{
-			Content:     content,
-			ContentType: att.ContentType,
-			Filename:    att.Filename,
-			Inline:      false,
-		})
+		return nil
+	}); err != nil {
+		log.Warn().Err(err).Msg("Failed to stream raw message for forward attachments (offline?)")
 	}
 }
 

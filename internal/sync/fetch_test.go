@@ -2,6 +2,7 @@ package sync
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -35,5 +36,25 @@ func TestIsRawMessageNotFoundError(t *testing.T) {
 	}
 	if IsRawMessageNotFoundError(fmt.Errorf("message body not found")) {
 		t.Fatal("expected unrelated errors not to be treated as UID not found")
+	}
+}
+
+func TestReadRawMessageLiteralWithLimitRejectsOversized(t *testing.T) {
+	_, err := readRawMessageLiteralWithLimit(42, strings.NewReader("abcdef"), 5)
+	if err == nil {
+		t.Fatal("expected oversized raw message to fail")
+	}
+	if !IsRawMessageTooLargeError(fmt.Errorf("wrapped: %w", err)) {
+		t.Fatalf("expected RawMessageTooLargeError, got %T %v", err, err)
+	}
+}
+
+func TestReadRawMessageLiteralWithLimitAllowsAtLimit(t *testing.T) {
+	raw, err := readRawMessageLiteralWithLimit(42, strings.NewReader("abcde"), 5)
+	if err != nil {
+		t.Fatalf("expected at-limit raw message to succeed: %v", err)
+	}
+	if string(raw) != "abcde" {
+		t.Fatalf("raw = %q, want abcde", string(raw))
 	}
 }
