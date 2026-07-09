@@ -1625,6 +1625,34 @@ export namespace v1 {
 		    return a;
 		}
 	}
+	export class ContactAccountGroup {
+	    accountId: string;
+	    name?: string;
+	    email: string;
+	    count: number;
+	    senderCount: number;
+	    recipientCount: number;
+	    ccCount: number;
+	    bccCount: number;
+
+	    static createFrom(source: any = {}) {
+	        return new ContactAccountGroup(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.accountId = source["accountId"];
+	        this.name = source["name"];
+	        this.email = source["email"];
+	        this.count = source["count"];
+	        this.senderCount = source["senderCount"];
+	        this.recipientCount = source["recipientCount"];
+	        this.ccCount = source["ccCount"];
+	        this.bccCount = source["bccCount"];
+	    }
+	}
+
+
 	export class ContactBrowseResult {
 	    items: Contact[];
 	    total: number;
@@ -1657,34 +1685,6 @@ export namespace v1 {
 		    return a;
 		}
 	}
-	export class ContactAccountGroup {
-	    accountId: string;
-	    name?: string;
-	    email: string;
-	    count: number;
-	    senderCount: number;
-	    recipientCount: number;
-	    ccCount: number;
-	    bccCount: number;
-
-	    static createFrom(source: any = {}) {
-	        return new ContactAccountGroup(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.accountId = source["accountId"];
-	        this.name = source["name"];
-	        this.email = source["email"];
-	        this.count = source["count"];
-	        this.senderCount = source["senderCount"];
-	        this.recipientCount = source["recipientCount"];
-	        this.ccCount = source["ccCount"];
-	        this.bccCount = source["bccCount"];
-	    }
-	}
-
-
 	export class ContactPhoto {
 	    data?: string;
 	    mediaType?: string;
