@@ -387,10 +387,23 @@
     <div class="flex items-center gap-2">
       <button
         class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+        type="button"
         onclick={onCompose}
       >
         <Icon icon="mdi:email-edit-outline" class="w-4 h-4" />
         <span>{$_('sidebar.compose')}</span>
+      </button>
+      <button
+        class="h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+        type="button"
+        title={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
+        aria-label={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
+        onclick={toggleSync}
+      >
+        <Icon
+          icon="mdi:sync"
+          class="w-5 h-5 {accountStore.isAnySyncing ? 'animate-spin text-primary' : ''}"
+        />
       </button>
       {#if showBackButton}
         <button
