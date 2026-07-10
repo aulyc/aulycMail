@@ -28,6 +28,7 @@
 
   let refreshing = $state(false)
   let accountGroups = $derived(contactAccountGroups.groups)
+  let retriedAfterAccountsLoaded = $state(false)
 
   function accountSourceID(accountID: string): string {
     return `account:${accountID}`
@@ -35,7 +36,23 @@
 
   onMount(() => {
     initContactRefreshEvents()
-    void loadContactAccountGroups()
+    void loadContactAccountGroups({ force: true })
+    if (!accountStore.loading && accountStore.accounts.length === 0) {
+      void accountStore.load()
+    }
+  })
+
+  $effect(() => {
+    if (
+      !retriedAfterAccountsLoaded &&
+      contactAccountGroups.loaded &&
+      !contactAccountGroups.loading &&
+      contactAccountGroups.groups.length === 0 &&
+      accountStore.accounts.length > 0
+    ) {
+      retriedAfterAccountsLoaded = true
+      void loadContactAccountGroups({ force: true })
+    }
   })
 
   // Re-scan every account's mail and re-collect participants into the local
@@ -61,7 +78,6 @@
   // Source IDs:
   //   ''                              → all local contacts
   //   'account:<accountID>'           → contacts associated with one mail account
-  //   'account:<accountID>:<role>'    → account-scoped sender/recipient/cc/bcc
   type SidebarItem = {
     id: string
     label: string
@@ -77,14 +93,25 @@
       label: $_('contacts.sidebar.all'),
     }]
 
-    for (const [accountIndex, account] of accountGroups.entries()) {
-      builtins.push({
-        id: accountSourceID(account.accountId),
-        label: account.email || account.name || $_('contacts.common.unnamed'),
-        count: account.count,
-        accountID: account.accountId,
-        accountIndex,
-      })
+    if (accountGroups.length > 0) {
+      for (const [accountIndex, account] of accountGroups.entries()) {
+        builtins.push({
+          id: accountSourceID(account.accountId),
+          label: account.email || account.name || $_('contacts.common.unnamed'),
+          count: account.count,
+          accountID: account.accountId,
+          accountIndex,
+        })
+      }
+    } else {
+      for (const [accountIndex, { account }] of accountStore.accounts.entries()) {
+        builtins.push({
+          id: accountSourceID(account.id),
+          label: account.email || account.name || $_('contacts.common.unnamed'),
+          accountID: account.id,
+          accountIndex,
+        })
+      }
     }
 
     return [{ items: builtins }]
@@ -126,10 +153,14 @@
     <div
       role="option"
       aria-selected={active}
-      class="flex items-center gap-2 mx-2 py-1.5 pr-2 text-sm rounded-md text-left transition-colors cursor-pointer select-none {active
-        ? 'bg-primary/10 text-primary font-medium'
-        : 'text-foreground hover:bg-muted/50'}"
-      style="padding-left: 0.75rem"
+      class={it.accountID
+        ? `w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-left transition-colors cursor-pointer select-none ${active
+          ? 'bg-primary/10 text-primary'
+          : 'text-foreground hover:bg-muted/50'}`
+        : `flex items-center gap-2 mx-2 py-1.5 pr-2 text-sm rounded-md text-left transition-colors cursor-pointer select-none ${active
+          ? 'bg-primary/10 text-primary font-medium'
+          : 'text-foreground hover:bg-muted/50'}`}
+      style={it.accountID ? undefined : 'padding-left: 0.75rem'}
       onclick={() => pick(it.id)}
     >
       {#if it.accountID}
@@ -141,7 +172,7 @@
       {/if}
       <span class="truncate min-w-0 flex-1">{it.label}</span>
       {#if it.count !== undefined}
-        <span class="text-xs text-muted-foreground flex-shrink-0">{it.count}</span>
+        <span class="text-xs font-medium text-muted-foreground flex-shrink-0">{it.count}</span>
       {/if}
     </div>
   {/snippet}

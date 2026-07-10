@@ -29,9 +29,9 @@
   // @ts-ignore - wailsjs bindings
   import type { contactdto } from '$wailsjs/go/models'
 
-  // Contacts needs a denser middle column than mail. Keep following the user's
-  // saved mail list width, but render contacts at 70% of that width.
-  const listWidth = $derived.by(() => { getUIStateVersion(); return Math.round(getUIState().listWidth * 0.7) })
+  // Match mail's middle list column width so switching panes keeps the same
+  // second-column footprint.
+  const listWidth = $derived.by(() => { getUIStateVersion(); return getUIState().listWidth })
 
   interface Props {
     onAdd?: () => void
