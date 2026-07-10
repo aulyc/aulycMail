@@ -18,7 +18,7 @@
   import ListPane from '$lib/components/kit/ListPane.svelte'
   import ListRow from '$lib/components/kit/ListRow.svelte'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
-  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$contacts/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { createDebouncer } from '$lib/utils/debounce'
   // Canonical list toolbar — owns hamburger placement, title styling, count
@@ -27,7 +27,7 @@
   import ListHeader from '$lib/components/kit/ListHeader.svelte'
   import { getUIState, getUIStateVersion } from '$lib/stores/uiState.svelte'
   // @ts-ignore - wailsjs bindings
-  import type { v1 } from '$wailsjs/go/models'
+  import type { contactdto } from '$wailsjs/go/models'
 
   // Contacts needs a denser middle column than mail. Keep following the user's
   // saved mail list width, but render contacts at 70% of that width.
@@ -47,7 +47,6 @@
   // ref is only read inside event handlers (focus / blur / select / equality
   // check against document.activeElement), never in a reactive context, so
   // making it $state adds overhead without benefit.
-  // svelte-ignore non_reactive_update
   let searchInputEl: HTMLInputElement | null = null
   let sortOrder = $state<SortOrder>('name-asc')
 
@@ -55,7 +54,7 @@
   // has its own button-triggered confirm dialog; this one fires when the user
   // has the LIST focused and hits Delete/Backspace on the highlighted row.
   let showDeleteConfirm = $state(false)
-  let pendingDelete = $state<v1.Contact | null>(null)
+  let pendingDelete = $state<contactdto.Contact | null>(null)
   let deleting = $state(false)
 
   function requestDelete(id: string) {
@@ -161,11 +160,11 @@
     sortOrder = sortOrder === 'name-asc' ? 'name-desc' : 'name-asc'
   }
 
-  function primaryEmail(c: v1.Contact): string {
+  function primaryEmail(c: contactdto.Contact): string {
     return c.emails && c.emails.length > 0 ? c.emails[0] : ''
   }
 
-  function rowKey(c: v1.Contact): string {
+  function rowKey(c: contactdto.Contact): string {
     return (c.name || primaryEmail(c) || '').toLowerCase()
   }
 
@@ -276,7 +275,7 @@
     onDelete={requestDelete}
     onFocusSearch={toggleSearchFocus}
   >
-    {#snippet row(c: v1.Contact, { selected })}
+    {#snippet row(c: contactdto.Contact, { selected })}
       <ListRow {selected} onclick={() => activateContact(c.id)}>
         <span class="flex flex-col min-w-0 flex-1">
           <span class="font-medium truncate text-foreground">{c.name || primaryEmail(c) || $_('contacts.common.unnamed')}</span>
@@ -315,10 +314,10 @@
   title={$_('contacts.delete.title')}
   description={pendingDelete
     ? $_('contacts.delete.descriptionLocal', {
-        values: {
-          name: pendingDelete.name || (pendingDelete.emails && pendingDelete.emails[0]) || $_('contacts.common.unnamed'),
-        },
-      })
+      values: {
+        name: pendingDelete.name || (pendingDelete.emails && pendingDelete.emails[0]) || $_('contacts.common.unnamed'),
+      },
+    })
     : ''}
   confirmLabel={$_('contacts.common.delete')}
   cancelLabel={$_('contacts.common.cancel')}

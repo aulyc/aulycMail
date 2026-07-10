@@ -1,6 +1,6 @@
 import { register, init, waitLocale, locale, _ } from 'svelte-i18n'
 import { loadDateFnsLocale } from './dateFnsLocale'
-import { registerContactsI18n } from '$contacts/frontend/i18n'
+import { registerContactsI18n } from '$contacts/i18n'
 
 // Register core locale files with lazy loading. The built-in Contacts pane
 // registers its own locales via Vite glob auto-discovery in initI18n().

@@ -12,7 +12,7 @@
   // @ts-ignore - wailsjs path
   import { SearchMailInAccount, Contacts_ListContactsForBrowse } from '../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
-  import type { v1 } from '../../../wailsjs/go/models'
+  import type { contactdto } from '../../../wailsjs/go/models'
 
   // Substring mail-search result (mirrors Go message.ContactMessage).
   interface MailResult {
@@ -35,7 +35,7 @@
     mode: 'mail' | 'contacts'
     onClose: () => void
     onSelectMail?: (r: MailResult) => void
-    onSelectContact?: (c: v1.Contact) => void
+    onSelectContact?: (c: contactdto.Contact) => void
   }
 
   interface SearchScope {
@@ -47,7 +47,7 @@
 
   let query = $state('')
   let mailResults = $state<MailResult[]>([])
-  let contactResults = $state<v1.Contact[]>([])
+  let contactResults = $state<contactdto.Contact[]>([])
   let loading = $state(false)
   let activeIndex = $state(0)
   let selectedScopeId = $state('')
@@ -203,7 +203,7 @@
     }
   }
 
-  function contactEmail(c: v1.Contact): string {
+  function contactEmail(c: contactdto.Contact): string {
     return c.emails && c.emails.length > 0 ? c.emails[0] : ''
   }
 </script>

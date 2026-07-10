@@ -9,17 +9,17 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import Icon from '@iconify/svelte'
-  import { updateContact } from '$contacts/frontend/stores/contactsView.svelte'
+  import { updateContact } from '$contacts/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import ContactFieldsForm from './fields/ContactFieldsForm.svelte'
   import type { EmailRow } from './fields/types'
   // @ts-ignore - wailsjs bindings
-  import type { v1 } from '$wailsjs/go/models'
+  import type { contactdto } from '$wailsjs/go/models'
 
   interface Props {
     open: boolean
-    contact: v1.Contact | null
+    contact: contactdto.Contact | null
     onClose?: () => void
   }
 
@@ -95,7 +95,7 @@
         emails: emails
           .filter((e) => e.email.trim() !== '')
           .map((e) => ({ email: e.email.trim().toLowerCase(), type: e.type, isPrimary: e.isPrimary })),
-      }) as unknown as v1.ContactPatch
+      }) as unknown as contactdto.ContactPatch
       await updateContact(recordID, patch)
       toasts.success($_('contacts.toast.updated'))
       close()

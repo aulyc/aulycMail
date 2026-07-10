@@ -25,6 +25,11 @@
     searchLocalMessageList,
     searchServerMessageList,
   } from './messageListSearch'
+  import {
+    getMessageListRowHeight,
+    getVirtualWindow as calculateVirtualWindow,
+    type VirtualWindow,
+  } from './messageListVirtual'
 
   interface Props {
     accountId?: string | null
@@ -45,13 +50,6 @@
     onToggleSidebar?: () => void
   }
 
-  type MessageListDensity = 'micro' | 'compact' | 'standard' | 'large'
-  type VirtualRow<T> = { item: T; index: number }
-  type VirtualWindow<T> = {
-    rows: VirtualRow<T>[]
-    topHeight: number
-    bottomHeight: number
-  }
   type RowContextMenuState = {
     messageIds: string[]
     accountId: string
@@ -60,14 +58,6 @@
     isStarred: boolean
     isRead: boolean
     allowReply: boolean
-  }
-
-  const VIRTUAL_OVERSCAN = 8
-  const ROW_HEIGHT_BY_DENSITY: Record<MessageListDensity, number> = {
-    micro: 66,
-    compact: 80,
-    standard: 94,
-    large: 120,
   }
 
   let {
@@ -963,9 +953,7 @@
   let listViewportHeight = $state(0)
   let listScrollTop = $state(0)
 
-  const rowHeight = $derived(
-    ROW_HEIGHT_BY_DENSITY[getMessageListDensity() as MessageListDensity] ?? ROW_HEIGHT_BY_DENSITY.standard
-  )
+  const rowHeight = $derived(getMessageListRowHeight(getMessageListDensity()))
 
   // Reference to the "Load more" button for keyboard navigation
   let loadMoreButtonRef = $state<HTMLButtonElement | null>(null)
@@ -985,24 +973,7 @@
   }
 
   function getVirtualWindow<T>(items: T[]): VirtualWindow<T> {
-    if (items.length === 0) {
-      return { rows: [], topHeight: 0, bottomHeight: 0 }
-    }
-
-    const viewport = listViewportHeight || 600
-    const visibleCount = Math.ceil(viewport / rowHeight) + VIRTUAL_OVERSCAN * 2
-    const maxStart = Math.max(0, items.length - visibleCount)
-    const start = Math.min(maxStart, Math.max(0, Math.floor(listScrollTop / rowHeight) - VIRTUAL_OVERSCAN))
-    const end = Math.min(items.length, start + visibleCount)
-
-    return {
-      rows: items.slice(start, end).map((item, offset) => ({
-        item,
-        index: start + offset,
-      })),
-      topHeight: start * rowHeight,
-      bottomHeight: (items.length - end) * rowHeight,
-    }
+    return calculateVirtualWindow(items, listViewportHeight, listScrollTop, rowHeight)
   }
 
   function getConversationMessageIds(conversation: any): string[] {

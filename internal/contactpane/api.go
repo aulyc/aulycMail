@@ -1,4 +1,4 @@
-package backend
+package contactpane
 
 import (
 	"errors"
@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/aulyc/aulycmail/internal/contact"
-	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	contactdto "github.com/aulyc/aulycmail/internal/contactdto"
 	"github.com/google/uuid"
 )
 
@@ -122,7 +122,7 @@ func NewAPI(localStore *contact.Store) *API {
 
 // SearchContacts delegates to the local contact store's search (email + display
 // name match; ranking by send count + recency).
-func (a *API) SearchContacts(query string, limit int) ([]coreapi.Contact, error) {
+func (a *API) SearchContacts(query string, limit int) ([]contactdto.Contact, error) {
 	if a.localStore == nil {
 		return nil, nil
 	}
@@ -130,7 +130,7 @@ func (a *API) SearchContacts(query string, limit int) ([]coreapi.Contact, error)
 	if err != nil {
 		return nil, fmt.Errorf("contacts.SearchContacts: %w", err)
 	}
-	out := make([]coreapi.Contact, 0, len(results))
+	out := make([]contactdto.Contact, 0, len(results))
 	for _, c := range results {
 		out = append(out, fromLocal(c))
 	}
@@ -139,7 +139,7 @@ func (a *API) SearchContacts(query string, limit int) ([]coreapi.Contact, error)
 
 // GetContact looks up a contact by record id or, when the argument contains
 // '@', by email. Returns (nil, nil) when not found.
-func (a *API) GetContact(emailOrID string) (*coreapi.Contact, error) {
+func (a *API) GetContact(emailOrID string) (*contactdto.Contact, error) {
 	if emailOrID == "" || a.localStore == nil {
 		return nil, nil
 	}
@@ -178,7 +178,7 @@ func (a *API) GetContact(emailOrID string) (*coreapi.Contact, error) {
 //   - SourceIDLocalCollected   → auto-collected local contacts only
 //   - role:sender / recipient / ccbcc → collected contacts by mail role
 //     (发件人 / 收件人 / 抄送密送)
-func (a *API) ListContacts(filter coreapi.ContactFilter) ([]coreapi.Contact, error) {
+func (a *API) ListContacts(filter contactdto.ContactFilter) ([]contactdto.Contact, error) {
 	if a.localStore == nil {
 		return nil, nil
 	}
@@ -191,25 +191,25 @@ func (a *API) ListContacts(filter coreapi.ContactFilter) ([]coreapi.Contact, err
 
 // BrowseContacts returns the current page plus the full count for the same
 // source/search filter so the UI can distinguish "shown" from "total".
-func (a *API) BrowseContacts(filter coreapi.ContactFilter) (coreapi.ContactBrowseResult, error) {
+func (a *API) BrowseContacts(filter contactdto.ContactFilter) (contactdto.ContactBrowseResult, error) {
 	if a.localStore == nil {
-		return coreapi.ContactBrowseResult{}, nil
+		return contactdto.ContactBrowseResult{}, nil
 	}
 	recordFilter := contactRecordFilter(filter)
 	records, err := a.localStore.ListRecords(recordFilter)
 	if err != nil {
-		return coreapi.ContactBrowseResult{}, fmt.Errorf("contacts.ListContacts: %w", err)
+		return contactdto.ContactBrowseResult{}, fmt.Errorf("contacts.ListContacts: %w", err)
 	}
 	recordFilter.Limit = 0
 	recordFilter.Offset = 0
 	total, err := a.localStore.CountRecords(recordFilter)
 	if err != nil {
-		return coreapi.ContactBrowseResult{}, fmt.Errorf("contacts.ListContacts count: %w", err)
+		return contactdto.ContactBrowseResult{}, fmt.Errorf("contacts.ListContacts count: %w", err)
 	}
-	return coreapi.ContactBrowseResult{Items: contactsFromRecords(records), Total: total}, nil
+	return contactdto.ContactBrowseResult{Items: contactsFromRecords(records), Total: total}, nil
 }
 
-func contactRecordFilter(filter coreapi.ContactFilter) contact.RecordFilter {
+func contactRecordFilter(filter contactdto.ContactFilter) contact.RecordFilter {
 	scope := browseScopeFromSourceID(filter.SourceID)
 	return contact.RecordFilter{
 		Source:    "local",
@@ -222,15 +222,15 @@ func contactRecordFilter(filter coreapi.ContactFilter) contact.RecordFilter {
 	}
 }
 
-func contactsFromRecords(records []*contact.Record) []coreapi.Contact {
-	out := make([]coreapi.Contact, 0, len(records))
+func contactsFromRecords(records []*contact.Record) []contactdto.Contact {
+	out := make([]contactdto.Contact, 0, len(records))
 	for _, rec := range records {
 		out = append(out, fromRecord(rec))
 	}
 	return out
 }
 
-func (a *API) ListAccountGroups() ([]coreapi.ContactAccountGroup, error) {
+func (a *API) ListAccountGroups() ([]contactdto.ContactAccountGroup, error) {
 	if a.localStore == nil {
 		return nil, nil
 	}
@@ -238,9 +238,9 @@ func (a *API) ListAccountGroups() ([]coreapi.ContactAccountGroup, error) {
 	if err != nil {
 		return nil, fmt.Errorf("contacts.ListAccountGroups: %w", err)
 	}
-	out := make([]coreapi.ContactAccountGroup, 0, len(associations))
+	out := make([]contactdto.ContactAccountGroup, 0, len(associations))
 	for _, assoc := range associations {
-		out = append(out, coreapi.ContactAccountGroup{
+		out = append(out, contactdto.ContactAccountGroup{
 			AccountID:      assoc.AccountID,
 			Name:           assoc.Name,
 			Email:          assoc.Email,
@@ -254,14 +254,14 @@ func (a *API) ListAccountGroups() ([]coreapi.ContactAccountGroup, error) {
 	return out, nil
 }
 
-func (a *API) fromRecordWithAssociations(rec *contact.Record) (coreapi.Contact, error) {
+func (a *API) fromRecordWithAssociations(rec *contact.Record) (contactdto.Contact, error) {
 	out := fromRecord(rec)
 	associations, err := a.localStore.ListAssociatedAccountsForEmails(out.Emails)
 	if err != nil {
 		return out, fmt.Errorf("contacts.GetContact associated accounts: %w", err)
 	}
 	for _, assoc := range associations {
-		out.AssociatedAccounts = append(out.AssociatedAccounts, coreapi.ContactAssociatedAccount{
+		out.AssociatedAccounts = append(out.AssociatedAccounts, contactdto.ContactAssociatedAccount{
 			AccountID: assoc.AccountID,
 			Name:      assoc.Name,
 			Email:     assoc.Email,
@@ -278,7 +278,7 @@ func (a *API) fromRecordWithAssociations(rec *contact.Record) (coreapi.Contact, 
 //   - "local:collected"            → rejected (reserved for auto-collection).
 //
 // Email is normalized (trim + lowercase) before storage.
-func (a *API) CreateContact(input coreapi.ContactCreateInput) (string, error) {
+func (a *API) CreateContact(input contactdto.ContactCreateInput) (string, error) {
 	email := strings.ToLower(strings.TrimSpace(input.Email))
 	if email == "" {
 		return "", fmt.Errorf("contacts.CreateContact: email is required")
@@ -330,7 +330,7 @@ func (a *API) CreateContact(input coreapi.ContactCreateInput) (string, error) {
 // record (by record id, or by email when the arg contains '@'), applies every
 // non-nil patch field, then writes via UpsertRecord. Empty/nil patch is a
 // no-op success.
-func (a *API) UpdateContact(id string, patch coreapi.ContactPatch) error {
+func (a *API) UpdateContact(id string, patch contactdto.ContactPatch) error {
 	if id == "" {
 		return fmt.Errorf("contacts.UpdateContact: id is required")
 	}
@@ -368,7 +368,7 @@ func (a *API) UpdateContact(id string, patch coreapi.ContactPatch) error {
 // Multi-value fields use the pointer-to-slice contract: non-nil empty slice
 // = clear, non-nil populated slice = replace. Photo uses pointer-to-struct
 // with the same semantics: non-nil with empty Data+URL = clear.
-func applyContactPatchToRecord(rec *contact.Record, patch coreapi.ContactPatch) bool {
+func applyContactPatchToRecord(rec *contact.Record, patch contactdto.ContactPatch) bool {
 	applied := false
 	if patch.Name != nil {
 		rec.Fn = strings.TrimSpace(*patch.Name)
@@ -474,7 +474,7 @@ func applyContactPatchToRecord(rec *contact.Record, patch coreapi.ContactPatch) 
 //
 // When input.Emails is non-empty it REPLACES the implicit single-primary email
 // constructed from `email`. Same for the other repeating slices.
-func recordFromCreateInput(input coreapi.ContactCreateInput, email, name string) *contact.Record {
+func recordFromCreateInput(input contactdto.ContactCreateInput, email, name string) *contact.Record {
 	rec := &contact.Record{
 		Fn:       strings.TrimSpace(name),
 		Nickname: strings.TrimSpace(input.Nickname),
@@ -542,7 +542,7 @@ func recordFromCreateInput(input coreapi.ContactCreateInput, email, name string)
 // hasRichFields reports whether any non-legacy field on the input is set.
 // Used by CreateContact to pick between the legacy minimal-create shortcut
 // (email + name only) and the full recordFromCreateInput path.
-func hasRichFields(input coreapi.ContactCreateInput) bool {
+func hasRichFields(input contactdto.ContactCreateInput) bool {
 	if input.Nickname != "" || input.Org != "" || input.Title != "" || input.Note != "" || input.Bday != "" {
 		return true
 	}

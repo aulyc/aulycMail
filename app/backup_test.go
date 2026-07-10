@@ -14,7 +14,7 @@ import (
 )
 
 func TestBackupMessageKeyIncludesUIDValidity(t *testing.T) {
-	first := backupMessageRow{
+	first := mailBackup.MessageRow{
 		AccountID:   "account-1",
 		FolderID:    "folder-1",
 		UIDValidity: 100,
@@ -23,13 +23,13 @@ func TestBackupMessageKeyIncludesUIDValidity(t *testing.T) {
 	second := first
 	second.UIDValidity = 200
 
-	if backupMessageKey(first) == backupMessageKey(second) {
+	if mailBackup.MessageKey(first) == mailBackup.MessageKey(second) {
 		t.Fatal("expected backup keys to differ when UIDVALIDITY changes")
 	}
 }
 
 func TestBackupMessageRelativePathIncludesStableMetadata(t *testing.T) {
-	row := backupMessageRow{
+	row := mailBackup.MessageRow{
 		AccountEmail: "user@example.com",
 		FolderPath:   "INBOX/Reports",
 		UIDValidity:  42,
@@ -38,7 +38,7 @@ func TestBackupMessageRelativePathIncludesStableMetadata(t *testing.T) {
 		Date:         time.Date(2026, 7, 4, 12, 13, 14, 0, time.UTC),
 	}
 
-	got := backupMessageRelativePath(row)
+	got := mailBackup.MessageRelativePathForRow(row)
 	want := "eml/user@example.com/INBOX/Reports/20260704-121314_uv42_uid99_Q2_Risk_Plan.eml"
 	if got != want {
 		t.Fatalf("backup path mismatch\nwant: %s\n got: %s", want, got)
@@ -68,21 +68,21 @@ func TestUniqueNonEmptyStrings(t *testing.T) {
 }
 
 func TestGroupBackupMessageRowsPreservesGroupAndRowOrder(t *testing.T) {
-	rows := []backupMessageRow{
+	rows := []mailBackup.MessageRow{
 		{AccountID: "a1", FolderID: "inbox", UID: 1},
 		{AccountID: "a1", FolderID: "sent", UID: 2},
 		{AccountID: "a1", FolderID: "inbox", UID: 3},
 		{AccountID: "a2", FolderID: "inbox", UID: 4},
 	}
 
-	groups := groupBackupMessageRows(rows)
+	groups := mailBackup.GroupMessageRows(rows)
 	if len(groups) != 3 {
 		t.Fatalf("group count mismatch: %d", len(groups))
 	}
 	if groups[0].AccountID != "a1" || groups[0].FolderID != "inbox" {
 		t.Fatalf("first group mismatch: %#v", groups[0])
 	}
-	if got := backupRowUIDs(groups[0].Rows); !reflect.DeepEqual(got, []uint32{1, 3}) {
+	if got := mailBackup.RowUIDs(groups[0].Rows); !reflect.DeepEqual(got, []uint32{1, 3}) {
 		t.Fatalf("first group UIDs mismatch: %#v", got)
 	}
 	if groups[1].AccountID != "a1" || groups[1].FolderID != "sent" {
@@ -94,13 +94,13 @@ func TestGroupBackupMessageRowsPreservesGroupAndRowOrder(t *testing.T) {
 }
 
 func TestBackupRowsByUIDIgnoresZeroUID(t *testing.T) {
-	rows := []backupMessageRow{
+	rows := []mailBackup.MessageRow{
 		{UID: 0, Subject: "missing"},
 		{UID: 10, Subject: "ten"},
 		{UID: 11, Subject: "eleven"},
 	}
 
-	got := backupRowsByUID(rows)
+	got := mailBackup.RowsByUID(rows)
 	if len(got) != 2 {
 		t.Fatalf("UID map size mismatch: %d", len(got))
 	}
@@ -163,11 +163,11 @@ func TestBackupDoneProgressIncludesMissingCount(t *testing.T) {
 }
 
 func TestFormatBackupRunResultIncludesMissingOnlyWhenPresent(t *testing.T) {
-	withMissing := formatBackupRunResult(backupIndexRun{Exported: 7, Skipped: 2, Missing: 1})
+	withMissing := mailBackup.FormatRunResult(mailBackup.IndexRun{Exported: 7, Skipped: 2, Missing: 1})
 	if !strings.Contains(withMissing, "1 missing") {
 		t.Fatalf("expected missing count in result: %s", withMissing)
 	}
-	withoutMissing := formatBackupRunResult(backupIndexRun{Exported: 7, Skipped: 3})
+	withoutMissing := mailBackup.FormatRunResult(mailBackup.IndexRun{Exported: 7, Skipped: 3})
 	if strings.Contains(withoutMissing, "missing") {
 		t.Fatalf("did not expect missing count in result: %s", withoutMissing)
 	}
@@ -176,11 +176,11 @@ func TestFormatBackupRunResultIncludesMissingOnlyWhenPresent(t *testing.T) {
 func TestBackupIndexRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	hasAttachments := true
-	idx := &backupIndex{
-		Version:   backupIndexVersion,
+	idx := &mailBackup.Index{
+		Version:   mailBackup.IndexVersion,
 		CreatedAt: "2026-07-04T00:00:00Z",
 		UpdatedAt: "2026-07-04T00:00:00Z",
-		Messages: map[string]backupIndexMessage{
+		Messages: map[string]mailBackup.IndexMessage{
 			"account:folder:1:2": {
 				AccountID:      "account",
 				AccountEmail:   "user@example.com",
@@ -194,18 +194,18 @@ func TestBackupIndexRoundTrip(t *testing.T) {
 		},
 	}
 
-	if err := saveBackupIndex(dir, idx); err != nil {
+	if err := mailBackup.SaveIndex(dir, idx); err != nil {
 		t.Fatalf("save index: %v", err)
 	}
 
-	got, found, err := loadBackupIndex(dir)
+	got, found, err := mailBackup.LoadIndex(dir)
 	if err != nil {
 		t.Fatalf("load index: %v", err)
 	}
 	if !found {
 		t.Fatal("expected saved backup index to be found")
 	}
-	if got.Version != backupIndexVersion {
+	if got.Version != mailBackup.IndexVersion {
 		t.Fatalf("version mismatch: %d", got.Version)
 	}
 	if len(got.Messages) != 1 {
@@ -220,7 +220,7 @@ func TestBackupIndexRoundTrip(t *testing.T) {
 }
 
 func TestParseBackupTimeAcceptsGoTimeString(t *testing.T) {
-	got := parseBackupTime("2025-10-09 10:59:15 +0000 UTC")
+	got := mailBackup.ParseMessageTime("2025-10-09 10:59:15 +0000 UTC")
 	want := time.Date(2025, 10, 9, 10, 59, 15, 0, time.UTC)
 	if !got.Equal(want) {
 		t.Fatalf("time mismatch\nwant: %s\n got: %s", want, got)
@@ -270,7 +270,7 @@ func TestParseBackupViewerEMLExtractsBodyAndAttachments(t *testing.T) {
 		"",
 	}, "\r\n")
 
-	detail, err := parseBackupViewerEML("k", backupIndexMessage{
+	detail, err := parseBackupViewerEML("k", mailBackup.IndexMessage{
 		AccountEmail: "backup@example.com",
 		FolderPath:   "INBOX",
 	}, strings.NewReader(raw))
@@ -299,7 +299,7 @@ func TestParseBackupViewerEMLExtractsBodyAndAttachments(t *testing.T) {
 
 func TestBackupViewerMessagesIncludesAttachmentCount(t *testing.T) {
 	hasAttachments := true
-	idx := &backupIndex{Messages: map[string]backupIndexMessage{
+	idx := &mailBackup.Index{Messages: map[string]mailBackup.IndexMessage{
 		"k": {
 			AccountEmail:   "user@example.com",
 			FolderPath:     "INBOX",

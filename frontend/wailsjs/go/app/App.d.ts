@@ -3,7 +3,7 @@
 import {certificate} from '../models';
 import {account} from '../models';
 import {app} from '../models';
-import {v1} from '../models';
+import {contactdto} from '../models';
 import {message} from '../models';
 import {folder} from '../models';
 import {smtp} from '../models';
@@ -28,19 +28,19 @@ export function ChooseBackupDirectory():Promise<string>;
 
 export function ClearOfflineBodyCache(arg1:string):Promise<app.OfflineBodyCacheClearResult>;
 
-export function Contacts_BrowseContacts(arg1:string,arg2:string,arg3:number,arg4:number):Promise<v1.ContactBrowseResult>;
+export function Contacts_BrowseContacts(arg1:string,arg2:string,arg3:number,arg4:number):Promise<contactdto.ContactBrowseResult>;
 
-export function Contacts_CreateContact(arg1:v1.ContactCreateInput):Promise<string>;
+export function Contacts_CreateContact(arg1:contactdto.ContactCreateInput):Promise<string>;
 
 export function Contacts_DeleteLocalContact(arg1:string):Promise<void>;
 
-export function Contacts_GetContactAccountGroups():Promise<Array<v1.ContactAccountGroup>>;
+export function Contacts_GetContactAccountGroups():Promise<Array<contactdto.ContactAccountGroup>>;
 
-export function Contacts_GetContactDetail(arg1:string):Promise<v1.Contact>;
+export function Contacts_GetContactDetail(arg1:string):Promise<contactdto.Contact>;
 
-export function Contacts_ListContactsForBrowse(arg1:string,arg2:string,arg3:number,arg4:number):Promise<Array<v1.Contact>>;
+export function Contacts_ListContactsForBrowse(arg1:string,arg2:string,arg3:number,arg4:number):Promise<Array<contactdto.Contact>>;
 
-export function Contacts_UpdateContact(arg1:string,arg2:v1.ContactPatch):Promise<void>;
+export function Contacts_UpdateContact(arg1:string,arg2:contactdto.ContactPatch):Promise<void>;
 
 export function CopyToFolder(arg1:Array<string>,arg2:string):Promise<void>;
 

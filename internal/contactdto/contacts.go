@@ -1,4 +1,4 @@
-package v1
+package contactdto
 
 // ContactPatch is the optional-fields shape passed to Contacts_UpdateContact.
 // Pointer fields distinguish "leave unchanged" (nil) from "set to empty"

@@ -1,8 +1,8 @@
-package backend
+package contactpane
 
 import (
 	"github.com/aulyc/aulycmail/internal/contact"
-	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	contactdto "github.com/aulyc/aulycmail/internal/contactdto"
 )
 
 // fromLocal converts a core contact.Contact into the API-surface Contact.
@@ -11,12 +11,12 @@ import (
 // local Source field becomes SourceID for autocomplete-style per-email row
 // paths; multi-field fromRecord is the path the Contacts pane uses for its list
 // + detail views.
-func fromLocal(c *contact.Contact) coreapi.Contact {
+func fromLocal(c *contact.Contact) contactdto.Contact {
 	updated := c.LastUsed
 	if updated.IsZero() {
 		updated = c.CreatedAt
 	}
-	return coreapi.Contact{
+	return contactdto.Contact{
 		ID:        c.Email,
 		Name:      c.DisplayName,
 		Emails:    []string{c.Email},
@@ -26,21 +26,21 @@ func fromLocal(c *contact.Contact) coreapi.Contact {
 }
 
 // fromRecord converts a local contact.Record into the API-surface
-// coreapi.Contact. One Contact per record, with all sub-tables surfaced through
+// contactdto.Contact. One Contact per record, with all sub-tables surfaced through
 // the rich Emails/Phones/Addresses/URLs/IMPPs/Categories slices.
 //
 // SourceID semantics:
 //   - For local records: returns the legacy-mapped Source value ("aulycmail") so
 //     the ContactDetail.svelte gate `sourceId === 'aulycmail'` keeps working for
 //     Edit/Delete on local contacts.
-func fromRecord(rec *contact.Record) coreapi.Contact {
+func fromRecord(rec *contact.Record) contactdto.Contact {
 	if rec == nil {
-		return coreapi.Contact{Emails: []string{}}
+		return contactdto.Contact{Emails: []string{}}
 	}
 	// Initialize Emails as empty slice (not nil) so the JSON payload always has
 	// `"emails": []` rather than `"emails": null`. Frontend `{#each contact.emails}`
 	// blocks iterate empty arrays fine; iterating null throws.
-	out := coreapi.Contact{
+	out := contactdto.Contact{
 		ID:             rec.ID,
 		Name:           rec.Fn,
 		Emails:         []string{},
@@ -64,21 +64,21 @@ func fromRecord(rec *contact.Record) coreapi.Contact {
 	// Flat email list (legacy autocomplete shape) + structured email items.
 	for _, e := range rec.Emails {
 		out.Emails = append(out.Emails, e.Email)
-		out.EmailItems = append(out.EmailItems, coreapi.ContactEmail{
+		out.EmailItems = append(out.EmailItems, contactdto.ContactEmail{
 			Email:     e.Email,
 			Type:      e.EmailType,
 			IsPrimary: e.IsPrimary,
 		})
 	}
 	for _, p := range rec.Phones {
-		out.Phones = append(out.Phones, coreapi.ContactPhone{
+		out.Phones = append(out.Phones, contactdto.ContactPhone{
 			Number:    p.Number,
 			Type:      p.PhoneType,
 			IsPrimary: p.IsPrimary,
 		})
 	}
 	for _, a := range rec.Addresses {
-		out.Addresses = append(out.Addresses, coreapi.ContactAddress{
+		out.Addresses = append(out.Addresses, contactdto.ContactAddress{
 			Type:     a.AddrType,
 			Street:   a.Street,
 			City:     a.City,
@@ -88,10 +88,10 @@ func fromRecord(rec *contact.Record) coreapi.Contact {
 		})
 	}
 	for _, u := range rec.URLs {
-		out.URLs = append(out.URLs, coreapi.ContactURL{URL: u.URL, Type: u.URLType})
+		out.URLs = append(out.URLs, contactdto.ContactURL{URL: u.URL, Type: u.URLType})
 	}
 	for _, i := range rec.IMPPs {
-		out.IMPPs = append(out.IMPPs, coreapi.ContactIMPP{Handle: i.Handle, Type: i.IMPPType})
+		out.IMPPs = append(out.IMPPs, contactdto.ContactIMPP{Handle: i.Handle, Type: i.IMPPType})
 	}
 	out.Categories = append(out.Categories, rec.Categories...)
 	return out

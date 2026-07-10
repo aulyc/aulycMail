@@ -12,13 +12,13 @@
 import { noMods, ctrlOrMeta } from '$lib/keyboard/shortcuts'
 
 /** `e` — edit the currently-focused contact. */
-export const CONTACT_EDIT = (e: KeyboardEvent): boolean =>
+const CONTACT_EDIT = (e: KeyboardEvent): boolean =>
   e.key === 'e' && noMods(e)
 
 /** `Ctrl/Cmd+N` — open the local new-contact dialog. Routed by the rail-pane
  *  shortcut registry before App.svelte's mail-domain switch — only fires when
  *  contacts is the active rail. */
-export const CONTACT_NEW = (e: KeyboardEvent): boolean =>
+const CONTACT_NEW = (e: KeyboardEvent): boolean =>
   e.key.toLowerCase() === 'n' && ctrlOrMeta(e) && !e.shiftKey && !e.altKey
 
 export const KEY = {

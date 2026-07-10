@@ -26,8 +26,6 @@ const (
 	backupScopeAll      = "all"
 	backupScopeSelected = "selected"
 
-	backupIndexVersion = 1
-
 	backupRawFetchBatchSize = 10
 )
 
@@ -149,79 +147,6 @@ func (t *backupRunTracker) snapshot() BackupRunState {
 		state.Progress = &progress
 	}
 	return state
-}
-
-type backupIndex struct {
-	Version   int                           `json:"version"`
-	CreatedAt string                        `json:"createdAt"`
-	UpdatedAt string                        `json:"updatedAt"`
-	Messages  map[string]backupIndexMessage `json:"messages"`
-	LastRun   *backupIndexRun               `json:"lastRun,omitempty"`
-}
-
-type backupIndexMessage struct {
-	AccountID      string `json:"accountId"`
-	AccountEmail   string `json:"accountEmail"`
-	FolderID       string `json:"folderId"`
-	FolderPath     string `json:"folderPath"`
-	UIDValidity    uint32 `json:"uidValidity"`
-	UID            uint32 `json:"uid"`
-	MessageID      string `json:"messageId,omitempty"`
-	Subject        string `json:"subject,omitempty"`
-	Date           string `json:"date,omitempty"`
-	EMLPath        string `json:"emlPath"`
-	Size           int    `json:"size"`
-	HasAttachments *bool  `json:"hasAttachments,omitempty"`
-	ExportedAt     string `json:"exportedAt"`
-}
-
-type backupIndexRun struct {
-	StartedAt  string `json:"startedAt"`
-	FinishedAt string `json:"finishedAt"`
-	Mode       string `json:"mode"`
-	Total      int    `json:"total"`
-	Exported   int    `json:"exported"`
-	Skipped    int    `json:"skipped"`
-	Missing    int    `json:"missing,omitempty"`
-	Failed     int    `json:"failed"`
-}
-
-type backupFailure struct {
-	AccountEmail string `json:"accountEmail"`
-	FolderPath   string `json:"folderPath"`
-	UID          uint32 `json:"uid"`
-	Subject      string `json:"subject,omitempty"`
-	Error        string `json:"error"`
-}
-
-type backupReport struct {
-	backupIndexRun
-	Directory       string          `json:"directory"`
-	MissingMessages []backupFailure `json:"missingMessages,omitempty"`
-	Failures        []backupFailure `json:"failures,omitempty"`
-}
-
-type backupMessageRow struct {
-	ID             string
-	AccountID      string
-	AccountEmail   string
-	FolderID       string
-	FolderPath     string
-	FolderName     string
-	UIDValidity    uint32
-	UID            uint32
-	MessageID      string
-	Subject        string
-	Date           time.Time
-	DateRaw        string
-	Size           int
-	HasAttachments bool
-}
-
-type backupMessageGroup struct {
-	AccountID string
-	FolderID  string
-	Rows      []backupMessageRow
 }
 
 // GetBackupSettings returns the persisted backup settings.
@@ -359,7 +284,7 @@ func (a *App) GetBackupStatus(directory string) (*BackupStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	idx, found, err := loadBackupIndex(cleanDir)
+	idx, found, err := mailBackup.LoadIndex(cleanDir)
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +302,7 @@ func (a *App) GetBackupStatus(directory string) (*BackupStatus, error) {
 	if idx.LastRun != nil {
 		status.LastRunAt = idx.LastRun.FinishedAt
 		status.LastRunMode = idx.LastRun.Mode
-		status.LastRunResult = formatBackupRunResult(*idx.LastRun)
+		status.LastRunResult = mailBackup.FormatRunResult(*idx.LastRun)
 	}
 	return status, nil
 }
@@ -473,7 +398,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 		accountIDs = append(accountIDs, acc.ID)
 	}
 
-	idx, found, err := loadBackupIndex(directory)
+	idx, found, err := mailBackup.LoadIndex(directory)
 	if err != nil {
 		return nil, err
 	}
@@ -482,10 +407,10 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 		mode = "incremental"
 	}
 	if idx.Messages == nil {
-		idx.Messages = make(map[string]backupIndexMessage)
+		idx.Messages = make(map[string]mailBackup.IndexMessage)
 	}
 	if idx.Version == 0 {
-		idx.Version = backupIndexVersion
+		idx.Version = mailBackup.IndexVersion
 	}
 	if idx.CreatedAt == "" {
 		idx.CreatedAt = startedAt
@@ -501,11 +426,11 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 		Mode:      mode,
 		Total:     len(rows),
 	}
-	failures := make([]backupFailure, 0)
-	missing := make([]backupFailure, 0)
+	failures := make([]mailBackup.Failure, 0)
+	missing := make([]mailBackup.Failure, 0)
 	a.emitBackupProgress(BackupProgress{Phase: "running", Total: len(rows), Message: "开始备份"})
 
-	pendingRows := make([]backupMessageRow, 0, len(rows))
+	pendingRows := make([]mailBackup.MessageRow, 0, len(rows))
 	processed := 0
 	for _, row := range rows {
 		select {
@@ -514,10 +439,10 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 		default:
 		}
 
-		key := backupMessageKey(row)
+		key := mailBackup.MessageKey(row)
 		existing, indexed := idx.Messages[key]
 		if indexed && mailBackup.FileExists(directory, existing.EMLPath) {
-			existing.HasAttachments = boolPtr(row.HasAttachments)
+			existing.HasAttachments = mailBackup.BoolPtr(row.HasAttachments)
 			idx.Messages[key] = existing
 			result.Skipped++
 			processed++
@@ -538,7 +463,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 		pendingRows = append(pendingRows, row)
 	}
 
-	for _, group := range groupBackupMessageRows(pendingRows) {
+	for _, group := range mailBackup.GroupMessageRows(pendingRows) {
 		for offset := 0; offset < len(group.Rows); offset += backupRawFetchBatchSize {
 			select {
 			case <-a.ctx.Done():
@@ -551,18 +476,18 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 				end = len(group.Rows)
 			}
 			chunk := group.Rows[offset:end]
-			rowsByUID := backupRowsByUID(chunk)
-			streamResults, streamFailures, err := a.syncEngine.StreamRawMessages(a.ctx, group.AccountID, group.FolderID, backupRowUIDs(chunk), func(uid uint32, body io.Reader) (int64, error) {
+			rowsByUID := mailBackup.RowsByUID(chunk)
+			streamResults, streamFailures, err := a.syncEngine.StreamRawMessages(a.ctx, group.AccountID, group.FolderID, mailBackup.RowUIDs(chunk), func(uid uint32, body io.Reader) (int64, error) {
 				row, ok := rowsByUID[uid]
 				if !ok {
 					return 0, fmt.Errorf("unexpected backup UID: %d", uid)
 				}
-				return mailBackup.WriteFileFromReader(directory, backupMessageRelativePath(row), body)
+				return mailBackup.WriteFileFromReader(directory, mailBackup.MessageRelativePathForRow(row), body)
 			})
 			if err != nil {
 				for _, row := range chunk {
 					result.Failed++
-					failures = append(failures, backupFailureFromRow(row, err))
+					failures = append(failures, mailBackup.FailureFromRow(row, err))
 					processed++
 					a.emitBackupProgress(BackupProgress{
 						Phase:        "running",
@@ -581,8 +506,8 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 			}
 
 			for _, row := range chunk {
-				key := backupMessageKey(row)
-				relPath := backupMessageRelativePath(row)
+				key := mailBackup.MessageKey(row)
+				relPath := mailBackup.MessageRelativePathForRow(row)
 				streamResult, ok := streamResults[row.UID]
 				err := streamFailures[row.UID]
 				if err == nil && !ok {
@@ -591,7 +516,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 				if err != nil {
 					if mailSync.IsRawMessageNotFoundError(err) {
 						result.Missing++
-						missing = append(missing, backupFailureFromRow(row, err))
+						missing = append(missing, mailBackup.FailureFromRow(row, err))
 						processed++
 						a.emitBackupProgress(BackupProgress{
 							Phase:        "running",
@@ -608,7 +533,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 						continue
 					}
 					result.Failed++
-					failures = append(failures, backupFailureFromRow(row, err))
+					failures = append(failures, mailBackup.FailureFromRow(row, err))
 					processed++
 					a.emitBackupProgress(BackupProgress{
 						Phase:        "running",
@@ -625,7 +550,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 					continue
 				}
 
-				idx.Messages[key] = backupIndexMessage{
+				idx.Messages[key] = mailBackup.IndexMessage{
 					AccountID:      row.AccountID,
 					AccountEmail:   row.AccountEmail,
 					FolderID:       row.FolderID,
@@ -637,7 +562,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 					Date:           row.DateRaw,
 					EMLPath:        relPath,
 					Size:           mailBackup.FileSizeInt(streamResult.BytesWritten),
-					HasAttachments: boolPtr(row.HasAttachments),
+					HasAttachments: mailBackup.BoolPtr(row.HasAttachments),
 					ExportedAt:     time.Now().UTC().Format(time.RFC3339),
 				}
 				result.Exported++
@@ -657,7 +582,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 		}
 	}
 
-	run := backupIndexRun{
+	run := mailBackup.IndexRun{
 		StartedAt:  startedAt,
 		FinishedAt: time.Now().UTC().Format(time.RFC3339),
 		Mode:       mode,
@@ -667,15 +592,15 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 		Missing:    result.Missing,
 		Failed:     result.Failed,
 	}
-	idx.Version = backupIndexVersion
+	idx.Version = mailBackup.IndexVersion
 	idx.UpdatedAt = run.FinishedAt
 	idx.LastRun = &run
 
-	if err := saveBackupIndex(directory, idx); err != nil {
+	if err := mailBackup.SaveIndex(directory, idx); err != nil {
 		return nil, err
 	}
-	reportPath, err := saveBackupReport(directory, backupReport{
-		backupIndexRun:  run,
+	reportPath, err := mailBackup.SaveReport(directory, mailBackup.Report{
+		IndexRun:        run,
 		Directory:       directory,
 		MissingMessages: missing,
 		Failures:        failures,
@@ -714,13 +639,6 @@ func backupDoneProgress(result *BackupRunResult) BackupProgress {
 	}
 }
 
-func formatBackupRunResult(run backupIndexRun) string {
-	if run.Missing > 0 {
-		return fmt.Sprintf("%d exported, %d skipped, %d missing, %d failed", run.Exported, run.Skipped, run.Missing, run.Failed)
-	}
-	return fmt.Sprintf("%d exported, %d skipped, %d failed", run.Exported, run.Skipped, run.Failed)
-}
-
 func (a *App) resolveBackupAccounts(scope string, selectedIDs []string) ([]*account.Account, error) {
 	all, err := a.accountStore.List()
 	if err != nil {
@@ -750,7 +668,7 @@ func (a *App) resolveBackupAccounts(scope string, selectedIDs []string) ([]*acco
 	return resolved, nil
 }
 
-func (a *App) listBackupMessages(accountIDs []string) ([]backupMessageRow, error) {
+func (a *App) listBackupMessages(accountIDs []string) ([]mailBackup.MessageRow, error) {
 	if len(accountIDs) == 0 {
 		return nil, nil
 	}
@@ -788,9 +706,9 @@ func (a *App) listBackupMessages(accountIDs []string) ([]backupMessageRow, error
 	}
 	defer rows.Close()
 
-	var messages []backupMessageRow
+	var messages []mailBackup.MessageRow
 	for rows.Next() {
-		var row backupMessageRow
+		var row mailBackup.MessageRow
 		var uid, uidValidity int64
 		var size int64
 		var hasAttachments bool
@@ -818,7 +736,7 @@ func (a *App) listBackupMessages(accountIDs []string) ([]backupMessageRow, error
 		row.HasAttachments = hasAttachments
 		if dateRaw.Valid {
 			row.DateRaw = dateRaw.String
-			row.Date = parseBackupTime(dateRaw.String)
+			row.Date = mailBackup.ParseMessageTime(dateRaw.String)
 		}
 		if row.FolderPath == "" {
 			row.FolderPath = row.FolderName
@@ -831,148 +749,11 @@ func (a *App) listBackupMessages(accountIDs []string) ([]backupMessageRow, error
 	return messages, nil
 }
 
-func groupBackupMessageRows(rows []backupMessageRow) []backupMessageGroup {
-	groups := make([]backupMessageGroup, 0)
-	indexByKey := make(map[string]int)
-	for _, row := range rows {
-		key := row.AccountID + "\x00" + row.FolderID
-		index, ok := indexByKey[key]
-		if !ok {
-			index = len(groups)
-			indexByKey[key] = index
-			groups = append(groups, backupMessageGroup{
-				AccountID: row.AccountID,
-				FolderID:  row.FolderID,
-			})
-		}
-		groups[index].Rows = append(groups[index].Rows, row)
-	}
-	return groups
-}
-
-func backupRowUIDs(rows []backupMessageRow) []uint32 {
-	uids := make([]uint32, 0, len(rows))
-	for _, row := range rows {
-		if row.UID == 0 {
-			continue
-		}
-		uids = append(uids, row.UID)
-	}
-	return uids
-}
-
-func backupRowsByUID(rows []backupMessageRow) map[uint32]backupMessageRow {
-	byUID := make(map[uint32]backupMessageRow, len(rows))
-	for _, row := range rows {
-		if row.UID == 0 {
-			continue
-		}
-		byUID[row.UID] = row
-	}
-	return byUID
-}
-
 func normalizeBackupScope(scope string) string {
 	if scope == backupScopeSelected {
 		return backupScopeSelected
 	}
 	return backupScopeAll
-}
-
-func loadBackupIndex(directory string) (*backupIndex, bool, error) {
-	path := mailBackup.IndexPath(directory)
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return &backupIndex{Version: backupIndexVersion, Messages: map[string]backupIndexMessage{}}, false, nil
-	}
-	if err != nil {
-		return nil, false, fmt.Errorf("failed to read backup index: %w", err)
-	}
-	var idx backupIndex
-	if err := json.Unmarshal(data, &idx); err != nil {
-		return nil, false, fmt.Errorf("failed to parse backup index: %w", err)
-	}
-	if idx.Messages == nil {
-		idx.Messages = map[string]backupIndexMessage{}
-	}
-	return &idx, true, nil
-}
-
-func saveBackupIndex(directory string, idx *backupIndex) error {
-	path := mailBackup.IndexPath(directory)
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return fmt.Errorf("failed to create backup metadata directory: %w", err)
-	}
-	data, err := json.MarshalIndent(idx, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to encode backup index: %w", err)
-	}
-	return mailBackup.WriteFileAtomic(path, data, 0600)
-}
-
-func saveBackupReport(directory string, report backupReport) (string, error) {
-	reportDir := filepath.Join(directory, ".aulycmail-backup", "reports")
-	if err := os.MkdirAll(reportDir, 0700); err != nil {
-		return "", fmt.Errorf("failed to create backup report directory: %w", err)
-	}
-	name := time.Now().UTC().Format("20060102-150405") + ".json"
-	path := filepath.Join(reportDir, name)
-	data, err := json.MarshalIndent(report, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("failed to encode backup report: %w", err)
-	}
-	if err := mailBackup.WriteFileAtomic(path, data, 0600); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-func backupMessageKey(row backupMessageRow) string {
-	return fmt.Sprintf("%s:%s:%d:%d", row.AccountID, row.FolderID, row.UIDValidity, row.UID)
-}
-
-func backupMessageRelativePath(row backupMessageRow) string {
-	return mailBackup.MessageRelativePath(row.AccountEmail, row.FolderPath, row.Subject, row.Date, row.UIDValidity, row.UID)
-}
-
-func boolPtr(value bool) *bool {
-	return &value
-}
-
-func parseBackupTime(raw string) time.Time {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return time.Time{}
-	}
-	layouts := []string{
-		time.RFC3339Nano,
-		time.RFC3339,
-		"2006-01-02 15:04:05.999999999-07:00",
-		"2006-01-02 15:04:05.999999999Z07:00",
-		"2006-01-02 15:04:05.999999999 -0700 MST",
-		"2006-01-02 15:04:05-07:00",
-		"2006-01-02 15:04:05Z07:00",
-		"2006-01-02 15:04:05 -0700 MST",
-		"2006-01-02 15:04:05",
-		time.RFC1123Z,
-		time.RFC1123,
-	}
-	for _, layout := range layouts {
-		if t, err := time.Parse(layout, raw); err == nil {
-			return t
-		}
-	}
-	return time.Time{}
-}
-
-func backupFailureFromRow(row backupMessageRow, err error) backupFailure {
-	return backupFailure{
-		AccountEmail: row.AccountEmail,
-		FolderPath:   row.FolderPath,
-		UID:          row.UID,
-		Subject:      row.Subject,
-		Error:        err.Error(),
-	}
 }
 
 func uniqueNonEmptyStrings(values []string) []string {

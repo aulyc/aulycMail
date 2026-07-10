@@ -11,11 +11,11 @@ import (
 	goSync "sync"
 	"time"
 
-	extcontactsbe "github.com/aulyc/aulycmail/extensions/contacts/backend"
 	"github.com/aulyc/aulycmail/internal/account"
 	"github.com/aulyc/aulycmail/internal/appstate"
 	"github.com/aulyc/aulycmail/internal/certificate"
 	"github.com/aulyc/aulycmail/internal/contact"
+	"github.com/aulyc/aulycmail/internal/contactpane"
 	"github.com/aulyc/aulycmail/internal/credentials"
 	"github.com/aulyc/aulycmail/internal/database"
 	"github.com/aulyc/aulycmail/internal/draft"
@@ -161,7 +161,7 @@ func isValidEmail(email string) bool {
 type App struct {
 	// Embedded Contacts bridge. Go's method promotion makes Contacts_* methods
 	// Wails-bindable while keeping contacts logic outside the host App.
-	*extcontactsbe.ContactsBridge
+	*contactpane.ContactsBridge
 
 	ctx context.Context
 
@@ -488,7 +488,7 @@ func (a *App) Startup(ctx context.Context) {
 	// Built-in Contacts pane. ContactsBridge is Wails-bound and lazy:
 	// no contacts-specific stores are opened until a Contacts_* method is
 	// actually called.
-	a.initContactsExtension()
+	a.initContactsBridge()
 
 	// Initialize undo stack (max 50 commands, 30 second timeout)
 	a.undoStack = undo.NewStack(50, 30*time.Second)

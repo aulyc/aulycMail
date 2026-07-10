@@ -11,7 +11,7 @@ import {
   Contacts_CreateContact as CreateContact,
 } from '$wailsjs/go/app/App'
 // @ts-ignore - wailsjs bindings
-import type { v1 } from '$wailsjs/go/models'
+import type { contactdto } from '$wailsjs/go/models'
 // Responsive (mobile) integration — match mail's pattern of firing
 // showViewer/hideSidebar from the consumer's select actions. Layout-store
 // calls are self-gating: showViewer is a no-op when not responsive,
@@ -21,7 +21,7 @@ import type { v1 } from '$wailsjs/go/models'
 // in next" decisions on user actions.
 import { isResponsive, showViewer, hideSidebar } from '$lib/stores/layout.svelte'
 
-export const CONTACTS_PAGE_SIZE = 200
+const CONTACTS_PAGE_SIZE = 200
 
 // Source ID values the sidebar can dispatch:
 //   ""                  → all local contacts
@@ -31,9 +31,9 @@ export const CONTACTS_PAGE_SIZE = 200
 let selectedSourceId = $state<string>('')
 let searchQuery = $state<string>('')
 let selectedContactId = $state<string | null>(null)
-let contacts = $state<v1.Contact[]>([])
+let contacts = $state<contactdto.Contact[]>([])
 let total = $state<number>(0)
-let detail = $state<v1.Contact | null>(null)
+let detail = $state<contactdto.Contact | null>(null)
 let loading = $state<boolean>(false)
 let loadingMore = $state<boolean>(false)
 let listResetSignal = $state(0)
@@ -50,13 +50,13 @@ export const contactsView = {
   get selectedContactId(): string | null {
     return selectedContactId
   },
-  get contacts(): v1.Contact[] {
+  get contacts(): contactdto.Contact[] {
     return contacts
   },
   get total(): number {
     return total
   },
-  get detail(): v1.Contact | null {
+  get detail(): contactdto.Contact | null {
     return detail
   },
   get loading(): boolean {
@@ -196,7 +196,7 @@ export async function activateContactFromGlobalSearch(id: string): Promise<void>
 // Update a local contact with a multi-field patch. On conflict the backend
 // emits "contacts:conflict" via the event listener wired in ContactsPane; this
 // method's caller doesn't see the conflict directly.
-export async function updateContact(id: string, patch: v1.ContactPatch): Promise<void> {
+export async function updateContact(id: string, patch: contactdto.ContactPatch): Promise<void> {
   await UpdateContact(id, patch)
   // Refresh the list + detail view so changes are visible immediately.
   await reloadContacts()
@@ -224,6 +224,6 @@ export async function deleteLocalContact(email: string): Promise<void> {
 // Does NOT reload contacts or change the selected source — the caller
 // (ContactsPane.handleCreated) controls the post-create UX so the dialog can
 // close before the source switch.
-export async function createContact(input: v1.ContactCreateInput): Promise<string> {
+export async function createContact(input: contactdto.ContactCreateInput): Promise<string> {
   return await CreateContact(input)
 }

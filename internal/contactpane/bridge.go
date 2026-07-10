@@ -1,11 +1,11 @@
-package backend
+package contactpane
 
 import (
 	"errors"
 	"sync"
 
 	"github.com/aulyc/aulycmail/internal/contact"
-	coreapi "github.com/aulyc/aulycmail/internal/core/api/v1"
+	contactdto "github.com/aulyc/aulycmail/internal/contactdto"
 	"github.com/aulyc/aulycmail/internal/database"
 )
 
@@ -64,13 +64,13 @@ func (b *ContactsBridge) ensureInit() error {
 	return b.initErr
 }
 
-// emitConflict translates a `*coreapi.ErrConflict` from a write path into
+// emitConflict translates a `*contactdto.ErrConflict` from a write path into
 // a `contacts:conflict` event the frontend listens for. Returns true when
 // the error was a conflict (and an event was emitted) so the caller can
 // short-circuit further error handling — the user's intent was acknowledged,
 // just superseded by the server.
 func (b *ContactsBridge) emitConflict(err error) bool {
-	var conflict *coreapi.ErrConflict
+	var conflict *contactdto.ErrConflict
 	if !errors.As(err, &conflict) {
 		return false
 	}
@@ -95,11 +95,11 @@ func (b *ContactsBridge) emitConflict(err error) bool {
 //   - SourceIDLocal                 → all local contacts
 //   - SourceIDLocalManual           → user-added local contacts
 //   - SourceIDLocalCollected        → auto-collected local contacts
-func (b *ContactsBridge) Contacts_ListContactsForBrowse(query, sourceID string, limit, offset int) ([]coreapi.Contact, error) {
+func (b *ContactsBridge) Contacts_ListContactsForBrowse(query, sourceID string, limit, offset int) ([]contactdto.Contact, error) {
 	if err := b.ensureInit(); err != nil {
 		return nil, err
 	}
-	return b.api.ListContacts(coreapi.ContactFilter{
+	return b.api.ListContacts(contactdto.ContactFilter{
 		Query:    query,
 		SourceID: sourceID,
 		Limit:    limit,
@@ -110,11 +110,11 @@ func (b *ContactsBridge) Contacts_ListContactsForBrowse(query, sourceID string, 
 // Contacts_BrowseContacts returns a paged list and the full total for the
 // current source/search filter. The older Contacts_ListContactsForBrowse method
 // stays array-shaped for existing lightweight search callers.
-func (b *ContactsBridge) Contacts_BrowseContacts(query, sourceID string, limit, offset int) (coreapi.ContactBrowseResult, error) {
+func (b *ContactsBridge) Contacts_BrowseContacts(query, sourceID string, limit, offset int) (contactdto.ContactBrowseResult, error) {
 	if err := b.ensureInit(); err != nil {
-		return coreapi.ContactBrowseResult{}, err
+		return contactdto.ContactBrowseResult{}, err
 	}
-	return b.api.BrowseContacts(coreapi.ContactFilter{
+	return b.api.BrowseContacts(contactdto.ContactFilter{
 		Query:    query,
 		SourceID: sourceID,
 		Limit:    limit,
@@ -124,7 +124,7 @@ func (b *ContactsBridge) Contacts_BrowseContacts(query, sourceID string, limit, 
 
 // Contacts_GetContactAccountGroups returns the enabled mail accounts that back
 // the Contacts sidebar tree, including per-role counts for each account.
-func (b *ContactsBridge) Contacts_GetContactAccountGroups() ([]coreapi.ContactAccountGroup, error) {
+func (b *ContactsBridge) Contacts_GetContactAccountGroups() ([]contactdto.ContactAccountGroup, error) {
 	if err := b.ensureInit(); err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func (b *ContactsBridge) Contacts_GetContactAccountGroups() ([]coreapi.ContactAc
 
 // Contacts_GetContactDetail returns a single contact by email (if argument
 // contains '@') or by local record UUID otherwise.
-func (b *ContactsBridge) Contacts_GetContactDetail(emailOrID string) (*coreapi.Contact, error) {
+func (b *ContactsBridge) Contacts_GetContactDetail(emailOrID string) (*contactdto.Contact, error) {
 	if err := b.ensureInit(); err != nil {
 		return nil, err
 	}
@@ -149,7 +149,7 @@ func (b *ContactsBridge) Contacts_GetContactDetail(emailOrID string) (*coreapi.C
 //
 // The historical `Contacts_CreateLocalContact(email, name)` shape was renamed
 // here when the bridge started accepting the full input shape.
-func (b *ContactsBridge) Contacts_CreateContact(input coreapi.ContactCreateInput) (string, error) {
+func (b *ContactsBridge) Contacts_CreateContact(input contactdto.ContactCreateInput) (string, error) {
 	if err := b.ensureInit(); err != nil {
 		return "", err
 	}
@@ -162,7 +162,7 @@ func (b *ContactsBridge) Contacts_CreateContact(input coreapi.ContactCreateInput
 // 412 conflicts surface as a contacts:conflict event the UI listens for;
 // the method returns nil on conflict (the user's edit was discarded but
 // the local cache now matches the server, so the UI just reloads).
-func (b *ContactsBridge) Contacts_UpdateContact(idOrEmail string, patch coreapi.ContactPatch) error {
+func (b *ContactsBridge) Contacts_UpdateContact(idOrEmail string, patch contactdto.ContactPatch) error {
 	if err := b.ensureInit(); err != nil {
 		return err
 	}

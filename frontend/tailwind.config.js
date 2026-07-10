@@ -4,9 +4,6 @@ export default {
   content: [
     './src/**/*.{html,js,svelte,ts}',
     './index.html',
-    // Contacts lives outside frontend/. Its assets need scanning so Tailwind's
-    // JIT compiler emits the classes they use.
-    '../extensions/contacts/frontend/**/*.{html,js,svelte,ts}',
   ],
   theme: {
     extend: {

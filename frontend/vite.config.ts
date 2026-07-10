@@ -2,14 +2,7 @@ import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
 import path from 'path'
 
-// Contacts lives outside frontend/ at the repo root (../extensions/contacts/...).
-// $contacts aliases that directory so App.svelte and contacts files can import
-// components and stores cleanly. $wailsjs aliases the generated Wails bindings
-// so deep contacts files don't need ../ chains.
-//
-// Contacts Svelte/TS files live outside frontend/, so Vite needs an explicit
-// filesystem allow-list and a few dependency aliases back to frontend/node_modules.
-const CONTACTS_DIR = path.resolve(__dirname, '../extensions/contacts')
+const CONTACTS_DIR = path.resolve(__dirname, './src/lib/contacts')
 const WAILSJS_DIR = path.resolve(__dirname, './wailsjs')
 const NODE_MODULES_DIR = path.resolve(__dirname, './node_modules')
 
@@ -43,7 +36,7 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('/wailsjs/')) return 'wails'
-          if (id.includes('/extensions/contacts/')) return 'contacts'
+          if (id.includes('/src/lib/contacts/')) return 'contacts'
           if (id.includes('/node_modules/')) return 'vendor'
         },
       },
@@ -51,10 +44,5 @@ export default defineConfig({
   },
   server: {
     strictPort: true,
-    fs: {
-      // Vite blocks file reads outside its root by default. Contacts lives
-      // one level above the frontend root, so allow that directory.
-      allow: ['..', CONTACTS_DIR],
-    },
   },
 })

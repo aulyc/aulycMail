@@ -4,11 +4,11 @@
   import { Button } from '$lib/components/ui/button'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
   import Icon from '@iconify/svelte'
-  import { contactsView, deleteLocalContact } from '$contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, deleteLocalContact } from '$contacts/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { formatLocalDateTime, formatRelativeDate } from '$lib/utils/date'
   // @ts-ignore - wailsjs bindings
-  import type { v1 } from '$wailsjs/go/models'
+  import type { contactdto } from '$wailsjs/go/models'
   // @ts-ignore - wailsjs bindings
   import { GetContactMessages } from '$wailsjs/go/app/App'
   // @ts-ignore - wailsjs bindings
@@ -73,7 +73,7 @@
   // shortcut can open it from anywhere within the pane). The button below
   // calls onEdit; ContactsPane owns the dialog itself.
   interface Props {
-    onEdit?: (contact: v1.Contact) => void
+    onEdit?: (contact: contactdto.Contact) => void
   }
   let { onEdit }: Props = $props()
 

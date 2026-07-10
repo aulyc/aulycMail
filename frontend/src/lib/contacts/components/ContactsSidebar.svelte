@@ -5,17 +5,17 @@
   import SourceSidebar from '$lib/components/kit/SourceSidebar.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { getAccountColor } from '$lib/utils/accountColor'
-  import { contactsView, selectSource, reloadContacts } from '$contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, selectSource, reloadContacts } from '$contacts/stores/contactsView.svelte'
   import {
     contactAccountGroups,
     loadContactAccountGroups,
-  } from '$contacts/frontend/stores/contactAccountGroups.svelte'
+  } from '$contacts/stores/contactAccountGroups.svelte'
   import {
     beginContactRefresh,
     completeContactRefresh,
     failContactRefresh,
     initContactRefreshEvents,
-  } from '$contacts/frontend/stores/contactRefresh.svelte'
+  } from '$contacts/stores/contactRefresh.svelte'
   import { toasts } from '$lib/stores/toast'
   // @ts-ignore - wailsjs bindings
   import { RefreshContactsFromMail } from '$wailsjs/go/app/App'

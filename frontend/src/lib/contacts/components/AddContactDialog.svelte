@@ -8,13 +8,13 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import Icon from '@iconify/svelte'
-  import { createContact } from '$contacts/frontend/stores/contactsView.svelte'
+  import { createContact } from '$contacts/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import ContactFieldsForm from './fields/ContactFieldsForm.svelte'
   import type { EmailRow } from './fields/types'
   // @ts-ignore - wailsjs bindings
-  import { v1 } from '$wailsjs/go/models'
+  import { contactdto } from '$wailsjs/go/models'
 
   interface Props {
     open: boolean
@@ -92,7 +92,7 @@
     toasts.error(`${$_('contacts.toast.failedAdd')}: ${msg}`)
   }
 
-  function buildCreateInput(): v1.ContactCreateInput {
+  function buildCreateInput(): contactdto.ContactCreateInput {
     const filteredEmails = emails
       .filter(e => e.email.trim() !== '')
       .map(e => ({ email: e.email.trim().toLowerCase(), type: e.type, isPrimary: e.isPrimary }))
@@ -101,7 +101,7 @@
     }
     const primaryEmail = filteredEmails.find(e => e.isPrimary)?.email ?? filteredEmails[0]?.email ?? ''
 
-    return v1.ContactCreateInput.createFrom({
+    return contactdto.ContactCreateInput.createFrom({
       sourceId: LOCAL_VALUE,
       email: primaryEmail,
       name: nameInput.trim(),

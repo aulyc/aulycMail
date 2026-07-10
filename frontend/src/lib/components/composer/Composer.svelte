@@ -55,6 +55,16 @@
     removeSignatureFromContent,
     hasSignatureMarker,
   } from './composerSignature'
+  import {
+    handleComposerTabNavigation,
+    type ComposerFocusRefs,
+  } from './composerFocus'
+  import {
+    buildDraftContentHash,
+    getDraftStatusMeta,
+    type DraftSaveStatus,
+    type DraftSyncStatus,
+  } from './composerDraft'
   import * as Select from '$lib/components/ui/select'
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import { ThreeOptionDialog } from '$lib/components/ui/confirm-dialog'
@@ -177,7 +187,7 @@
 
   // Draft auto-save state
   let currentDraftId = $state<string | null>(null)
-  let saveStatus = $state<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  let saveStatus = $state<DraftSaveStatus>('idle')
 
   // Initialize currentDraftId from prop (runs once on mount)
   $effect(() => {
@@ -186,46 +196,17 @@
     }
   })
 
-  let syncStatus = $state<'pending' | 'synced' | 'failed'>('pending') // IMAP sync status
+  let syncStatus = $state<DraftSyncStatus>('pending') // IMAP sync status
   let unsubscribeDraftSync: (() => void) | null = null
   let lastSavedAt = $state<Date | null>(null)
   let saveTimeoutId: ReturnType<typeof setTimeout> | null = null
   let lastContent = ''  // Track content changes to avoid unnecessary saves
 
   // Computed draft status indicator
-  let draftStatusIcon = $derived.by(() => {
-    if (saveStatus === 'saving') return 'mdi:loading'
-    if (saveStatus === 'error') return 'mdi:alert-circle'
-    if (saveStatus !== 'saved' || !lastSavedAt) return ''
-    switch (syncStatus) {
-      case 'synced': return 'mdi:cloud-check'
-      case 'pending': return 'mdi:cloud-upload'
-      case 'failed': return 'mdi:cloud-off-outline'
-      default: return ''
-    }
-  })
-  let draftStatusColor = $derived.by(() => {
-    if (saveStatus === 'saving') return ''
-    if (saveStatus === 'error') return 'text-red-500'
-    if (saveStatus !== 'saved' || !lastSavedAt) return ''
-    switch (syncStatus) {
-      case 'synced': return 'text-green-500'
-      case 'pending': return 'text-blue-500'
-      case 'failed': return 'text-yellow-500'
-      default: return ''
-    }
-  })
-  let draftStatusLabel = $derived.by(() => {
-    if (saveStatus === 'saving') return $_('composer.saving')
-    if (saveStatus === 'error') return $_('composer.saveFailed')
-    if (saveStatus !== 'saved' || !lastSavedAt) return ''
-    switch (syncStatus) {
-      case 'synced': return $_('composer.synced')
-      case 'pending': return $_('composer.savedLocally')
-      case 'failed': return $_('composer.savedLocallyOffline')
-      default: return ''
-    }
-  })
+  let draftStatusMeta = $derived(getDraftStatusMeta(saveStatus, syncStatus, !!lastSavedAt))
+  let draftStatusIcon = $derived(draftStatusMeta.icon)
+  let draftStatusColor = $derived(draftStatusMeta.color)
+  let draftStatusLabel = $derived(draftStatusMeta.labelKey ? $_(draftStatusMeta.labelKey) : '')
 
   // 10-second debounce like Geary
   const DRAFT_SAVE_DELAY = 10000
@@ -262,8 +243,6 @@
   let lastMentionPointerY = -1
   let composerTextComposing = $state(false)
   const visibleMentionSuggestions = $derived(mentionSuggestions.slice(mentionWindowStart, mentionWindowStart + MENTION_VISIBLE_ROWS))
-
-  type ComposerFocusTarget = 'from' | 'to' | 'cc' | 'bcc' | 'subject' | 'body'
 
   $effect(() => {
     const maxStart = Math.max(0, mentionSuggestions.length - MENTION_VISIBLE_ROWS)
@@ -874,7 +853,15 @@
   function getContentHash(): string {
     const bodyContent = isPlainTextMode ? plainTextContent : (editor?.getHTML() || '')
     const attachmentNames = attachments.map(a => a.filename).join(',')
-    return `${toRecipients.length}|${ccRecipients.length}|${bccRecipients.length}|${subject}|${bodyContent}|${attachmentNames}|${isPlainTextMode}`
+    return buildDraftContentHash({
+      toCount: toRecipients.length,
+      ccCount: ccRecipients.length,
+      bccCount: bccRecipients.length,
+      subject,
+      bodyContent,
+      attachmentNames,
+      isPlainTextMode,
+    })
   }
 
   // Schedule a draft save (debounced)
@@ -937,7 +924,7 @@
       currentDraftId = result.id
       lastContent = currentHash
       saveStatus = 'saved'
-      syncStatus = result.syncStatus as 'pending' | 'synced' | 'failed'
+      syncStatus = result.syncStatus as DraftSyncStatus
       lastSavedAt = new Date()
     } catch (err) {
       console.error('Failed to save draft:', err)
@@ -1490,85 +1477,31 @@
     input.click()
   }
 
-  function getComposerFocusOrder(): ComposerFocusTarget[] {
-    const order: ComposerFocusTarget[] = ['from', 'to']
-    if (showCc) order.push('cc')
-    if (showBcc) order.push('bcc')
-    order.push('subject', 'body')
-    return order
-  }
-
-  function focusFromField() {
-    const trigger = fromFieldElement?.querySelector<HTMLElement>(
-      'button, [role="combobox"], [tabindex]:not([tabindex="-1"])'
-    )
-    trigger?.focus()
-  }
-
-  function focusComposerBody() {
-    if (isPlainTextMode) {
-      plainTextRef?.focus()
-      return
-    }
-    editor?.commands.focus()
-  }
-
-  function focusComposerTarget(target: ComposerFocusTarget) {
-    switch (target) {
-      case 'from':
-        focusFromField()
-        break
-      case 'to':
-        toInputRef?.focus()
-        break
-      case 'cc':
-        ccInputRef?.focus()
-        break
-      case 'bcc':
-        bccInputRef?.focus()
-        break
-      case 'subject':
-        subjectInputElement?.focus()
-        break
-      case 'body':
-        focusComposerBody()
-        break
-    }
-  }
-
-  function getActiveComposerFocusTarget(): ComposerFocusTarget | null {
-    const active = document.activeElement
-    if (!active) return null
-    if (fromFieldElement?.contains(active)) return 'from'
-    if (toFieldElement?.contains(active)) return 'to'
-    if (ccFieldElement?.contains(active)) return 'cc'
-    if (bccFieldElement?.contains(active)) return 'bcc'
-    if (subjectInputElement === active) return 'subject'
-    if (composerBodyElement?.contains(active)) return 'body'
-    return null
-  }
-
-  function shouldTrapComposerTab(): boolean {
-    return !!composerRootElement &&
-      !showEmptySubjectDialog &&
-      !showMissingAttachmentDialog &&
-      !showFlatpakDndDialog &&
-      !showCloseConfirm
-  }
-
   function handleComposerTabKeydown(e: KeyboardEvent) {
-    if (!shouldTrapComposerTab()) return
-    e.preventDefault()
-    e.stopPropagation()
-
-    const order = getComposerFocusOrder()
-    const activeTarget = getActiveComposerFocusTarget()
-    const activeIndex = activeTarget ? order.indexOf(activeTarget) : -1
-    const nextIndex = e.shiftKey
-      ? (activeIndex <= 0 ? order.length - 1 : activeIndex - 1)
-      : (activeIndex < 0 || activeIndex >= order.length - 1 ? 0 : activeIndex + 1)
-
-    focusComposerTarget(order[nextIndex])
+    const refs: ComposerFocusRefs = {
+      fromFieldElement,
+      toFieldElement,
+      ccFieldElement,
+      bccFieldElement,
+      subjectInputElement,
+      composerBodyElement,
+      plainTextRef,
+      toInputRef,
+      ccInputRef,
+      bccInputRef,
+      editor,
+      isPlainTextMode,
+    }
+    handleComposerTabNavigation(e, refs, {
+      showCc,
+      showBcc,
+      disabled: !composerRootElement ||
+        showEmptySubjectDialog ||
+        showMissingAttachmentDialog ||
+        showFlatpakDndDialog ||
+        showCloseConfirm,
+      activeElement: document.activeElement,
+    })
   }
 
   // Create the TipTap editor on demand. No-op if it already exists or its

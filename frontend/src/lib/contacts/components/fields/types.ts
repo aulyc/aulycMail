@@ -1,8 +1,8 @@
 // Shared types for the contacts field sub-components.
 //
-// EmailRow / PhoneRow / AddressRow / URLRow / IMPPRow / PhotoState mirror
-// ContactEditDialog's prior inline shapes — extracted so AddContactDialog
-// can drive the same field components with the same data shape.
+// EmailRow mirrors ContactEditDialog's prior inline shape — extracted so
+// AddContactDialog can drive the same field components with the same data
+// shape.
 //
 // SlotConstraint encodes the per-source UI gating ContactFieldsForm applies
 // to each repeater: max-items, max-of-a-type, info banner, or none. See
@@ -12,37 +12,6 @@ export type EmailRow = {
   email: string
   type: string
   isPrimary: boolean
-}
-
-export type PhoneRow = {
-  number: string
-  type: string
-  isPrimary: boolean
-}
-
-export type AddressRow = {
-  type: string
-  street: string
-  city: string
-  region: string
-  postcode: string
-  country: string
-}
-
-export type URLRow = {
-  url: string
-  type: string
-}
-
-export type IMPPRow = {
-  handle: string
-  type: string
-}
-
-export type PhotoState = {
-  data: string
-  mediaType: string
-  url: string
 }
 
 // SlotConstraint encodes a per-field-component constraint. ContactFieldsForm

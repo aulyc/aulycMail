@@ -10,9 +10,9 @@ Use this checklist to ensure your submission is complete:
 
 - [ ] **Claimed language** — filed a [Translation issue](https://github.com/aulyc/aulycmail/issues/new?template=translation.yml) to avoid duplicate efforts
 - [ ] **Core locale JSON** — `frontend/src/lib/i18n/locales/<code>.json` created with all core mail/UI keys translated
-- [ ] **Contacts locale JSON** — `extensions/contacts/frontend/i18n/locales/<code>.json` when translating the built-in Contacts pane. Optional per locale — Contacts falls back to English at runtime; see [§ Contacts translations](#contacts-translations).
+- [ ] **Contacts locale JSON** — `frontend/src/lib/contacts/i18n/locales/<code>.json` when translating the built-in Contacts pane. Optional per locale — Contacts falls back to English at runtime; see [§ Contacts translations](#contacts-translations).
 - [ ] **Register locale** — added `register()` call in `frontend/src/lib/i18n/index.ts` (core locale only)
-- [ ] **Register Contacts locale** — if you translated Contacts, added a `register()` line in `extensions/contacts/frontend/i18n/index.ts`
+- [ ] **Register Contacts locale** — if you translated Contacts, added a `register()` line in `frontend/src/lib/contacts/i18n/index.ts`
 - [ ] **Supported locales** — added entry to `supportedLocales` array in `frontend/src/lib/i18n/index.ts`
 - [ ] **date-fns locale** — added `case` in `frontend/src/lib/i18n/dateFnsLocale.ts`
 - [ ] **Checks pass** — `npm run check`, `npm run build`, and `go test ./...` all pass
@@ -107,7 +107,7 @@ For a complete, real-world example of a translated locale file, refer to `fronte
   - Example: English `"synced": "Synced {time}"` → Chinese `"synced": "{time}同步"` (time goes before the verb in Chinese)
 - Do not translate JSON keys (left side of `:`)
 - The file is organized by namespace: `common`, `sidebar`, `messageList`, `viewer`, `composer`, `contextMenu`, `toast`, `responsive`, `settings`, `settingsAbout`, `settingsAccounts`, `settingsGeneral`, `settingsBackup`, `backupViewer`, `editor`, `account`, `identity`, `certificate`, `terms`, `dialog`, `date`, `aria`, `window`, `attachment`, `search`, `syncLog`, `images`
-- **Contacts strings are NOT in this file.** The built-in Contacts pane owns its locale files under `extensions/contacts/frontend/i18n/locales/`. See [§ Contacts translations](#contacts-translations) for that flow.
+- **Contacts strings are NOT in this file.** The built-in Contacts pane owns its locale files under `frontend/src/lib/contacts/i18n/locales/`. See [§ Contacts translations](#contacts-translations) for that flow.
 
 ### 2. Register the Locale
 
@@ -198,9 +198,9 @@ Then run the app, open Settings > General, and select the new language from the 
 | File | Change |
 |------|--------|
 | `frontend/src/lib/i18n/locales/<code>.json` | **New** — translated core/mail strings |
-| `extensions/contacts/frontend/i18n/locales/<code>.json` | **Optional** — translated Contacts pane strings |
+| `frontend/src/lib/contacts/i18n/locales/<code>.json` | **Optional** — translated Contacts pane strings |
 | `frontend/src/lib/i18n/index.ts` | Add `register()` for the core locale + `supportedLocales` entry |
-| `extensions/contacts/frontend/i18n/index.ts` | Add `register()` line for your Contacts locale, if translated |
+| `frontend/src/lib/contacts/i18n/index.ts` | Add `register()` line for your Contacts locale, if translated |
 | `frontend/src/lib/i18n/dateFnsLocale.ts` | Add `case` for date-fns locale |
 
 No backend changes are needed. The language setting is stored via the existing `GetLanguage`/`SetLanguage` Wails bindings in `app/settings.go`.
@@ -214,7 +214,7 @@ translation updates.
 ### Layout
 
 ```
-extensions/contacts/frontend/i18n/
+frontend/src/lib/contacts/i18n/
   index.ts                       # registers each locale via svelte-i18n
   locales/
     en.json                      # English source of truth
@@ -229,7 +229,7 @@ If you want to translate Contacts in addition to core mail:
 1. **Copy the English source file**:
 
    ```bash
-   cp extensions/contacts/frontend/i18n/locales/en.json extensions/contacts/frontend/i18n/locales/<code>.json
+   cp frontend/src/lib/contacts/i18n/locales/en.json frontend/src/lib/contacts/i18n/locales/<code>.json
    ```
 
 2. **Translate every value**, leaving JSON keys unchanged. Contacts namespaces its keys under `contacts.*`, so there's no overlap with the core file.
@@ -237,7 +237,7 @@ If you want to translate Contacts in addition to core mail:
 3. **Register the locale** in Contacts' `index.ts`:
 
    ```typescript
-   // extensions/contacts/frontend/i18n/index.ts
+   // frontend/src/lib/contacts/i18n/index.ts
    import { register } from 'svelte-i18n'
 
    export function registerContactsI18n() {
@@ -289,7 +289,7 @@ That's fine. Submit a PR with just the core file. Contacts falls back to English
 | `syncLog` | Sync activity log panel |
 | `images` | Remote image allowlist management (addresses, domains) |
 
-### Contacts (`extensions/contacts/frontend/i18n/locales/<code>.json`)
+### Contacts (`frontend/src/lib/contacts/i18n/locales/<code>.json`)
 
 Contacts namespaces its keys under `contacts.*`:
 

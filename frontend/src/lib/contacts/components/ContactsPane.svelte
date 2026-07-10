@@ -7,14 +7,14 @@
   import AddContactDialog from './AddContactDialog.svelte'
   import ContactEditDialog from './ContactEditDialog.svelte'
   import PaneLayout from '$lib/components/kit/PaneLayout.svelte'
-  import { contactsView, reloadContacts, selectSource, activateContact } from '$contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, reloadContacts, selectSource, activateContact } from '$contacts/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { registerPaneShortcut } from '$lib/stores/paneShortcuts.svelte'
-  import { KEY } from '$contacts/frontend/keyboard/shortcuts'
+  import { KEY } from '$contacts/keyboard/shortcuts'
   // @ts-ignore - wailsjs bindings
   import { EventsOn } from '$wailsjs/runtime/runtime'
   // @ts-ignore - wailsjs bindings
-  import type { v1 } from '$wailsjs/go/models'
+  import type { contactdto } from '$wailsjs/go/models'
 
   // Conflict events are emitted by the bridge's write path. With a single
   // local address book these never actually fire, but the listener stays so
@@ -41,7 +41,7 @@
   // Edit-dialog state is hoisted to the pane so the 'e' keyboard shortcut and
   // ContactDetail's Edit button both route through one owner.
   let showEdit = $state(false)
-  let editTarget = $state<v1.Contact | null>(null)
+  let editTarget = $state<contactdto.Contact | null>(null)
 
   function handleSourceSelected() {
     reloadContacts()
@@ -51,7 +51,7 @@
     showAdd = true
   }
 
-  function openEdit(contact: v1.Contact | null) {
+  function openEdit(contact: contactdto.Contact | null) {
     if (!contact) return
     // Every contact lives in the local address book, which is always editable.
     editTarget = contact

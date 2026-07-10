@@ -10,7 +10,7 @@
     "paths": {
       "$lib/*": ["src/lib/*"],
       "$/*": ["src/*"],
-      "$contacts/*": ["../extensions/contacts/*"],
+      "$contacts/*": ["src/lib/contacts/*"],
       "$wailsjs/*": ["wailsjs/*"],
       "@iconify/*": ["node_modules/@iconify/*"],
       "svelte": ["node_modules/svelte/src/runtime/index"],
@@ -28,9 +28,7 @@
     "src/**/*.d.ts",
     "src/**/*.ts",
     "src/**/*.js",
-    "src/**/*.svelte",
-    "../extensions/contacts/frontend/**/*.ts",
-    "../extensions/contacts/frontend/**/*.svelte"
+    "src/**/*.svelte"
   ],
   "references": [
     {
