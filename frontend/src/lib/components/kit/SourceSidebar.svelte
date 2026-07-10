@@ -132,27 +132,29 @@
   onmousedown={handleMouseDown}
 >
   {#snippet body()}
-    {#if header}
-      {@render header()}
-    {/if}
-
-    {#each sections as section, sIdx (sIdx)}
-      {#if section.heading}
-        <div class="mx-4 mt-3 mb-1 text-[11px] uppercase tracking-wider text-muted-foreground">
-          {section.heading}
-        </div>
+    <div class="py-2">
+      {#if header}
+        {@render header()}
       {/if}
 
-      {#if section.items.length === 0}
-        {#if sectionEmpty}
-          {@render sectionEmpty(section)}
+      {#each sections as section, sIdx (sIdx)}
+        {#if section.heading}
+          <div class="mx-4 mt-3 mb-1 text-[11px] uppercase tracking-wider text-muted-foreground">
+            {section.heading}
+          </div>
         {/if}
-      {:else}
-        {#each section.items as it (it.id)}
-          {@render item(it, { active: it.id === selectedId })}
-        {/each}
-      {/if}
-    {/each}
+
+        {#if section.items.length === 0}
+          {#if sectionEmpty}
+            {@render sectionEmpty(section)}
+          {/if}
+        {:else}
+          {#each section.items as it (it.id)}
+            {@render item(it, { active: it.id === selectedId })}
+          {/each}
+        {/if}
+      {/each}
+    </div>
   {/snippet}
 
   {#snippet footer()}

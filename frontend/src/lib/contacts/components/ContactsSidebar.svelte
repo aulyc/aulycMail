@@ -166,10 +166,10 @@
       role="option"
       aria-selected={active}
       class={it.accountID
-        ? `w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-left transition-colors cursor-pointer select-none ${active
+        ? `mb-1 w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-left transition-colors cursor-pointer select-none ${active
           ? 'bg-primary/10 text-primary'
           : 'text-foreground hover:bg-muted/50'}`
-        : `flex items-center gap-2 mx-2 py-1.5 pr-2 text-sm rounded-md text-left transition-colors cursor-pointer select-none ${active
+        : `mb-1 flex items-center gap-2 mx-2 py-1.5 pr-2 text-sm rounded-md text-left transition-colors cursor-pointer select-none ${active
           ? 'bg-primary/10 text-primary font-medium'
           : 'text-foreground hover:bg-muted/50'}`}
       style={it.accountID ? undefined : 'padding-left: 0.75rem'}
@@ -184,7 +184,7 @@
       {/if}
       <span class="truncate min-w-0 flex-1">{it.label}</span>
       {#if it.count !== undefined}
-        <span class="text-xs font-medium text-muted-foreground flex-shrink-0">{it.count}</span>
+        <span class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground flex-shrink-0">{it.count}</span>
       {/if}
     </div>
   {/snippet}
