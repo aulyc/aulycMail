@@ -1059,6 +1059,14 @@
     }
   }
 
+  type RowRenderOptions = {
+    useItemLocation?: boolean
+    showAccountIndicator?: boolean
+    showSearchFields?: boolean
+    showNonLocal?: boolean
+    allowDraftOpen?: boolean
+  }
+
   // Get current selected index
   function getSelectedIndex(): number {
     if (!selectedThreadId) return -1
@@ -1664,6 +1672,57 @@
     </div>
   {/if}
 
+  {#snippet conversationRows(window: VirtualWindow<any>, options: RowRenderOptions)}
+    <MessageContextMenu
+      messageIds={rowContextMenu.messageIds}
+      accountId={rowContextMenu.accountId}
+      currentFolderId={rowContextMenu.folderId}
+      folderType={rowContextMenu.folderType}
+      isStarred={rowContextMenu.isStarred}
+      isRead={rowContextMenu.isRead}
+      onActionComplete={handleActionComplete}
+      onReply={rowContextMenu.allowReply ? onReply : undefined}
+    >
+      <div>
+        <div aria-hidden="true" style="height: {window.topHeight}px"></div>
+        {#each window.rows as row (row.item.threadId + '-' + row.index)}
+          {@const conversation = row.item}
+          {@const index = row.index}
+          {@const rowAccountId = conversation.accountId || accountId || ''}
+          {@const rowFolderId = conversation.folderId || folderId || ''}
+          {@const resolvedAccountId = options.useItemLocation || isUnifiedView ? rowAccountId : accountId!}
+          {@const resolvedFolderId = options.useItemLocation || isUnifiedView ? rowFolderId : folderId!}
+          <ConversationRow
+            {conversation}
+            density={getMessageListDensity()}
+            selected={isRowSelected(conversation.threadId)}
+            checked={checkedThreadIds.has(conversation.threadId)}
+            accountId={resolvedAccountId}
+            folderId={resolvedFolderId}
+            rowIndex={index}
+            {selectedMessageIds}
+            showAccountIndicator={!!options.showAccountIndicator && isUnifiedView}
+            accountColor={conversation.accountColor || ''}
+            accountName={conversation.accountName || ''}
+            highlightedSubject={options.showSearchFields ? conversation.highlightedSubject : ''}
+            highlightedSnippet={options.showSearchFields ? conversation.highlightedSnippet : ''}
+            highlightedFromName={options.showSearchFields ? conversation.highlightedFromName : ''}
+            searchFolderName={options.showSearchFields ? conversation.folderName : ''}
+            searchFolderType={options.showSearchFields ? conversation.folderType : ''}
+            isNonLocal={!!options.showNonLocal && conversation._isLocal === false}
+            onSelect={(e?: MouseEvent) => selectConversation(conversation.threadId, index, e)}
+            onContextMenu={() => prepareRowContextMenu(conversation, resolvedAccountId, resolvedFolderId, checkedThreadIds.has(conversation.threadId))}
+            onActionComplete={handleActionComplete}
+            onOpenDraft={options.allowDraftOpen && folderType === 'drafts' && conversation.messageIds?.[0]
+              ? () => onOpenDraft?.(conversation.messageIds[0])
+              : undefined}
+          />
+        {/each}
+        <div aria-hidden="true" style="height: {window.bottomHeight}px"></div>
+      </div>
+    </MessageContextMenu>
+  {/snippet}
+
   <!-- Conversation List -->
   <div
     bind:this={listContainerRef}
@@ -1725,41 +1784,7 @@
             </button>
           </div>
           {@const serverWindow = getVirtualWindow(serverSearchResults)}
-          <MessageContextMenu
-            messageIds={rowContextMenu.messageIds}
-            accountId={rowContextMenu.accountId}
-            currentFolderId={rowContextMenu.folderId}
-            folderType={rowContextMenu.folderType}
-            isStarred={rowContextMenu.isStarred}
-            isRead={rowContextMenu.isRead}
-            onActionComplete={handleActionComplete}
-            onReply={rowContextMenu.allowReply ? onReply : undefined}
-          >
-            <div>
-              <div aria-hidden="true" style="height: {serverWindow.topHeight}px"></div>
-              {#each serverWindow.rows as row (row.item.threadId + '-' + row.index)}
-                {@const result = row.item}
-                {@const index = row.index}
-                {@const resultAccountId = result.accountId || accountId || ''}
-                {@const resultFolderId = result.folderId || folderId || ''}
-                <ConversationRow
-                  conversation={result}
-                  density={getMessageListDensity()}
-                  selected={isRowSelected(result.threadId)}
-                  checked={checkedThreadIds.has(result.threadId)}
-                  accountId={resultAccountId}
-                  folderId={resultFolderId}
-                  rowIndex={index}
-                  {selectedMessageIds}
-                  isNonLocal={result._isLocal === false}
-                  onSelect={(e?: MouseEvent) => selectConversation(result.threadId, index, e)}
-                  onContextMenu={() => prepareRowContextMenu(result, resultAccountId, resultFolderId, checkedThreadIds.has(result.threadId))}
-                  onActionComplete={handleActionComplete}
-                />
-              {/each}
-              <div aria-hidden="true" style="height: {serverWindow.bottomHeight}px"></div>
-            </div>
-          </MessageContextMenu>
+          {@render conversationRows(serverWindow, { useItemLocation: true, showNonLocal: true })}
 
           <!-- Show all results button (when results are capped) -->
           {#if serverSearchCount < serverSearchTotalCount}
@@ -1805,52 +1830,7 @@
           {/if}
         </div>
         {@const searchWindow = getVirtualWindow(searchResults)}
-        <MessageContextMenu
-          messageIds={rowContextMenu.messageIds}
-          accountId={rowContextMenu.accountId}
-          currentFolderId={rowContextMenu.folderId}
-          folderType={rowContextMenu.folderType}
-          isStarred={rowContextMenu.isStarred}
-          isRead={rowContextMenu.isRead}
-          onActionComplete={handleActionComplete}
-          onReply={rowContextMenu.allowReply ? onReply : undefined}
-        >
-          <div>
-            <div aria-hidden="true" style="height: {searchWindow.topHeight}px"></div>
-            {#each searchWindow.rows as row (row.item.threadId + '-' + row.index)}
-              {@const result = row.item}
-              {@const index = row.index}
-              {@const resultAccountId = result.accountId || accountId || ''}
-              {@const resultFolderId = result.folderId || folderId || ''}
-              {@const resolvedAccountId = isUnifiedView ? resultAccountId : accountId!}
-              {@const resolvedFolderId = isUnifiedView ? resultFolderId : folderId!}
-              {@const resultAccountColor = result.accountColor || ''}
-              {@const resultAccountName = result.accountName || ''}
-              <ConversationRow
-                conversation={result}
-                density={getMessageListDensity()}
-                selected={isRowSelected(result.threadId)}
-                checked={checkedThreadIds.has(result.threadId)}
-                accountId={resolvedAccountId}
-                folderId={resolvedFolderId}
-                rowIndex={index}
-                {selectedMessageIds}
-                showAccountIndicator={isUnifiedView}
-                accountColor={resultAccountColor}
-                accountName={resultAccountName}
-                highlightedSubject={result.highlightedSubject}
-                highlightedSnippet={result.highlightedSnippet}
-                highlightedFromName={result.highlightedFromName}
-                searchFolderName={result.folderName}
-                searchFolderType={result.folderType}
-                onSelect={(e?: MouseEvent) => selectConversation(result.threadId, index, e)}
-                onContextMenu={() => prepareRowContextMenu(result, resolvedAccountId, resolvedFolderId, checkedThreadIds.has(result.threadId))}
-                onActionComplete={handleActionComplete}
-              />
-            {/each}
-            <div aria-hidden="true" style="height: {searchWindow.bottomHeight}px"></div>
-          </div>
-        </MessageContextMenu>
+        {@render conversationRows(searchWindow, { showAccountIndicator: true, showSearchFields: true })}
 
         <!-- Load more search results -->
         {#if searchResults.length < searchTotalCount}
@@ -1891,50 +1871,7 @@
       </div>
     {:else}
       {@const conversationWindow = getVirtualWindow(conversations)}
-      <MessageContextMenu
-        messageIds={rowContextMenu.messageIds}
-        accountId={rowContextMenu.accountId}
-        currentFolderId={rowContextMenu.folderId}
-        folderType={rowContextMenu.folderType}
-        isStarred={rowContextMenu.isStarred}
-        isRead={rowContextMenu.isRead}
-        onActionComplete={handleActionComplete}
-        onReply={rowContextMenu.allowReply ? onReply : undefined}
-      >
-        <div>
-          <div aria-hidden="true" style="height: {conversationWindow.topHeight}px"></div>
-          {#each conversationWindow.rows as row (row.item.threadId + '-' + row.index)}
-            {@const conv = row.item}
-            {@const index = row.index}
-            {@const convAccountId = (conv as any).accountId || accountId || ''}
-            {@const convFolderId = (conv as any).folderId || folderId || ''}
-            {@const resolvedAccountId = isUnifiedView ? convAccountId : accountId!}
-            {@const resolvedFolderId = isUnifiedView ? convFolderId : folderId!}
-            {@const convAccountColor = (conv as any).accountColor || ''}
-            {@const convAccountName = (conv as any).accountName || ''}
-            <ConversationRow
-              conversation={conv}
-              density={getMessageListDensity()}
-              selected={isRowSelected(conv.threadId)}
-              checked={checkedThreadIds.has(conv.threadId)}
-              accountId={resolvedAccountId}
-              folderId={resolvedFolderId}
-              rowIndex={index}
-              {selectedMessageIds}
-              showAccountIndicator={isUnifiedView}
-              accountColor={convAccountColor}
-              accountName={convAccountName}
-              onSelect={(e?: MouseEvent) => selectConversation(conv.threadId, index, e)}
-              onContextMenu={() => prepareRowContextMenu(conv, resolvedAccountId, resolvedFolderId, checkedThreadIds.has(conv.threadId))}
-              onActionComplete={handleActionComplete}
-              onOpenDraft={folderType === 'drafts' && conv.messageIds?.[0]
-                ? () => onOpenDraft?.(conv.messageIds[0])
-                : undefined}
-            />
-          {/each}
-          <div aria-hidden="true" style="height: {conversationWindow.bottomHeight}px"></div>
-        </div>
-      </MessageContextMenu>
+      {@render conversationRows(conversationWindow, { showAccountIndicator: true, allowDraftOpen: true })}
 
       <!-- Load more button for pagination -->
       {#if conversations.length < totalCount}
