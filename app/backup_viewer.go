@@ -22,7 +22,10 @@ import (
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-const backupViewerDefaultLimit = 50
+const (
+	backupViewerDefaultLimit     = 50
+	backupViewerMaxTextPartBytes = 10 * 1024 * 1024
+)
 
 // BackupViewerCatalog summarizes a backup directory for the read-only viewer.
 type BackupViewerCatalog struct {
@@ -514,24 +517,28 @@ func parseBackupViewerEntity(entity *gomessage.Entity, parsed *backupViewerParse
 	filename := backupViewerPartFilename(contentParams, dispositionParams)
 	isAttachment := filename != "" || disposition == "attachment" || (!strings.HasPrefix(contentType, "text/") && contentType != "")
 
-	raw, err := io.ReadAll(entity.Body)
-	if err != nil {
-		return err
-	}
-
 	if isAttachment {
 		if filename == "" {
 			filename = backupViewerAttachmentFallbackName(contentType)
+		}
+		size, err := countBackupViewerAttachment(entity.Body)
+		if err != nil {
+			return err
 		}
 		index := len(parsed.attachments)
 		parsed.attachments = append(parsed.attachments, BackupViewerAttachment{
 			Index:       index,
 			Filename:    filename,
 			ContentType: contentType,
-			Size:        len(raw),
+			Size:        size,
 			Inline:      disposition == "inline" || contentID != "",
 		})
 		return nil
+	}
+
+	raw, err := readBackupViewerTextPart(entity.Body)
+	if err != nil {
+		return err
 	}
 
 	decoded := mailSync.DecodeTextCharset(raw, contentParams["charset"])
@@ -550,6 +557,33 @@ func parseBackupViewerEntity(entity *gomessage.Entity, parsed *backupViewerParse
 		}
 	}
 	return nil
+}
+
+func readBackupViewerTextPart(r io.Reader) ([]byte, error) {
+	limited := io.LimitReader(r, backupViewerMaxTextPartBytes+1)
+	raw, err := io.ReadAll(limited)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(raw)) <= backupViewerMaxTextPartBytes {
+		return raw, nil
+	}
+	if _, err := io.Copy(io.Discard, r); err != nil {
+		return nil, err
+	}
+	return raw[:backupViewerMaxTextPartBytes], nil
+}
+
+func countBackupViewerAttachment(r io.Reader) (int, error) {
+	n, err := io.Copy(io.Discard, r)
+	if err != nil {
+		return 0, err
+	}
+	maxInt := int(^uint(0) >> 1)
+	if n > int64(maxInt) {
+		return maxInt, nil
+	}
+	return int(n), nil
 }
 
 func backupViewerPartFilename(contentParams, dispositionParams map[string]string) string {

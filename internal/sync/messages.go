@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"time"
@@ -767,7 +766,7 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 				// Read header bytes from literal reader
 				if data.Literal != nil {
 					var err error
-					headerBytes, err = io.ReadAll(data.Literal)
+					headerBytes, err = readHeaderLiteralWithLimit(data.Literal)
 					if err != nil {
 						e.log.Warn().Err(err).Uint32("uid", uint32(fetchedUID)).Msg("Failed to read header literal")
 					}

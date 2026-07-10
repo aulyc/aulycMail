@@ -19,7 +19,10 @@
       "localManual": "Local - Contacts",
       "localCollected": "Local - Collected"
     },
-    "status": {},
+    "status": {
+      "refreshing": "Refreshing contacts...",
+      "refreshingProgress": "Refreshing contacts {scanned}/{total}"
+    },
     "list": {
       "header": "Contacts",
       "label": "Contacts",
@@ -78,7 +81,6 @@
       "title": "Delete this contact?",
       "descriptionLocal": "{name} will be removed from your local contacts. Mail you've already sent to this address is not affected."
     },
-    "settings": {},
     "toast": {
       "refreshed": "Refreshed contacts from {count} messages",
       "conflict": "This contact was changed elsewhere. Your edit was discarded — refreshed with the latest version.",

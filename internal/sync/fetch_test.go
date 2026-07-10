@@ -58,3 +58,13 @@ func TestReadRawMessageLiteralWithLimitAllowsAtLimit(t *testing.T) {
 		t.Fatalf("raw = %q, want abcde", string(raw))
 	}
 }
+
+func TestReadHeaderLiteralWithLimitRejectsOversized(t *testing.T) {
+	_, err := readHeaderLiteralWithLimit(strings.NewReader(strings.Repeat("a", maxHeaderLiteralBytes+1)))
+	if err == nil {
+		t.Fatal("expected oversized header literal to fail")
+	}
+	if _, ok := err.(HeaderLiteralTooLargeError); !ok {
+		t.Fatalf("expected HeaderLiteralTooLargeError, got %T %v", err, err)
+	}
+}

@@ -74,13 +74,24 @@ func IsRawMessageTooLargeError(err error) bool {
 	return errors.As(err, &tooLarge)
 }
 
+type HeaderLiteralTooLargeError struct {
+	LimitBytes int64
+}
+
+func (e HeaderLiteralTooLargeError) Error() string {
+	return fmt.Sprintf("header literal exceeds %d bytes", e.LimitBytes)
+}
+
 // RawMessageStreamHandler streams one raw RFC822 literal to its destination.
 // The handler must fully consume body unless it returns an error; the caller
 // drains any remaining literal data so the IMAP stream stays aligned.
 type RawMessageStreamHandler func(uid uint32, body io.Reader) (int64, error)
 
-const rawMessageFetchIdleTimeout = 2 * time.Minute
-const maxBackgroundRawBodyBytes = 25 * 1024 * 1024
+const (
+	rawMessageFetchIdleTimeout = 2 * time.Minute
+	maxBackgroundRawBodyBytes  = 25 * 1024 * 1024
+	maxHeaderLiteralBytes      = 2 * 1024 * 1024
+)
 
 type rawMessageProgressReader struct {
 	reader io.Reader
@@ -105,6 +116,18 @@ func readRawMessageLiteralWithLimit(uid uint32, literal io.Reader, limitBytes in
 		return nil, RawMessageTooLargeError{UID: uid, LimitBytes: limitBytes}
 	}
 	return rawBytes, nil
+}
+
+func readHeaderLiteralWithLimit(literal io.Reader) ([]byte, error) {
+	headerBytes, err := io.ReadAll(io.LimitReader(literal, maxHeaderLiteralBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(headerBytes)) > maxHeaderLiteralBytes {
+		_, _ = io.Copy(io.Discard, literal)
+		return nil, HeaderLiteralTooLargeError{LimitBytes: maxHeaderLiteralBytes}
+	}
+	return headerBytes, nil
 }
 
 // FetchMessageBody fetches the body for a single message on-demand.

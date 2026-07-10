@@ -19,7 +19,10 @@
       "localManual": "本地 - 联系人",
       "localCollected": "本地 - 已收集"
     },
-    "status": {},
+    "status": {
+      "refreshing": "正在刷新联系人...",
+      "refreshingProgress": "正在刷新联系人 {scanned}/{total}"
+    },
     "list": {
       "header": "联系人",
       "label": "联系人",
@@ -78,7 +81,6 @@
       "title": "删除此联系人？",
       "descriptionLocal": "{name} 将从您的本地联系人中移除。您已发送到此地址的邮件不受影响。"
     },
-    "settings": {},
     "toast": {
       "refreshed": "已从 {count} 封邮件刷新联系人",
       "conflict": "此联系人已在别处被更改。您的编辑已被放弃 — 已刷新为最新版本。",

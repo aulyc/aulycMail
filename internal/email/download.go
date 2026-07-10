@@ -41,6 +41,16 @@ type AttachmentContentResult struct {
 	Err      error
 }
 
+const maxBufferedAttachmentBytes = 25 * 1024 * 1024
+
+type AttachmentContentTooLargeError struct {
+	LimitBytes int64
+}
+
+func (e AttachmentContentTooLargeError) Error() string {
+	return fmt.Sprintf("attachment content exceeds in-memory limit of %d bytes", e.LimitBytes)
+}
+
 // NewAttachmentDownloader creates a new attachment downloader
 func NewAttachmentDownloader(attachmentsDir string) *AttachmentDownloader {
 	return &AttachmentDownloader{
@@ -57,7 +67,7 @@ func (d *AttachmentDownloader) ExtractAttachmentContent(raw []byte, targetFilena
 // callers to keep the whole raw message in memory.
 func (d *AttachmentDownloader) ExtractAttachmentContentFromReader(raw io.Reader, targetFilename string) ([]byte, error) {
 	var buf bytes.Buffer
-	if _, err := d.ExtractAttachmentContentToWriter(raw, targetFilename, &buf); err != nil {
+	if _, err := d.extractAttachmentContentToWriter(raw, targetFilename, &buf, maxBufferedAttachmentBytes); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
@@ -93,7 +103,7 @@ func (d *AttachmentDownloader) ExtractAttachmentsContentFromRawReader(raw io.Rea
 		resultIndex := indexes[0]
 		pending[filename] = indexes[1:]
 		var buf bytes.Buffer
-		if _, err := writeAttachmentEntityContent(part, &buf); err != nil {
+		if _, err := writeAttachmentEntityContentWithLimit(part, &buf, maxBufferedAttachmentBytes); err != nil {
 			results[resultIndex].Err = err
 			return nil
 		}
@@ -123,6 +133,10 @@ func (d *AttachmentDownloader) ExtractAttachmentsContentFromRawReader(raw io.Rea
 // ExtractAttachmentContentToWriter extracts one attachment and streams decoded
 // content directly to dst.
 func (d *AttachmentDownloader) ExtractAttachmentContentToWriter(raw io.Reader, targetFilename string, dst io.Writer) (int64, error) {
+	return d.extractAttachmentContentToWriter(raw, targetFilename, dst, 0)
+}
+
+func (d *AttachmentDownloader) extractAttachmentContentToWriter(raw io.Reader, targetFilename string, dst io.Writer, maxBytes int64) (int64, error) {
 	entity, err := gomessage.Read(raw)
 	if err != nil {
 		return 0, fmt.Errorf("failed to parse message: %w", err)
@@ -130,12 +144,12 @@ func (d *AttachmentDownloader) ExtractAttachmentContentToWriter(raw io.Reader, t
 
 	// We need to find the attachment by matching properties
 	if mr := entity.MultipartReader(); mr != nil {
-		return d.findAttachmentInMultipartToWriter(mr, targetFilename, dst)
+		return d.findAttachmentInMultipartToWriterWithLimit(mr, targetFilename, dst, maxBytes)
 	}
 
 	// Single-part message: the whole entity may itself be the attachment.
 	if getFilename(entity) == targetFilename {
-		return writeAttachmentEntityContent(entity, dst)
+		return writeAttachmentEntityContentWithLimit(entity, dst, maxBytes)
 	}
 
 	return 0, fmt.Errorf("attachment not found: %s", targetFilename)
@@ -144,13 +158,17 @@ func (d *AttachmentDownloader) ExtractAttachmentContentToWriter(raw io.Reader, t
 // findAttachmentInMultipart searches for an attachment by filename in a multipart message
 func (d *AttachmentDownloader) findAttachmentInMultipart(mr gomessage.MultipartReader, targetFilename string) ([]byte, error) {
 	var buf bytes.Buffer
-	if _, err := d.findAttachmentInMultipartToWriter(mr, targetFilename, &buf); err != nil {
+	if _, err := d.findAttachmentInMultipartToWriterWithLimit(mr, targetFilename, &buf, maxBufferedAttachmentBytes); err != nil {
 		return nil, err
 	}
 	return buf.Bytes(), nil
 }
 
 func (d *AttachmentDownloader) findAttachmentInMultipartToWriter(mr gomessage.MultipartReader, targetFilename string, dst io.Writer) (int64, error) {
+	return d.findAttachmentInMultipartToWriterWithLimit(mr, targetFilename, dst, 0)
+}
+
+func (d *AttachmentDownloader) findAttachmentInMultipartToWriterWithLimit(mr gomessage.MultipartReader, targetFilename string, dst io.Writer, maxBytes int64) (int64, error) {
 	for {
 		part, err := mr.NextPart()
 		if err == io.EOF {
@@ -162,7 +180,7 @@ func (d *AttachmentDownloader) findAttachmentInMultipartToWriter(mr gomessage.Mu
 
 		// Handle nested multipart
 		if nestedMr := part.MultipartReader(); nestedMr != nil {
-			if n, err := d.findAttachmentInMultipartToWriter(nestedMr, targetFilename, dst); err == nil {
+			if n, err := d.findAttachmentInMultipartToWriterWithLimit(nestedMr, targetFilename, dst, maxBytes); err == nil {
 				return n, nil
 			}
 			continue
@@ -171,7 +189,7 @@ func (d *AttachmentDownloader) findAttachmentInMultipartToWriter(mr gomessage.Mu
 		// Check filename
 		filename := getFilename(part)
 		if filename == targetFilename {
-			return writeAttachmentEntityContent(part, dst)
+			return writeAttachmentEntityContentWithLimit(part, dst, maxBytes)
 		}
 	}
 
@@ -406,7 +424,11 @@ func (d *AttachmentDownloader) attachmentSavePath(att *message.Attachment, custo
 }
 
 func readAttachmentContent(r io.Reader) ([]byte, error) {
-	return io.ReadAll(r)
+	var buf bytes.Buffer
+	if _, err := copyAttachmentContent(&buf, r, maxBufferedAttachmentBytes); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func decodeAttachmentContent(content []byte, encoding string) ([]byte, error) {
@@ -414,7 +436,39 @@ func decodeAttachmentContent(content []byte, encoding string) ([]byte, error) {
 }
 
 func writeAttachmentEntityContent(entity *gomessage.Entity, dst io.Writer) (int64, error) {
-	return io.Copy(dst, entity.Body)
+	return writeAttachmentEntityContentWithLimit(entity, dst, 0)
+}
+
+func writeAttachmentEntityContentWithLimit(entity *gomessage.Entity, dst io.Writer, maxBytes int64) (int64, error) {
+	return copyAttachmentContent(dst, entity.Body, maxBytes)
+}
+
+func copyAttachmentContent(dst io.Writer, src io.Reader, maxBytes int64) (int64, error) {
+	if maxBytes <= 0 {
+		return io.Copy(dst, src)
+	}
+
+	limited := &io.LimitedReader{R: src, N: maxBytes}
+	written, err := io.Copy(dst, limited)
+	if err != nil {
+		return written, err
+	}
+	if limited.N > 0 {
+		return written, nil
+	}
+
+	var extra [1]byte
+	n, err := src.Read(extra[:])
+	if err != nil && err != io.EOF {
+		return written, err
+	}
+	if n == 0 {
+		return written, nil
+	}
+	if _, err := io.Copy(io.Discard, src); err != nil {
+		return written, err
+	}
+	return written, AttachmentContentTooLargeError{LimitBytes: maxBytes}
 }
 
 func writeAttachmentToPath(savePath string, write func(io.Writer) (int64, error)) (int64, error) {

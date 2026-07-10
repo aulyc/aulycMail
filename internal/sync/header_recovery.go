@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net/mail"
 	"strings"
 	"time"
 
+	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
-	"github.com/aulyc/aulycmail/internal/message"
 )
 
 // recoverFailedHeaderBatch re-fetches the given UIDs without requesting ENVELOPE so the
@@ -89,7 +88,7 @@ func (e *Engine) recoverFailedHeaderBatch(ctx context.Context, client *imapclien
 				internalDate = data.Time
 			case imapclient.FetchItemDataBodySection:
 				if data.Literal != nil {
-					b, rerr := io.ReadAll(data.Literal)
+					b, rerr := readHeaderLiteralWithLimit(data.Literal)
 					if rerr != nil {
 						e.log.Warn().Err(rerr).Uint32("uid", uint32(fetchedUID)).Msg("Failed to read header literal in recovery")
 						continue

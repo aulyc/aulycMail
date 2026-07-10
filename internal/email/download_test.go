@@ -2,6 +2,7 @@ package email
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -275,5 +276,23 @@ func TestExtractAttachmentsContentFromRawReaderReadsMultipleAttachmentsInOnePass
 	}
 	if string(results[1].Content) != "two" {
 		t.Fatalf("second attachment = %q, want two", string(results[1].Content))
+	}
+}
+
+func TestCopyAttachmentContentRejectsOverLimit(t *testing.T) {
+	var buf bytes.Buffer
+	written, err := copyAttachmentContent(&buf, strings.NewReader("abcdef"), 3)
+	if err == nil {
+		t.Fatal("expected over-limit attachment content to fail")
+	}
+	var tooLarge AttachmentContentTooLargeError
+	if !errors.As(err, &tooLarge) {
+		t.Fatalf("expected AttachmentContentTooLargeError, got %T %v", err, err)
+	}
+	if written != 3 {
+		t.Fatalf("written = %d, want 3", written)
+	}
+	if buf.String() != "abc" {
+		t.Fatalf("buffer = %q, want abc", buf.String())
 	}
 }
