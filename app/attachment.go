@@ -95,20 +95,15 @@ func (a *App) DownloadAttachment(attachmentID, savePath string) (string, error) 
 
 	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
 	var localPath string
-	var contentSize int
+	var contentSize int64
 
 	err = a.withStreamedRawMessage(msg, func(raw io.Reader) error {
-		content, err := downloader.ExtractAttachmentContentFromReader(raw, att.Filename)
+		var err error
+		localPath, contentSize, err = downloader.SaveAttachmentFromRawReader(raw, att, savePath)
 		if err != nil {
-			return fmt.Errorf("failed to extract attachment: %w", err)
+			return err
 		}
-		contentSize = len(content)
-		log.Debug().Int("contentSize", contentSize).Msg("Extracted attachment content")
-
-		localPath, err = downloader.SaveAttachment(att, content, savePath)
-		if err != nil {
-			return fmt.Errorf("failed to save attachment: %w", err)
-		}
+		log.Debug().Int64("contentSize", contentSize).Msg("Extracted and saved attachment content")
 		return nil
 	})
 	if err != nil {
@@ -123,7 +118,7 @@ func (a *App) DownloadAttachment(attachmentID, savePath string) (string, error) 
 		}
 	}
 
-	log.Info().Str("attachment", att.Filename).Str("path", localPath).Int("size", contentSize).Msg("Attachment downloaded")
+	log.Info().Str("attachment", att.Filename).Str("path", localPath).Int64("size", contentSize).Msg("Attachment downloaded")
 	return localPath, nil
 }
 
@@ -360,18 +355,12 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 
 	err = a.withStreamedRawMessagePath(msg, func(rawPath string) error {
 		for _, att := range attachments {
-			content, err := extractAttachmentFromRawFile(downloader, rawPath, att.Filename)
-			if err != nil {
-				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to extract attachment")
-				continue
-			}
-
 			savePath, err := email.UniqueAttachmentPath(saveDir, att.Filename)
 			if err != nil {
 				log.Warn().Err(err).Str("filename", att.Filename).Msg("Skipping attachment with unsafe filename")
 				continue
 			}
-			_, err = downloader.SaveAttachment(att, content, savePath)
+			_, _, err = saveAttachmentFromRawFile(downloader, rawPath, att, savePath)
 			if err != nil {
 				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
 				continue
@@ -423,13 +412,7 @@ func (a *App) saveAllAttachmentsViaPortal(messageID string, attachments []*messa
 				break
 			}
 
-			content, err := extractAttachmentFromRawFile(downloader, rawPath, att.Filename)
-			if err != nil {
-				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to extract attachment")
-				continue
-			}
-
-			_, err = downloader.SaveAttachment(att, content, savePaths[i])
+			_, _, err := saveAttachmentFromRawFile(downloader, rawPath, att, savePaths[i])
 			if err != nil {
 				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
 				continue
@@ -482,4 +465,13 @@ func extractAttachmentFromRawFile(downloader *email.AttachmentDownloader, rawPat
 	}
 	defer file.Close()
 	return downloader.ExtractAttachmentContentFromReader(file, filename)
+}
+
+func saveAttachmentFromRawFile(downloader *email.AttachmentDownloader, rawPath string, att *message.Attachment, savePath string) (string, int64, error) {
+	file, err := os.Open(rawPath)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to open streamed message: %w", err)
+	}
+	defer file.Close()
+	return downloader.SaveAttachmentFromRawReader(file, att, savePath)
 }

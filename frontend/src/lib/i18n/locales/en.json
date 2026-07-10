@@ -117,6 +117,8 @@
     "viewSource": "View Source",
     "hideSource": "Hide Source",
     "loadingSource": "Loading message source...",
+    "sourceTooLarge": "This message source is too large to display inline.",
+    "openSourceFile": "Open source file",
     "deleteConversationTitle": "Delete Permanently?",
     "deleteConversationDescription": "This conversation will be permanently deleted. This action cannot be undone.",
     "to": "to",

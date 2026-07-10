@@ -697,6 +697,24 @@ export namespace app {
 	        this.body = source["body"];
 	    }
 	}
+	export class MessageSourceResult {
+	    content?: string;
+	    filePath?: string;
+	    size: number;
+	    tooLarge: boolean;
+
+	    static createFrom(source: any = {}) {
+	        return new MessageSourceResult(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.content = source["content"];
+	        this.filePath = source["filePath"];
+	        this.size = source["size"];
+	        this.tooLarge = source["tooLarge"];
+	    }
+	}
 	export class OfflineBodyCacheClearResult {
 	    folders: number;
 	    bodiesCleared: number;

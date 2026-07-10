@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/aulyc/aulycmail/internal/email"
+	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/aulyc/aulycmail/internal/platform"
 	"github.com/aulyc/aulycmail/internal/settings"
 	mailSync "github.com/aulyc/aulycmail/internal/sync"
@@ -180,14 +181,6 @@ func (a *App) SaveBackupViewerAttachmentAs(directory, key string, attachmentInde
 	}
 	attachment := detail.Attachments[attachmentIndex]
 
-	if _, err := file.Seek(0, io.SeekStart); err != nil {
-		return "", fmt.Errorf("failed to rewind backup message: %w", err)
-	}
-	content, err := email.NewAttachmentDownloader(a.paths.AttachmentsPath()).ExtractAttachmentContentFromReader(file, attachment.Filename)
-	if err != nil {
-		return "", fmt.Errorf("failed to extract backup attachment: %w", err)
-	}
-
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		homeDir = ""
@@ -214,7 +207,18 @@ func (a *App) SaveBackupViewerAttachmentAs(directory, key string, attachmentInde
 	if savePath == "" {
 		return "", nil
 	}
-	if err := os.WriteFile(savePath, content, 0600); err != nil {
+
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to rewind backup message: %w", err)
+	}
+	att := &message.Attachment{
+		MessageID:   key,
+		Filename:    attachment.Filename,
+		ContentType: attachment.ContentType,
+		Size:        attachment.Size,
+		IsInline:    attachment.Inline,
+	}
+	if _, _, err := email.NewAttachmentDownloader(a.paths.AttachmentsPath()).SaveAttachmentFromRawReader(file, att, savePath); err != nil {
 		return "", fmt.Errorf("failed to save backup attachment: %w", err)
 	}
 	return savePath, nil

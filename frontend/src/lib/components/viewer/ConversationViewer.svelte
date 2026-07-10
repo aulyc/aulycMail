@@ -2,13 +2,13 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   // @ts-ignore - wailsjs bindings
-  import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource, FetchMessageBody } from '../../../../wailsjs/go/app/App'
+  import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource, FetchMessageBody, OpenFile } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs bindings
   import { MarkAsRead, MarkAsUnread, Star, Unstar, Archive, Trash, MarkAsSpam, MarkAsNotSpam, DeletePermanently, Undo } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
   import { EventsOn } from '../../../../wailsjs/runtime/runtime'
   // @ts-ignore - wailsjs path
-  import { message as messageModels } from '../../../../wailsjs/go/models'
+  import { app as appModels, message as messageModels } from '../../../../wailsjs/go/models'
   import AttachmentList from './AttachmentList.svelte'
   import EmailBody from './EmailBody.svelte'
   import { toasts } from '$lib/stores/toast'
@@ -1066,6 +1066,7 @@
   // View source state — shown in a modal dialog, opened from the toolbar icon.
   let showSourceDialog = $state(false)
   let messageSource = $state<string | null>(null)
+  let messageSourceFilePath = $state('')
   let loadingSource = $state(false)
 
   // Pick which message's source to show: the one the user is focused on, else
@@ -1086,13 +1087,25 @@
     showSourceDialog = true
     loadingSource = true
     messageSource = null
+    messageSourceFilePath = ''
     try {
-      messageSource = await GetMessageSource(msgId)
+      const source = await GetMessageSource(msgId) as appModels.MessageSourceResult
+      messageSource = source?.content || null
+      messageSourceFilePath = source?.filePath || ''
     } catch {
       toasts.error($_('viewer.failedToLoadSource'))
       showSourceDialog = false
     } finally {
       loadingSource = false
+    }
+  }
+
+  async function openSourceFile() {
+    if (!messageSourceFilePath) return
+    try {
+      await OpenFile(messageSourceFilePath)
+    } catch {
+      toasts.error($_('viewer.failedToLoadSource'))
     }
   }
 
@@ -1543,6 +1556,17 @@
       </div>
     {:else if messageSource}
       <pre class="text-xs bg-muted/50 p-4 rounded-md overflow-auto max-h-[70vh] whitespace-pre-wrap break-all font-mono text-foreground">{messageSource}</pre>
+    {:else if messageSourceFilePath}
+      <div class="flex flex-col items-center justify-center gap-3 rounded-md bg-muted/50 p-6 text-center">
+        <Icon icon="mdi:file-document-outline" class="w-8 h-8 text-muted-foreground" />
+        <p class="text-sm text-muted-foreground">{$_('viewer.sourceTooLarge')}</p>
+        <button
+          class="text-sm text-primary hover:underline"
+          onclick={openSourceFile}
+        >
+          {$_('viewer.openSourceFile')}
+        </button>
+      </div>
     {/if}
   </Dialog.Content>
 </Dialog.Root>

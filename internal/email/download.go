@@ -36,31 +36,44 @@ func (d *AttachmentDownloader) ExtractAttachmentContent(raw []byte, targetFilena
 // ExtractAttachmentContentFromReader extracts one attachment without requiring
 // callers to keep the whole raw message in memory.
 func (d *AttachmentDownloader) ExtractAttachmentContentFromReader(raw io.Reader, targetFilename string) ([]byte, error) {
+	var buf bytes.Buffer
+	if _, err := d.ExtractAttachmentContentToWriter(raw, targetFilename, &buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// ExtractAttachmentContentToWriter extracts one attachment and streams decoded
+// content directly to dst.
+func (d *AttachmentDownloader) ExtractAttachmentContentToWriter(raw io.Reader, targetFilename string, dst io.Writer) (int64, error) {
 	entity, err := gomessage.Read(raw)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse message: %w", err)
+		return 0, fmt.Errorf("failed to parse message: %w", err)
 	}
 
 	// We need to find the attachment by matching properties
 	if mr := entity.MultipartReader(); mr != nil {
-		return d.findAttachmentInMultipart(mr, targetFilename)
+		return d.findAttachmentInMultipartToWriter(mr, targetFilename, dst)
 	}
 
 	// Single-part message: the whole entity may itself be the attachment.
 	if getFilename(entity) == targetFilename {
-		content, err := readAttachmentContent(entity.Body)
-		if err != nil {
-			return nil, err
-		}
-		transferEncoding := strings.ToLower(entity.Header.Get("Content-Transfer-Encoding"))
-		return decodeAttachmentContent(content, transferEncoding)
+		return writeAttachmentEntityContent(entity, dst)
 	}
 
-	return nil, fmt.Errorf("attachment not found: %s", targetFilename)
+	return 0, fmt.Errorf("attachment not found: %s", targetFilename)
 }
 
 // findAttachmentInMultipart searches for an attachment by filename in a multipart message
 func (d *AttachmentDownloader) findAttachmentInMultipart(mr gomessage.MultipartReader, targetFilename string) ([]byte, error) {
+	var buf bytes.Buffer
+	if _, err := d.findAttachmentInMultipartToWriter(mr, targetFilename, &buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+func (d *AttachmentDownloader) findAttachmentInMultipartToWriter(mr gomessage.MultipartReader, targetFilename string, dst io.Writer) (int64, error) {
 	for {
 		part, err := mr.NextPart()
 		if err == io.EOF {
@@ -72,8 +85,8 @@ func (d *AttachmentDownloader) findAttachmentInMultipart(mr gomessage.MultipartR
 
 		// Handle nested multipart
 		if nestedMr := part.MultipartReader(); nestedMr != nil {
-			if content, err := d.findAttachmentInMultipart(nestedMr, targetFilename); err == nil {
-				return content, nil
+			if n, err := d.findAttachmentInMultipartToWriter(nestedMr, targetFilename, dst); err == nil {
+				return n, nil
 			}
 			continue
 		}
@@ -81,18 +94,11 @@ func (d *AttachmentDownloader) findAttachmentInMultipart(mr gomessage.MultipartR
 		// Check filename
 		filename := getFilename(part)
 		if filename == targetFilename {
-			content, err := readAttachmentContent(part.Body)
-			if err != nil {
-				return nil, err
-			}
-
-			// Decode content if transfer-encoded
-			transferEncoding := strings.ToLower(part.Header.Get("Content-Transfer-Encoding"))
-			return decodeAttachmentContent(content, transferEncoding)
+			return writeAttachmentEntityContent(part, dst)
 		}
 	}
 
-	return nil, fmt.Errorf("attachment not found: %s", targetFilename)
+	return 0, fmt.Errorf("attachment not found: %s", targetFilename)
 }
 
 // decodeMIMEFilename decodes a MIME-encoded filename with full charset support.
@@ -218,6 +224,47 @@ func UniqueAttachmentPath(dir, filename string) (string, error) {
 
 // SaveAttachment saves attachment content to disk
 func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content []byte, customPath string) (string, error) {
+	savePath, err := d.attachmentSavePath(att, customPath)
+	if err != nil {
+		return "", err
+	}
+
+	// Write content to file
+	if err := os.WriteFile(savePath, content, 0600); err != nil {
+		return "", fmt.Errorf("failed to write attachment: %w", err)
+	}
+
+	return savePath, nil
+}
+
+// SaveAttachmentFromRawReader extracts att from raw and streams it directly to
+// disk without buffering the attachment content in memory.
+func (d *AttachmentDownloader) SaveAttachmentFromRawReader(raw io.Reader, att *message.Attachment, customPath string) (string, int64, error) {
+	savePath, err := d.attachmentSavePath(att, customPath)
+	if err != nil {
+		return "", 0, err
+	}
+
+	file, err := os.OpenFile(savePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to create attachment file: %w", err)
+	}
+
+	written, extractErr := d.ExtractAttachmentContentToWriter(raw, att.Filename, file)
+	closeErr := file.Close()
+	if extractErr != nil {
+		_ = os.Remove(savePath)
+		return "", written, fmt.Errorf("failed to extract attachment: %w", extractErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(savePath)
+		return "", written, fmt.Errorf("failed to close attachment file: %w", closeErr)
+	}
+
+	return savePath, written, nil
+}
+
+func (d *AttachmentDownloader) attachmentSavePath(att *message.Attachment, customPath string) (string, error) {
 	if att == nil {
 		return "", fmt.Errorf("attachment is required")
 	}
@@ -243,11 +290,6 @@ func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content [
 		}
 	}
 
-	// Write content to file
-	if err := os.WriteFile(savePath, content, 0600); err != nil {
-		return "", fmt.Errorf("failed to write attachment: %w", err)
-	}
-
 	return savePath, nil
 }
 
@@ -257,6 +299,10 @@ func readAttachmentContent(r io.Reader) ([]byte, error) {
 
 func decodeAttachmentContent(content []byte, encoding string) ([]byte, error) {
 	return decodeContent(content, encoding), nil
+}
+
+func writeAttachmentEntityContent(entity *gomessage.Entity, dst io.Writer) (int64, error) {
+	return io.Copy(dst, entity.Body)
 }
 
 func attachmentMessagePrefix(messageID string) string {

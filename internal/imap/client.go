@@ -2,9 +2,11 @@
 package imap
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"time"
@@ -727,13 +729,22 @@ func (c *Client) RawClient() *imapclient.Client {
 
 // AppendMessage appends a message to a mailbox and returns the assigned UID
 func (c *Client) AppendMessage(mailbox string, flags []imap.Flag, date time.Time, msg []byte) (imap.UID, error) {
+	return c.AppendMessageFromReader(mailbox, flags, date, int64(len(msg)), bytes.NewReader(msg))
+}
+
+// AppendMessageFromReader appends a message to a mailbox by streaming exactly
+// size bytes from r.
+func (c *Client) AppendMessageFromReader(mailbox string, flags []imap.Flag, date time.Time, size int64, r io.Reader) (imap.UID, error) {
 	if c.client == nil {
 		return 0, fmt.Errorf("not connected")
+	}
+	if size < 0 {
+		return 0, fmt.Errorf("invalid append size: %d", size)
 	}
 
 	c.log.Debug().
 		Str("mailbox", mailbox).
-		Int("size", len(msg)).
+		Int64("size", size).
 		Strs("flags", flagsToStrings(flags)).
 		Msg("Appending message")
 
@@ -744,11 +755,17 @@ func (c *Client) AppendMessage(mailbox string, flags []imap.Flag, date time.Time
 		options.Time = date
 	}
 
-	appendCmd := c.client.Append(mailbox, int64(len(msg)), options)
+	appendCmd := c.client.Append(mailbox, size, options)
 
 	// Write the message data
-	if _, err := appendCmd.Write(msg); err != nil {
+	written, err := io.Copy(appendCmd, r)
+	if err != nil {
+		_ = appendCmd.Close()
 		return 0, fmt.Errorf("failed to write message data: %w", err)
+	}
+	if written != size {
+		_ = appendCmd.Close()
+		return 0, fmt.Errorf("append size mismatch: wrote %d bytes, expected %d", written, size)
 	}
 
 	if err := appendCmd.Close(); err != nil {

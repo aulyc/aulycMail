@@ -117,6 +117,8 @@
     "viewSource": "查看源码",
     "hideSource": "隐藏源码",
     "loadingSource": "正在加载邮件源码...",
+    "sourceTooLarge": "这封邮件源码太大，无法直接显示。",
+    "openSourceFile": "打开源码文件",
     "deleteConversationTitle": "永久删除？",
     "deleteConversationDescription": "此会话将被永久删除。此操作无法撤销。",
     "to": "给",

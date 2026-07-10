@@ -1,8 +1,10 @@
 package email
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/aulyc/aulycmail/internal/message"
@@ -77,5 +79,86 @@ func TestSaveAttachmentDefaultPathSanitizesFilename(t *testing.T) {
 	}
 	if filepath.Base(filepath.Dir(path)) != "msg" {
 		t.Fatalf("message directory = %q, want msg", filepath.Base(filepath.Dir(path)))
+	}
+}
+
+func TestExtractAttachmentContentToWriterDecodesAttachment(t *testing.T) {
+	raw := strings.Join([]string{
+		"From: sender@example.com",
+		"To: user@example.com",
+		"Subject: attachment",
+		"Content-Type: multipart/mixed; boundary=abc",
+		"",
+		"--abc",
+		"Content-Type: text/plain",
+		"",
+		"hello",
+		"--abc",
+		"Content-Type: text/plain; name=\"note.txt\"",
+		"Content-Disposition: attachment; filename=\"note.txt\"",
+		"Content-Transfer-Encoding: base64",
+		"",
+		"aGVsbG8gYXR0YWNobWVudA==",
+		"--abc--",
+		"",
+	}, "\r\n")
+
+	downloader := NewAttachmentDownloader(t.TempDir())
+	var out bytes.Buffer
+	n, err := downloader.ExtractAttachmentContentToWriter(strings.NewReader(raw), "note.txt", &out)
+	if err != nil {
+		t.Fatalf("ExtractAttachmentContentToWriter() error = %v", err)
+	}
+	if got := out.String(); got != "hello attachment" {
+		t.Fatalf("decoded content = %q, want %q", got, "hello attachment")
+	}
+	if n != int64(out.Len()) {
+		t.Fatalf("written = %d, want %d", n, out.Len())
+	}
+}
+
+func TestSaveAttachmentFromRawReaderWritesDecodedFile(t *testing.T) {
+	raw := strings.Join([]string{
+		"From: sender@example.com",
+		"To: user@example.com",
+		"Subject: attachment",
+		"Content-Type: multipart/mixed; boundary=abc",
+		"",
+		"--abc",
+		"Content-Type: text/plain",
+		"",
+		"hello",
+		"--abc",
+		"Content-Type: text/plain; name=\"note.txt\"",
+		"Content-Disposition: attachment; filename=\"note.txt\"",
+		"Content-Transfer-Encoding: quoted-printable",
+		"",
+		"hello=20file",
+		"--abc--",
+		"",
+	}, "\r\n")
+
+	downloader := NewAttachmentDownloader(t.TempDir())
+	att := &message.Attachment{
+		MessageID: "msg-123456789",
+		Filename:  "note.txt",
+	}
+
+	path, n, err := downloader.SaveAttachmentFromRawReader(strings.NewReader(raw), att, "")
+	if err != nil {
+		t.Fatalf("SaveAttachmentFromRawReader() error = %v", err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(%q): %v", path, err)
+	}
+	if string(content) != "hello file" {
+		t.Fatalf("saved content = %q, want %q", string(content), "hello file")
+	}
+	if n != int64(len(content)) {
+		t.Fatalf("written = %d, want %d", n, len(content))
+	}
+	if filepath.Base(filepath.Dir(path)) != "msg-1234" {
+		t.Fatalf("message directory = %q, want msg-1234", filepath.Base(filepath.Dir(path)))
 	}
 }

@@ -3,6 +3,8 @@ package app
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/aulyc/aulycmail/internal/folder"
@@ -708,8 +710,8 @@ func flagsForAppend(m *message.Message) []goImap.Flag {
 	return flags
 }
 
-// copyMessagesAcrossAccounts fetches each message's raw RFC822 bytes from the
-// source account's IMAP and APPENDs them to the destination account's IMAP.
+// copyMessagesAcrossAccounts streams each message's raw RFC822 content from the
+// source account's IMAP and APPENDs it to the destination account's IMAP.
 // Used by the cross-account branches of MoveToFolder and CopyToFolder.
 //
 // Synchronous: returns when every APPEND has succeeded. Caller is expected to
@@ -734,12 +736,8 @@ func (a *App) copyMessagesAcrossAccounts(messages []*message.Message, destFolder
 			return fmt.Errorf("failed to select destination mailbox: %w", err)
 		}
 		for _, m := range messages {
-			raw, err := a.syncEngine.FetchRawMessage(a.ctx, m.AccountID, m.FolderID, m.UID)
-			if err != nil {
-				return fmt.Errorf("failed to fetch raw message from source: %w", err)
-			}
-			if _, err := conn.AppendMessage(destFolder.Path, flagsForAppend(m), m.Date, raw); err != nil {
-				return fmt.Errorf("failed to append to destination: %w", err)
+			if err := a.appendMessageAcrossAccounts(conn, m, destFolder); err != nil {
+				return err
 			}
 		}
 		log.Info().
@@ -748,6 +746,71 @@ func (a *App) copyMessagesAcrossAccounts(messages []*message.Message, destFolder
 			Msg("Cross-account append completed")
 		return nil
 	})
+}
+
+func (a *App) appendMessageAcrossAccounts(destConn *imap.Client, m *message.Message, destFolder *folder.Folder) error {
+	if m.Size <= 0 {
+		return a.appendMessageAcrossAccountsViaTemp(destConn, m, destFolder)
+	}
+
+	expectedSize := int64(m.Size)
+	pr, pw := io.Pipe()
+	streamDone := make(chan error, 1)
+
+	go func() {
+		result, err := a.syncEngine.StreamRawMessage(a.ctx, m.AccountID, m.FolderID, m.UID, pw)
+		if err != nil {
+			_ = pw.CloseWithError(err)
+			streamDone <- fmt.Errorf("failed to stream raw message from source: %w", err)
+			return
+		}
+		if result.BytesWritten != expectedSize {
+			err := fmt.Errorf("source message size mismatch: streamed %d bytes, expected %d", result.BytesWritten, expectedSize)
+			_ = pw.CloseWithError(err)
+			streamDone <- err
+			return
+		}
+		if err := pw.Close(); err != nil {
+			streamDone <- fmt.Errorf("failed to close source stream: %w", err)
+			return
+		}
+		streamDone <- nil
+	}()
+
+	_, appendErr := destConn.AppendMessageFromReader(destFolder.Path, flagsForAppend(m), m.Date, expectedSize, pr)
+	if appendErr != nil {
+		_ = pr.CloseWithError(appendErr)
+	}
+	streamErr := <-streamDone
+	if appendErr != nil {
+		return fmt.Errorf("failed to append to destination: %w", appendErr)
+	}
+	if streamErr != nil {
+		return streamErr
+	}
+	return nil
+}
+
+func (a *App) appendMessageAcrossAccountsViaTemp(destConn *imap.Client, m *message.Message, destFolder *folder.Folder) error {
+	tmp, err := os.CreateTemp("", "aulycmail-cross-account-*.eml")
+	if err != nil {
+		return fmt.Errorf("failed to create temp message file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath)
+	defer tmp.Close()
+
+	result, err := a.syncEngine.StreamRawMessage(a.ctx, m.AccountID, m.FolderID, m.UID, tmp)
+	if err != nil {
+		return fmt.Errorf("failed to stream raw message from source: %w", err)
+	}
+	if _, err := tmp.Seek(0, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to rewind temp message file: %w", err)
+	}
+	if _, err := destConn.AppendMessageFromReader(destFolder.Path, flagsForAppend(m), m.Date, result.BytesWritten, tmp); err != nil {
+		return fmt.Errorf("failed to append to destination: %w", err)
+	}
+	return nil
 }
 
 // Archive moves messages to the Archive folder

@@ -132,7 +132,7 @@ export function GetMessageListDensity():Promise<string>;
 
 export function GetMessageListSortOrder():Promise<string>;
 
-export function GetMessageSource(arg1:string):Promise<string>;
+export function GetMessageSource(arg1:string):Promise<app.MessageSourceResult>;
 
 export function GetNativeTitleBar():Promise<boolean>;
 
