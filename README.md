@@ -31,8 +31,8 @@ make build
 
 ```bash
 make release-dmg \
-  SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-  NOTARY_PROFILE=aulycmail-notary
+  SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" \
+  NOTARY_PROFILE=aulyc-notary
 ```
 
 ## Product Links

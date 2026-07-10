@@ -2,9 +2,8 @@
   import * as Select from '$lib/components/ui/select'
   import { Label } from '$lib/components/ui/label'
   import BoolSelect from '$lib/components/ui/bool-select/BoolSelect.svelte'
-  import { _, setLocale } from '$lib/i18n'
+  import { _ } from '$lib/i18n'
   import { supportedLocales } from '$lib/i18n'
-  import { getIsDarkActive } from '$lib/stores/theme.svelte'
 
   interface Props {
     messageListDensity: string
@@ -102,6 +101,8 @@
     return themeModeOptions.find(opt => opt.value === value)?.label || value
   }
 
+  const draftThemeIsDark = $derived(themeMode === 'pop-dark')
+
   function getLanguageLabel(code: string): string {
     return supportedLocales.find(l => l.code === code)?.name || code || 'English'
   }
@@ -140,7 +141,6 @@
 
   function handleLanguageChange(value: string) {
     language = value
-    setLocale(value)
     onLanguageChange?.(value)
   }
 </script>
@@ -183,7 +183,7 @@
   </div>
 
   <!-- Dark mail content — only relevant when a dark theme is active -->
-  {#if getIsDarkActive()}
+  {#if draftThemeIsDark}
     <div class="flex items-center justify-between gap-3">
       <div>
         <Label for="dark-mail-content">{$_('settingsGeneral.darkMailContent')}</Label>

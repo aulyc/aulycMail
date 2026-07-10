@@ -8,7 +8,6 @@
   import { GetReadReceiptResponsePolicy, SetReadReceiptResponsePolicy, GetMarkAsReadDelay, SetMarkAsReadDelay, GetMessageListDensity, SetMessageListDensity, GetThemeMode, SetThemeMode, GetShowTitleBar, SetShowTitleBar, GetRunBackground, SetRunBackground, GetStartHidden, SetStartHidden, GetAutostart, SetAutostart, GetLanguage, SetLanguage, GetComposerFormat, SetComposerFormat, GetNativeTitleBar, SetNativeTitleBar, GetAlwaysLoadImages, SetAlwaysLoadImages, GetDarkMailContent, SetDarkMailContent, GetAccentBarUnread, SetAccentBarUnread, GetMenuBarIcon, SetMenuBarIcon, GetDeveloperMode, SetDeveloperMode, QuitApp } from '../../../../wailsjs/go/app/App.js'
   import { addToast } from '$lib/stores/toast'
   import { setMessageListDensity as updateDensityStore, setThemeMode as updateThemeStore, setLanguage as updateLanguageStore, setComposerFormat as updateComposerFormatStore, setAlwaysLoadImages as updateAlwaysLoadImagesStore, setDarkMailContent as updateDarkMailContentStore, setAccentBarUnread as updateAccentBarUnreadStore, setDeveloperMode as updateDeveloperModeStore, type MessageListDensity, type ThemeMode, type ComposerFormat } from '$lib/stores/settings.svelte'
-  import { applyThemeFromMode } from '$lib/stores/theme.svelte'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
   import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
@@ -46,22 +45,10 @@
   let menuBarIcon = $state<boolean>(false)
   let developerMode = $state<boolean>(false)
   let originalNativeTitleBar = false
-  // Snapshot of the saved theme at dialog open time. Used to revert live preview
-  // if the dialog closes without Save (Cancel / ESC / click-outside).
-  let originalThemeMode = ''
-  let hasSaved = $state(false)
   let showRestartDialog = $state(false)
   let loading = $state(true)
   let saving = $state(false)
   let activeTab = $state('general')
-
-  // Live theme preview: apply the picker's current value to the document
-  // immediately so the user sees what each theme looks like before saving.
-  // The revert path is in handleOpenChange when the dialog closes unsaved.
-  $effect(() => {
-    if (loading || !themeMode) return
-    applyThemeFromMode(themeMode as ThemeMode)
-  })
 
   // Load settings on mount
   onMount(async () => {
@@ -87,7 +74,6 @@
 
   async function loadSettings() {
     loading = true
-    hasSaved = false
     try {
       const [policy, delayMs, density, theme, titleBar, runBg, startHid, autoSt, lang, compFmt, nativeTB, alwaysImages, darkMail, accentBar, menuBar, devMode] = await Promise.all([
         GetReadReceiptResponsePolicy(),
@@ -114,7 +100,6 @@
       // Only Dark (pop-dark) and Light (light-blue) remain; coerce any legacy
       // value (system / yaru-dark) to Dark so the dropdown shows a valid option.
       themeMode = (theme === 'pop-dark' || theme === 'light-blue') ? theme : 'pop-dark'
-      originalThemeMode = themeMode
       showTitleBar = titleBar
       runBackground = runBg
       startHidden = startHid
@@ -177,8 +162,6 @@
         type: 'success',
         message: $_('toast.settingsSaved'),
       })
-      hasSaved = true
-      originalThemeMode = themeMode
       // Show restart dialog if native title bar setting changed
       if (nativeTitleBar !== originalNativeTitleBar) {
         originalNativeTitleBar = nativeTitleBar
@@ -198,14 +181,7 @@
     }
   }
 
-  function revertLivePreview() {
-    if (!hasSaved && originalThemeMode && themeMode !== originalThemeMode) {
-      applyThemeFromMode(originalThemeMode as ThemeMode)
-    }
-  }
-
   function handleCancel() {
-    revertLivePreview()
     open = false
     onClose?.()
   }
@@ -213,7 +189,6 @@
   function handleOpenChange(isOpen: boolean) {
     open = isOpen
     if (!isOpen) {
-      revertLivePreview()
       onClose?.()
     }
   }

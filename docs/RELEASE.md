@@ -11,7 +11,7 @@
 Prerequisites on the release Mac:
 
 - `Developer ID Application` certificate installed in the login keychain.
-- `notarytool` credentials stored in Keychain, e.g. `aulycmail-notary`.
+- `notarytool` credentials stored in Keychain, e.g. `aulyc-notary`.
 - Use a repository-local Go cache in sandboxed Codex sessions.
 
 Create a signed, notarized drag-to-Applications DMG in `dist/aulycmail.dmg`:
@@ -19,8 +19,8 @@ Create a signed, notarized drag-to-Applications DMG in `dist/aulycmail.dmg`:
 ```bash
 GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
   make release-dmg \
-  SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-  NOTARY_PROFILE=aulycmail-notary
+  SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" \
+  NOTARY_PROFILE=aulyc-notary
 ```
 
 The DMG packaging script:
@@ -48,8 +48,8 @@ When reinstalling this Mac from a signed release build, package a DMG into
 ```bash
 GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
   make install-release-dmg \
-  SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-  NOTARY_PROFILE=aulycmail-notary
+  SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" \
+  NOTARY_PROFILE=aulyc-notary
 ```
 
 This target runs `release-dmg`, quits a running `aulycmail`, mounts

@@ -122,11 +122,11 @@ dmg:
 # Build, Developer ID sign, notarize, and staple a release DMG.
 release-dmg: build
 	@if [ -z "$(SIGN_IDENTITY)" ]; then \
-		echo 'SIGN_IDENTITY is required, e.g. make release-dmg SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=aulycmail-notary'; \
+		echo 'SIGN_IDENTITY is required, e.g. make release-dmg SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary'; \
 		exit 1; \
 	fi
 	@if [ -z "$(NOTARY_PROFILE)" ]; then \
-		echo 'NOTARY_PROFILE is required, e.g. NOTARY_PROFILE=aulycmail-notary'; \
+		echo 'NOTARY_PROFILE is required, e.g. NOTARY_PROFILE=aulyc-notary'; \
 		exit 1; \
 	fi
 	@./tools/package_macos_dmg.sh --output "$(DMG_PATH)" \
