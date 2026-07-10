@@ -91,10 +91,7 @@
 
   // Reactive — re-runs when locale changes because $_ is referenced inside.
   const sections = $derived.by(() => {
-    const builtins: SidebarItem[] = [{
-      id: '',
-      label: $_('contacts.sidebar.all'),
-    }]
+    const builtins: SidebarItem[] = []
 
     if (accountGroups.length > 0) {
       for (const [accountIndex, account] of accountGroups.entries()) {
@@ -138,16 +135,28 @@
   onSelect={pick}
 >
   {#snippet titleAction()}
-    <button
-      class="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-      title={$_('contacts.sidebar.refresh')}
-      aria-label={$_('contacts.sidebar.refresh')}
-      onclick={runRefresh}
-      disabled={refreshing}
-      type="button"
-    >
-      <Icon icon="mdi:refresh" class="w-5 h-5 {contactRefresh.active ? 'animate-spin' : ''}" />
-    </button>
+    <div class="flex items-center gap-1 min-w-0">
+      <button
+        class="px-2 py-1 rounded-md text-sm font-medium transition-colors whitespace-nowrap {contactsView.selectedSourceId === ''
+          ? 'bg-primary/10 text-primary'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/40'}"
+        aria-pressed={contactsView.selectedSourceId === ''}
+        onclick={() => pick('')}
+        type="button"
+      >
+        {$_('contacts.sidebar.allButton')}
+      </button>
+      <button
+        class="p-1 rounded hover:bg-muted/40 text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+        title={$_('contacts.sidebar.refresh')}
+        aria-label={$_('contacts.sidebar.refresh')}
+        onclick={runRefresh}
+        disabled={refreshing}
+        type="button"
+      >
+        <Icon icon="mdi:refresh" class="w-5 h-5 {contactRefresh.active ? 'animate-spin' : ''}" />
+      </button>
+    </div>
   {/snippet}
 
   {#snippet item(it: SidebarItem, { active })}

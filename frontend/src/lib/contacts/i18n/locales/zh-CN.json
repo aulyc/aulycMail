@@ -11,6 +11,7 @@
       "title": "联系人",
       "refresh": "从邮件刷新通讯录",
       "all": "全部联系人",
+      "allButton": "全部",
       "roleSender": "发件人",
       "roleRecipient": "收件人",
       "roleCc": "抄送",
