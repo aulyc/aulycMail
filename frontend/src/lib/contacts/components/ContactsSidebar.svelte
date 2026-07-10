@@ -13,6 +13,7 @@
   import {
     beginContactRefresh,
     completeContactRefresh,
+    contactRefresh,
     failContactRefresh,
     initContactRefreshEvents,
   } from '$contacts/stores/contactRefresh.svelte'
@@ -63,9 +64,11 @@
     beginContactRefresh()
     try {
       const count = await RefreshContactsFromMail()
-      await loadContactAccountGroups({ force: true })
+      completeContactRefresh(count, count)
       await reloadContacts()
-      completeContactRefresh(count)
+      // Account group counts scan message/contact associations and can be slow
+      // on large mailboxes. Refresh them after the list is usable.
+      void loadContactAccountGroups({ force: true })
       toasts.success($_('contacts.toast.refreshed', { values: { count } }))
     } catch (err) {
       failContactRefresh()
@@ -143,7 +146,7 @@
       disabled={refreshing}
       type="button"
     >
-      <Icon icon="mdi:refresh" class="w-5 h-5 {refreshing ? 'animate-spin' : ''}" />
+      <Icon icon="mdi:refresh" class="w-5 h-5 {contactRefresh.active ? 'animate-spin' : ''}" />
     </button>
   {/snippet}
 

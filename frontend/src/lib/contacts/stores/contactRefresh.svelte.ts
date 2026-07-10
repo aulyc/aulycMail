@@ -27,7 +27,7 @@ function applyProgress(data: ContactRefreshProgress | null | undefined): void {
   scanned = normalizeCount(data?.scanned)
   total = normalizeCount(data?.total)
 
-  if (phase === 'complete' || phase === 'error') {
+  if (phase === 'complete' || phase === 'error' || (total > 0 && scanned >= total)) {
     active = false
     return
   }

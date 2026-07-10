@@ -82,6 +82,10 @@
     /** Fired when the user invokes the focus-search global shortcut (Ctrl+S).
      *  The consumer (e.g., ContactList) typically focuses its own search input. */
     onFocusSearch?: () => void
+    /** Fired when the scrollable list reaches the bottom threshold. Consumers
+     *  use this for incremental loading without embedding buttons in the list. */
+    onReachEnd?: () => void
+    reachEndThreshold?: number
   }
 
   const {
@@ -108,6 +112,8 @@
     onRangePrev,
     onDelete,
     onFocusSearch,
+    onReachEnd,
+    reachEndThreshold = 96,
   }: Props = $props()
 
   let containerRef = $state<HTMLDivElement | null>(null)
@@ -262,6 +268,14 @@
     }
   }
 
+  function handleScroll(e: Event) {
+    if (!onReachEnd) return
+    const el = e.currentTarget as HTMLElement
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= reachEndThreshold) {
+      onReachEnd()
+    }
+  }
+
   // Register pane-nav so global Alt+? shortcuts can dispatch here.
   // (No mail-equivalent Alt shortcut targets messageList today, but the
   // registry is symmetric with SourceSidebar for future use.)
@@ -287,7 +301,12 @@
   onfocus={handleFocus}
   onmousedown={handleMouseDown}
 >
-  <div bind:this={scrollRegionRef} class="flex-1 min-h-0 overflow-y-auto" aria-busy={loading}>
+  <div
+    bind:this={scrollRegionRef}
+    class="flex-1 min-h-0 overflow-y-auto"
+    aria-busy={loading}
+    onscroll={handleScroll}
+  >
     {#if loading}
       {#if loadingSnippet}
         {@render loadingSnippet()}

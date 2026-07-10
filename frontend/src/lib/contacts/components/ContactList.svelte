@@ -160,6 +160,11 @@
     sortOrder = sortOrder === 'name-asc' ? 'name-desc' : 'name-asc'
   }
 
+  function handleReachEnd() {
+    if (!contactsView.hasMore || contactsView.loading || contactsView.loadingMore) return
+    void loadMoreContacts()
+  }
+
   function primaryEmail(c: contactdto.Contact): string {
     return c.emails && c.emails.length > 0 ? c.emails[0] : ''
   }
@@ -274,6 +279,7 @@
     onActivate={(id) => activateContact(id)}
     onDelete={requestDelete}
     onFocusSearch={toggleSearchFocus}
+    onReachEnd={handleReachEnd}
   >
     {#snippet row(c: contactdto.Contact, { selected })}
       <ListRow {selected} onclick={() => activateContact(c.id)}>
@@ -293,18 +299,12 @@
     {/snippet}
   </ListPane>
 
-  {#if contactsView.hasMore}
-    <div class="shrink-0 border-t border-border bg-muted/20 px-4 py-3">
-      <button
-        class="w-full text-sm text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background rounded px-2 py-1.5 disabled:opacity-60 disabled:cursor-not-allowed disabled:no-underline"
-        onclick={() => loadMoreContacts()}
-        disabled={contactsView.loading || contactsView.loadingMore}
-        type="button"
-      >
-        {contactsView.loadingMore
-          ? $_('common.loading')
-          : $_('contacts.list.loadMore', { values: { remaining: contactsView.remaining } })}
-      </button>
+  {#if contactsView.loadingMore}
+    <div class="shrink-0 border-t border-border bg-muted/20 px-4 py-2">
+      <div class="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
+        <span>{$_('common.loading')}</span>
+      </div>
     </div>
   {/if}
 </div>
