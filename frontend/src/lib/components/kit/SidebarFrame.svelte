@@ -73,7 +73,7 @@
   role="navigation"
   aria-label={label ?? title ?? 'Sidebar'}
   tabindex={focusable ? 0 : undefined}
-  class="flex-shrink-0 flex flex-col pt-3 border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {extraClass}"
+  class="flex-shrink-0 flex flex-col {title ? '' : 'pt-3'} border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {extraClass}"
   style="width: {paneWidth}px"
   {onkeydown}
   {onfocus}
@@ -92,7 +92,7 @@
   {/if}
 
   {#if title}
-    <div class="px-4 mb-3 flex items-center justify-between gap-2">
+    <div class="px-4 py-3 border-b border-border flex items-center justify-between gap-2 min-h-[61px]">
       <h2 class="text-lg font-semibold text-foreground">{title}</h2>
       {#if titleAction}
         {@render titleAction()}
