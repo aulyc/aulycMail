@@ -8,6 +8,31 @@ import (
 	"github.com/google/uuid"
 )
 
+const upsertMessageQuery = `
+	INSERT INTO messages (
+		id, account_id, folder_id, uid, message_id, in_reply_to, references_list, thread_id,
+		subject, from_name, from_email, to_list, cc_list, bcc_list, reply_to, date,
+		snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
+		size, has_attachments, body_text, body_html, body_fetched,
+		read_receipt_to, read_receipt_handled, received_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(folder_id, uid) DO UPDATE SET
+		id=excluded.id, account_id=excluded.account_id,
+		message_id=excluded.message_id, in_reply_to=excluded.in_reply_to,
+		references_list=excluded.references_list, thread_id=excluded.thread_id,
+		subject=excluded.subject, from_name=excluded.from_name, from_email=excluded.from_email,
+		to_list=excluded.to_list, cc_list=excluded.cc_list, bcc_list=excluded.bcc_list,
+		reply_to=excluded.reply_to, date=excluded.date,
+		snippet=excluded.snippet, is_read=excluded.is_read, is_starred=excluded.is_starred,
+		is_answered=excluded.is_answered, is_forwarded=excluded.is_forwarded,
+		is_draft=excluded.is_draft, is_deleted=excluded.is_deleted,
+		size=excluded.size, has_attachments=excluded.has_attachments,
+		body_text=excluded.body_text, body_html=excluded.body_html,
+		body_fetched=excluded.body_fetched,
+		read_receipt_to=excluded.read_receipt_to, read_receipt_handled=excluded.read_receipt_handled,
+		received_at=excluded.received_at
+`
+
 // Get returns a full message by ID
 func (s *Store) Get(id string) (*Message, error) {
 	query := `
@@ -215,39 +240,62 @@ func (s *Store) Create(m *Message) error {
 // This handles cases where a previous copy was deleted but the stale row remains, or where
 // the IMAP server reuses UIDs after EXPUNGE.
 func (s *Store) Upsert(m *Message) error {
+	prepareMessageForUpsert(m)
+
+	_, err := s.db.Exec(upsertMessageQuery, upsertMessageArgs(m)...)
+	if err != nil {
+		return fmt.Errorf("failed to upsert message: %w", err)
+	}
+
+	return nil
+}
+
+// UpsertBatch inserts or updates multiple messages in a single transaction.
+func (s *Store) UpsertBatch(messages []*Message) error {
+	if len(messages) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin message upsert batch: %w", err)
+	}
+
+	stmt, err := tx.Prepare(upsertMessageQuery)
+	if err != nil {
+		_ = tx.Rollback()
+		return fmt.Errorf("failed to prepare message upsert batch: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, m := range messages {
+		if m == nil {
+			continue
+		}
+		prepareMessageForUpsert(m)
+		if _, err := stmt.Exec(upsertMessageArgs(m)...); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("failed to upsert message in batch: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit message upsert batch: %w", err)
+	}
+	return nil
+}
+
+func prepareMessageForUpsert(m *Message) {
 	if m.ID == "" {
 		m.ID = uuid.New().String()
 	}
 	if m.ReceivedAt.IsZero() {
 		m.ReceivedAt = time.Now().UTC()
 	}
+}
 
-	query := `
-		INSERT INTO messages (
-			id, account_id, folder_id, uid, message_id, in_reply_to, references_list, thread_id,
-			subject, from_name, from_email, to_list, cc_list, bcc_list, reply_to, date,
-			snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
-			size, has_attachments, body_text, body_html, body_fetched,
-			read_receipt_to, read_receipt_handled, received_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(folder_id, uid) DO UPDATE SET
-			id=excluded.id, account_id=excluded.account_id,
-			message_id=excluded.message_id, in_reply_to=excluded.in_reply_to,
-			references_list=excluded.references_list, thread_id=excluded.thread_id,
-			subject=excluded.subject, from_name=excluded.from_name, from_email=excluded.from_email,
-			to_list=excluded.to_list, cc_list=excluded.cc_list, bcc_list=excluded.bcc_list,
-			reply_to=excluded.reply_to, date=excluded.date,
-			snippet=excluded.snippet, is_read=excluded.is_read, is_starred=excluded.is_starred,
-			is_answered=excluded.is_answered, is_forwarded=excluded.is_forwarded,
-			is_draft=excluded.is_draft, is_deleted=excluded.is_deleted,
-			size=excluded.size, has_attachments=excluded.has_attachments,
-			body_text=excluded.body_text, body_html=excluded.body_html,
-			body_fetched=excluded.body_fetched,
-			read_receipt_to=excluded.read_receipt_to, read_receipt_handled=excluded.read_receipt_handled,
-			received_at=excluded.received_at
-	`
-
-	_, err := s.db.Exec(query,
+func upsertMessageArgs(m *Message) []any {
+	return []any{
 		m.ID, m.AccountID, m.FolderID, m.UID,
 		nullString(m.MessageID), nullString(m.InReplyTo), nullString(m.References), nullString(m.ThreadID),
 		m.Subject, m.FromName, m.FromEmail,
@@ -258,12 +306,7 @@ func (s *Store) Upsert(m *Message) error {
 		nullString(m.BodyText), nullString(m.BodyHTML), m.BodyFetched,
 		nullString(m.ReadReceiptTo), m.ReadReceiptHandled,
 		m.ReceivedAt,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to upsert message: %w", err)
 	}
-
-	return nil
 }
 
 // Update updates an existing message

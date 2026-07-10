@@ -21,6 +21,8 @@
 
   interface Props {
     title?: string
+    /** Optional custom title content forwarded to SidebarFrame. */
+    titleContent?: Snippet
     /** Optional action(s) pinned to the right of the title — forwarded to
      *  SidebarFrame's titleAction slot (e.g. a refresh button). */
     titleAction?: Snippet
@@ -40,6 +42,7 @@
 
   const {
     title,
+    titleContent,
     titleAction,
     sections,
     selectedId,
@@ -122,6 +125,7 @@
 
 <SidebarFrame
   {title}
+  {titleContent}
   {titleAction}
   {label}
   bind:containerRef

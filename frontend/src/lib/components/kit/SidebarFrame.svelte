@@ -20,6 +20,9 @@
   interface Props {
     /** Optional title rendered as <h2>. Omit for sidebars with no title. */
     title?: string
+    /** Optional replacement for the title text. Keeps the same pinned title row
+     *  chrome while allowing a consumer to render a button-like title. */
+    titleContent?: Snippet
     /** Optional action(s) pinned to the right of the title row (e.g. a
      *  refresh button). Only rendered when `title` is set. */
     titleAction?: Snippet
@@ -47,6 +50,7 @@
 
   let {
     title,
+    titleContent,
     titleAction,
     label,
     body,
@@ -91,9 +95,13 @@
     </button>
   {/if}
 
-  {#if title}
+  {#if title || titleContent}
     <div class="px-4 py-3 border-b border-border flex items-center justify-between gap-2 min-h-[61px]">
-      <h2 class="text-lg font-semibold text-foreground">{title}</h2>
+      {#if titleContent}
+        {@render titleContent()}
+      {:else}
+        <h2 class="text-lg font-semibold text-foreground">{title}</h2>
+      {/if}
       {#if titleAction}
         {@render titleAction()}
       {/if}

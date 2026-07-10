@@ -62,56 +62,63 @@
 
   // Density-based class mappings
   // micro = smallest (power users), compact = small, standard = default, large = accessibility
-  const densityClasses = {
-    row: {
-      micro: 'px-3 py-2 gap-2',
-      compact: 'px-4 py-3 gap-3',
-      standard: 'px-5 py-3.5 gap-3.5',
-      large: 'px-6 py-5 gap-5',
-    },
-    avatar: {
-      micro: 'w-8 h-8 text-xs',
-      compact: 'w-10 h-10 text-sm',
-      standard: 'w-11 h-11 text-sm',
-      large: 'w-14 h-14 text-lg',
-    },
-    senderText: {
-      micro: 'text-xs',
-      compact: 'text-sm',
-      standard: 'text-[15px]',
-      large: 'text-lg',
-    },
-    text: {
-      micro: 'text-[10px]',
-      compact: 'text-xs',
-      standard: 'text-sm',
-      large: 'text-base',
-    },
-    dateText: {
-      micro: 'text-[10px]',
-      compact: 'text-xs',
-      standard: 'text-sm',
-      large: 'text-base',
-    },
-    icon: {
-      micro: 'w-3 h-3',
-      compact: 'w-3.5 h-3.5',
-      standard: 'w-4 h-4',
-      large: 'w-5 h-5',
-    },
-    starIcon: {
-      micro: 'w-3.5 h-3.5',
-      compact: 'w-4 h-4',
-      standard: 'w-5 h-5',
-      large: 'w-6 h-6',
-    },
-    badge: {
-      micro: 'px-1 py-0 text-[10px]',
-      compact: 'px-1.5 py-0.5 text-xs',
-      standard: 'px-2 py-1 text-xs',
-      large: 'px-2.5 py-1 text-sm',
-    },
-  }
+	  const densityClasses = {
+	    row: {
+	      micro: 'px-3 py-2 gap-2',
+	      compact: 'px-4 py-3 gap-3',
+	      standard: 'px-5 py-3.5 gap-3.5',
+	      large: 'px-6 py-5 gap-5',
+	    },
+	    avatar: {
+	      micro: 'w-8 h-8 text-xs',
+	      compact: 'w-10 h-10 text-sm',
+	      standard: 'w-11 h-11 text-sm',
+	      large: 'w-14 h-14 text-lg',
+	    },
+	    senderText: {
+	      micro: 'text-xs',
+	      compact: 'text-sm',
+	      standard: 'text-[15px]',
+	      large: 'text-lg',
+	    },
+	    text: {
+	      micro: 'text-[10px]',
+	      compact: 'text-xs',
+	      standard: 'text-sm',
+	      large: 'text-base',
+	    },
+	    dateText: {
+	      micro: 'text-[10px]',
+	      compact: 'text-xs',
+	      standard: 'text-sm',
+	      large: 'text-base',
+	    },
+	    icon: {
+	      micro: 'w-3 h-3',
+	      compact: 'w-3.5 h-3.5',
+	      standard: 'w-4 h-4',
+	      large: 'w-5 h-5',
+	    },
+	    starIcon: {
+	      micro: 'w-3.5 h-3.5',
+	      compact: 'w-4 h-4',
+	      standard: 'w-5 h-5',
+	      large: 'w-6 h-6',
+	    },
+	    badge: {
+	      micro: 'px-1 py-0 text-[10px]',
+	      compact: 'px-1.5 py-0.5 text-xs',
+	      standard: 'px-2 py-1 text-xs',
+	      large: 'px-2.5 py-1 text-sm',
+	    },
+	  }
+
+	  const densityRowHeight = {
+	    micro: 66,
+	    compact: 80,
+	    standard: 94,
+	    large: 120,
+	  }
 
   // Get display name for participants
   function getParticipantNames(): string {
@@ -186,13 +193,14 @@
   }
 </script>
 
-<div
-  data-conversation-row
-  data-row-index={rowIndex}
-  draggable="true"
-  class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
-    ? 'bg-primary/20'
-    : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
+	<div
+	  data-conversation-row
+	  data-row-index={rowIndex}
+	  draggable="true"
+	  style="height: {densityRowHeight[density]}px; min-height: {densityRowHeight[density]}px;"
+	  class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
+	    ? 'bg-primary/20'
+	    : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
   onclick={(e) => onSelect(e)}
   ondblclick={() => onOpenDraft?.()}
   onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() }}}

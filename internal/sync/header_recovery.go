@@ -133,15 +133,24 @@ func (e *Engine) recoverFailedHeaderBatch(ctx context.Context, client *imapclien
 			m.ReadReceiptTo = e.extractDispositionNotificationTo(headerBytes)
 		}
 
-		if err := e.messageStore.Upsert(m); err != nil {
-			e.log.Warn().Err(err).Uint32("uid", m.UID).Msg("Failed to save recovered message header")
-			continue
-		}
 		recovered = append(recovered, m)
 	}
 
 	if err := fetchCmd.Close(); err != nil {
 		e.log.Warn().Err(err).Int("recovered", len(recovered)).Msg("Header recovery fetch close error")
+	}
+
+	if err := e.messageStore.UpsertBatch(recovered); err != nil {
+		e.log.Warn().Err(err).Int("count", len(recovered)).Msg("Failed to batch save recovered message headers; falling back to per-message upsert")
+		persisted := make([]*message.Message, 0, len(recovered))
+		for _, m := range recovered {
+			if err := e.messageStore.Upsert(m); err != nil {
+				e.log.Warn().Err(err).Uint32("uid", m.UID).Msg("Failed to save recovered message header")
+				continue
+			}
+			persisted = append(persisted, m)
+		}
+		recovered = persisted
 	}
 
 	e.log.Info().

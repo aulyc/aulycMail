@@ -48,6 +48,64 @@ func (s *Store) ExistsInFolder(messageID string, folderType string, accountID st
 	return count > 0, nil
 }
 
+// UIDsWithCopiesInFolderTypes returns source-folder UIDs whose RFC822
+// Message-ID also exists in one of the requested folder types for the same
+// account. The source row is excluded so a Trash/Spam sync can still delete a
+// row that disappeared from that same mailbox.
+func (s *Store) UIDsWithCopiesInFolderTypes(folderID, accountID string, uids []uint32, folderTypes []string) (map[uint32]bool, error) {
+	result := make(map[uint32]bool)
+	if len(uids) == 0 || len(folderTypes) == 0 {
+		return result, nil
+	}
+
+	uidPlaceholders := make([]string, len(uids))
+	args := make([]any, 0, 2+len(uids)+len(folderTypes))
+	args = append(args, folderID, accountID)
+	for i, uid := range uids {
+		uidPlaceholders[i] = "?"
+		args = append(args, uid)
+	}
+
+	typePlaceholders := make([]string, len(folderTypes))
+	for i, folderType := range folderTypes {
+		typePlaceholders[i] = "?"
+		args = append(args, folderType)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT DISTINCT src.uid
+		FROM messages src
+		JOIN messages copy
+			ON copy.account_id = src.account_id
+			AND copy.message_id = src.message_id
+			AND copy.folder_id != src.folder_id
+		JOIN folders f ON copy.folder_id = f.id
+		WHERE src.folder_id = ?
+			AND src.account_id = ?
+			AND src.uid IN (%s)
+			AND COALESCE(src.message_id, '') != ''
+			AND f.folder_type IN (%s)
+	`, strings.Join(uidPlaceholders, ", "), strings.Join(typePlaceholders, ", "))
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check message copies in folder types: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var uid uint32
+		if err := rows.Scan(&uid); err != nil {
+			return nil, fmt.Errorf("failed to scan UID with folder-type copy: %w", err)
+		}
+		result[uid] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate UIDs with folder-type copies: %w", err)
+	}
+	return result, nil
+}
+
 // HasCopiesInOtherFolders checks if a message with the same RFC 822 Message-ID
 // exists in any other folder (excluding the specified folder) for the account.
 // Used by Gmail-aware permanent delete to avoid destroying the underlying message

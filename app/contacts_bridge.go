@@ -9,7 +9,7 @@ import (
 // Startup. The bridge stays lazy: it constructs the contact store/API only
 // when a Contacts_* Wails method is first called.
 func (a *App) initContactsBridge() {
-	// Single emitter for all contacts:* frontend events (conflict, changed).
+	// Single emitter for contacts:* frontend events.
 	emit := func(eventName string, payload any) {
 		wailsRuntime.EventsEmit(a.ctx, eventName, payload)
 	}

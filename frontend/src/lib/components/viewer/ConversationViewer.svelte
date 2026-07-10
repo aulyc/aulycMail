@@ -77,6 +77,7 @@
   let conversation = $state<messageModels.Conversation | null>(null)
   let loading = $state(false)
   let error = $state<string | null>(null)
+  let bodyFetchErrors = $state<Record<string, string>>({})
 
   // Track which messages are expanded (unread messages auto-expand)
   let expandedMessages = $state<Set<string>>(new Set())
@@ -407,6 +408,7 @@
       // Something changed — update conversation, preserving scroll position
       const scrollTop = contentContainerRef?.scrollTop ?? 0
       conversation = updated
+      pruneBodyFetchErrors()
 
       // Expand any new unread messages
       if (conversation.messages) {
@@ -438,6 +440,7 @@
 
     loading = true
     error = null
+    bodyFetchErrors = {}
 
     try {
       const result = await GetConversation(tid, fid)
@@ -446,6 +449,7 @@
       if (threadId !== tid) return
 
       conversation = result
+      pruneBodyFetchErrors()
 
       // Auto-expand unread messages and the last message
       if (conversation?.messages) {
@@ -492,30 +496,52 @@
   }
 
   // Fetch bodies on-demand for messages that don't have them yet
-  async function fetchUnfetchedBodies(messages: messageModels.Message[]) {
-    for (const msg of messages) {
-      if ((msg as any).bodyFetched === false && !msg.bodyHtml && !msg.bodyText) {
-        try {
-          const updated = await FetchMessageBody(msg.id)
-          // Update the message in the conversation if still viewing
-          if (conversation?.messages) {
-            const idx = conversation.messages.findIndex(m => m.id === msg.id)
-            if (idx >= 0 && updated) {
-              conversation.messages[idx] = updated
-              conversation = conversation // trigger reactivity
-            }
-          }
-        } catch (err) {
-          console.error('Failed to fetch body for message:', msg.id, err)
-          // Message may have been deleted from server — remove from conversation display
-          if (conversation?.messages) {
-            conversation.messages = conversation.messages.filter(m => m.id !== msg.id)
-            conversation = conversation // trigger reactivity
-          }
-        }
-      }
-    }
-  }
+	  async function fetchUnfetchedBodies(messages: messageModels.Message[]) {
+	    for (const msg of messages) {
+	      if ((msg as any).bodyFetched === false && !msg.bodyHtml && !msg.bodyText) {
+	        try {
+	          const updated = await FetchMessageBody(msg.id)
+	          // Update the message in the conversation if still viewing
+	          if (conversation?.messages) {
+	            const idx = conversation.messages.findIndex(m => m.id === msg.id)
+	            if (idx >= 0 && updated) {
+	              conversation.messages[idx] = updated
+	              conversation = conversation // trigger reactivity
+	            }
+	          }
+	          if (bodyFetchErrors[msg.id]) {
+	            const nextErrors = { ...bodyFetchErrors }
+	            delete nextErrors[msg.id]
+	            bodyFetchErrors = nextErrors
+	          }
+	        } catch (err) {
+	          console.error('Failed to fetch body for message:', msg.id, err)
+	          bodyFetchErrors = {
+	            ...bodyFetchErrors,
+	            [msg.id]: describeBodyFetchError(err),
+	          }
+	        }
+	      }
+	    }
+	  }
+
+	  function describeBodyFetchError(err: unknown): string {
+	    const raw = String(err instanceof Error ? err.message : err ?? '')
+	    if (raw.toLowerCase().includes('too large')) {
+	      return $_('viewer.bodyTooLarge')
+	    }
+	    return $_('viewer.failedToFetchBody')
+	  }
+
+	  function pruneBodyFetchErrors() {
+	    if (!conversation?.messages || Object.keys(bodyFetchErrors).length === 0) return
+	    const ids = new Set(conversation.messages.map((m) => m.id))
+	    const nextErrors: Record<string, string> = {}
+	    for (const [id, message] of Object.entries(bodyFetchErrors)) {
+	      if (ids.has(id)) nextErrors[id] = message
+	    }
+	    bodyFetchErrors = nextErrors
+	  }
 
   // Schedule marking messages as read based on user's delay setting
   function scheduleMarkAsRead(capturedThreadId: string, messages: messageModels.Message[]) {
@@ -1419,12 +1445,17 @@
                         </div>
                       {/if}
 
-                      <!-- Body -->
-                      <div class="mb-4">
-                        {#if (msg as any).bodyFetched === false && !msg.bodyHtml && !msg.bodyText}
-                          <!-- Body not yet fetched (IDLE synced headers only) -->
-                          <div class="flex items-center gap-2 text-muted-foreground text-sm italic py-4">
-                            <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
+	                      <!-- Body -->
+	                      <div class="mb-4">
+	                        {#if bodyFetchErrors[msg.id]}
+	                          <div class="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm text-destructive">
+	                            <Icon icon="mdi:alert-circle-outline" class="mt-0.5 h-4 w-4 shrink-0" />
+	                            <span>{bodyFetchErrors[msg.id]}</span>
+	                          </div>
+	                        {:else if (msg as any).bodyFetched === false && !msg.bodyHtml && !msg.bodyText}
+	                          <!-- Body not yet fetched (IDLE synced headers only) -->
+	                          <div class="flex items-center gap-2 text-muted-foreground text-sm italic py-4">
+	                            <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />
                             {$_('viewer.downloadingContent')}
                           </div>
                         {:else}

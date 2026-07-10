@@ -72,7 +72,7 @@ function waitForRuntime(): Promise<void> {
 
 // waitForBackendReady resolves when the Go-side Startup hook has reached the
 // point where the frontend can safely mount: stores constructed, migrations
-// applied, extensions registered, background sync started. (The D-Bus
+// applied, built-in panes registered, background sync started. (The D-Bus
 // desktop-integration inits that run later in Startup can hang for many
 // seconds on systems where xdg-desktop-portal isn't running — we
 // deliberately do NOT wait for those.)

@@ -401,7 +401,7 @@
         onclick={toggleSync}
       >
         <Icon
-          icon="mdi:sync"
+          icon="mdi:refresh"
           class="w-5 h-5 {accountStore.isAnySyncing ? 'animate-spin text-primary' : ''}"
         />
       </button>

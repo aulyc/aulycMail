@@ -68,3 +68,40 @@ func TestReadHeaderLiteralWithLimitRejectsOversized(t *testing.T) {
 		t.Fatalf("expected HeaderLiteralTooLargeError, got %T %v", err, err)
 	}
 }
+
+func TestSkippedBodySizesTooLargeForcesFailureCharge(t *testing.T) {
+	sizes := skippedBodySizesByMessageID(
+		map[uint32]string{42: "msg-42"},
+		map[uint32]bodyFetchSkipped{
+			42: {
+				Reason:        bodyFetchSkipTooLarge,
+				ReportedSize:  100 * 1024 * 1024,
+				ReceivedBytes: maxBackgroundRawBodyBytes + 1,
+			},
+		},
+	)
+	size, ok := sizes["msg-42"]
+	if !ok {
+		t.Fatal("missing skipped size for msg-42")
+	}
+	if !shouldChargeFailure(size.received, size.reported) {
+		t.Fatal("oversized body skip should be charged so background sync does not retry forever")
+	}
+}
+
+func TestSkippedBodySizesEmptyCanDeferTruncatedFetch(t *testing.T) {
+	sizes := skippedBodySizesByMessageID(
+		map[uint32]string{42: "msg-42"},
+		map[uint32]bodyFetchSkipped{
+			42: {
+				Reason:        bodyFetchSkipEmpty,
+				ReportedSize:  100_000,
+				ReceivedBytes: 10,
+			},
+		},
+	)
+	size := sizes["msg-42"]
+	if shouldChargeFailure(size.received, size.reported) {
+		t.Fatal("empty body with a large reported-size shortfall should be deferred")
+	}
+}

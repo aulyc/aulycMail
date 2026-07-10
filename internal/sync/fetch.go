@@ -35,6 +35,19 @@ type ProcessedBody struct {
 	ReceivedBytes int64
 }
 
+type bodyFetchSkipReason string
+
+const (
+	bodyFetchSkipEmpty    bodyFetchSkipReason = "empty"
+	bodyFetchSkipTooLarge bodyFetchSkipReason = "too_large"
+)
+
+type bodyFetchSkipped struct {
+	Reason        bodyFetchSkipReason
+	ReportedSize  int64
+	ReceivedBytes int64
+}
+
 // RawMessageStreamResult summarizes a raw message stream operation.
 type RawMessageStreamResult struct {
 	BytesWritten int64
@@ -166,19 +179,20 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 
 	// Use fetchMessageBodiesBatch for streaming fetch (avoids .Collect() blocking)
 	uidToMessageID := map[uint32]string{uid: messageID}
-	results, err := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
+	results, skipped, err := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
 	if err != nil {
 		return nil, fmt.Errorf("fetch body failed: %w", err)
 	}
 
 	result, ok := results[uid]
 	if !ok || result == nil {
-		// Message no longer exists on server — clean up the ghost
-		e.log.Warn().Str("messageID", messageID).Uint32("uid", uid).Msg("Message not found on server, deleting ghost")
-		if delErr := e.messageStore.Delete(messageID); delErr != nil {
-			e.log.Debug().Err(delErr).Str("messageID", messageID).Msg("Failed to delete ghost message")
+		if skippedResult, skippedOK := skipped[uid]; skippedOK {
+			if skippedResult.Reason == bodyFetchSkipTooLarge {
+				return nil, RawMessageTooLargeError{UID: uid, LimitBytes: maxBackgroundRawBodyBytes}
+			}
+			return nil, fmt.Errorf("message body unavailable: UID %d returned no usable body", uid)
 		}
-		return nil, fmt.Errorf("message not found on server")
+		return nil, RawMessageNotFoundError{UID: uid}
 	}
 
 	// Update message in store
@@ -201,20 +215,22 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 
 // fetchMessageBodiesBatch fetches bodies for multiple messages in a single IMAP command
 // The mailbox must already be selected by the caller.
-// Returns a map of UID -> ProcessedBody for successfully fetched messages.
+// Returns a map of UID -> ProcessedBody for successfully fetched messages and a
+// map of UID -> bodyFetchSkipped for UIDs the server returned but that could not
+// be processed without corrupting or overloading the background fetch path.
 //
 // Uses streaming (Next() loop) instead of Collect() to:
 // - Avoid indefinite blocking if connection hangs
 // - Allow context cancellation between messages
 // - Return partial results if connection dies mid-batch
-func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient.Client, uidToMessageID map[uint32]string) (map[uint32]*ProcessedBody, error) {
+func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient.Client, uidToMessageID map[uint32]string) (map[uint32]*ProcessedBody, map[uint32]bodyFetchSkipped, error) {
 	if len(uidToMessageID) == 0 {
-		return make(map[uint32]*ProcessedBody), nil
+		return make(map[uint32]*ProcessedBody), make(map[uint32]bodyFetchSkipped), nil
 	}
 
 	// Check context
 	if ctx.Err() != nil {
-		return nil, ctx.Err()
+		return nil, nil, ctx.Err()
 	}
 
 	// Build UID set for batch fetch
@@ -240,6 +256,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 
 	fetchCmd := client.Fetch(uidSet, fetchOptions)
 	results := make(map[uint32]*ProcessedBody)
+	skipped := make(map[uint32]bodyFetchSkipped)
 
 	// Stream messages one at a time instead of blocking on Collect()
 	// This allows cancellation between messages and returns partial results on error
@@ -251,7 +268,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 				Int("fetched", len(results)).
 				Int("requested", len(uidToMessageID)).
 				Msg("Fetch cancelled, returning partial results")
-			return results, ctx.Err()
+			return results, skipped, ctx.Err()
 		}
 
 		msg := fetchCmd.Next()
@@ -265,6 +282,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 		var gotBodySection bool
 		var bodyTooLarge bool
 		var reportedSize int64 // RFC822.SIZE; 0 if server didn't return it
+		var receivedBytes int64
 
 		for {
 			item := msg.Next()
@@ -287,6 +305,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 				if data.Literal != nil {
 					var err error
 					rawBytes, err = io.ReadAll(io.LimitReader(data.Literal, maxBackgroundRawBodyBytes+1))
+					receivedBytes = int64(len(rawBytes))
 					if err != nil {
 						e.log.Warn().
 							Err(err).
@@ -334,11 +353,18 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 
 		if len(rawBytes) == 0 {
 			if bodyTooLarge {
+				skipped[uid] = bodyFetchSkipped{
+					Reason:        bodyFetchSkipTooLarge,
+					ReportedSize:  reportedSize,
+					ReceivedBytes: receivedBytes,
+				}
 				continue
 			}
-			e.log.Warn().Uint32("uid", uid).Str("messageID", messageID).Msg("Empty message body — deleting ghost message")
-			if delErr := e.messageStore.Delete(messageID); delErr != nil {
-				e.log.Warn().Err(delErr).Str("messageID", messageID).Msg("Failed to delete ghost message")
+			e.log.Warn().Uint32("uid", uid).Str("messageID", messageID).Msg("Empty message body returned by IMAP")
+			skipped[uid] = bodyFetchSkipped{
+				Reason:        bodyFetchSkipEmpty,
+				ReportedSize:  reportedSize,
+				ReceivedBytes: receivedBytes,
 			}
 			continue
 		}
@@ -392,7 +418,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 		Int("requested", len(uidToMessageID)).
 		Msg("Batch fetch complete")
 
-	return results, nil
+	return results, skipped, nil
 }
 
 // bodyTruncationThreshold is the fraction of the IMAP-reported size below
@@ -446,6 +472,28 @@ func shouldChargeFailure(receivedBytes, reportedSize int64) bool {
 type fetchedSize struct {
 	received int64
 	reported int64
+}
+
+func skippedBodySizesByMessageID(uidToMessageID map[uint32]string, skipped map[uint32]bodyFetchSkipped) map[string]fetchedSize {
+	if len(skipped) == 0 {
+		return nil
+	}
+	sizes := make(map[string]fetchedSize, len(skipped))
+	for uid, skip := range skipped {
+		messageID := uidToMessageID[uid]
+		if messageID == "" {
+			continue
+		}
+		if skip.Reason == bodyFetchSkipTooLarge {
+			// Oversized messages are an intentional background-sync skip, not a
+			// transient truncation. Force shouldChargeFailure down the "charge"
+			// branch so they are marked body_failed and do not loop forever.
+			sizes[messageID] = fetchedSize{received: skip.ReceivedBytes, reported: 0}
+			continue
+		}
+		sizes[messageID] = fetchedSize{received: skip.ReceivedBytes, reported: skip.ReportedSize}
+	}
+	return sizes
 }
 
 func (e *Engine) markUnresolvedAsFailed(requestedIDs []string, updates []message.BodyUpdate, sizes map[string]fetchedSize) {
@@ -789,7 +837,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 		}
 
 		// Step 4: Fetch bodies via IMAP - single round-trip for all messages in batch
-		bodies, fetchErr := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
+		bodies, skipped, fetchErr := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
 		if fetchErr != nil {
 			// Check if this is a connection error
 			if imapPkg.IsConnectionError(fetchErr) {
@@ -841,15 +889,22 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 		// Reset failure counters on success
 		failedBatches = 0
 
-		// If we got no bodies back, persist the failure for every requested
-		// ID so they are excluded from future syncs forever — otherwise the
-		// next cycle would query and FETCH the same UIDs again.
-		if len(bodies) == 0 {
+		// If we got no bodies or explicit skipped results back, persist the
+		// failure for every requested ID so they are excluded from future
+		// syncs forever — otherwise the next cycle would query and FETCH the
+		// same UIDs again.
+		if len(bodies) == 0 && len(skipped) == 0 {
 			e.log.Warn().Int("requested", len(uidToMessageID)).Msg("IMAP returned no bodies for batch")
 			// No size signals here — server returned nothing, so every ID
 			// falls through to the "no signal" branch of shouldChargeFailure
 			// and gets charged. Pass nil to keep the call sites uniform.
 			e.markUnresolvedAsFailed(batchIDs, nil, nil)
+			failed += len(uidToMessageID)
+			continue
+		}
+		if len(bodies) == 0 {
+			e.log.Warn().Int("requested", len(uidToMessageID)).Int("skipped", len(skipped)).Msg("IMAP returned only skipped bodies for batch")
+			e.markUnresolvedAsFailed(batchIDs, nil, skippedBodySizesByMessageID(uidToMessageID, skipped))
 			failed += len(uidToMessageID)
 			continue
 		}
@@ -859,12 +914,17 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 		// Attachments were already extracted during parsing - no re-parse needed!
 		resultChan := make(chan processingResult, 1)
 		currentBodies := bodies // capture for goroutine
+		currentSkipped := skipped
+		currentUIDToMessageID := uidToMessageID
 
 		go func() {
 			startTime := time.Now()
 			var bodyUpdates []message.BodyUpdate
 			var allAttachments []*message.Attachment
-			sizes := make(map[string]fetchedSize, len(currentBodies))
+			sizes := make(map[string]fetchedSize, len(currentBodies)+len(currentSkipped))
+			for messageID, size := range skippedBodySizesByMessageID(currentUIDToMessageID, currentSkipped) {
+				sizes[messageID] = size
+			}
 
 			for _, pb := range currentBodies {
 				// Build body update

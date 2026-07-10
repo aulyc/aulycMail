@@ -504,20 +504,24 @@
     selectSearchScope(accountScopes[nextIndex].id)
   }
 
-  async function selectSearchResult(index: number) {
-    const message = searchResults[index]
-    if (!message) return
-    selectedAccountEmail = message.accountEmail
-    if (!messages.some((item) => item.key === message.key)) {
-      messages = [message, ...messages]
-      messagesTotal = Math.max(messagesTotal, messages.length)
-    }
-    closeSearch()
-    await tick()
-    await selectMessage(message.key)
-    await tick()
-    scrollMessageIntoView(message.key)
-  }
+	  async function selectSearchResult(index: number) {
+	    const message = searchResults[index]
+	    if (!message) return
+	    const accountChanged = selectedAccountEmail !== message.accountEmail
+	    selectedAccountEmail = message.accountEmail
+	    closeSearch()
+	    if (accountChanged) {
+	      await loadMessagePage({ reset: true })
+	    }
+	    if (!messages.some((item) => item.key === message.key)) {
+	      messages = [message, ...messages]
+	      messagesTotal = Math.max(messagesTotal, messages.length)
+	    }
+	    await tick()
+	    await selectMessage(message.key)
+	    await tick()
+	    scrollMessageIntoView(message.key)
+	  }
 
   function onSearchKeydown(event: KeyboardEvent) {
     if (event.isComposing || event.keyCode === 229) return

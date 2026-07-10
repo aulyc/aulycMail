@@ -252,14 +252,17 @@ func (f *FTSIndexer) supplementCompleteFolderIndex(ctx context.Context, folderID
 		if err := f.updateIndexStatus(ctx, folderID, currentCount, currentCount, true); err != nil {
 			return fmt.Errorf("failed to refresh index status: %w", err)
 		}
+		if f.onComplete != nil {
+			f.onComplete(folderID)
+		}
 		return nil
 	}
 
 	// INSERT/DELETE triggers normally keep FTS current after the first backfill.
-	// When a complete folder grows, only touch the newly appended rowid tail
-	// instead of scanning and rewriting the whole mailbox on startup.
+	// When a complete folder grows, re-inserting the folder with OR IGNORE keeps
+	// the operation idempotent and repairs any FTS rows missed by triggers.
 	const batchSize = 200
-	toProcess := currentCount - previousCount
+	toProcess := currentCount
 	processed := 0
 
 	if err := f.updateIndexStatus(ctx, folderID, previousCount, currentCount, false); err != nil {
@@ -280,14 +283,10 @@ func (f *FTSIndexer) supplementCompleteFolderIndex(ctx context.Context, folderID
 
 		rows, err := f.db.QueryContext(ctx, `
 			SELECT rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text
-			FROM (
-				SELECT m.rowid AS rowid, m.subject, m.from_name, m.from_email, m.to_list, m.cc_list, m.snippet, m.body_text
-				FROM messages m
-				WHERE m.folder_id = ?
-				ORDER BY m.rowid DESC
-				LIMIT ? OFFSET ?
-			)
+			FROM messages
+			WHERE folder_id = ?
 			ORDER BY rowid
+			LIMIT ? OFFSET ?
 		`, folderID, limit, processed)
 		if err != nil {
 			return fmt.Errorf("failed to get messages for FTS supplement: %w", err)

@@ -221,6 +221,15 @@ func (e *Engine) SyncMessagesWithOptions(ctx context.Context, accountID, folderI
 	if acc, accErr := e.accountStore.Get(accountID); accErr == nil && acc != nil {
 		isGmail = acc.IMAPHost == "imap.gmail.com"
 	}
+	gmailHiddenUIDs := map[uint32]bool{}
+	if isGmail && len(deletedUIDs) > 0 {
+		var gmailErr error
+		gmailHiddenUIDs, gmailErr = e.messageStore.UIDsWithCopiesInFolderTypes(folderID, accountID, deletedUIDs, []string{string(folder.TypeTrash), string(folder.TypeSpam)})
+		if gmailErr != nil {
+			e.log.Warn().Err(gmailErr).Int("uids", len(deletedUIDs)).Msg("Gmail: failed to batch-check Trash/Spam copies; local deletion will continue")
+			gmailHiddenUIDs = map[uint32]bool{}
+		}
+	}
 
 	// Delete removed messages
 	for _, uid := range deletedUIDs {
@@ -228,17 +237,10 @@ func (e *Engine) SyncMessagesWithOptions(ctx context.Context, accountID, folderI
 		// Gmail hides messages from all other IMAP views when Trash/Spam label is
 		// added, so the UID disappears from this folder's server listing even though
 		// the message isn't truly deleted. Skip local deletion to preserve it.
-		if isGmail {
-			msg, msgErr := e.messageStore.GetByUID(folderID, uid)
-			if msgErr == nil && msg != nil && msg.MessageID != "" {
-				inTrash, _ := e.messageStore.ExistsInFolder(msg.MessageID, string(folder.TypeTrash), accountID)
-				inSpam, _ := e.messageStore.ExistsInFolder(msg.MessageID, string(folder.TypeSpam), accountID)
-				if inTrash || inSpam {
-					e.log.Debug().Uint32("uid", uid).Str("messageID", msg.MessageID).
-						Msg("Gmail: skipping local delete — message hidden by Trash/Spam label")
-					continue
-				}
-			}
+		if gmailHiddenUIDs[uid] {
+			e.log.Debug().Uint32("uid", uid).
+				Msg("Gmail: skipping local delete — message hidden by Trash/Spam label")
+			continue
 		}
 
 		if err := e.messageStore.DeleteByUID(folderID, uid); err != nil {
@@ -808,21 +810,8 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 		// Parse flags using shared helper
 		applyFlagsToMessage(m, flags)
 
-		// Save to store immediately (don't wait for all messages)
-		if err := e.messageStore.Upsert(m); err != nil {
-			e.log.Warn().Err(err).Uint32("uid", m.UID).Msg("Failed to save message header")
-			continue
-		}
 		savedMessages = append(savedMessages, m)
 		fetchedCount++
-
-		// Auto-collect the sender into local contacts (received mail only),
-		// tagged with the 发件人 (sender) role. Idempotent + best-effort —
-		// fetchMessageHeaders only runs for NEW UIDs, so this fires once when
-		// a message first arrives.
-		if collectSenders && m.FromEmail != "" {
-			_ = e.contactStore.AddOrUpdateWithRole(m.FromEmail, m.FromName, contact.RoleSender)
-		}
 	}
 
 	if err := fetchCmd.Close(); err != nil {
@@ -852,6 +841,32 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 			}
 			savedMessages = append(savedMessages, recovered...)
 			fetchedCount += len(recovered)
+		}
+	}
+
+	if err := e.messageStore.UpsertBatch(savedMessages); err != nil {
+		e.log.Warn().Err(err).Int("count", len(savedMessages)).Msg("Failed to batch save message headers; falling back to per-message upsert")
+		persisted := make([]*message.Message, 0, len(savedMessages))
+		for _, m := range savedMessages {
+			if err := e.messageStore.Upsert(m); err != nil {
+				e.log.Warn().Err(err).Uint32("uid", m.UID).Msg("Failed to save message header")
+				continue
+			}
+			persisted = append(persisted, m)
+		}
+		savedMessages = persisted
+		fetchedCount = len(savedMessages)
+	}
+
+	// Auto-collect the sender into local contacts (received mail only), tagged
+	// with the 发件人 (sender) role. Idempotent + best-effort —
+	// fetchMessageHeaders only runs for NEW UIDs, so this fires once when a
+	// message first arrives.
+	if collectSenders {
+		for _, m := range savedMessages {
+			if m.FromEmail != "" {
+				_ = e.contactStore.AddOrUpdateWithRole(m.FromEmail, m.FromName, contact.RoleSender)
+			}
 		}
 	}
 

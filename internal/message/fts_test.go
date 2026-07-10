@@ -74,3 +74,51 @@ func TestFTSIndexerSupplementsCompleteFolderOnCountIncrease(t *testing.T) {
 		t.Fatal("complete callback was not called")
 	}
 }
+
+func TestFTSIndexerRepairsMissingRowsInCompleteFolder(t *testing.T) {
+	s, accountID, folderID := newBodyFailedTestStore(t)
+	now := time.Now().UTC()
+
+	for i := 1; i <= 3; i++ {
+		msg := &Message{
+			ID:          fmt.Sprintf("hole-msg-%d", i),
+			AccountID:   accountID,
+			FolderID:    folderID,
+			UID:         uint32(i),
+			Subject:     fmt.Sprintf("hole subject %d", i),
+			BodyText:    fmt.Sprintf("hole_needle_%d", i),
+			BodyFetched: true,
+			Date:        now.Add(time.Duration(i) * time.Second),
+		}
+		if err := s.Create(msg); err != nil {
+			t.Fatalf("Create message %d: %v", i, err)
+		}
+	}
+
+	if _, err := s.db.Exec(`
+		INSERT INTO messages_fts(messages_fts, rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text)
+		SELECT 'delete', rowid, subject, from_name, from_email, to_list, cc_list, snippet, body_text
+		FROM messages
+		WHERE id = 'hole-msg-2'
+	`); err != nil {
+		t.Fatalf("remove FTS row: %v", err)
+	}
+
+	ctx := context.Background()
+	indexer := NewFTSIndexer(s.db.DB)
+	if err := indexer.updateIndexStatus(ctx, folderID, 2, 2, true); err != nil {
+		t.Fatalf("seed index status: %v", err)
+	}
+
+	if err := indexer.IndexFolder(ctx, folderID); err != nil {
+		t.Fatalf("IndexFolder: %v", err)
+	}
+
+	var matches int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM messages_fts WHERE messages_fts MATCH 'hole_needle_2'`).Scan(&matches); err != nil {
+		t.Fatalf("query repaired FTS row: %v", err)
+	}
+	if matches != 1 {
+		t.Fatalf("FTS matches after repair = %d, want 1", matches)
+	}
+}

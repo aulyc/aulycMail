@@ -932,9 +932,11 @@
   )
 
   // Reference to the list container for scrolling
-  let listContainerRef = $state<HTMLDivElement | null>(null)
-  let listViewportHeight = $state(0)
-  let listScrollTop = $state(0)
+	  let listContainerRef = $state<HTMLDivElement | null>(null)
+	  let listViewportHeight = $state(0)
+	  let listScrollTop = $state(0)
+	  let localSearchHeaderHeight = $state(0)
+	  let serverSearchHeaderHeight = $state(0)
 
   const rowHeight = $derived(getMessageListRowHeight(getMessageListDensity()))
 
@@ -955,9 +957,9 @@
     listScrollTop = listContainerRef?.scrollTop ?? 0
   }
 
-  function getVirtualWindow<T>(items: T[]): VirtualWindow<T> {
-    return calculateVirtualWindow(items, listViewportHeight, listScrollTop, rowHeight)
-  }
+	  function getVirtualWindow<T>(items: T[], topOffset = 0): VirtualWindow<T> {
+	    return calculateVirtualWindow(items, listViewportHeight, Math.max(0, listScrollTop - topOffset), rowHeight)
+	  }
 
   function prepareRowContextMenu(conversation: any, rowAccountId: string, rowFolderId: string, useMultiSelect: boolean) {
     if (useMultiSelect) {
@@ -1662,7 +1664,7 @@
           </div>
         {:else}
           <!-- Server results header -->
-          <div class="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border text-sm text-muted-foreground">
+	          <div bind:clientHeight={serverSearchHeaderHeight} class="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border text-sm text-muted-foreground">
             <span>
               {#if serverSearchCount < serverSearchTotalCount}
                 {$_('search.serverResultsCapped', { values: { shown: serverSearchCount, total: serverSearchTotalCount, query: searchQuery } })}
@@ -1677,7 +1679,7 @@
               {$_('search.localSearch')}
             </button>
           </div>
-          {@const serverWindow = getVirtualWindow(serverSearchResults)}
+	          {@const serverWindow = getVirtualWindow(serverSearchResults, serverSearchHeaderHeight)}
           {@render conversationRows(serverWindow, { useItemLocation: true, showNonLocal: true })}
 
           <!-- Show all results button (when results are capped) -->
@@ -1712,7 +1714,7 @@
         </div>
       {:else}
         <!-- Local search results header -->
-        <div class="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border text-sm text-muted-foreground">
+	        <div bind:clientHeight={localSearchHeaderHeight} class="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border text-sm text-muted-foreground">
           <span>{$_('messageList.foundResults', { values: { count: searchTotalCount, query: searchQuery } })}</span>
           {#if !isUnifiedView && accountId && folderId}
             <button
@@ -1723,7 +1725,7 @@
             </button>
           {/if}
         </div>
-        {@const searchWindow = getVirtualWindow(searchResults)}
+	        {@const searchWindow = getVirtualWindow(searchResults, localSearchHeaderHeight)}
         {@render conversationRows(searchWindow, { showAccountIndicator: true, showSearchFields: true })}
 
         <!-- Load more search results -->
