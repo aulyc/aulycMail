@@ -41,8 +41,8 @@ func normalizeAuthType(authType AuthType) AuthType {
 	case "", AuthPassword:
 		return AuthPassword
 	default:
-		// Legacy/unknown values, including the removed "oauth2", are treated as
-		// password accounts so old databases do not enter a removed auth path.
+		// Unknown values are treated as password accounts so stale data cannot
+		// enter a removed auth path.
 		return AuthPassword
 	}
 }

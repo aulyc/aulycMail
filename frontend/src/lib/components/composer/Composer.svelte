@@ -13,6 +13,7 @@
   import RecipientInput from './RecipientInput.svelte'
   import EditorToolbar from './EditorToolbar.svelte'
   import ComposerAttachmentList from './ComposerAttachmentList.svelte'
+  import ComposerConfirmDialogs from './ComposerConfirmDialogs.svelte'
   import {
     addParagraphStyles,
     stripParagraphStyles,
@@ -78,12 +79,12 @@
     MENTION_VISIBLE_ROWS,
   } from './composerMentionLayout'
   import {
+    createInlineImageFromAttachment,
+    createInlineImageFromDataUrl,
     createInlineImageCID,
     MAX_INLINE_IMAGE_SIZE,
   } from './composerInlineImages'
   import * as Select from '$lib/components/ui/select'
-  import * as AlertDialog from '$lib/components/ui/alert-dialog'
-  import { ThreeOptionDialog } from '$lib/components/ui/confirm-dialog'
   import { addToast } from '$lib/stores/toast'
   import { getComposerFormat } from '$lib/stores/settings.svelte'
   import { _ } from '$lib/i18n'
@@ -654,16 +655,15 @@
 
       // data: URLs — parse and register directly
       if (src.startsWith('data:')) {
-        const match = src.match(/^data:([^;]+);base64,(.+)$/)
-        if (!match) continue
         const cid = generateCID()
-        inlineImages = [...inlineImages, {
+        const inlineImage = createInlineImageFromDataUrl({
           cid,
           dataUrl: src,
-          contentType: match[1],
-          data: match[2],
-          filename: `pasted-image${inlineImageCounter}.${match[1].split('/')[1] || 'png'}`,
-        }]
+          counter: inlineImageCounter,
+          fallbackPrefix: 'pasted-image',
+        })
+        if (!inlineImage) continue
+        inlineImages = [...inlineImages, inlineImage]
         continue
       }
 
@@ -677,7 +677,6 @@
         if (!ctx) continue
         ctx.drawImage(img, 0, 0)
         const dataUrl = canvas.toDataURL('image/png')
-        const base64Data = dataUrl.split(',')[1]
 
         // If the same canvas-extracted content was already registered
         // (e.g. user pasted the same screenshot twice), reuse that cid —
@@ -690,13 +689,14 @@
         }
 
         const cid = generateCID()
-        inlineImages = [...inlineImages, {
+        const inlineImage = createInlineImageFromDataUrl({
           cid,
           dataUrl,
-          contentType: 'image/png',
-          data: base64Data,
-          filename: `pasted-image${inlineImageCounter}.png`,
-        }]
+          counter: inlineImageCounter,
+          fallbackPrefix: 'pasted-image',
+        })
+        if (!inlineImage) continue
+        inlineImages = [...inlineImages, inlineImage]
         result = result.replaceAll(src, dataUrl)
       } catch {
         continue
@@ -1553,24 +1553,15 @@
       }
 
       const cid = generateCID()
-
-      // Extract base64 data and content type from data URL
-      const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
-      if (!matches) {
-        console.error('Invalid data URL format')
-        return
-      }
-
-      const contentType = matches[1]
-      const base64Data = matches[2]
-
-      // Store the inline image
-      const inlineImage: InlineImage = {
+      const inlineImage = createInlineImageFromDataUrl({
         cid,
         dataUrl,
-        contentType,
-        data: base64Data,
-        filename: file.name || `image${inlineImageCounter}.${contentType.split('/')[1] || 'png'}`,
+        counter: inlineImageCounter,
+        filename: file.name,
+      })
+      if (!inlineImage) {
+        console.error('Invalid data URL format')
+        return
       }
       inlineImages = [...inlineImages, inlineImage]
 
@@ -1628,13 +1619,13 @@
           }
 
           const cid = generateCID()
-          inlineImages = [...inlineImages, {
+          inlineImages = [...inlineImages, createInlineImageFromAttachment({
             cid,
             dataUrl,
             contentType: att.contentType,
             data: att.data,
             filename: att.filename,
-          }]
+          })]
           editor?.chain().focus().setImage({ src: dataUrl, alt: att.filename }).run()
           continue
         }
@@ -2090,71 +2081,17 @@
   {/if}
 </div>
 
-<!-- Empty Subject Confirmation Dialog -->
-<AlertDialog.Root bind:open={showEmptySubjectDialog}>
-  <AlertDialog.Content>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$_('composer.emptySubjectTitle')}</AlertDialog.Title>
-      <AlertDialog.Description>
-        {$_('composer.emptySubjectDescription')}
-      </AlertDialog.Description>
-    </AlertDialog.Header>
-    <AlertDialog.Footer>
-      <AlertDialog.Cancel>{$_('common.cancel')}</AlertDialog.Cancel>
-      <AlertDialog.Action onclick={handleConfirmEmptySubject}>{$_('composer.sendAnywayGeneric')}</AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
-
-<!-- Missing Attachment Confirmation Dialog -->
-<AlertDialog.Root bind:open={showMissingAttachmentDialog}>
-  <AlertDialog.Content>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$_('composer.missingAttachmentTitle')}</AlertDialog.Title>
-      <AlertDialog.Description>
-        {$_('composer.missingAttachmentDescription')}
-      </AlertDialog.Description>
-    </AlertDialog.Header>
-    <AlertDialog.Footer>
-      <AlertDialog.Cancel>{$_('common.cancel')}</AlertDialog.Cancel>
-      <AlertDialog.Action onclick={handleConfirmMissingAttachment}>{$_('composer.sendAnywayGeneric')}</AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
-
-<!-- Flatpak Drag-and-Drop Info Dialog -->
-<AlertDialog.Root bind:open={showFlatpakDndDialog}>
-  <AlertDialog.Content>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$_('composer.flatpakDndTitle')}</AlertDialog.Title>
-      <AlertDialog.Description>
-        <p class="mb-3">{$_('composer.flatpakDndDescription')}</p>
-        <p class="mb-2">{$_('composer.flatpakDndGrantExample')}</p>
-        <code class="block bg-muted px-3 py-2 rounded text-sm font-mono mb-3 select-all overflow-x-auto">flatpak override --user --filesystem=home com.aulyc.aulycmail</code>
-        <p class="mb-3 text-sm text-destructive">{$_('composer.flatpakDndSecurityWarning')}</p>
-        <p class="text-sm text-muted-foreground">{$_('composer.flatpakDndAlternative')}</p>
-      </AlertDialog.Description>
-    </AlertDialog.Header>
-    <AlertDialog.Footer>
-      <AlertDialog.Action onclick={() => showFlatpakDndDialog = false}>{$_('common.ok')}</AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
-
-<!-- Close Confirmation Dialog -->
-<ThreeOptionDialog
-  bind:open={showCloseConfirm}
-  title={$_('composer.closeTitle')}
-  description={$_('composer.closeDescription')}
-  option1Label={$_('composer.discardDraft')}
-  option2Label={$_('composer.saveAndClose')}
-  option3Label={$_('composer.keepEditing')}
-  option1Variant="destructive"
-  option2Variant="default"
-  loading={closeLoading === 'discard' ? 'option1' : closeLoading === 'save' ? 'option2' : null}
-  onOption1={handleDiscardAndClose}
-  onOption2={handleSaveAndClose}
-  onOption3={handleKeepEditing}
+<ComposerConfirmDialogs
+  bind:showEmptySubjectDialog
+  bind:showMissingAttachmentDialog
+  bind:showFlatpakDndDialog
+  bind:showCloseConfirm
+  {closeLoading}
+  onConfirmEmptySubject={handleConfirmEmptySubject}
+  onConfirmMissingAttachment={handleConfirmMissingAttachment}
+  onDiscardAndClose={handleDiscardAndClose}
+  onSaveAndClose={handleSaveAndClose}
+  onKeepEditing={handleKeepEditing}
 />
 
 <style>

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"mime"
-	"net/mail"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -447,11 +446,11 @@ func parseBackupViewerEML(key string, entry mailBackup.IndexMessage, reader io.R
 		return nil, fmt.Errorf("failed to parse backup message: %w", err)
 	}
 
-	subject := decodeBackupHeader(entity.Header.Get("Subject"))
+	subject := email.DecodeMIMEHeader(entity.Header.Get("Subject"))
 	if strings.TrimSpace(subject) == "" {
 		subject = entry.Subject
 	}
-	date := decodeBackupHeader(entity.Header.Get("Date"))
+	date := email.DecodeMIMEHeader(entity.Header.Get("Date"))
 	if strings.TrimSpace(date) == "" {
 		date = entry.Date
 	}
@@ -472,10 +471,10 @@ func parseBackupViewerEML(key string, entry mailBackup.IndexMessage, reader io.R
 		FolderPath:   entry.FolderPath,
 		Subject:      subject,
 		Date:         date,
-		From:         parseBackupAddressHeader(entity.Header.Get("From")),
-		To:           parseBackupAddressHeader(entity.Header.Get("To")),
-		Cc:           parseBackupAddressHeader(entity.Header.Get("Cc")),
-		Bcc:          parseBackupAddressHeader(entity.Header.Get("Bcc")),
+		From:         email.ParseAddressHeader(entity.Header.Get("From")),
+		To:           email.ParseAddressHeader(entity.Header.Get("To")),
+		Cc:           email.ParseAddressHeader(entity.Header.Get("Cc")),
+		Bcc:          email.ParseAddressHeader(entity.Header.Get("Bcc")),
 		BodyHTML:     bodyHTML,
 		BodyText:     parsed.text,
 		HasHTML:      bodyHTML != "",
@@ -557,7 +556,7 @@ func backupViewerPartFilename(contentParams, dispositionParams map[string]string
 	for _, candidate := range []string{dispositionParams["filename"], contentParams["name"]} {
 		candidate = strings.TrimSpace(candidate)
 		if candidate != "" {
-			return decodeBackupHeader(candidate)
+			return email.DecodeMIMEHeader(candidate)
 		}
 	}
 	return ""
@@ -571,38 +570,4 @@ func backupViewerAttachmentFallbackName(contentType string) string {
 		return "attachment." + ext
 	}
 	return "attachment.bin"
-}
-
-func decodeBackupHeader(value string) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-	decoder := &mime.WordDecoder{CharsetReader: mailSync.CharsetReader}
-	decoded, err := decoder.DecodeHeader(value)
-	if err != nil {
-		return value
-	}
-	return decoded
-}
-
-func parseBackupAddressHeader(value string) []string {
-	value = decodeBackupHeader(value)
-	if strings.TrimSpace(value) == "" {
-		return nil
-	}
-	addresses, err := mail.ParseAddressList(value)
-	if err != nil {
-		return []string{value}
-	}
-	out := make([]string, 0, len(addresses))
-	for _, address := range addresses {
-		name := strings.TrimSpace(address.Name)
-		if name == "" {
-			out = append(out, address.Address)
-			continue
-		}
-		out = append(out, fmt.Sprintf("%s <%s>", name, address.Address))
-	}
-	return out
 }

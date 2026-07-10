@@ -5,6 +5,7 @@
   // active rail. Selecting a result navigates to it via the parent's callbacks.
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
+  import ModalFrame from '$lib/components/ui/ModalFrame.svelte'
   import SearchScopeCarousel from '$lib/components/search/SearchScopeCarousel.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { formatRelativeDateTime } from '$lib/utils/date'
@@ -209,13 +210,12 @@
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 z-[100] bg-black/80" onclick={onClose}>
-    <div
-      class="mx-auto mt-[calc(12vh+52px)] w-[min(90vw,640px)]"
-      onclick={(e) => e.stopPropagation()}
-    >
+  <ModalFrame
+    {open}
+    onClose={onClose}
+    containerClass="z-[100]"
+    panelClass="mx-auto mt-[calc(12vh+52px)] w-[min(90vw,640px)]"
+  >
       <!-- Search scope tags -->
       <div class="mb-3 overflow-hidden">
         <SearchScopeCarousel scopes={scopes} selectedId={selectedScopeId} onSelect={selectScope} />
@@ -293,6 +293,5 @@
           </div>
         {/if}
       </div>
-    </div>
-  </div>
+  </ModalFrame>
 {/if}

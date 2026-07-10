@@ -148,17 +148,6 @@ func TestAccountConfigValidate(t *testing.T) {
 			},
 		},
 		{
-			name: "legacy oauth2 auth normalizes to password",
-			modify: func(c *AccountConfig) {
-				c.AuthType = AuthType("oauth2")
-			},
-			checkFunc: func(t *testing.T, c *AccountConfig) {
-				if c.AuthType != AuthPassword {
-					t.Errorf("AuthType = %q, want %q", c.AuthType, AuthPassword)
-				}
-			},
-		},
-		{
 			name: "unknown auth normalizes to password",
 			modify: func(c *AccountConfig) {
 				c.AuthType = AuthType("token")
@@ -295,12 +284,12 @@ func TestStoreCreate(t *testing.T) {
 	}
 }
 
-func TestStoreCreateNormalizesLegacyAuthType(t *testing.T) {
+func TestStoreCreateNormalizesUnknownAuthType(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db)
 
 	cfg := validAccountConfig()
-	cfg.AuthType = AuthType("oauth2")
+	cfg.AuthType = AuthType("token")
 	acct, err := store.Create(cfg)
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
@@ -352,7 +341,7 @@ func TestStoreGet(t *testing.T) {
 	}
 }
 
-func TestStoreGetNormalizesLegacyOAuth2AuthType(t *testing.T) {
+func TestStoreGetNormalizesUnknownAuthType(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db)
 
@@ -361,8 +350,8 @@ func TestStoreGetNormalizesLegacyOAuth2AuthType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	if _, err := db.Exec("UPDATE accounts SET auth_type = ? WHERE id = ?", "oauth2", created.ID); err != nil {
-		t.Fatalf("seed legacy oauth2 auth_type: %v", err)
+	if _, err := db.Exec("UPDATE accounts SET auth_type = ? WHERE id = ?", "token", created.ID); err != nil {
+		t.Fatalf("seed unknown auth_type: %v", err)
 	}
 
 	got, err := store.Get(created.ID)
@@ -437,7 +426,7 @@ func TestStoreUpdate(t *testing.T) {
 	}
 }
 
-func TestStoreUpdateNormalizesLegacyAuthType(t *testing.T) {
+func TestStoreUpdateNormalizesUnknownAuthType(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db)
 
@@ -447,7 +436,7 @@ func TestStoreUpdateNormalizesLegacyAuthType(t *testing.T) {
 		t.Fatalf("Create() error = %v", err)
 	}
 
-	cfg.AuthType = AuthType("oauth2")
+	cfg.AuthType = AuthType("token")
 	updated, err := store.Update(created.ID, cfg)
 	if err != nil {
 		t.Fatalf("Update() error = %v", err)

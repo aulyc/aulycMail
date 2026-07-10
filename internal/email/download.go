@@ -12,8 +12,6 @@ import (
 
 	"github.com/aulyc/aulycmail/internal/message"
 	gomessage "github.com/emersion/go-message"
-	msgcharset "github.com/emersion/go-message/charset"
-	"golang.org/x/text/encoding/htmlindex"
 )
 
 // AttachmentDownloader handles downloading and saving attachments
@@ -180,30 +178,8 @@ func (d *AttachmentDownloader) findAttachmentInMultipartToWriter(mr gomessage.Mu
 	return 0, fmt.Errorf("attachment not found: %s", targetFilename)
 }
 
-// decodeMIMEFilename decodes a MIME-encoded filename with full charset support.
-// Mirrors the sync code's decodeMIMEWord() to ensure filenames match between
-// sync (when stored to DB) and download (when extracting from raw message).
 func decodeMIMEFilename(s string) string {
-	if s == "" {
-		return s
-	}
-	dec := &mime.WordDecoder{
-		CharsetReader: func(charsetName string, r io.Reader) (io.Reader, error) {
-			if reader, err := msgcharset.Reader(charsetName, r); err == nil {
-				return reader, nil
-			}
-			enc, err := htmlindex.Get(charsetName)
-			if err != nil {
-				return nil, fmt.Errorf("unknown charset: %s", charsetName)
-			}
-			return enc.NewDecoder().Reader(r), nil
-		},
-	}
-	decoded, err := dec.DecodeHeader(s)
-	if err != nil {
-		return s
-	}
-	return decoded
+	return DecodeMIMEHeader(s)
 }
 
 // getFilename extracts the filename from a message part

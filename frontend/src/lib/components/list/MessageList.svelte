@@ -2,6 +2,7 @@
   import { onMount, onDestroy, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   import ConversationRow from './ConversationRow.svelte'
+  import MessageListSearchBox from './MessageListSearchBox.svelte'
   import { DropdownMenu } from 'bits-ui'
   import { cn } from '$lib/utils'
   import { Button } from '$lib/components/ui/button'
@@ -13,8 +14,6 @@
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   // @ts-ignore - wailsjs path
   import { message } from '../../../../wailsjs/go/models'
-  // @ts-ignore - wailsjs runtime
-  import { EventsOn } from '../../../../wailsjs/runtime/runtime'
   import { getMessageListDensity, getMessageListSortOrder, setMessageListSortOrder } from '$lib/stores/settings.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { getLayoutMode, hideViewer } from '$lib/stores/layout.svelte'
@@ -39,6 +38,14 @@
     toggleSetEntry,
     type RowContextMenuState,
   } from './messageListSelection'
+  import {
+    registerMessageListEvents,
+    type FTSCompleteEvent,
+    type FTSIndexingEvent,
+    type FTSProgressEvent,
+    type FolderEvent,
+    type ReadChangedEvent,
+  } from './messageListEvents'
 
   interface Props {
     accountId?: string | null
@@ -197,78 +204,77 @@
     }, 300)
   }
 
-  // Listen for folder sync events from backend
+  function shouldReloadForFolderEvent(data: FolderEvent): boolean {
+    return (isUnifiedView && isInboxFolder(data.accountId, data.folderId)) ||
+      (!isUnifiedView && !!accountId && !!folderId && data.accountId === accountId && data.folderId === folderId)
+  }
+
+  function handleFolderEvent(data: FolderEvent) {
+    if (shouldReloadForFolderEvent(data)) {
+      scheduleReload()
+    }
+  }
+
+  function handleReadChanged(data: ReadChangedEvent) {
+    // Update conversations locally instead of reloading from DB.
+    let anyUpdated = false
+    for (const c of conversations) {
+      const affectedCount = (c.messageIds || []).filter(id => data.messageIds.includes(id)).length
+      if (affectedCount > 0) {
+        anyUpdated = true
+        const delta = data.isRead ? -affectedCount : affectedCount
+        c.unreadCount = Math.max(0, (c.unreadCount || 0) + delta)
+      }
+    }
+    if (anyUpdated) {
+      conversations = conversations
+      return
+    }
+    // loadConversations() is in-flight — the new array isn't ready yet.
+    // Buffer this change so we can apply it after the load completes.
+    if (loading) {
+      pendingFlagChanges.push({ messageIds: data.messageIds, isRead: data.isRead })
+    }
+  }
+
+  function handleFTSProgress(data: FTSProgressEvent) {
+    if (folderId && data.folderId === folderId) {
+      indexProgress = data.percentage
+      indexComplete = false
+      isIndexing = true
+    }
+  }
+
+  function handleFTSComplete(data: FTSCompleteEvent) {
+    if (folderId && data.folderId === folderId) {
+      indexComplete = true
+      isIndexing = false
+      indexProgress = 100
+    }
+  }
+
+  function handleFTSIndexing(data: FTSIndexingEvent) {
+    switch (data.status) {
+      case 'completed':
+        indexComplete = true
+        isIndexing = false
+        break
+      case 'started':
+        isIndexing = true
+        break
+    }
+  }
+
+  // Listen for folder/message/FTS events from backend.
   onMount(() => {
-    eventUnsubscribers = [
-      EventsOn('folder:synced', (data: { accountId: string; folderId: string }) => {
-        // Reload if this is the current folder, or unified inbox when an inbox folder synced
-        if ((isUnifiedView && isInboxFolder(data.accountId, data.folderId)) || (!isUnifiedView && accountId && folderId && data.accountId === accountId && data.folderId === folderId)) {
-          scheduleReload()
-        }
-      }),
-
-      // Listen for messages:updated events (e.g., from IDLE push notifications)
-      EventsOn('messages:updated', (data: { accountId: string; folderId: string }) => {
-        // Reload if this is the current folder, or unified inbox when an inbox folder updated
-        if ((isUnifiedView && isInboxFolder(data.accountId, data.folderId)) || (!isUnifiedView && accountId && folderId && data.accountId === accountId && data.folderId === folderId)) {
-          scheduleReload()
-        }
-      }),
-
-      // Listen for message read-state changes.
-      EventsOn('messages:readChanged', (data: { messageIds: string[], isRead: boolean }) => {
-        // Update conversations locally instead of reloading from DB
-        let anyUpdated = false
-        for (const c of conversations) {
-          const affectedCount = (c.messageIds || []).filter(id => data.messageIds.includes(id)).length
-          if (affectedCount > 0) {
-            anyUpdated = true
-            const delta = data.isRead ? -affectedCount : affectedCount
-            c.unreadCount = Math.max(0, (c.unreadCount || 0) + delta)
-          }
-        }
-        if (anyUpdated) {
-          conversations = conversations
-          return
-        }
-        // loadConversations() is in-flight — the new array isn't ready yet.
-        // Buffer this change so we can apply it after the load completes.
-        if (loading) {
-          pendingFlagChanges.push({ messageIds: data.messageIds, isRead: data.isRead })
-        }
-      }),
-
-      // Listen for FTS indexing progress
-      EventsOn('fts:progress', (data: { folderId: string; indexed: number; total: number; percentage: number }) => {
-        if (folderId && data.folderId === folderId) {
-          indexProgress = data.percentage
-          indexComplete = false
-          isIndexing = true
-        }
-      }),
-
-      // Listen for FTS indexing completion
-      EventsOn('fts:complete', (data: { folderId: string }) => {
-        if (folderId && data.folderId === folderId) {
-          indexComplete = true
-          isIndexing = false
-          indexProgress = 100
-        }
-      }),
-
-      // Listen for FTS indexing status changes
-      EventsOn('fts:indexing', (data: { status: string }) => {
-        switch (data.status) {
-          case 'completed':
-            indexComplete = true
-            isIndexing = false
-            break
-          case 'started':
-            isIndexing = true
-            break
-        }
-      }),
-    ]
+    eventUnsubscribers = registerMessageListEvents({
+      onFolderSynced: handleFolderEvent,
+      onMessagesUpdated: handleFolderEvent,
+      onReadChanged: handleReadChanged,
+      onFTSProgress: handleFTSProgress,
+      onFTSComplete: handleFTSComplete,
+      onFTSIndexing: handleFTSIndexing,
+    })
 
     // Check initial FTS index status for current folder
     checkFTSIndexStatus()
@@ -1379,45 +1385,17 @@
         {$_('messageList.unread', { values: { count: unreadCount } })}
       </span>
     </div>
-    {#if showSearch}
-      <!-- Search input — sits where the search button used to be -->
-      <div class="flex items-center gap-1 bg-muted rounded-md px-2 flex-1 min-w-0">
-        <Icon icon="mdi:magnify" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
-        <input
-          bind:this={searchInputRef}
-          type="text"
-          placeholder={$_('messageList.searchMessages')}
-          class="bg-transparent border-none outline-none text-sm py-1.5 w-full min-w-0"
-          bind:value={searchQuery}
-          oninput={handleSearchInput}
-          onkeydown={handleSearchKeydown}
-        />
-        {#if serverSearchMode}
-          <button
-            onclick={() => { serverSearchMode = false }}
-            class="px-1.5 py-0.5 text-[10px] font-medium bg-primary/20 text-primary rounded-full flex-shrink-0 hover:bg-primary/30 transition-colors"
-            title={$_('search.localSearch')}
-          >
-            {$_('search.server')}
-          </button>
-        {/if}
-        {#if searchQuery || isSearching || isServerSearching}
-          <button
-            onclick={clearSearch}
-            class="p-0.5 hover:bg-muted-foreground/20 rounded flex-shrink-0"
-            title={$_('messageList.clearSearch')}
-          >
-            {#if isSearching || isServerSearching}
-              <Icon icon="mdi:loading" class="w-4 h-4 animate-spin text-muted-foreground" />
-            {:else}
-              <Icon icon="mdi:close" class="w-4 h-4 text-muted-foreground" />
-            {/if}
-          </button>
-        {/if}
-      </div>
-    {:else}
-      <div class="flex-1"></div>
-    {/if}
+    <MessageListSearchBox
+      {showSearch}
+      bind:searchQuery
+      bind:serverSearchMode
+      {isSearching}
+      {isServerSearching}
+      bind:searchInputRef
+      onSearchInput={handleSearchInput}
+      onSearchKeydown={handleSearchKeydown}
+      onClearSearch={clearSearch}
+    />
     <div class="flex items-center gap-1 flex-shrink-0">
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors"

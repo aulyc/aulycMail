@@ -5,7 +5,7 @@
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
   import BackupTab from '$lib/components/settings/BackupTab.svelte'
-  import BackupModalFrame from './BackupModalFrame.svelte'
+  import ModalFrame from '$lib/components/ui/ModalFrame.svelte'
 
   interface Props {
     open?: boolean
@@ -54,7 +54,7 @@
 </script>
 
 {#if open}
-  <BackupModalFrame
+  <ModalFrame
     {open}
     onClose={closeDialog}
     labelledBy="backup-dialog-title"
@@ -84,5 +84,5 @@
           {$_('common.close')}
         </Button>
       </div>
-  </BackupModalFrame>
+  </ModalFrame>
 {/if}

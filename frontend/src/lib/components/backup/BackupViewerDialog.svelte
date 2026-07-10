@@ -2,10 +2,10 @@
   import { tick } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
-  import * as Select from '$lib/components/ui/select'
-  import BackupDirectoryPicker from '$lib/components/backup/BackupDirectoryPicker.svelte'
-  import BackupModalFrame from '$lib/components/backup/BackupModalFrame.svelte'
-  import SearchScopeCarousel from '$lib/components/search/SearchScopeCarousel.svelte'
+  import ModalFrame from '$lib/components/ui/ModalFrame.svelte'
+  import BackupViewerMessageDetail from '$lib/components/backup/BackupViewerMessageDetail.svelte'
+  import BackupViewerSearchOverlay from '$lib/components/backup/BackupViewerSearchOverlay.svelte'
+  import BackupViewerToolbar from '$lib/components/backup/BackupViewerToolbar.svelte'
   // @ts-ignore - wailsjs path
   import {
     GetBackupSettings,
@@ -20,7 +20,6 @@
   import { toasts } from '$lib/stores/toast'
   import { getDarkMailContent, getThemeMode } from '$lib/stores/settings.svelte'
   import { buildDarkMailFilterStyles } from '$lib/utils/dark-mail'
-  import { formatFileSize } from '$lib/utils/fileSize'
   import { createDebouncer } from '$lib/utils/debounce'
   import { formatLocalDateTime, formatLocalDateTimeShort, parseFlexibleDate } from '$lib/utils/date'
   import {
@@ -462,136 +461,36 @@
 </script>
 
 {#if open}
-  <BackupModalFrame
+  <ModalFrame
     {open}
     onClose={closeDialog}
     containerClass="z-[90] flex items-center justify-center p-5"
     panelClass="flex h-[min(86vh,760px)] w-[min(94vw,1180px)] flex-col overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl"
   >
-      <header class="relative z-20 flex shrink-0 items-center gap-3 overflow-visible border-b border-border px-4 py-2">
-        <h2 class="shrink-0 text-lg font-semibold">{$_('backupViewer.title')}</h2>
-
-        <div class="flex min-w-0 flex-1 items-center gap-2 overflow-visible">
-          <div class="w-[340px] min-w-[240px] shrink">
-            <BackupDirectoryPicker
-              bind:menuOpen={directoryMenuOpen}
-              {directory}
-              placeholder={$_('backupViewer.directoryPlaceholder')}
-              onChoose={(path) => loadCatalog(path, { remember: true })}
-              onChooseError={handleChooseDirectoryError}
-              onSelectHistory={(path) => loadCatalog(path, { fromHistory: true, remember: true })}
-              onRemoveHistory={handleRemoveDirectoryHistory}
-              onOpenDirectory={() => openDirectory()}
-            />
-          </div>
-
-          <Select.Root
-            value={selectedAccountEmail}
-            onValueChange={(value) => void selectScope(value)}
-            disabled={!catalog?.messageCount}
-          >
-            <Select.Trigger showChevron={false} class="relative h-10 w-[300px] shrink-0 justify-start border-border bg-background px-3 py-2 text-sm font-semibold shadow-none hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0">
-              <Icon icon="mdi:chevron-down" class="pointer-events-none absolute left-3 h-4 w-4 opacity-50" />
-              <Select.Value class="min-w-0 flex-1 text-left" placeholder={$_('backupViewer.scopeAll')}>
-                <span class="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-4 pl-6">
-                  <span class="truncate">{scopeLabel(selectedScope)}</span>
-                  {#if typeof selectedScope?.count === 'number'}
-                    <span class="shrink-0 tabular-nums text-muted-foreground">{selectedScope.count}</span>
-                  {/if}
-                </span>
-              </Select.Value>
-            </Select.Trigger>
-            <Select.Content class="z-[130] w-[300px]">
-              {#each accountScopes as scope (scope.id || 'all')}
-                <Select.Item value={scope.id} label={scope.label} class="pr-3">
-                  <span class="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
-                    <span class="truncate">{scope.label}</span>
-                    {#if typeof scope.count === 'number'}
-                      <span class="shrink-0 tabular-nums text-muted-foreground">{scope.count}</span>
-                    {/if}
-                  </span>
-                </Select.Item>
-              {/each}
-            </Select.Content>
-          </Select.Root>
-
-          <div class="flex shrink-0 items-center gap-1" role="toolbar" aria-label={$_('backupViewer.title')}>
-            <button
-              type="button"
-              class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!catalog?.messageCount}
-              title={$_('backupViewer.scrollToTop')}
-              aria-label={$_('backupViewer.scrollToTop')}
-              onclick={scrollMessageListToTop}
-            >
-              <Icon icon="mdi:arrow-collapse-up" class="h-5 w-5 text-muted-foreground" />
-            </button>
-            <button
-              type="button"
-              class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!directory}
-              title={$_('backupViewer.clearDirectory')}
-              aria-label={$_('backupViewer.clearDirectory')}
-              onclick={clearDirectory}
-            >
-              <Icon icon="mdi:folder-remove-outline" class="h-5 w-5 text-muted-foreground" />
-            </button>
-            <button
-              type="button"
-              class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!directory || loadingCatalog}
-              title={$_('backupViewer.refresh')}
-              aria-label={$_('backupViewer.refresh')}
-              onclick={refreshCatalog}
-            >
-              <Icon icon="mdi:refresh" class="h-5 w-5 text-muted-foreground {loadingCatalog ? 'animate-spin' : ''}" />
-            </button>
-            <button
-              type="button"
-              class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!catalog?.messageCount}
-              title={$_('backupViewer.search')}
-              aria-label={$_('backupViewer.search')}
-              onclick={openSearch}
-            >
-              <Icon icon="mdi:magnify" class="h-5 w-5 text-muted-foreground" />
-            </button>
-            <button
-              type="button"
-              class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={!catalog?.messageCount}
-              title={messageSortOrder === 'newest' ? $_('backupViewer.showingNewest') : $_('backupViewer.showingOldest')}
-              aria-label={messageSortOrder === 'newest' ? $_('backupViewer.showingNewest') : $_('backupViewer.showingOldest')}
-              onclick={toggleMessageSortOrder}
-            >
-              <Icon icon={messageSortOrder === 'newest' ? 'mdi:sort-descending' : 'mdi:sort-ascending'} class="h-5 w-5 text-muted-foreground" />
-            </button>
-            <button
-              type="button"
-              class="rounded-md p-2 transition-colors hover:bg-muted"
-              aria-pressed={darkFilterEnabled}
-              aria-label={$_('backupViewer.darkFilter')}
-              title={$_('backupViewer.darkFilter')}
-              onclick={() => darkFilterEnabled = !darkFilterEnabled}
-            >
-              <Icon icon={darkFilterEnabled ? 'mdi:weather-night' : 'mdi:white-balance-sunny'} class="h-5 w-5 text-muted-foreground" />
-            </button>
-          </div>
-
-          {#if errorMessage}
-            <span class="max-w-[180px] shrink truncate text-sm text-destructive" title={errorMessage}>{errorMessage}</span>
-          {/if}
-        </div>
-
-        <button
-          type="button"
-          class="shrink-0 rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          aria-label={$_('common.close')}
-          onclick={closeDialog}
-        >
-          <Icon icon="mdi:close" width="20" height="20" />
-        </button>
-      </header>
+      <BackupViewerToolbar
+        {directory}
+        bind:directoryMenuOpen
+        {catalog}
+        {selectedAccountEmail}
+        {selectedScope}
+        {accountScopes}
+        {loadingCatalog}
+        {errorMessage}
+        bind:darkFilterEnabled
+        {messageSortOrder}
+        onLoadCatalog={loadCatalog}
+        onChooseDirectoryError={handleChooseDirectoryError}
+        onRemoveDirectoryHistory={handleRemoveDirectoryHistory}
+        onOpenDirectory={openDirectory}
+        onSelectScope={selectScope}
+        onScrollToTop={scrollMessageListToTop}
+        onClearDirectory={clearDirectory}
+        onRefreshCatalog={refreshCatalog}
+        onOpenSearch={openSearch}
+        onToggleSortOrder={toggleMessageSortOrder}
+        onClose={closeDialog}
+        {scopeLabel}
+      />
 
       <div class="grid min-h-0 flex-1 overflow-hidden grid-cols-[42%_1fr]">
         <section class="flex min-h-0 flex-col border-r border-border">
@@ -647,247 +546,37 @@
           {/if}
         </section>
 
-        <section class="flex min-h-0 flex-col overflow-hidden">
-          {#if loadingDetail}
-            <div class="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
-              <Icon icon="mdi:loading" class="mr-2 animate-spin" width="18" height="18" />
-              {$_('backupViewer.loading')}
-            </div>
-          {:else if !detail}
-            <div class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-              <Icon icon="mdi:email-open-outline" width="42" height="42" />
-              <p class="text-sm">{$_('backupViewer.selectMessage')}</p>
-            </div>
-          {:else}
-            <div class="min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-thin">
-              <div class="mb-5 space-y-1 rounded-md border border-border bg-muted/20 p-3 text-sm">
-                <div class="grid grid-cols-[64px_1fr] gap-2">
-                  <span class="text-muted-foreground">{$_('backupViewer.subject')}</span>
-                  <span class="min-w-0 break-words font-semibold">{detailHeaderTitle}</span>
-                </div>
-                <div class="grid grid-cols-[64px_1fr] gap-2">
-                  <span class="text-muted-foreground">{$_('backupViewer.from')}</span>
-                  <span class="min-w-0 break-words">{detail.from?.join(', ') || '-'}</span>
-                </div>
-                <div class="grid grid-cols-[64px_1fr] gap-2">
-                  <span class="text-muted-foreground">{$_('backupViewer.to')}</span>
-                  <span class="min-w-0 break-words">{detail.to?.join(', ') || '-'}</span>
-                </div>
-                {#if detail.cc?.length}
-                  <div class="grid grid-cols-[64px_1fr] gap-2">
-                    <span class="text-muted-foreground">{$_('backupViewer.cc')}</span>
-                    <span class="min-w-0 break-words">{detail.cc.join(', ')}</span>
-                  </div>
-                {/if}
-                {#if detail.bcc?.length}
-                  <div class="grid grid-cols-[64px_1fr] gap-2">
-                    <span class="text-muted-foreground">{$_('backupViewer.bcc')}</span>
-                    <span class="min-w-0 break-words">{detail.bcc.join(', ')}</span>
-                  </div>
-                {/if}
-                <div class="grid grid-cols-[64px_1fr] gap-2">
-                  <span class="text-muted-foreground">{$_('backupViewer.date')}</span>
-                  <span>{formatDate(detail.date)}</span>
-                </div>
-                <div class="grid grid-cols-[64px_1fr] gap-2">
-                  <span class="text-muted-foreground">{$_('backupViewer.folder')}</span>
-                  <span>{detail.accountEmail}{detail.folderPath ? ` / ${detail.folderPath}` : ''}</span>
-                </div>
-                <div class="grid grid-cols-[64px_1fr] gap-2">
-                  <span class="text-muted-foreground">{$_('backupViewer.size')}</span>
-                  <span>{formatFileSize(detail.size)}</span>
-                </div>
-              </div>
-
-              {#if detail.attachments?.length}
-                <div class="mb-5">
-                  <div class="overflow-hidden rounded-md border border-border bg-muted/20">
-                    <button
-                      type="button"
-                      class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-semibold transition hover:bg-muted/40"
-                      aria-expanded={attachmentsExpanded}
-                      onclick={() => attachmentsExpanded = !attachmentsExpanded}
-                    >
-                      <Icon icon={attachmentsExpanded ? 'mdi:chevron-down' : 'mdi:chevron-right'} class="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span class="min-w-0 flex-1">{$_('backupViewer.attachments')}</span>
-                      <span class="shrink-0 tabular-nums text-xs text-muted-foreground">{detail.attachments.length}</span>
-                    </button>
-                    {#if attachmentsExpanded}
-                      <div class="border-t border-border">
-                        {#each detail.attachments as attachment, index (attachment.filename + '-' + index)}
-                          {@const attachmentIndex = typeof attachment.index === 'number' ? attachment.index : index}
-                          {@const isSavingAttachment = savingAttachmentIndexes.has(attachmentIndex)}
-                          <button
-                            type="button"
-                            class="flex w-full items-center gap-3 border-b border-border px-3 py-2 text-left transition last:border-b-0 hover:bg-muted/40 disabled:cursor-wait disabled:opacity-70"
-                            disabled={isSavingAttachment}
-                            title={$_('attachment.download')}
-                            onclick={() => saveBackupAttachment(attachment, index)}
-                          >
-                            {#if isSavingAttachment}
-                              <Icon icon="mdi:loading" class="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
-                            {:else}
-                              <Icon icon="mdi:paperclip" class="h-4 w-4 shrink-0 text-muted-foreground" />
-                            {/if}
-                            <span class="min-w-0 flex-1 truncate text-sm">{attachment.filename}</span>
-                            <span class="text-xs text-muted-foreground">{attachment.contentType}</span>
-                            <span class="text-xs text-muted-foreground">{formatFileSize(attachment.size)}</span>
-                            <Icon icon="mdi:download" class="h-4 w-4 shrink-0 text-muted-foreground" />
-                          </button>
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
-                </div>
-              {/if}
-
-              <div class="backup-viewer-body rounded-md border border-border bg-background p-4" style={darkFilterStyle}>
-                <div class="backup-viewer-mail-content {darkFilterEnabled ? 'backup-viewer-dark-filter' : ''}">
-                  {#if detail.hasHTML}
-                    <!-- eslint-disable-next-line svelte/no-at-html-tags -- backup viewer HTML is sanitized in Go before it reaches the UI -->
-                    {@html detail.bodyHTML}
-                  {:else if detail.bodyText}
-                    <pre class="whitespace-pre-wrap break-words font-sans text-sm leading-6">{detail.bodyText}</pre>
-                  {:else}
-                    <p class="text-sm text-muted-foreground">{$_('backupViewer.noBody')}</p>
-                  {/if}
-                </div>
-              </div>
-            </div>
-          {/if}
-        </section>
+        <BackupViewerMessageDetail
+          {detail}
+          {loadingDetail}
+          {detailHeaderTitle}
+          bind:attachmentsExpanded
+          {savingAttachmentIndexes}
+          {darkFilterStyle}
+          {darkFilterEnabled}
+          onSaveAttachment={saveBackupAttachment}
+          {formatDate}
+        />
       </div>
-  </BackupModalFrame>
+  </ModalFrame>
 
-  {#if searchOpen}
-    <BackupModalFrame
-      open={searchOpen}
-      onClose={closeSearch}
-      containerClass="z-[120]"
-      backdropClass="bg-black/75"
-      panelClass="mx-auto mt-[calc(12vh+52px)] w-[min(90vw,680px)]"
-    >
-        <div class="mb-3 overflow-hidden">
-          <SearchScopeCarousel
-            scopes={accountScopes}
-            selectedId={searchScopeEmail}
-            maxLabelWidthClass="max-w-[240px]"
-            onSelect={selectSearchScope}
-          />
-        </div>
-
-        <div class="overflow-hidden rounded-xl border border-border bg-popover shadow-2xl">
-          <div class="flex items-center gap-2 border-b border-border px-4 py-3">
-            <Icon icon="mdi:magnify" class="h-5 w-5 shrink-0 text-muted-foreground" />
-            <input
-              bind:this={searchInputEl}
-              bind:value={searchQuery}
-              oninput={onSearchInput}
-              oncompositionstart={onCompositionStart}
-              oncompositionend={onCompositionEnd}
-              onkeydown={onSearchKeydown}
-              placeholder={$_('backupViewer.searchPlaceholder')}
-              class="min-w-0 flex-1 border-none bg-transparent text-base text-foreground outline-none"
-            />
-            {#if searchLoading}
-              <Icon icon="mdi:loading" class="h-4 w-4 shrink-0 animate-spin text-muted-foreground" />
-            {/if}
-            <button type="button" class="shrink-0 rounded p-1 hover:bg-muted" onclick={closeSearch} aria-label={$_('common.close')}>
-              <Icon icon="mdi:close" class="h-5 w-5 text-muted-foreground" />
-            </button>
-          </div>
-
-          {#if searchQuery.trim() && searchResults.length === 0 && !searchLoading}
-            <div class="px-4 py-6 text-center text-sm text-muted-foreground">{$_('backupViewer.searchNoResults')}</div>
-          {:else if searchResults.length > 0}
-            <div class="max-h-[55vh] overflow-y-auto py-1 scrollbar-thin">
-              {#each searchResults as result, index (result.key)}
-                <button
-                  type="button"
-                  class="flex w-full items-start gap-3 px-4 py-2 text-left {index === searchActiveIndex ? 'bg-muted' : 'hover:bg-muted/50'}"
-                  onclick={() => selectSearchResult(index)}
-                  onmousemove={() => searchActiveIndex = index}
-                >
-                  <Icon icon="mdi:email-outline" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span class="min-w-0 flex-1">
-                    <span class="flex min-w-0 items-baseline gap-2">
-                      <span class="min-w-0 flex-1 truncate text-sm text-foreground">{result.subject || $_('backupViewer.unknownSubject')}</span>
-                      {#if messageAttachmentCount(result) > 0}
-                        <span class="shrink-0 text-amber-600 dark:text-amber-500" title={$_('backupViewer.attachments')}>
-                          <Icon icon="mdi:paperclip" class="h-4 w-4" />
-                        </span>
-                      {/if}
-                      <span class="shrink-0 text-xs text-muted-foreground">{formatShortDate(result.date)}</span>
-                    </span>
-                    <span class="truncate text-xs text-muted-foreground">{result.accountEmail}{result.folderPath ? ` / ${result.folderPath}` : ''}</span>
-                  </span>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-    </BackupModalFrame>
-  {/if}
+  <BackupViewerSearchOverlay
+    open={searchOpen}
+    {accountScopes}
+    {searchScopeEmail}
+    bind:searchQuery
+    {searchResults}
+    {searchLoading}
+    bind:searchActiveIndex
+    bind:searchInputEl
+    onClose={closeSearch}
+    onSelectSearchScope={selectSearchScope}
+    onSearchInput={onSearchInput}
+    onCompositionStart={onCompositionStart}
+    onCompositionEnd={onCompositionEnd}
+    onSearchKeydown={onSearchKeydown}
+    onSelectSearchResult={selectSearchResult}
+    {messageAttachmentCount}
+    {formatShortDate}
+  />
 {/if}
-
-<style>
-  :global(.backup-viewer-body) {
-    max-width: 100%;
-    overflow-x: auto;
-    color: hsl(var(--foreground));
-    font-size: 0.875rem;
-    line-height: 1.6;
-  }
-
-  :global(.backup-viewer-mail-content) {
-    min-height: 2rem;
-    max-width: 100%;
-    overflow-wrap: anywhere;
-  }
-
-  :global(.backup-viewer-body p) {
-    margin: 0 0 0.75rem;
-  }
-
-  :global(.backup-viewer-body a) {
-    color: hsl(var(--primary));
-    text-decoration: underline;
-  }
-
-  :global(.backup-viewer-body img) {
-    max-width: 100%;
-    height: auto;
-  }
-
-  :global(.backup-viewer-body table) {
-    width: auto !important;
-    max-width: 100% !important;
-    table-layout: auto;
-  }
-
-  :global(.backup-viewer-body th),
-  :global(.backup-viewer-body td) {
-    max-width: 100%;
-    white-space: normal !important;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
-  :global(.backup-viewer-mail-content.backup-viewer-dark-filter) {
-    background: #fff;
-    color: #1a1a0a;
-    color-scheme: dark;
-    filter: var(--backup-viewer-content-filter);
-  }
-
-  :global(.backup-viewer-mail-content.backup-viewer-dark-filter a) {
-    color: #2563eb;
-  }
-
-  :global(.backup-viewer-mail-content.backup-viewer-dark-filter img:not([data-blocked-src])),
-  :global(.backup-viewer-mail-content.backup-viewer-dark-filter video),
-  :global(.backup-viewer-mail-content.backup-viewer-dark-filter iframe),
-  :global(.backup-viewer-mail-content.backup-viewer-dark-filter [data-no-invert]) {
-    filter: var(--backup-viewer-media-filter);
-  }
-</style>
