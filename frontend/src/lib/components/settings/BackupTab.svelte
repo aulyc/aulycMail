@@ -86,33 +86,19 @@
     }
   }
 
-  function formatProgressMessage(): string {
+  function formatProgressValue(): string {
     if (!progress) return ''
-    const current = progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'
-    const target = [progress.accountEmail, progress.folderPath].filter(Boolean).join(' / ')
-    return target ? `${current} · ${target}` : current
+    return progress.total > 0 ? `${progress.current}/${progress.total}` : '0/0'
   }
 
-  function formatProgressCounts(): string {
+  function formatProgressTarget(): string {
     if (!progress) return ''
-    const missing = progress.missing ?? 0
-    if (missing > 0) {
-      return $_('settingsBackup.progressCountsWithMissing', {
-        values: {
-          exported: progress.exported,
-          skipped: progress.skipped,
-          missing,
-          failed: progress.failed,
-        },
-      })
-    }
-    return $_('settingsBackup.progressCounts', {
-      values: {
-        exported: progress.exported,
-        skipped: progress.skipped,
-        failed: progress.failed,
-      },
-    })
+    return [progress.accountEmail, progress.folderPath].filter(Boolean).join(' / ')
+  }
+
+  function progressPercent(): number {
+    if (!progress || progress.total <= 0) return 0
+    return Math.min(100, Math.round((progress.current / progress.total) * 100))
   }
 
   function isBackupAlreadyRunningError(err: unknown): boolean {
@@ -423,23 +409,44 @@
 
     {#if running || progress}
       <div class="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
-        <div class="flex items-center gap-2">
+        <div class="flex min-w-0 items-center gap-2">
           {#if running}
-            <Icon icon="mdi:loading" class="h-4 w-4 animate-spin text-primary" />
+            <Icon icon="mdi:loading" class="h-4 w-4 shrink-0 animate-spin text-primary" />
           {:else}
-            <Icon icon={progress?.failed ? 'mdi:alert-circle-outline' : 'mdi:check-circle-outline'} class="h-4 w-4 text-primary" />
+            <Icon icon={progress?.failed ? 'mdi:alert-circle-outline' : 'mdi:check-circle-outline'} class="h-4 w-4 shrink-0 text-primary" />
           {/if}
-          <span>{formatProgressMessage()}</span>
+          <span class="w-[12ch] shrink-0 text-right font-medium tabular-nums">{formatProgressValue()}</span>
+          {#if formatProgressTarget()}
+            <span class="shrink-0 text-muted-foreground">·</span>
+            <span class="min-w-0 truncate">{formatProgressTarget()}</span>
+          {/if}
         </div>
         {#if progress && progress.total > 0}
           <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
             <div
               class="h-full rounded-full bg-primary transition-all"
-              style={`width: ${Math.min(100, Math.round((progress.current / progress.total) * 100))}%`}
+              style={`width: ${progressPercent()}%`}
             ></div>
           </div>
-          <div class="mt-1 text-xs text-muted-foreground">
-            {formatProgressCounts()}
+          <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+            <span class="inline-grid grid-cols-[auto_7ch] items-baseline gap-1">
+              <span>{$_('settingsBackup.progressExported')}</span>
+              <span class="text-right tabular-nums">{progress.exported}</span>
+            </span>
+            <span class="inline-grid grid-cols-[auto_7ch] items-baseline gap-1">
+              <span>{$_('settingsBackup.progressSkipped')}</span>
+              <span class="text-right tabular-nums">{progress.skipped}</span>
+            </span>
+            {#if (progress.missing ?? 0) > 0}
+              <span class="inline-grid grid-cols-[auto_7ch] items-baseline gap-1">
+                <span>{$_('settingsBackup.progressMissing')}</span>
+                <span class="text-right tabular-nums">{progress.missing ?? 0}</span>
+              </span>
+            {/if}
+            <span class="inline-grid grid-cols-[auto_7ch] items-baseline gap-1">
+              <span>{$_('settingsBackup.progressFailed')}</span>
+              <span class="text-right tabular-nums">{progress.failed}</span>
+            </span>
           </div>
         {/if}
       </div>

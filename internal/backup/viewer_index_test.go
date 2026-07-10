@@ -39,15 +39,16 @@ func TestViewerIndexListAndSearch(t *testing.T) {
 	defer viewerIndex.Close()
 
 	entry := IndexMessage{
-		AccountID:    "account",
-		AccountEmail: "alice@example.com",
-		FolderID:     "folder",
-		FolderPath:   "INBOX",
-		Subject:      "测试全文索引",
-		Date:         "Sat, 04 Jul 2026 12:00:00 +0800",
-		EMLPath:      relPath,
-		Size:         len(raw),
-		ExportedAt:   "2026-07-04T04:00:00Z",
+		AccountID:      "account",
+		AccountEmail:   "alice@example.com",
+		FolderID:       "folder",
+		FolderPath:     "INBOX",
+		Subject:        "测试全文索引",
+		Date:           "Sat, 04 Jul 2026 12:00:00 +0800",
+		EMLPath:        relPath,
+		Size:           len(raw),
+		HasAttachments: BoolPtr(true),
+		ExportedAt:     "2026-07-04T04:00:00Z",
 	}
 	if err := viewerIndex.UpsertMessageFromFile(dir, "key-1", entry); err != nil {
 		t.Fatalf("upsert message: %v", err)

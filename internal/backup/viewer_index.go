@@ -21,9 +21,12 @@ import (
 )
 
 const (
-	ViewerIndexSchemaVersion = 1
-	ViewerIndexDefaultLimit  = 200
-	viewerIndexMaxTextBytes  = 10 * 1024 * 1024
+	ViewerIndexSchemaVersion    = 1
+	ViewerIndexDefaultLimit     = 200
+	viewerIndexMaxRawBytes      = 2 * 1024 * 1024
+	viewerIndexMaxTextBytes     = 256 * 1024
+	viewerIndexMaxParts         = 100
+	viewerIndexMaxAttachmentIDs = 50
 )
 
 type ViewerIndex struct {
@@ -62,9 +65,11 @@ type ViewerIndexedMessage struct {
 }
 
 type viewerParsedMessage struct {
-	text        string
-	html        string
-	attachments []string
+	text                string
+	html                string
+	attachments         []string
+	parts               int
+	wantAttachmentNames bool
 }
 
 func ViewerIndexPath(directory string) string {
@@ -404,7 +409,7 @@ func (v *ViewerIndex) UpsertMessageFromFile(directory, key string, entry IndexMe
 	}
 	defer file.Close()
 
-	indexed, parseErr := ParseViewerIndexedMessage(entry, file)
+	indexed, parseErr := ParseViewerIndexedMessage(entry, io.LimitReader(file, viewerIndexMaxRawBytes))
 	if parseErr != nil {
 		indexed = ViewerIndexedMessage{}
 	}
@@ -422,6 +427,10 @@ func (v *ViewerIndex) UpsertMessage(key string, entry IndexMessage, indexed View
 	}
 	if indexed.AttachmentCount > 0 {
 		hasAttachments = 1
+	}
+	attachmentCount := indexed.AttachmentCount
+	if attachmentCount == 0 && hasAttachments == 1 {
+		attachmentCount = 1
 	}
 
 	tx, err := v.db.Begin()
@@ -457,7 +466,7 @@ func (v *ViewerIndex) UpsertMessage(key string, entry IndexMessage, indexed View
 			exported_at = excluded.exported_at
 	`, key, entry.AccountID, entry.AccountEmail, entry.FolderID, entry.FolderPath, entry.UIDValidity, entry.UID,
 		entry.MessageID, entry.Subject, indexed.Sender, indexed.Recipients, entry.Date, dateTS, entry.Size, entry.EMLPath,
-		hasAttachments, indexed.AttachmentCount, indexed.AttachmentNames, entry.ExportedAt); err != nil {
+		hasAttachments, attachmentCount, indexed.AttachmentNames, entry.ExportedAt); err != nil {
 		return fmt.Errorf("failed to upsert backup viewer message: %w", err)
 	}
 	if _, err := tx.Exec(`DELETE FROM messages_fts WHERE key = ?`, key); err != nil {
@@ -510,7 +519,9 @@ func ParseViewerIndexedMessage(entry IndexMessage, reader io.Reader) (ViewerInde
 	if err != nil {
 		return ViewerIndexedMessage{}, err
 	}
-	parsed := &viewerParsedMessage{}
+	parsed := &viewerParsedMessage{
+		wantAttachmentNames: entry.HasAttachments != nil && *entry.HasAttachments,
+	}
 	if err := parseViewerIndexEntity(entity, parsed); err != nil {
 		return ViewerIndexedMessage{}, err
 	}
@@ -531,8 +542,15 @@ func parseViewerIndexEntity(entity *gomessage.Entity, parsed *viewerParsedMessag
 	if entity == nil {
 		return nil
 	}
+	if parsed.parts >= viewerIndexMaxParts {
+		return nil
+	}
+	parsed.parts++
 	if mr := entity.MultipartReader(); mr != nil {
 		for {
+			if parsed.parts >= viewerIndexMaxParts || (parsed.hasSearchableBody() && !parsed.wantAttachmentNames) {
+				break
+			}
 			part, err := mr.NextPart()
 			if err == io.EOF {
 				break
@@ -561,8 +579,9 @@ func parseViewerIndexEntity(entity *gomessage.Entity, parsed *viewerParsedMessag
 		if filename == "" {
 			filename = "attachment"
 		}
-		parsed.attachments = append(parsed.attachments, filename)
-		_, _ = io.Copy(io.Discard, entity.Body)
+		if len(parsed.attachments) < viewerIndexMaxAttachmentIDs {
+			parsed.attachments = append(parsed.attachments, filename)
+		}
 		return nil
 	}
 
@@ -597,10 +616,11 @@ func readViewerIndexTextPart(r io.Reader) ([]byte, error) {
 	if int64(len(raw)) <= viewerIndexMaxTextBytes {
 		return raw, nil
 	}
-	if _, err := io.Copy(io.Discard, r); err != nil {
-		return nil, err
-	}
 	return raw[:viewerIndexMaxTextBytes], nil
+}
+
+func (p *viewerParsedMessage) hasSearchableBody() bool {
+	return strings.TrimSpace(p.text) != "" || strings.TrimSpace(p.html) != ""
 }
 
 func viewerIndexRecipients(entity *gomessage.Entity) []string {

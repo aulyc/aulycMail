@@ -118,7 +118,7 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 			existing.HasAttachments = BoolPtr(row.HasAttachments)
 			idx.Messages[key] = existing
 			if !viewerIndex.HasMessage(key) {
-				_ = viewerIndex.UpsertMessageFromFile(options.Directory, key, existing)
+				_ = viewerIndex.UpsertMessage(key, existing, ViewerIndexedMessage{})
 			}
 			result.Skipped++
 			processed++
