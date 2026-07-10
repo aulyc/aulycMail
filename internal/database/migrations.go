@@ -256,57 +256,16 @@ var migrations = []Migration{
 	{
 		Version: 6,
 		SQL: `
-			-- Contact sources table (CardDAV servers/accounts)
-			CREATE TABLE contact_sources (
-				id TEXT PRIMARY KEY,
-				name TEXT NOT NULL,
-				type TEXT NOT NULL,
-				url TEXT NOT NULL,
-				username TEXT,
-				enabled INTEGER DEFAULT 1,
-				sync_interval INTEGER DEFAULT 60,
-				last_synced_at DATETIME,
-				last_error TEXT,
-				last_error_at DATETIME,
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-			);
-
-			-- Contact source addressbooks (which addressbooks to sync from each source)
-			CREATE TABLE contact_source_addressbooks (
-				id TEXT PRIMARY KEY,
-				source_id TEXT NOT NULL,
-				path TEXT NOT NULL,
-				name TEXT,
-				enabled INTEGER DEFAULT 1,
-				sync_token TEXT,
-				last_synced_at DATETIME,
-				FOREIGN KEY (source_id) REFERENCES contact_sources(id) ON DELETE CASCADE
-			);
-
-			CREATE INDEX idx_contact_source_addressbooks_source ON contact_source_addressbooks(source_id);
-
-			-- CardDAV contacts
-			CREATE TABLE carddav_contacts (
-				id TEXT PRIMARY KEY,
-				addressbook_id TEXT NOT NULL,
-				email TEXT NOT NULL,
-				display_name TEXT,
-				href TEXT,
-				etag TEXT,
-				synced_at DATETIME,
-				FOREIGN KEY (addressbook_id) REFERENCES contact_source_addressbooks(id) ON DELETE CASCADE
-			);
-
-			CREATE INDEX idx_carddav_contacts_addressbook ON carddav_contacts(addressbook_id);
-			CREATE INDEX idx_carddav_contacts_email ON carddav_contacts(email);
+			-- Removed remote contact-source schema. Version retained so existing
+			-- migration histories stay monotonic.
+			SELECT 1;
 		`,
 	},
 	{
 		Version: 7,
 		SQL: `
-			-- Add encrypted password column to contact_sources for fallback credential storage
-			-- Used when OS keyring is not available
-			ALTER TABLE contact_sources ADD COLUMN encrypted_password TEXT;
+			-- Removed remote contact-source credential fallback.
+			SELECT 1;
 		`,
 	},
 	{
@@ -327,18 +286,8 @@ var migrations = []Migration{
 	{
 		Version: 9,
 		SQL: `
-			-- Historical OAuth token metadata table. Keep it in the migration
-			-- chain so old databases can upgrade in order; v47 removes it.
-			CREATE TABLE oauth_tokens (
-				account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
-				provider TEXT NOT NULL,  -- 'google', 'microsoft'
-				expires_at DATETIME,
-				scopes TEXT,  -- JSON array of granted scopes
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-			);
-
-			-- Fallback encrypted token storage (when OS keyring is unavailable)
+			-- Temporary legacy token columns. v47 drops them; they remain here only
+			-- because SQLite cannot conditionally drop a column later.
 			ALTER TABLE accounts ADD COLUMN encrypted_access_token TEXT;
 			ALTER TABLE accounts ADD COLUMN encrypted_refresh_token TEXT;
 		`,
@@ -480,27 +429,8 @@ var migrations = []Migration{
 	{
 		Version: 17,
 		SQL: `
-			-- Historical account linkage for removed remote contact sources.
-			-- Kept for old upgrade paths; v47 removes contact_sources.
-			ALTER TABLE contact_sources ADD COLUMN account_id TEXT REFERENCES accounts(id) ON DELETE CASCADE;
-
-			-- Historical OAuth metadata for standalone contact sources. Kept for
-			-- old upgrade paths; v47 removes this table.
-			CREATE TABLE contact_source_oauth (
-				source_id TEXT PRIMARY KEY REFERENCES contact_sources(id) ON DELETE CASCADE,
-				provider TEXT NOT NULL,  -- 'google', 'microsoft'
-				expires_at DATETIME,
-				scopes TEXT,  -- JSON array of granted scopes
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-			);
-
-			-- Fallback encrypted token storage for standalone contact sources
-			ALTER TABLE contact_sources ADD COLUMN encrypted_access_token TEXT;
-			ALTER TABLE contact_sources ADD COLUMN encrypted_refresh_token TEXT;
-
-			-- Index for finding linked contact sources by email account
-			CREATE INDEX idx_contact_sources_account ON contact_sources(account_id);
+			-- Removed remote contact-source OAuth metadata.
+			SELECT 1;
 		`,
 	},
 	{
@@ -707,60 +637,15 @@ var migrations = []Migration{
 	{
 		Version: 29,
 		SQL: `
-			-- Historical multi-config OAuth token shape.
-			--
-			-- Old databases can still contain oauth_tokens/contact_source_oauth
-			-- rows here. v47 removes those legacy tables after the full upgrade
-			-- path has succeeded.
-			--
-			-- For backward compatibility: existing rows are backfilled to the old
-			-- mail config ids before the composite primary key rebuild.
-
-			-- Step 1: Add column to oauth_tokens and backfill.
-			ALTER TABLE oauth_tokens ADD COLUMN client_config_id TEXT;
-			UPDATE oauth_tokens SET client_config_id = 'google-mail'    WHERE provider = 'google'    AND client_config_id IS NULL;
-			UPDATE oauth_tokens SET client_config_id = 'microsoft-mail' WHERE provider = 'microsoft' AND client_config_id IS NULL;
-
-			-- Step 2: Change PK from (account_id) to (account_id, client_config_id)
-			-- via the SQLite swap-table dance (ALTER TABLE can't change PK in place).
-			CREATE TABLE oauth_tokens_new (
-				account_id       TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
-				client_config_id TEXT NOT NULL,
-				provider         TEXT NOT NULL,
-				expires_at       DATETIME,
-				scopes           TEXT,
-				created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
-				updated_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
-				PRIMARY KEY (account_id, client_config_id)
-			);
-			INSERT INTO oauth_tokens_new (account_id, client_config_id, provider, expires_at, scopes, created_at, updated_at)
-				SELECT account_id, client_config_id, provider, expires_at, scopes, created_at, updated_at
-				FROM oauth_tokens;
-			DROP TABLE oauth_tokens;
-			ALTER TABLE oauth_tokens_new RENAME TO oauth_tokens;
-
-			-- Step 3: Add the same column to contact_source_oauth for routing parity.
-			-- PK stays as source_id (one source has one set of tokens).
-			ALTER TABLE contact_source_oauth ADD COLUMN client_config_id TEXT;
-			UPDATE contact_source_oauth SET client_config_id = 'google-mail'    WHERE provider = 'google'    AND client_config_id IS NULL;
-			UPDATE contact_source_oauth SET client_config_id = 'microsoft-mail' WHERE provider = 'microsoft' AND client_config_id IS NULL;
+			-- Removed OAuth token schema.
+			SELECT 1;
 		`,
 	},
 	{
 		Version: 30,
 		SQL: `
-			-- Legacy reserved: write capability flag for contact sources.
-			--
-			-- contact_sources.writable: explicit per-source write capability flag.
-			-- Remote contact sources were removed. The column remains in this
-			-- migration only so older DBs with contact_sources rows still migrate
-			-- before v47 removes the legacy tables.
-			--
-			-- Note: contacts.name_overridden is added by contact.Store.ensureTable
-			-- (lazy schema) since the contacts table isn't part of the migration
-			-- system — see internal/contact/store.go.
-
-			ALTER TABLE contact_sources ADD COLUMN writable INTEGER NOT NULL DEFAULT 0;
+			-- Removed remote contact-source write capability flag.
+			SELECT 1;
 		`,
 	},
 	{
@@ -768,11 +653,10 @@ var migrations = []Migration{
 		SQL: `
 			-- Phase 2b.2.a: Unified contact-record schema.
 			--
-			-- This migration replaces the legacy denormalized "contacts" (autocomplete-
-			-- by-email-only) and "carddav_contacts" (per-email fan-out) tables with a
-			-- single unified record-based shape:
+			-- This migration replaces the legacy denormalized "contacts"
+			-- (autocomplete-by-email-only) table with a local record-based shape:
 			--
-			--   contact_records      → one row per logical contact (local or carddav)
+			--   contact_records      → one row per logical local contact
 			--   contact_emails       → composite-PK (record_id, email) with per-email
 			--                          autocomplete metadata (send_count, last_used,
 			--                          name_overridden). Replaces the legacy contacts
@@ -782,23 +666,12 @@ var migrations = []Migration{
 			--   contact_urls         → multi-value per record
 			--   contact_impps        → multi-value per record (instant messaging)
 			--   contact_categories   → multi-value per record (tags)
-			--   carddav_record_state → CardDAV-only sidecar: href + etag + synced_at
-			--                          + addressbook_id. ON DELETE CASCADE so removing
-			--                          a record removes its sync state.
 			--
-			-- This migration is the architectural pivot for the Contacts extension:
+			-- This migration is the architectural pivot for Contacts:
 			-- - Mail's autocomplete still works through contact.Store's public API
 			--   (Search/AddOrUpdate/Get) — only the internals change to query the
 			--   unified tables.
-			-- - Multi-field reads land (phone/address/org/etc.) — vCard parser
-			--   expanded to extract them in the same release.
-			-- - One-row-per-vCard semantics for CardDAV (fixes the duplicate-row UX
-			--   wart where a 2-email vCard appeared twice in the list).
-			--
-			-- Downgrade: tools/db/rollback-v31.sql reconstructs the legacy tables from
-			-- this unified schema via JOIN — no separate backup file required.
-			-- Multi-field data is inherently lost on rollback (v30 schema has no
-			-- columns for it). Documented in docs/SQL_ROLLBACK.md.
+			-- - Multi-field local contacts land (phone/address/org/etc.).
 
 			-- Defensive: contact.Store.ensureTable creates "contacts" lazily AFTER
 			-- migrations run, so on a fresh install the table won't exist here. Make
@@ -822,9 +695,9 @@ var migrations = []Migration{
 
 			CREATE TABLE contact_records (
 				id            TEXT PRIMARY KEY,
-				source        TEXT NOT NULL,             -- 'local' | 'carddav' (legacy remote records)
-				kind          TEXT,                      -- local: 'manual' | 'collected'; NULL for carddav
-				source_ref    TEXT,                      -- carddav: addressbook_id. local: NULL
+				source        TEXT NOT NULL,             -- 'local'
+				kind          TEXT,                      -- 'manual' | 'collected'
+				source_ref    TEXT,
 				fn            TEXT,                      -- vCard FN (display name)
 				n_given       TEXT,                      -- vCard N: given name
 				n_family      TEXT,                      -- vCard N: family name
@@ -833,14 +706,13 @@ var migrations = []Migration{
 				note          TEXT,
 				bday          TEXT,                      -- ISO-8601 date string (vCard BDAY)
 				nickname      TEXT,
-				vcard_raw     TEXT,                      -- Preserved original vCard for unknown-property round-trip; NULL for local
+				vcard_raw     TEXT,
 				created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
 				updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
 			);
 
 			CREATE INDEX idx_contact_records_source ON contact_records(source);
 			CREATE INDEX idx_contact_records_source_kind ON contact_records(source, kind);
-			CREATE INDEX idx_contact_records_source_ref ON contact_records(source_ref);
 
 			CREATE TABLE contact_emails (
 				record_id       TEXT NOT NULL REFERENCES contact_records(id) ON DELETE CASCADE,
@@ -898,16 +770,6 @@ var migrations = []Migration{
 				PRIMARY KEY (record_id, category)
 			);
 
-			CREATE TABLE carddav_record_state (
-				record_id       TEXT PRIMARY KEY REFERENCES contact_records(id) ON DELETE CASCADE,
-				addressbook_id  TEXT NOT NULL,
-				href            TEXT NOT NULL UNIQUE,
-				etag            TEXT,
-				synced_at       DATETIME
-			);
-
-			CREATE INDEX idx_carddav_record_state_addressbook ON carddav_record_state(addressbook_id);
-
 			-- Backfill from legacy contacts. One record per row (email is the natural
 			-- record-grain for local contacts today; multi-field expansion for local
 			-- happens via the new sub-tables which start empty).
@@ -931,11 +793,8 @@ var migrations = []Migration{
 				created_at
 			FROM contacts;
 
-			-- OR IGNORE: legacy data can hold the same address more than once for
-			-- one record (messy CardDAV collections fan a vCard across rows;
-			-- case/whitespace variants normalize to the same value). A plain
-			-- INSERT trips PRIMARY KEY(record_id, email) and fails the whole
-			-- migration at startup (issue #289). Dropping the duplicate is correct.
+			-- OR IGNORE: legacy data can hold case/whitespace variants that normalize
+			-- to the same value. Dropping the duplicate is correct.
 			INSERT OR IGNORE INTO contact_emails (record_id, email, send_count, last_used, name_overridden, is_primary)
 			SELECT
 				'local-' || email,
@@ -946,73 +805,8 @@ var migrations = []Migration{
 				1
 			FROM contacts;
 
-			-- Backfill from legacy carddav_contacts. Consolidate fan-out: group by
-			-- (addressbook_id, href) so one record represents one vCard regardless
-			-- of how many email rows the old schema fanned it into. The MIN(id)
-			-- picks an arbitrary-but-deterministic representative id to reuse.
-			INSERT INTO contact_records (id, source, source_ref, fn, created_at, updated_at)
-			SELECT
-				MIN(id),
-				'carddav',
-				addressbook_id,
-				MIN(display_name),  -- first display_name encountered for the href
-				MIN(synced_at),
-				MAX(synced_at)
-			FROM carddav_contacts
-			WHERE href IS NOT NULL AND href != ''
-			GROUP BY addressbook_id, href;
-
-			-- Temp index so the canonical-group JOIN below isn't O(N²) on large
-			-- addressbooks. carddav_contacts has indexes on addressbook_id and
-			-- email but not (addressbook_id, href). Without this, the next
-			-- INSERT can take minutes on a 5k-contact source. Index goes away
-			-- when we DROP carddav_contacts at the end of the migration.
-			CREATE INDEX IF NOT EXISTS idx_carddav_contacts_ab_href_tmp
-				ON carddav_contacts(addressbook_id, href);
-
-			-- All emails from each fanned-out group attach to the same record_id
-			-- (the MIN(id) chosen above). Pre-compute the (addressbook_id, href)
-			-- → representative-id mapping ONCE in a subquery (canonical), then
-			-- JOIN every email row against it. Replaces a per-row correlated
-			-- subquery that was O(N²) — fast on small sets, but locks the app
-			-- for minutes on real addressbooks.
-			-- OR IGNORE: a single vCard (one href) can list the same address
-			-- twice; all rows in the fan-out collapse onto one record_id, so the
-			-- duplicate would trip PRIMARY KEY(record_id, email) and fail the
-			-- migration (issue #289). Keep the first, drop the duplicate.
-			INSERT OR IGNORE INTO contact_emails (record_id, email, send_count, name_overridden, is_primary)
-			SELECT
-				canonical.rec_id,
-				cc.email,
-				0,
-				0,
-				CASE WHEN cc.id = canonical.rec_id THEN 1 ELSE 0 END
-			FROM carddav_contacts cc
-			JOIN (
-				SELECT MIN(id) AS rec_id, addressbook_id, href
-				FROM carddav_contacts
-				WHERE href IS NOT NULL AND href != ''
-				GROUP BY addressbook_id, href
-			) AS canonical
-			  ON canonical.addressbook_id = cc.addressbook_id
-			 AND canonical.href = cc.href
-			WHERE cc.href IS NOT NULL AND cc.href != '';
-
-			-- Sidecar state: one row per consolidated record.
-			INSERT INTO carddav_record_state (record_id, addressbook_id, href, etag, synced_at)
-			SELECT
-				cr.id,
-				cr.source_ref,
-				cc.href,
-				cc.etag,
-				cc.synced_at
-			FROM contact_records cr
-			JOIN carddav_contacts cc ON cc.id = cr.id
-			WHERE cr.source = 'carddav';
-
-			-- Drop legacy tables — the unified schema is now authoritative.
+			-- Drop legacy table — the unified schema is now authoritative.
 			DROP TABLE contacts;
-			DROP TABLE carddav_contacts;
 		`,
 	},
 	{
@@ -1021,12 +815,9 @@ var migrations = []Migration{
 			-- Phase 2b.2 follow-up: rewrite local contact_records IDs from the
 			-- synthetic "local-<email>" form into real UUIDv4s.
 			--
-			-- Why: vCard/CardDAV identity is the UID (RFC 6350 §6.7.6) — one
-			-- UID, multiple EMAILs, EMAILs are fully editable. CardDAV records
-			-- already follow this (UUID + multi-email sub-rows). Local records
-			-- got the "local-<email>" shape in migration 31 as a leftover from
-			-- the legacy contacts(email PK) schema. That blocks email editing
-			-- and creates a record-per-email asymmetry between local and CardDAV.
+			-- Why: local records got the "local-<email>" shape in migration 31 as
+			-- a leftover from the legacy contacts(email PK) schema. That blocks
+			-- email editing and keeps the record identity tied to one address.
 			--
 			-- This migration unifies the identity shape: every contact_records
 			-- row gets a UUID, and the EMAIL becomes a fully-editable sub-row in
@@ -1064,8 +855,7 @@ var migrations = []Migration{
 			WHERE source = 'local';
 
 			-- Apply the new IDs to contact_records and every sub-table that
-			-- references record_id. carddav_record_state is excluded — its
-			-- record_id always points at source='carddav' records, never local.
+			-- references record_id.
 			UPDATE contact_records
 			SET id = (SELECT new_id FROM _migration_32_idmap WHERE old_id = contact_records.id)
 			WHERE id IN (SELECT old_id FROM _migration_32_idmap);
@@ -1100,72 +890,8 @@ var migrations = []Migration{
 	{
 		Version: 33,
 		SQL: `
-			-- Phase 2b.2.b.1 follow-up: add the FK that should have been on
-			-- carddav_record_state.addressbook_id from the start.
-			--
-			-- Why: migration 31 created carddav_record_state with
-			-- "addressbook_id TEXT NOT NULL" (no FK). When a CardDAV source
-			-- (or any one of its addressbooks) is deleted, the existing
-			-- source→addressbook CASCADE fires, but nothing cascades from
-			-- addressbook to state — every state row becomes an orphan
-			-- pointing at a dead addressbook_id, and the contact_records
-			-- they reference become unreachable from the source→ab→state→cr
-			-- chain that ListRecordIDsForSource walks. The UI sees them
-			-- disappear; the rows sit in the DB as zombies indefinitely.
-			--
-			-- That coverage gap was the underlying cause of two real
-			-- failures during 2b.2.b.1 development:
-			--   1. The "Enable write access" toggle's save path tore down
-			--      and rebuilt addressbooks via UpdateContactSource → every
-			--      state row got orphaned in one save.
-			--   2. A previously-deleted CardDAV source left 613 zombie
-			--      state + record rows behind.
-			--
-			-- Code-side fixes landed first (UpdateContactSource is now
-			-- differential; Store.DeleteSource explicitly scrubs records
-			-- before deleting the source). This migration closes the gap
-			-- at the schema layer so any future delete path benefits
-			-- automatically.
-			--
-			-- SQLite can't ALTER TABLE to add a FK; we have to rebuild the
-			-- table. Pre-step: clean any existing orphans so the rebuild's
-			-- INSERT doesn't fail FK validation. This makes the migration
-			-- safe for installs that ran the buggy code (i.e., anyone who
-			-- developed against 0.3.0-dev between 2b.2.a and 2b.2.b.1).
-
-			-- 1. Drop orphan state rows whose addressbook is gone.
-			DELETE FROM carddav_record_state
-			WHERE addressbook_id NOT IN (SELECT id FROM contact_source_addressbooks);
-
-			-- 2. Drop orphan contact_records (source='carddav') with no
-			--    state row. Bloat from interrupted syncs or past bugs;
-			--    they're unreachable via the source→ab→state→cr chain.
-			DELETE FROM contact_records
-			WHERE source = 'carddav'
-			  AND id NOT IN (SELECT record_id FROM carddav_record_state);
-
-			-- 3. Rebuild carddav_record_state with the FK. Copy preserves
-			--    the PRIMARY KEY (record_id) and the UNIQUE href constraint
-			--    that migration 31 set.
-			CREATE TABLE carddav_record_state_new (
-				record_id       TEXT PRIMARY KEY REFERENCES contact_records(id) ON DELETE CASCADE,
-				addressbook_id  TEXT NOT NULL REFERENCES contact_source_addressbooks(id) ON DELETE CASCADE,
-				href            TEXT NOT NULL UNIQUE,
-				etag            TEXT,
-				synced_at       DATETIME
-			);
-
-			INSERT INTO carddav_record_state_new (record_id, addressbook_id, href, etag, synced_at)
-			SELECT record_id, addressbook_id, href, etag, synced_at
-			FROM carddav_record_state;
-
-			DROP TABLE carddav_record_state;
-			ALTER TABLE carddav_record_state_new RENAME TO carddav_record_state;
-
-			-- 4. Recreate the index that migration 31 added (DROP TABLE
-			--    above also removed its indexes).
-			CREATE INDEX idx_carddav_record_state_addressbook
-				ON carddav_record_state(addressbook_id);
+			-- Removed remote contact sidecar schema.
+			SELECT 1;
 		`,
 	},
 	{
@@ -1173,10 +899,8 @@ var migrations = []Migration{
 		SQL: `
 			-- Phase 2b.2.b.2: first-class PHOTO field support on contact_records.
 			--
-			-- Before this migration, PHOTO data round-tripped through the
-			-- vcard_raw preservation mechanism (added in 2b.2.b.1) but was
-			-- never extracted, never displayed, never editable. Avatar always
-			-- showed initials. This migration adds three columns so the parser
+			-- Before this migration, PHOTO data was not extracted, displayed, or
+			-- editable. This migration adds three columns so the parser
 			-- can land photos natively and the builder can emit them under
 			-- explicit control.
 			--
@@ -1194,39 +918,15 @@ var migrations = []Migration{
 	{
 		Version: 35,
 		SQL: `
-			-- Historical table for extension-scoped secrets. The extension runtime
-			-- was later slimmed back to the built-in Contacts pane; v47 removes
-			-- this table after old databases have passed this point.
-			--
-			-- This table tracks ALL extension secret keys regardless of
-			-- where the value actually lives. The encrypted_value column
-			-- encodes location: '' (empty) = "lives in OS keyring at
-			-- ext:<extension>:<key>"; non-empty = "AES-encrypted base64
-			-- ciphertext is right here." Tracking keyring-stored keys in
-			-- the table was intended to support bulk cleanup of matching
-			-- keyring entries.
-			--
-			-- Owned by core. Not extension-specific despite the column name.
-
-			CREATE TABLE IF NOT EXISTS extension_secrets (
-				extension       TEXT NOT NULL,
-				key             TEXT NOT NULL,
-				encrypted_value TEXT NOT NULL DEFAULT '',
-				created_at      INTEGER NOT NULL,
-				PRIMARY KEY (extension, key)
-			);
-			CREATE INDEX IF NOT EXISTS idx_extension_secrets_ext ON extension_secrets(extension);
+			-- Removed extension secret registry.
+			SELECT 1;
 		`,
 	},
 	{
 		Version: 36,
 		SQL: `
-			-- Historical per-(account, client_config) encrypted fallback columns
-			-- for removed OAuth token support. v47 drops oauth_tokens after old
-			-- databases have passed this point.
-
-			ALTER TABLE oauth_tokens ADD COLUMN encrypted_access_token TEXT;
-			ALTER TABLE oauth_tokens ADD COLUMN encrypted_refresh_token TEXT;
+			-- Removed OAuth encrypted-token fallback.
+			SELECT 1;
 		`,
 	},
 	{

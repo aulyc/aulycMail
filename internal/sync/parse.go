@@ -2,6 +2,7 @@ package sync
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"io"
 	"mime"
@@ -18,30 +19,27 @@ import (
 // For file attachments, only metadata is captured - content fetched on-demand.
 // messageID is needed to create attachment records.
 func (e *Engine) parseMessageBodyFull(raw []byte, messageID string, timeout time.Duration) *ParsedBody {
-	type result struct {
-		parsed *ParsedBody
+	ctx := context.Background()
+	if timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
 	}
 
-	// Use buffered channel to prevent goroutine leak if timeout fires
-	done := make(chan result, 1)
-
-	go func() {
-		parsed := e.parseMessageBodyInternal(raw, messageID)
-		select {
-		case done <- result{parsed}:
-		default:
+	parsed, err := e.parseMessageBodyInternal(ctx, raw, messageID)
+	if err != nil {
+		if isContextDone(err) {
+			e.log.Warn().
+				Int("rawLen", len(raw)).
+				Dur("timeout", timeout).
+				Msg("Body parsing timed out - attempting fallback extraction")
+		} else {
+			e.log.Debug().Err(err).Int("rawLen", len(raw)).Msg("Failed to parse message, trying fallback extraction")
 		}
-	}()
-
-	select {
-	case r := <-done:
-		return r.parsed
-	case <-time.After(timeout):
 		e.log.Warn().
+			Err(err).
 			Int("rawLen", len(raw)).
-			Dur("timeout", timeout).
-			Msg("Body parsing timed out - attempting fallback extraction")
-
+			Msg("Body parser returned fallback content")
 		partialText := e.extractPlainTextFallback(raw)
 		return &ParsedBody{
 			BodyText:       partialText,
@@ -50,18 +48,22 @@ func (e *Engine) parseMessageBodyFull(raw []byte, messageID string, timeout time
 			Attachments:    nil,
 		}
 	}
+	return parsed
 }
 
 // parseMessageBodyInternal does the actual parsing work, extracting body text, HTML, and attachments.
-func (e *Engine) parseMessageBodyInternal(raw []byte, messageID string) *ParsedBody {
+func (e *Engine) parseMessageBodyInternal(ctx context.Context, raw []byte, messageID string) (*ParsedBody, error) {
 	result := &ParsedBody{}
-	reader := bytes.NewReader(raw)
+	reader := newContextReader(ctx, bytes.NewReader(raw))
 
 	entity, err := gomessage.Read(reader)
 	if err != nil {
+		if isContextDone(err) {
+			return nil, err
+		}
 		e.log.Debug().Err(err).Int("rawLen", len(raw)).Msg("Failed to parse message, trying as plain text")
 		result.BodyText = string(raw)
-		return result
+		return result, nil
 	}
 
 	topLevelCT := entity.Header.Get("Content-Type")
@@ -74,10 +76,14 @@ func (e *Engine) parseMessageBodyInternal(raw []byte, messageID string) *ParsedB
 	e.log.Debug().Bool("isMultipart", mr != nil).Msg("Multipart detection result")
 
 	if mr != nil {
-		e.parseMultipartBody(mr, result, messageID)
+		if err := e.parseMultipartBody(ctx, mr, result, messageID); err != nil {
+			return nil, err
+		}
 	}
 	if mr == nil {
-		e.parseSinglePartBody(entity, result, messageID)
+		if err := e.parseSinglePartBody(ctx, entity, result, messageID); err != nil {
+			return nil, err
+		}
 	}
 
 	e.log.Debug().
@@ -87,15 +93,22 @@ func (e *Engine) parseMessageBodyInternal(raw []byte, messageID string) *ParsedB
 		Int("attachmentCount", len(result.Attachments)).
 		Msg("parseMessageBody complete")
 
-	return result
+	return result, nil
 }
 
 // parseMultipartBody parses a multipart message body
-func (e *Engine) parseMultipartBody(mr gomessage.MultipartReader, result *ParsedBody, messageID string) {
+func (e *Engine) parseMultipartBody(ctx context.Context, mr gomessage.MultipartReader, result *ParsedBody, messageID string) error {
 	partIndex := 0
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		part, err := mr.NextPart()
 		if err != nil {
+			if isContextDone(err) {
+				return err
+			}
 			if errors.Is(err, io.EOF) || strings.Contains(err.Error(), "EOF") {
 				e.log.Debug().Int("partsProcessed", partIndex).Msg("Finished reading multipart parts")
 				break
@@ -106,7 +119,7 @@ func (e *Engine) parseMultipartBody(mr gomessage.MultipartReader, result *Parsed
 				e.log.Warn().Err(err).Int("partsProcessed", partIndex).Msg("Unknown encoding in multipart part, marking unsafe")
 				result.UnsafeContent = true
 				result.BodyText = "This message uses non-standard encoding and cannot be displayed safely."
-				return
+				return nil
 			}
 			e.log.Debug().Err(err).Int("partsProcessed", partIndex).Msg("Error reading multipart")
 			break
@@ -130,7 +143,10 @@ func (e *Engine) parseMultipartBody(mr gomessage.MultipartReader, result *Parsed
 			// If the attachment has a Content-ID, it's meant to be displayed inline in the HTML
 			// (referenced via cid:contentID), even if Content-Disposition says "attachment"
 			isInline := contentID != ""
-			att := e.extractAttachmentMetadata(part, messageID, contentType, dispParams, contentID, isInline)
+			att, err := e.extractAttachmentMetadata(ctx, part, messageID, contentType, dispParams, contentID, isInline)
+			if err != nil {
+				return err
+			}
 			if att != nil {
 				result.Attachments = append(result.Attachments, att)
 			}
@@ -140,7 +156,9 @@ func (e *Engine) parseMultipartBody(mr gomessage.MultipartReader, result *Parsed
 		// Handle nested multipart
 		if strings.HasPrefix(contentType, "multipart/") {
 			if nestedMr := part.MultipartReader(); nestedMr != nil {
-				e.parseMultipartBody(nestedMr, result, messageID)
+				if err := e.parseMultipartBody(ctx, nestedMr, result, messageID); err != nil {
+					return err
+				}
 			}
 			continue
 		}
@@ -150,7 +168,10 @@ func (e *Engine) parseMultipartBody(mr gomessage.MultipartReader, result *Parsed
 		if (disposition == "inline" && strings.HasPrefix(contentType, "image/")) ||
 			(contentID != "" && strings.HasPrefix(contentType, "image/")) {
 			result.HasAttachments = true
-			att := e.extractAttachmentMetadata(part, messageID, contentType, dispParams, contentID, true)
+			att, err := e.extractAttachmentMetadata(ctx, part, messageID, contentType, dispParams, contentID, true)
+			if err != nil {
+				return err
+			}
 			if att != nil {
 				result.Attachments = append(result.Attachments, att)
 			}
@@ -163,7 +184,10 @@ func (e *Engine) parseMultipartBody(mr gomessage.MultipartReader, result *Parsed
 			!isSignaturePart(contentType) {
 			result.HasAttachments = true
 			isInline := disposition == "inline" || contentID != ""
-			att := e.extractAttachmentMetadata(part, messageID, contentType, dispParams, contentID, isInline)
+			att, err := e.extractAttachmentMetadata(ctx, part, messageID, contentType, dispParams, contentID, isInline)
+			if err != nil {
+				return err
+			}
 			if att != nil {
 				result.Attachments = append(result.Attachments, att)
 			}
@@ -180,13 +204,15 @@ func (e *Engine) parseMultipartBody(mr gomessage.MultipartReader, result *Parsed
 			result.UnsafeContent = true
 			result.BodyText = "This message uses non-standard encoding and cannot be displayed safely."
 			result.BodyHTML = ""
-			return
+			return nil
 		}
 
 		// Read text parts
-		lr := io.LimitReader(part.Body, maxPartSize)
-		partBody, err := io.ReadAll(lr)
+		partBody, err := readLimitedPart(ctx, part.Body, maxPartSize)
 		if err != nil {
+			if isContextDone(err) {
+				return err
+			}
 			if len(partBody) > 0 {
 				e.log.Warn().Err(err).Int("partIndex", partIndex).Int("partialLen", len(partBody)).Msg("Read partial part body")
 			} else {
@@ -218,10 +244,15 @@ func (e *Engine) parseMultipartBody(mr gomessage.MultipartReader, result *Parsed
 			}
 		}
 	}
+	return nil
 }
 
 // parseSinglePartBody parses a single-part message body
-func (e *Engine) parseSinglePartBody(entity *gomessage.Entity, result *ParsedBody, messageID string) {
+func (e *Engine) parseSinglePartBody(ctx context.Context, entity *gomessage.Entity, result *ParsedBody, messageID string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	contentType, params, _ := mime.ParseMediaType(entity.Header.Get("Content-Type"))
 	e.log.Debug().Str("contentType", contentType).Str("charset", params["charset"]).Msg("Processing single-part message")
 
@@ -232,7 +263,7 @@ func (e *Engine) parseSinglePartBody(entity *gomessage.Entity, result *ParsedBod
 		e.log.Warn().Str("cte", cte).Msg("Non-standard Content-Transfer-Encoding in single-part, marking unsafe")
 		result.UnsafeContent = true
 		result.BodyText = "This message uses non-standard encoding and cannot be displayed safely."
-		return
+		return nil
 	}
 
 	// A single-part body can itself be an attachment (e.g. a DMARC report whose whole
@@ -245,18 +276,23 @@ func (e *Engine) parseSinglePartBody(entity *gomessage.Entity, result *ParsedBod
 	if disposition == "attachment" || isNonTextBody {
 		result.HasAttachments = true
 		isInline := disposition == "inline" || contentID != ""
-		att := e.extractAttachmentMetadata(entity, messageID, contentType, dispParams, contentID, isInline)
+		att, err := e.extractAttachmentMetadata(ctx, entity, messageID, contentType, dispParams, contentID, isInline)
+		if err != nil {
+			return err
+		}
 		if att != nil {
 			result.Attachments = append(result.Attachments, att)
 		}
-		return
+		return nil
 	}
 
-	lr := io.LimitReader(entity.Body, maxPartSize)
-	body, err := io.ReadAll(lr)
+	body, err := readLimitedPart(ctx, entity.Body, maxPartSize)
 	if err != nil {
+		if isContextDone(err) {
+			return err
+		}
 		e.log.Debug().Err(err).Msg("Failed to read single-part message body")
-		return
+		return nil
 	}
 
 	if int64(len(body)) == maxPartSize {
@@ -279,6 +315,7 @@ func (e *Engine) parseSinglePartBody(entity *gomessage.Entity, result *ParsedBod
 	default:
 		result.BodyText = decodedContent
 	}
+	return nil
 }
 
 // parseMessageBody parses a raw email message and extracts text/plain and text/html parts.
@@ -570,7 +607,11 @@ func (e *Engine) parseNestedMultipart(entity *gomessage.Entity) (bodyText, bodyH
 // extractAttachmentMetadata extracts attachment metadata from a MIME part.
 // For inline images, also captures content (up to maxInlineContentSize).
 // For file attachments, reads content to get size but doesn't store it (fetched on-demand).
-func (e *Engine) extractAttachmentMetadata(part *gomessage.Entity, messageID, contentType string, dispParams map[string]string, contentID string, isInline bool) *message.Attachment {
+func (e *Engine) extractAttachmentMetadata(ctx context.Context, part *gomessage.Entity, messageID, contentType string, dispParams map[string]string, contentID string, isInline bool) (*message.Attachment, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	filename := dispParams["filename"]
 	if filename == "" {
 		// Try to get from Content-Type name parameter
@@ -601,11 +642,13 @@ func (e *Engine) extractAttachmentMetadata(part *gomessage.Entity, messageID, co
 	}
 
 	// Read the attachment content
-	lr := io.LimitReader(part.Body, maxPartSize)
-	content, err := io.ReadAll(lr)
+	content, err := readLimitedPart(ctx, part.Body, maxPartSize)
 	if err != nil {
+		if isContextDone(err) {
+			return nil, err
+		}
 		e.log.Debug().Err(err).Str("filename", filename).Msg("Failed to read attachment content")
-		return att
+		return att, nil
 	}
 
 	att.Size = len(content)
@@ -625,7 +668,44 @@ func (e *Engine) extractAttachmentMetadata(part *gomessage.Entity, messageID, co
 		e.log.Debug().Str("filename", filename).Int("size", len(content)).Msg("Extracted file attachment metadata")
 	}
 
-	return att
+	return att, nil
+}
+
+type contextReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func newContextReader(ctx context.Context, r io.Reader) io.Reader {
+	if ctx == nil {
+		return r
+	}
+	return &contextReader{ctx: ctx, r: r}
+}
+
+func (r *contextReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	n, err := r.r.Read(p)
+	if err != nil {
+		return n, err
+	}
+	if ctxErr := r.ctx.Err(); ctxErr != nil {
+		return n, ctxErr
+	}
+	return n, nil
+}
+
+func readLimitedPart(ctx context.Context, r io.Reader, maxBytes int64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return io.ReadAll(io.LimitReader(newContextReader(ctx, r), maxBytes))
+}
+
+func isContextDone(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // isSignaturePart returns true for S/MIME and PGP signature content types
@@ -643,35 +723,39 @@ func isSignaturePart(contentType string) bool {
 // Used when normal parsing times out or fails completely.
 // Returns partial content which is better than nothing.
 func (e *Engine) extractPlainTextFallback(raw []byte) string {
-	rawStr := string(raw)
-
 	// Find the body (after double CRLF or double LF - standard email header/body separator)
-	bodyStart := strings.Index(rawStr, "\r\n\r\n")
+	bodyStart := bytes.Index(raw, []byte("\r\n\r\n"))
+	bodyOffset := 4
 	if bodyStart == -1 {
-		bodyStart = strings.Index(rawStr, "\n\n")
+		bodyStart = bytes.Index(raw, []byte("\n\n"))
+		bodyOffset = 2
 	}
 	if bodyStart == -1 {
 		// No header/body separator found, can't extract safely
 		return ""
 	}
 
-	body := rawStr[bodyStart+4:]
+	body := raw[bodyStart+bodyOffset:]
 
 	// Extract printable ASCII characters as a last resort
 	// This handles cases where content might be partially encoded
 	var result strings.Builder
-	for _, r := range body {
-		if r >= 32 && r < 127 || r == '\n' || r == '\r' || r == '\t' {
-			result.WriteRune(r)
+	const maxFallbackSize = 10 * 1024
+	result.Grow(min(len(body), maxFallbackSize))
+	for _, b := range body {
+		if (b >= 32 && b < 127) || b == '\n' || b == '\r' || b == '\t' {
+			result.WriteByte(b)
+			if result.Len() >= maxFallbackSize {
+				break
+			}
 		}
 	}
 
 	text := strings.TrimSpace(result.String())
 
 	// Limit to first 10KB to prevent huge partial extractions
-	const maxFallbackSize = 10 * 1024
-	if len(text) > maxFallbackSize {
-		text = text[:maxFallbackSize] + "... [truncated - parsing timed out]"
+	if len(text) >= maxFallbackSize {
+		text += "... [truncated - parsing timed out]"
 	}
 
 	if text != "" {
@@ -682,16 +766,3 @@ func (e *Engine) extractPlainTextFallback(raw []byte) string {
 
 	return text
 }
-
-/*
-// parseMessageBodyWithTimeout parses message body with a timeout.
-// If parsing takes too long (potentially due to malformed emails), it returns
-// partial results via fallback extraction - better than nothing.
-//
-// UNUSED: This function is not called anywhere. parseMessageBodyFull provides the
-// same functionality with a richer return type (ParsedBody instead of tuple).
-func (e *Engine) parseMessageBodyWithTimeout(raw []byte, timeout time.Duration) (bodyText, bodyHTML string, hasAttachments bool) {
-	result := e.parseMessageBodyFull(raw, "", timeout)
-	return result.BodyText, result.BodyHTML, result.HasAttachments
-}
-*/

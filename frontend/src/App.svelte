@@ -44,8 +44,9 @@
   import { isDialogGuardActive } from '$lib/stores/dialogGuard'
   import { dispatchExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
   import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive } from '$lib/stores/layout.svelte'
+  import { archiveMessages, setReadStateMessages, toggleSpamMessages, toggleStarMessages, undoLastMailAction } from '$lib/mailActions'
   // @ts-ignore - wailsjs path
-  import { PrepareReply, GetPendingMailto, GetDraft, MarkAsRead, MarkAsUnread, Star, Unstar, Archive, MarkAsSpam, MarkAsNotSpam, Undo, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, QuitApp, GetSystemTheme, NotifyStartupComplete } from '../wailsjs/go/app/App.js'
+  import { PrepareReply, GetPendingMailto, GetDraft, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, QuitApp, GetSystemTheme, NotifyStartupComplete } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
@@ -1322,91 +1323,52 @@
   }
 
   // Bulk action handlers
+  function handleBulkActionComplete(autoSelectNext?: boolean) {
+    messageListRef?.clearChecked()
+    messageListRef?.handleActionComplete(autoSelectNext)
+  }
+
   async function handleBulkArchive(messageIds: string[]) {
-    try {
-      await Archive(messageIds)
-      addToast({ type: 'success', message: $_('toast.archived'), actions: [{ label: $_('common.undo'), onClick: handleUndo }] })
-      messageListRef?.clearChecked()
-      messageListRef?.handleActionComplete(true)
-    } catch (err) {
-      console.error('Archive failed:', err)
-      addToast({ type: 'error', message: $_('toast.failedToArchive') })
-    }
+    await archiveMessages(messageIds, {
+      onUndo: handleUndo,
+      onSuccess: handleBulkActionComplete,
+      autoSelectNext: true,
+    })
   }
 
   async function handleBulkSpam(messageIds: string[]) {
-    try {
-      const isSpamFolder = selectedFolderType === 'spam'
-
-      if (isSpamFolder) {
-        // If we're in spam folder, mark as NOT spam
-        await MarkAsNotSpam(messageIds)
-        addToast({ type: 'success', message: $_('toast.markedAsNotSpam'), actions: [{ label: $_('common.undo'), onClick: handleUndo }] })
-      } else {
-        // Otherwise, mark as spam
-        await MarkAsSpam(messageIds)
-        addToast({ type: 'success', message: $_('toast.markedAsSpam'), actions: [{ label: $_('common.undo'), onClick: handleUndo }] })
-      }
-
-      messageListRef?.clearChecked()
-      messageListRef?.handleActionComplete(true)
-    } catch (err) {
-      const isSpamFolder = selectedFolderType === 'spam'
-      console.error('Spam toggle failed:', err)
-      addToast({ type: 'error', message: $_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam') })
-    }
+    await toggleSpamMessages(messageIds, selectedFolderType === 'spam', {
+      onUndo: handleUndo,
+      onSuccess: handleBulkActionComplete,
+      autoSelectNext: true,
+      spamSuccessMode: 'alwaysMarked',
+    })
   }
 
   async function handleBulkMarkRead(messageIds: string[]) {
-    try {
-      await MarkAsRead(messageIds)
-      addToast({ type: 'success', message: $_('toast.markedAsRead') })
-      messageListRef?.clearChecked()
-      messageListRef?.handleActionComplete()
-    } catch (err) {
-      console.error('Mark as read failed:', err)
-      addToast({ type: 'error', message: $_('toast.failedToMarkAsRead') })
-    }
+    await setReadStateMessages(messageIds, true, {
+      onSuccess: handleBulkActionComplete,
+      errorKey: 'toast.failedToMarkAsRead',
+    })
   }
 
   async function handleBulkMarkUnread(messageIds: string[]) {
-    try {
-      await MarkAsUnread(messageIds)
-      addToast({ type: 'success', message: $_('toast.markedAsUnread') })
-      messageListRef?.clearChecked()
-      messageListRef?.handleActionComplete()
-    } catch (err) {
-      console.error('Mark as unread failed:', err)
-      addToast({ type: 'error', message: $_('toast.failedToMarkAsUnread') })
-    }
+    await setReadStateMessages(messageIds, false, {
+      onSuccess: handleBulkActionComplete,
+      errorKey: 'toast.failedToMarkAsUnread',
+    })
   }
 
   async function handleBulkToggleStar(messageIds: string[], shouldStar: boolean) {
-    try {
-      if (shouldStar) {
-        await Star(messageIds)
-        addToast({ type: 'success', message: $_('toast.starred') })
-      } else {
-        await Unstar(messageIds)
-        addToast({ type: 'success', message: $_('toast.starRemoved') })
-      }
-      messageListRef?.clearChecked()
-      messageListRef?.handleActionComplete()
-    } catch (err) {
-      console.error('Star toggle failed:', err)
-      addToast({ type: 'error', message: $_('toast.failedToUpdateStar') })
-    }
+    await toggleStarMessages(messageIds, shouldStar, {
+      onSuccess: handleBulkActionComplete,
+    })
   }
 
   async function handleUndo() {
-    try {
-      const description = await Undo()
-      addToast({ type: 'success', message: $_('toast.undone', { values: { description } }) })
-      messageListRef?.handleActionComplete()
-    } catch (err) {
-      console.error('Undo failed:', err)
-      addToast({ type: 'error', message: $_('toast.undoFailed') })
-    }
+    await undoLastMailAction({
+      onSuccess: () => messageListRef?.handleActionComplete(),
+    })
   }
 </script>
 

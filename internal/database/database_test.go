@@ -50,31 +50,6 @@ func openTestDBAtMigration(t *testing.T, version int) *DB {
 	return db
 }
 
-func applyMigrationsAfter(t *testing.T, db *DB, version int) {
-	t.Helper()
-	for _, m := range migrations {
-		if m.Version <= version {
-			continue
-		}
-		if err := db.applyMigration(m); err != nil {
-			t.Fatalf("apply migration %d: %v", m.Version, err)
-		}
-	}
-}
-
-func applyMigrationVersion(t *testing.T, db *DB, version int) {
-	t.Helper()
-	for _, m := range migrations {
-		if m.Version == version {
-			if err := db.applyMigration(m); err != nil {
-				t.Fatalf("apply migration %d: %v", m.Version, err)
-			}
-			return
-		}
-	}
-	t.Fatalf("migration %d not found", version)
-}
-
 func tableExists(t *testing.T, db *DB, name string) bool {
 	t.Helper()
 	var count int
@@ -182,52 +157,33 @@ func TestCheckpoint(t *testing.T) {
 	}
 }
 
-// TestMigrationV29_OAuthCompositeKey verifies the legacy OAuth compatibility
-// migration: oauth_tokens uses composite PK (account_id, client_config_id) so
-// old databases with multiple token rows still migrate deterministically.
-func TestMigrationV29_OAuthCompositeKey(t *testing.T) {
-	db := openTestDBAtMigration(t, 29)
+func TestMigrateFinalSchemaExcludesRemovedRemoteContactAndTokenObjects(t *testing.T) {
+	db := openTestDB(t)
 
-	// Insert a test account row (oauth_tokens.account_id FK to accounts.id).
-	// Schema defaults handle most columns; only NOT NULL non-default fields are explicit.
-	if _, err := db.Exec(`
-		INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
-		VALUES ('acct-1', 'Test', 'user@example.com', 'imap.example.com', 'smtp.example.com', 'user@example.com')
-	`); err != nil {
-		t.Fatalf("insert account: %v", err)
+	for _, table := range []string{
+		"carddav_record_state",
+		"contact_source_oauth",
+		"contact_source_addressbooks",
+		"contact_sources",
+		"oauth_tokens",
+		"extension_secrets",
+		"user_oauth_clients",
+		"user_oauth_slot_aliases",
+	} {
+		if tableExists(t, db, table) {
+			t.Fatalf("removed table %s should not exist", table)
+		}
 	}
 
-	// Insert mail-config token row
-	if _, err := db.Exec(`
-		INSERT INTO oauth_tokens (account_id, client_config_id, provider, expires_at, scopes)
-		VALUES ('acct-1', 'google-mail', 'google', CURRENT_TIMESTAMP, '[]')
-	`); err != nil {
-		t.Fatalf("insert mail token row: %v", err)
+	for _, col := range []string{"encrypted_access_token", "encrypted_refresh_token"} {
+		if columnExists(t, db, "accounts", col) {
+			t.Fatalf("accounts.%s should not exist", col)
+		}
 	}
-
-	// Insert extension-config token row for same account — should succeed
-	if _, err := db.Exec(`
-		INSERT INTO oauth_tokens (account_id, client_config_id, provider, expires_at, scopes)
-		VALUES ('acct-1', 'google-extensions', 'google', CURRENT_TIMESTAMP, '[]')
-	`); err != nil {
-		t.Fatalf("insert extension token row failed (composite PK should allow it): %v", err)
-	}
-
-	// Verify both rows exist
-	var count int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM oauth_tokens WHERE account_id = 'acct-1'`).Scan(&count); err != nil {
-		t.Fatalf("count rows: %v", err)
-	}
-	if count != 2 {
-		t.Fatalf("expected 2 token rows for account, got %d", count)
-	}
-
-	// Duplicate (account_id, client_config_id) must violate the composite PK
-	if _, err := db.Exec(`
-		INSERT INTO oauth_tokens (account_id, client_config_id, provider, expires_at, scopes)
-		VALUES ('acct-1', 'google-mail', 'google', CURRENT_TIMESTAMP, '[]')
-	`); err == nil {
-		t.Fatal("expected composite PK conflict on duplicate (account_id, client_config_id), got no error")
+	for _, col := range []string{"source_ref", "vcard_raw"} {
+		if columnExists(t, db, "contact_records", col) {
+			t.Fatalf("contact_records.%s should not exist", col)
+		}
 	}
 }
 
@@ -270,7 +226,7 @@ func TestMigrationV46_FTSUpdateTriggerIgnoresFlagOnlyUpdates(t *testing.T) {
 	}
 }
 
-func TestMigrationV47_DropsLegacyRemoteContactSchema(t *testing.T) {
+func TestMigrationV47_RemovesLegacyColumnsAndNonLocalContacts(t *testing.T) {
 	db := openTestDBAtMigration(t, 46)
 
 	if _, err := db.Exec(`
@@ -282,23 +238,11 @@ func TestMigrationV47_DropsLegacyRemoteContactSchema(t *testing.T) {
 		INSERT INTO contact_emails (record_id, email, is_primary)
 		VALUES ('local-rec', 'local@example.com', 1);
 
-		INSERT INTO contact_sources (id, name, type, url, username, enabled, sync_interval)
-		VALUES ('src-1', 'Remote', 'carddav', 'https://example.com/dav', 'user', 1, 60);
-		INSERT INTO contact_source_addressbooks (id, source_id, path, name, enabled)
-		VALUES ('ab-1', 'src-1', '/contacts/', 'Contacts', 1);
-		INSERT INTO contact_source_oauth (source_id, provider, expires_at, scopes, client_config_id)
-		VALUES ('src-1', 'google', CURRENT_TIMESTAMP, '[]', 'google-extensions');
 		INSERT INTO contact_records (id, source, source_ref, fn, vcard_raw, created_at, updated_at)
 		VALUES ('remote-rec', 'carddav', 'ab-1', 'Remote', 'BEGIN:VCARD', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 		INSERT INTO contact_emails (record_id, email, is_primary)
 		VALUES ('remote-rec', 'remote@example.com', 1);
-		INSERT INTO carddav_record_state (record_id, addressbook_id, href, etag)
-		VALUES ('remote-rec', 'ab-1', '/contacts/remote.vcf', 'etag');
 
-		INSERT INTO oauth_tokens (account_id, client_config_id, provider, expires_at, scopes, encrypted_access_token, encrypted_refresh_token)
-		VALUES ('acct-1', 'google-mail', 'google', CURRENT_TIMESTAMP, '[]', 'token-access', 'token-refresh');
-		INSERT INTO extension_secrets (extension, key, encrypted_value, created_at)
-		VALUES ('contacts', 'token', 'secret', 1);
 		CREATE TABLE user_oauth_clients (id TEXT PRIMARY KEY);
 		CREATE TABLE user_oauth_slot_aliases (id TEXT PRIMARY KEY);
 		INSERT INTO user_oauth_clients (id) VALUES ('client-1');
@@ -306,7 +250,7 @@ func TestMigrationV47_DropsLegacyRemoteContactSchema(t *testing.T) {
 		INSERT INTO settings (key, value)
 		VALUES ('oauth_active_choice:google-mail', 'custom');
 	`); err != nil {
-		t.Fatalf("seed legacy schema: %v", err)
+		t.Fatalf("seed pre-v47 schema: %v", err)
 	}
 
 	if err := db.Migrate(); err != nil {
@@ -435,129 +379,6 @@ func TestMigrationV32_LocalRecordIDsRewrittenToUUIDs(t *testing.T) {
 	}
 }
 
-// TestMigrationV33_AddsAddressbookFK verifies migration 33 cleans existing
-// orphans AND wires the new FK so future addressbook deletes cascade to
-// state rows automatically.
-func TestMigrationV33_AddsAddressbookFK(t *testing.T) {
-	db := openTestDBAtMigration(t, 33)
-
-	// Seed a source + addressbook + record so we have a row to chain through.
-	if _, err := db.Exec(`
-		INSERT INTO contact_sources (id, name, type, url, username, enabled, sync_interval)
-		VALUES ('src-1', 'Test', 'carddav', 'https://x', 'u', 1, 60)
-	`); err != nil {
-		t.Fatalf("seed source: %v", err)
-	}
-	if _, err := db.Exec(`
-		INSERT INTO contact_source_addressbooks (id, source_id, path, name, enabled)
-		VALUES ('ab-1', 'src-1', '/dav/', 'ab', 1)
-	`); err != nil {
-		t.Fatalf("seed addressbook: %v", err)
-	}
-	if _, err := db.Exec(`
-		INSERT INTO contact_records (id, source, source_ref, fn)
-		VALUES ('rec-1', 'carddav', 'ab-1', 'Test')
-	`); err != nil {
-		t.Fatalf("seed record: %v", err)
-	}
-	if _, err := db.Exec(`
-		INSERT INTO carddav_record_state (record_id, addressbook_id, href, etag)
-		VALUES ('rec-1', 'ab-1', '/dav/rec-1.vcf', 'etag')
-	`); err != nil {
-		t.Fatalf("seed state: %v", err)
-	}
-
-	// Schema-level invariant: deleting the addressbook now cascades to state.
-	// Pre-migration this would have left the state row as a zombie.
-	if _, err := db.Exec(`DELETE FROM contact_source_addressbooks WHERE id = 'ab-1'`); err != nil {
-		t.Fatalf("delete addressbook: %v", err)
-	}
-
-	var stateRows, recordRows int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM carddav_record_state WHERE record_id = 'rec-1'`).Scan(&stateRows); err != nil {
-		t.Fatalf("count state: %v", err)
-	}
-	if err := db.QueryRow(`SELECT COUNT(*) FROM contact_records WHERE id = 'rec-1'`).Scan(&recordRows); err != nil {
-		t.Fatalf("count records: %v", err)
-	}
-	if stateRows != 0 {
-		t.Errorf("expected 0 state rows after addressbook delete, got %d", stateRows)
-	}
-	// contact_records does NOT cascade from state (cascade goes the other
-	// direction: record→state). So the record row survives. That's expected.
-	// (The application-level DeleteSource path handles record cleanup.)
-	if recordRows != 1 {
-		t.Errorf("expected record to survive addressbook delete (no cascade in that direction); got %d rows", recordRows)
-	}
-}
-
-// TestMigrationV33_CleansExistingOrphans verifies the pre-step that scrubs
-// orphan state rows + records before the FK is added. Simulates the v32
-// state by rebuilding carddav_record_state WITHOUT the FK, seeding orphans,
-// then re-running migration 33 — which must pre-clean orphans before the
-// table rebuild's INSERT.
-func TestMigrationV33_CleansExistingOrphans(t *testing.T) {
-	db := openTestDBAtMigration(t, 32)
-
-	// Seed: orphan state row whose addressbook doesn't exist. Pre-migration,
-	// this insert succeeds because the FK isn't there.
-	if _, err := db.Exec(`
-		INSERT INTO contact_records (id, source, source_ref, fn)
-		VALUES ('zombie-rec', 'carddav', 'dead-ab-id', 'Zombie')
-	`); err != nil {
-		t.Fatalf("seed zombie record: %v", err)
-	}
-	if _, err := db.Exec(`
-		INSERT INTO carddav_record_state (record_id, addressbook_id, href, etag)
-		VALUES ('zombie-rec', 'dead-ab-id', '/dav/zombie.vcf', 'etag')
-	`); err != nil {
-		t.Fatalf("seed zombie state: %v", err)
-	}
-
-	// Seed: contact_records (carddav) with no state row — bloat the
-	// migration should drop in pre-step 2.
-	if _, err := db.Exec(`
-		INSERT INTO contact_records (id, source, fn)
-		VALUES ('orphan-record', 'carddav', 'OrphanRec')
-	`); err != nil {
-		t.Fatalf("seed orphan record: %v", err)
-	}
-
-	// Apply just v33; it should pre-clean both rows before rebuilding the table
-	// with the FK. Later v47 removes this legacy sidecar entirely, so this test
-	// stops at the migration that owns the behavior.
-	applyMigrationVersion(t, db, 33)
-
-	var stateCount, recordCount int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM carddav_record_state WHERE record_id = 'zombie-rec'`).Scan(&stateCount); err != nil {
-		t.Fatalf("count zombie state: %v", err)
-	}
-	if err := db.QueryRow(`SELECT COUNT(*) FROM contact_records WHERE id IN ('zombie-rec','orphan-record')`).Scan(&recordCount); err != nil {
-		t.Fatalf("count orphan records: %v", err)
-	}
-	if stateCount != 0 {
-		t.Errorf("zombie state row should have been pre-cleaned; got %d", stateCount)
-	}
-	if recordCount != 0 {
-		t.Errorf("orphan records (no state) should have been pre-cleaned; got %d", recordCount)
-	}
-
-	// FK should now be enforcing — try inserting another orphan, expect FK violation.
-	_, err := db.Exec(`
-		INSERT INTO contact_records (id, source, fn) VALUES ('post-rec', 'carddav', 'Post');
-	`)
-	if err != nil {
-		t.Fatalf("insert valid record: %v", err)
-	}
-	_, err = db.Exec(`
-		INSERT INTO carddav_record_state (record_id, addressbook_id, href, etag)
-		VALUES ('post-rec', 'still-dead', '/dav/post.vcf', 'etag')
-	`)
-	if err == nil {
-		t.Error("expected FK violation when inserting state pointing at dead addressbook_id post-migration, got nil")
-	}
-}
-
 func TestPath(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "test.db")
 	db, err := Open(path)
@@ -619,49 +440,5 @@ func TestMigrationV34_AddsPhotoColumns(t *testing.T) {
 	}
 	if dataNull.Valid || typeNull.Valid || urlNull.Valid {
 		t.Errorf("expected all NULL, got %v/%v/%v", dataNull, typeNull, urlNull)
-	}
-}
-
-// Regression for #289: upgrading from v0.2.5 with a "messy" CardDAV collection
-// that lists the same address twice for one vCard must not crash the app inside
-// migration 31. The CardDAV backfill collapses fanned-out rows onto one
-// record_id; a plain INSERT tripped PRIMARY KEY(record_id, email) and rolled the
-// whole startup migration back. INSERT OR IGNORE dedupes instead.
-func TestMigration31_DuplicateCardDAVEmailDoesNotFailMigration(t *testing.T) {
-	db := openTestDBAtMigration(t, 30)
-
-	// Seed one CardDAV vCard (single href) whose old schema fanned the SAME
-	// address out across two rows — the exact #289 trigger.
-	if _, err := db.Exec(`
-		INSERT INTO contact_sources (id, name, type, url) VALUES ('src1','Test','carddav','https://example.com/dav');
-		INSERT INTO contact_source_addressbooks (id, source_id, path) VALUES ('ab1','src1','/');
-		INSERT INTO carddav_contacts (id, addressbook_id, email, display_name, href, synced_at) VALUES
-			('c1','ab1','dup@example.com','Dup Person','/contacts/1.vcf',CURRENT_TIMESTAMP),
-			('c2','ab1','dup@example.com','Dup Person','/contacts/1.vcf',CURRENT_TIMESTAMP);
-	`); err != nil {
-		t.Fatalf("seed legacy carddav_contacts: %v", err)
-	}
-
-	// Apply v31 first so we can assert the backfill dedupes before the final
-	// local-only cleanup removes remote rows.
-	applyMigrationVersion(t, db, 31)
-
-	// The duplicate collapsed to exactly one contact_emails row.
-	var n int
-	if err := db.QueryRow(`SELECT COUNT(*) FROM contact_emails WHERE email = 'dup@example.com'`).Scan(&n); err != nil {
-		t.Fatalf("count contact_emails: %v", err)
-	}
-	if n != 1 {
-		t.Fatalf("want 1 deduped contact_emails row, got %d", n)
-	}
-
-	// Later migrations must still complete, and v47 intentionally discards the
-	// remaining remote-contact rows.
-	applyMigrationsAfter(t, db, 31)
-	if err := db.QueryRow(`SELECT COUNT(*) FROM contact_emails WHERE email = 'dup@example.com'`).Scan(&n); err != nil {
-		t.Fatalf("count contact_emails after v47: %v", err)
-	}
-	if n != 0 {
-		t.Fatalf("want remote contact_emails removed by v47, got %d", n)
 	}
 }

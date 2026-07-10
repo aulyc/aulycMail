@@ -8,27 +8,25 @@
   } from '$lib/components/ui/context-menu'
   import {
     GetAccounts,
-    MarkAsRead,
-    MarkAsUnread,
-    Star,
-    Unstar,
-    Archive,
-    Trash,
-    MarkAsSpam,
-    MarkAsNotSpam,
-    DeletePermanently,
-    MoveToFolder,
-    CopyToFolder,
-    Undo,
   } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
   import { account } from '../../../../wailsjs/go/models'
-  import { toasts } from '$lib/stores/toast'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
   import FolderPickerDialog from './FolderPickerDialog.svelte'
   import type { Snippet } from 'svelte'
   import { _ } from '$lib/i18n'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
+  import {
+    archiveMessages,
+    copyMessagesToFolder,
+    deleteMessagesPermanently,
+    moveMessagesToFolder,
+    setReadStateMessages,
+    toggleSpamMessages,
+    toggleStarMessages,
+    trashMessages,
+    undoLastMailAction,
+  } from '$lib/mailActions'
 
   interface Props {
     messageIds: string[]
@@ -115,13 +113,7 @@
 
   // Undo handler
   async function handleUndo() {
-    try {
-      const description = await Undo()
-      toasts.success($_('toast.undone', { values: { description } }))
-    } catch (err) {
-      console.error('Undo failed:', err)
-      toasts.error($_('toast.undoFailed'))
-    }
+    await undoLastMailAction()
   }
 
   // Action handlers
@@ -144,97 +136,56 @@
   }
 
   async function handleArchive() {
-    try {
-      await Archive(messageIds)
-      toasts.success($_('toast.archived'), [{ label: $_('common.undo'), onClick: handleUndo }])
-      onActionComplete?.(true)
-    } catch (err) {
-      console.error('Archive failed:', err)
-      toasts.error($_('toast.failedToArchive'))
-    }
+    await archiveMessages(messageIds, {
+      onUndo: handleUndo,
+      onSuccess: onActionComplete,
+      autoSelectNext: true,
+    })
   }
 
   async function handleDelete() {
     if (isTrashFolder) {
       showDeleteConfirm = true
     } else {
-      try {
-        const movedToTrash = await Trash(messageIds)
-        const toastMsg = movedToTrash ? $_('toast.movedToTrash') : $_('toast.deletedFromFolder')
-        const actions = movedToTrash ? [{ label: $_('common.undo'), onClick: handleUndo }] : []
-        toasts.success(toastMsg, actions)
-        onActionComplete?.(true)
-      } catch (err) {
-        console.error('Delete failed:', err)
-        toasts.error($_('toast.failedToDelete'))
-      }
+      await trashMessages(messageIds, {
+        onUndo: handleUndo,
+        onSuccess: onActionComplete,
+        autoSelectNext: true,
+      })
     }
   }
 
   async function handleConfirmPermanentDelete() {
-    try {
-      await DeletePermanently(messageIds)
-      toasts.success($_('toast.permanentlyDeleted'))
-      showDeleteConfirm = false
-      onActionComplete?.(true)
-    } catch (err) {
-      console.error('Permanent delete failed:', err)
-      toasts.error($_('toast.failedToDelete'))
-      showDeleteConfirm = false
-    }
+    await deleteMessagesPermanently(messageIds, {
+      onSuccess: async (autoSelectNext) => {
+        showDeleteConfirm = false
+        await onActionComplete?.(autoSelectNext)
+      },
+      onError: () => {
+        showDeleteConfirm = false
+      },
+      autoSelectNext: true,
+    })
   }
 
   async function handleSpam() {
-    try {
-      if (isSpamFolder) {
-        // If we're in spam folder, mark as NOT spam
-        await MarkAsNotSpam(messageIds)
-        toasts.success($_('toast.markedAsNotSpam'), [{ label: $_('common.undo'), onClick: handleUndo }])
-        onActionComplete?.(true)
-        return
-      }
-      // Otherwise, mark as spam
-      const movedToSpam = await MarkAsSpam(messageIds)
-      const toastMsg = movedToSpam ? $_('toast.markedAsSpam') : $_('toast.deletedFromFolder')
-      const actions = movedToSpam ? [{ label: $_('common.undo'), onClick: handleUndo }] : []
-      toasts.success(toastMsg, actions)
-      onActionComplete?.(true)
-    } catch (err) {
-      console.error('Spam toggle failed:', err)
-      toasts.error($_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam'))
-    }
+    await toggleSpamMessages(messageIds, isSpamFolder, {
+      onUndo: handleUndo,
+      onSuccess: onActionComplete,
+      autoSelectNext: true,
+    })
   }
 
   async function handleToggleStar() {
-    try {
-      if (isStarred) {
-        await Unstar(messageIds)
-        toasts.success($_('toast.starRemoved'))
-      } else {
-        await Star(messageIds)
-        toasts.success($_('toast.starred'))
-      }
-      onActionComplete?.()
-    } catch (err) {
-      console.error('Star toggle failed:', err)
-      toasts.error($_('toast.failedToUpdateStar'))
-    }
+    await toggleStarMessages(messageIds, !isStarred, {
+      onSuccess: onActionComplete,
+    })
   }
 
   async function handleToggleRead() {
-    try {
-      if (isRead) {
-        await MarkAsUnread(messageIds)
-        toasts.success($_('toast.markedAsUnread'))
-      } else {
-        await MarkAsRead(messageIds)
-        toasts.success($_('toast.markedAsRead'))
-      }
-      onActionComplete?.()
-    } catch (err) {
-      console.error('Read status toggle failed:', err)
-      toasts.error($_('toast.failedToUpdateReadStatus'))
-    }
+    await setReadStateMessages(messageIds, !isRead, {
+      onSuccess: onActionComplete,
+    })
   }
 
   function openMoveTo() {
@@ -260,25 +211,15 @@
   }
 
   async function handleMoveTo(destFolderId: string, folderName: string) {
-    try {
-      await MoveToFolder(messageIds, destFolderId)
-      toasts.success($_('toast.movedTo', { values: { folder: folderName } }), [{ label: $_('common.undo'), onClick: handleUndo }])
-      onActionComplete?.(true)
-    } catch (err) {
-      console.error('Move failed:', err)
-      toasts.error($_('toast.failedToMove'))
-    }
+    await moveMessagesToFolder(messageIds, destFolderId, folderName, {
+      onUndo: handleUndo,
+      onSuccess: onActionComplete,
+      autoSelectNext: true,
+    })
   }
 
   async function handleCopyTo(destFolderId: string, folderName: string) {
-    try {
-      await CopyToFolder(messageIds, destFolderId)
-      toasts.success($_('toast.copyingTo', { values: { folder: folderName } }))
-      // CopyToFolder syncs in background; sidebar count + dest folder list refresh ride on folder:synced.
-    } catch (err) {
-      console.error('Copy failed:', err)
-      toasts.error($_('toast.failedToCopy'))
-    }
+    await copyMessagesToFolder(messageIds, destFolderId, folderName)
   }
 </script>
 

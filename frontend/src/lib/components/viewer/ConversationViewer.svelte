@@ -4,7 +4,7 @@
   // @ts-ignore - wailsjs bindings
   import { GetConversation, GetReadReceiptResponsePolicy, SendReadReceipt, IgnoreReadReceipt, GetMarkAsReadDelay, GetMessageSource, FetchMessageBody, OpenFile } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs bindings
-  import { MarkAsRead, MarkAsUnread, Star, Unstar, Archive, Trash, MarkAsSpam, MarkAsNotSpam, DeletePermanently, Undo } from '../../../../wailsjs/go/app/App'
+  import { MarkAsRead } from '../../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
   import { EventsOn } from '../../../../wailsjs/runtime/runtime'
   // @ts-ignore - wailsjs path
@@ -20,6 +20,15 @@
   import { isDialogGuardActive, onDialogGuardChange } from '$lib/stores/dialogGuard'
   import { getDarkMailContent, getDeveloperMode } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
+  import {
+    archiveMessages,
+    deleteMessagesPermanently,
+    setReadStateMessages,
+    toggleSpamMessages,
+    toggleStarMessages,
+    trashMessages,
+    undoLastMailAction,
+  } from '$lib/mailActions'
 
   interface Props {
     threadId?: string | null
@@ -671,17 +680,12 @@
   async function handleArchive() {
     if (!conversation?.messages) return
     const messageIds = conversation.messages.map(m => m.id)
-
-    try {
-      await Archive(messageIds)
-      toasts.success($_('toast.conversationArchived'), [
-        { label: $_('common.undo'), onClick: handleUndo }
-      ])
-      onActionComplete?.(true)
-    } catch (err) {
-      console.error('Archive failed:', err)
-      toasts.error($_('toast.failedToArchive'))
-    }
+    await archiveMessages(messageIds, {
+      successKey: 'toast.conversationArchived',
+      onUndo: handleUndo,
+      onSuccess: onActionComplete,
+      autoSelectNext: true,
+    })
   }
 
   async function handleDelete() {
@@ -693,16 +697,11 @@
     } else {
       // Move to trash (undoable)
       const messageIds = conversation.messages.map(m => m.id)
-      try {
-        const movedToTrash = await Trash(messageIds)
-        const toastMsg = movedToTrash ? $_('toast.movedToTrash') : $_('toast.deletedFromFolder')
-        const actions = movedToTrash ? [{ label: $_('common.undo'), onClick: handleUndo }] : []
-        toasts.success(toastMsg, actions)
-        onActionComplete?.(true)
-      } catch (err) {
-        console.error('Delete failed:', err)
-        toasts.error($_('toast.failedToDelete'))
-      }
+      await trashMessages(messageIds, {
+        onUndo: handleUndo,
+        onSuccess: onActionComplete,
+        autoSelectNext: true,
+      })
     }
   }
 
@@ -710,16 +709,16 @@
     if (!conversation?.messages) return
     const messageIds = conversation.messages.map(m => m.id)
 
-    try {
-      await DeletePermanently(messageIds)
-      toasts.success($_('toast.permanentlyDeleted'))
-      showDeleteConfirm = false
-      onActionComplete?.(true)
-    } catch (err) {
-      console.error('Permanent delete failed:', err)
-      toasts.error($_('toast.failedToDelete'))
-      showDeleteConfirm = false
-    }
+    await deleteMessagesPermanently(messageIds, {
+      onSuccess: async (autoSelectNext) => {
+        showDeleteConfirm = false
+        await onActionComplete?.(autoSelectNext)
+      },
+      onError: () => {
+        showDeleteConfirm = false
+      },
+      autoSelectNext: true,
+    })
   }
 
   // Delete the currently focused message (via keyboard)
@@ -728,28 +727,19 @@
 
     if (isTrashFolder) {
       // Permanent delete from trash
-      try {
-        await DeletePermanently([focusedMessageId])
-        toasts.success($_('toast.permanentlyDeleted'))
-        focusedMessageId = null
-        // Will auto-reload via messages:deleted event
-      } catch (err) {
-        console.error('Permanent delete failed:', err)
-        toasts.error($_('toast.failedToDelete'))
-      }
+      await deleteMessagesPermanently([focusedMessageId], {
+        onSuccess: () => {
+          focusedMessageId = null
+        },
+      })
     } else {
       // Move to trash (undoable)
-      try {
-        const movedToTrash = await Trash([focusedMessageId])
-        const toastMsg = movedToTrash ? $_('toast.movedToTrash') : $_('toast.deletedFromFolder')
-        const actions = movedToTrash ? [{ label: $_('common.undo'), onClick: handleUndo }] : []
-        toasts.success(toastMsg, actions)
-        focusedMessageId = null
-        // Will auto-reload via messages:deleted event
-      } catch (err) {
-        console.error('Delete failed:', err)
-        toasts.error($_('toast.failedToDelete'))
-      }
+      await trashMessages([focusedMessageId], {
+        onUndo: handleUndo,
+        onSuccess: () => {
+          focusedMessageId = null
+        },
+      })
     }
   }
 
@@ -757,26 +747,11 @@
     if (!conversation?.messages) return
     const messageIds = conversation.messages.map(m => m.id)
 
-    try {
-      if (isSpamFolder) {
-        // If we're in spam folder, mark as NOT spam
-        await MarkAsNotSpam(messageIds)
-        toasts.success($_('toast.markedAsNotSpam'), [
-          { label: $_('common.undo'), onClick: handleUndo }
-        ])
-        onActionComplete?.(true)
-        return
-      }
-      // Otherwise, mark as spam
-      const movedToSpam = await MarkAsSpam(messageIds)
-      const toastMsg = movedToSpam ? $_('toast.markedAsSpam') : $_('toast.deletedFromFolder')
-      const actions = movedToSpam ? [{ label: $_('common.undo'), onClick: handleUndo }] : []
-      toasts.success(toastMsg, actions)
-      onActionComplete?.(true)
-    } catch (err) {
-      console.error('Spam toggle failed:', err)
-      toasts.error($_(isSpamFolder ? 'toast.failedToMarkAsNotSpam' : 'toast.failedToMarkAsSpam'))
-    }
+    await toggleSpamMessages(messageIds, isSpamFolder, {
+      onUndo: handleUndo,
+      onSuccess: onActionComplete,
+      autoSelectNext: true,
+    })
   }
 
   async function handleStar() {
@@ -786,21 +761,13 @@
     const wasAllStarred = conversation.messages.every(m => m.isStarred)
     const messageIds = conversation.messages.map(m => m.id)
 
-    try {
-      if (wasAllStarred) {
-        await Unstar(messageIds)
-        toasts.success($_('toast.removedStar'))
-      }
-      if (!wasAllStarred) {
-        await Star(messageIds)
-        toasts.success($_('toast.starred'))
-      }
-      conversation = await GetConversation(threadId, folderId)
-      onActionComplete?.()
-    } catch (err) {
-      console.error('Star toggle failed:', err)
-      toasts.error($_('toast.failedToUpdateStar'))
-    }
+    await toggleStarMessages(messageIds, !wasAllStarred, {
+      unstarSuccessKey: 'toast.removedStar',
+      onSuccess: async () => {
+        conversation = await GetConversation(threadId, folderId)
+        onActionComplete?.()
+      },
+    })
   }
 
   async function handleMarkRead() {
@@ -816,35 +783,23 @@
     // the auto-mark-as-read timer).
     pendingMarkAsReadIds = new Set(messageIds)
 
-    try {
-      if (allRead) {
-        await MarkAsUnread(messageIds)
-        toasts.success($_('toast.markedAsUnread'))
-      }
-      if (!allRead) {
-        await MarkAsRead(messageIds)
-        toasts.success($_('toast.markedAsRead'))
-      }
-    } catch (err) {
-      console.error('Read status toggle failed:', err)
-      toasts.error($_('toast.failedToUpdateReadStatus'))
-      pendingMarkAsReadIds = new Set()
-    }
+    await setReadStateMessages(messageIds, !allRead, {
+      onError: () => {
+        pendingMarkAsReadIds = new Set()
+      },
+    })
   }
 
   async function handleUndo() {
-    try {
-      const description = await Undo()
-      toasts.success($_('toast.undone', { values: { description } }))
-      // Reload conversation to show updated state
-      if (threadId && folderId) {
-        await loadConversation(threadId, folderId)
-      }
-      onActionComplete?.()
-    } catch (err) {
-      console.error('Undo failed:', err)
-      toasts.error($_('toast.undoFailed'))
-    }
+    await undoLastMailAction({
+      onSuccess: async () => {
+        // Reload conversation to show updated state
+        if (threadId && folderId) {
+          await loadConversation(threadId, folderId)
+        }
+        onActionComplete?.()
+      },
+    })
   }
 
 

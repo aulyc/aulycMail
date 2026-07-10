@@ -156,14 +156,41 @@
   let availableFolders = $state<any[]>([])
   let autoDetectedFolders = $state<Record<string, string>>({})
 
-  // Folder mapping values
-  let sentFolderPath = $state('')
-  let draftsFolderPath = $state('')
-  let trashFolderPath = $state('')
-  let spamFolderPath = $state('')
-  let archiveFolderPath = $state('')
-  let allMailFolderPath = $state('')
-  let starredFolderPath = $state('')
+  type FolderMappingKey = 'sent' | 'drafts' | 'trash' | 'spam' | 'archive' | 'allMail' | 'starred'
+  type FolderMappingPathField =
+    | 'sentFolderPath'
+    | 'draftsFolderPath'
+    | 'trashFolderPath'
+    | 'spamFolderPath'
+    | 'archiveFolderPath'
+    | 'allMailFolderPath'
+    | 'starredFolderPath'
+  type FolderMappingConfig = {
+    key: FolderMappingKey
+    labelKey: string
+    pathField: FolderMappingPathField
+    detectedKey: string
+  }
+
+  const folderMappingConfigs: FolderMappingConfig[] = [
+    { key: 'sent', labelKey: 'account.folderSent', pathField: 'sentFolderPath', detectedKey: 'sent' },
+    { key: 'drafts', labelKey: 'account.folderDrafts', pathField: 'draftsFolderPath', detectedKey: 'drafts' },
+    { key: 'trash', labelKey: 'account.folderTrash', pathField: 'trashFolderPath', detectedKey: 'trash' },
+    { key: 'spam', labelKey: 'account.folderSpam', pathField: 'spamFolderPath', detectedKey: 'spam' },
+    { key: 'archive', labelKey: 'account.folderArchive', pathField: 'archiveFolderPath', detectedKey: 'archive' },
+    { key: 'allMail', labelKey: 'account.folderAllMail', pathField: 'allMailFolderPath', detectedKey: 'all' },
+    { key: 'starred', labelKey: 'account.folderStarred', pathField: 'starredFolderPath', detectedKey: 'starred' },
+  ]
+
+  let folderMappingPaths = $state<Record<FolderMappingKey, string>>({
+    sent: '',
+    drafts: '',
+    trash: '',
+    spam: '',
+    archive: '',
+    allMail: '',
+    starred: '',
+  })
 
   // Folder sync subscription state
   let showFolderSync = $state(false)
@@ -197,27 +224,22 @@
     try {
       availableFolders = await GetAccountFoldersForMapping(editAccount.id)
       autoDetectedFolders = await GetAutoDetectedFolders(editAccount.id)
-
-      // Pre-select: use saved value if exists, otherwise auto-detected
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      sentFolderPath = editAccount.sentFolderPath || autoDetectedFolders.sent || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      draftsFolderPath = editAccount.draftsFolderPath || autoDetectedFolders.drafts || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      trashFolderPath = editAccount.trashFolderPath || autoDetectedFolders.trash || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      spamFolderPath = editAccount.spamFolderPath || autoDetectedFolders.spam || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      archiveFolderPath = editAccount.archiveFolderPath || autoDetectedFolders.archive || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      allMailFolderPath = editAccount.allMailFolderPath || autoDetectedFolders.all || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      starredFolderPath = editAccount.starredFolderPath || autoDetectedFolders.starred || ''
+      initializeFolderMappings(editAccount, autoDetectedFolders)
     } catch (err) {
       console.error('Failed to load folders for mapping:', err)
     } finally {
       loadingFolders = false
     }
+  }
+
+  function initializeFolderMappings(acc: account.Account, detected: Record<string, string> = {}) {
+    for (const config of folderMappingConfigs) {
+      folderMappingPaths[config.key] = acc[config.pathField] || detected[config.detectedKey] || ''
+    }
+  }
+
+  function getFolderOptionLabel(path: string, config: FolderMappingConfig): string {
+    return path + (autoDetectedFolders[config.detectedKey] === path ? ' ' + $_('account.detected') : '')
   }
 
   async function loadSyncFolders() {
@@ -384,21 +406,8 @@
       color = editAccount.color || ''
       displayNameLoaded = false
 
-      // Initialize folder mappings (will be populated when section is expanded)
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      sentFolderPath = editAccount.sentFolderPath || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      draftsFolderPath = editAccount.draftsFolderPath || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      trashFolderPath = editAccount.trashFolderPath || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      spamFolderPath = editAccount.spamFolderPath || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      archiveFolderPath = editAccount.archiveFolderPath || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      allMailFolderPath = editAccount.allMailFolderPath || ''
-      // @ts-ignore - wailsjs binding will have these fields after regeneration
-      starredFolderPath = editAccount.starredFolderPath || ''
+      // Initialize folder mappings; auto-detected fallbacks are filled when the section expands.
+      initializeFolderMappings(editAccount)
 
       // Try to detect provider
       selectedProvider = detectProvider(email) ?? getCustomProvider()
@@ -514,13 +523,13 @@
       syncFoldersEnabled,
       readReceiptRequestPolicy,
       // Folder mappings
-      sentFolderPath,
-      draftsFolderPath,
-      trashFolderPath,
-      spamFolderPath,
-      archiveFolderPath,
-      allMailFolderPath,
-      starredFolderPath,
+      sentFolderPath: folderMappingPaths.sent,
+      draftsFolderPath: folderMappingPaths.drafts,
+      trashFolderPath: folderMappingPaths.trash,
+      spamFolderPath: folderMappingPaths.spam,
+      archiveFolderPath: folderMappingPaths.archive,
+      allMailFolderPath: folderMappingPaths.allMail,
+      starredFolderPath: folderMappingPaths.starred,
     })
   }
 
@@ -626,10 +635,9 @@
 </script>
 
 <form onsubmit={handleSubmit} class="flex flex-col h-[460px] max-h-[calc(90vh-140px)]">
-  {#if true}
-    <!-- Account Details (manual entry — provider grid removed). The fields
-         scroll inside this flex-1 area; the actions footer below stays pinned. -->
-    <div class="flex-1 min-h-0 overflow-y-auto space-y-4 pt-1.5 pl-1 pr-3">
+  <!-- Account Details (manual entry — provider grid removed). The fields
+       scroll inside this flex-1 area; the actions footer below stays pinned. -->
+  <div class="flex-1 min-h-0 overflow-y-auto space-y-4 pt-1.5 pl-1 pr-3">
       {#if selectedProvider?.notes}
         <div class="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
           <Icon icon="mdi:information-outline" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -1065,131 +1073,24 @@
                   <p class="text-sm text-muted-foreground">{$_('account.noFoldersAvailable')}</p>
                 {:else}
                   <div class="grid gap-3">
-                    <!-- Sent -->
-                    <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">{$_('account.folderSent')}:</Label>
-                      <Select.Root bind:value={sentFolderPath}>
-                        <Select.Trigger class="h-9">
-                          <Select.Value placeholder={$_('account.none')}>
-                            {sentFolderPath || $_('account.none')}
-                          </Select.Value>
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="" label={$_('account.none')} />
-                          {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.sent === f.path ? ' ' + $_('account.detected') : '')} />
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </div>
-
-                    <!-- Drafts -->
-                    <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">{$_('account.folderDrafts')}:</Label>
-                      <Select.Root bind:value={draftsFolderPath}>
-                        <Select.Trigger class="h-9">
-                          <Select.Value placeholder={$_('account.none')}>
-                            {draftsFolderPath || $_('account.none')}
-                          </Select.Value>
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="" label={$_('account.none')} />
-                          {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.drafts === f.path ? ' ' + $_('account.detected') : '')} />
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </div>
-
-                    <!-- Trash -->
-                    <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">{$_('account.folderTrash')}:</Label>
-                      <Select.Root bind:value={trashFolderPath}>
-                        <Select.Trigger class="h-9">
-                          <Select.Value placeholder={$_('account.none')}>
-                            {trashFolderPath || $_('account.none')}
-                          </Select.Value>
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="" label={$_('account.none')} />
-                          {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.trash === f.path ? ' ' + $_('account.detected') : '')} />
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </div>
-
-                    <!-- Spam/Junk -->
-                    <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">{$_('account.folderSpam')}:</Label>
-                      <Select.Root bind:value={spamFolderPath}>
-                        <Select.Trigger class="h-9">
-                          <Select.Value placeholder={$_('account.none')}>
-                            {spamFolderPath || $_('account.none')}
-                          </Select.Value>
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="" label={$_('account.none')} />
-                          {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.spam === f.path ? ' ' + $_('account.detected') : '')} />
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </div>
-
-                    <!-- Archive -->
-                    <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">{$_('account.folderArchive')}:</Label>
-                      <Select.Root bind:value={archiveFolderPath}>
-                        <Select.Trigger class="h-9">
-                          <Select.Value placeholder={$_('account.none')}>
-                            {archiveFolderPath || $_('account.none')}
-                          </Select.Value>
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="" label={$_('account.none')} />
-                          {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.archive === f.path ? ' ' + $_('account.detected') : '')} />
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </div>
-
-                    <!-- All Mail -->
-                    <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">{$_('account.folderAllMail')}:</Label>
-                      <Select.Root bind:value={allMailFolderPath}>
-                        <Select.Trigger class="h-9">
-                          <Select.Value placeholder={$_('account.none')}>
-                            {allMailFolderPath || $_('account.none')}
-                          </Select.Value>
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="" label={$_('account.none')} />
-                          {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.all === f.path ? ' ' + $_('account.detected') : '')} />
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </div>
-
-                    <!-- Starred -->
-                    <div class="grid grid-cols-[100px_1fr] items-center gap-2">
-                      <Label class="text-sm">{$_('account.folderStarred')}:</Label>
-                      <Select.Root bind:value={starredFolderPath}>
-                        <Select.Trigger class="h-9">
-                          <Select.Value placeholder={$_('account.none')}>
-                            {starredFolderPath || $_('account.none')}
-                          </Select.Value>
-                        </Select.Trigger>
-                        <Select.Content>
-                          <Select.Item value="" label={$_('account.none')} />
-                          {#each availableFolders as f (f.path)}
-                            <Select.Item value={f.path} label={f.path + (autoDetectedFolders.starred === f.path ? ' ' + $_('account.detected') : '')} />
-                          {/each}
-                        </Select.Content>
-                      </Select.Root>
-                    </div>
+                    {#each folderMappingConfigs as mapping (mapping.key)}
+                      <div class="grid grid-cols-[100px_1fr] items-center gap-2">
+                        <Label class="text-sm">{$_(mapping.labelKey)}:</Label>
+                        <Select.Root bind:value={folderMappingPaths[mapping.key]}>
+                          <Select.Trigger class="h-9">
+                            <Select.Value placeholder={$_('account.none')}>
+                              {folderMappingPaths[mapping.key] || $_('account.none')}
+                            </Select.Value>
+                          </Select.Trigger>
+                          <Select.Content>
+                            <Select.Item value="" label={$_('account.none')} />
+                            {#each availableFolders as f (f.path)}
+                              <Select.Item value={f.path} label={getFolderOptionLabel(f.path, mapping)} />
+                            {/each}
+                          </Select.Content>
+                        </Select.Root>
+                      </div>
+                    {/each}
                   </div>
                 {/if}
               </div>
@@ -1328,37 +1229,36 @@
           </div>
         </div>
       {/if}
+  </div>
+
+  <!-- Actions (pinned footer — stays visible while the fields scroll) -->
+  <div class="flex items-center justify-between pt-4 mt-4 border-t border-border shrink-0">
+    <Button
+      type="button"
+      variant="outline"
+      onclick={handleTestConnection}
+      disabled={testing || submitting}
+    >
+      {#if testing}
+        <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
+      {:else}
+        <Icon icon="mdi:connection" class="w-4 h-4 mr-2" />
+      {/if}
+      {$_('account.testConnection')}
+    </Button>
+
+    <div class="flex gap-2">
+      <Button type="button" variant="ghost" onclick={onCancel} disabled={submitting}>
+        {createdInDialog ? $_('common.close') : $_('common.cancel')}
+      </Button>
+      <Button type="submit" disabled={submitting || testing}>
+        {#if submitting}
+          <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
+        {/if}
+        {editAccount ? $_('common.saveChanges') : $_('account.addAccount')}
+      </Button>
     </div>
-
-    <!-- Actions (pinned footer — stays visible while the fields scroll) -->
-    <div class="flex items-center justify-between pt-4 mt-4 border-t border-border shrink-0">
-        <Button
-          type="button"
-          variant="outline"
-          onclick={handleTestConnection}
-          disabled={testing || submitting}
-        >
-          {#if testing}
-            <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-          {:else}
-            <Icon icon="mdi:connection" class="w-4 h-4 mr-2" />
-          {/if}
-          {$_('account.testConnection')}
-        </Button>
-
-        <div class="flex gap-2">
-          <Button type="button" variant="ghost" onclick={onCancel} disabled={submitting}>
-            {createdInDialog ? $_('common.close') : $_('common.cancel')}
-          </Button>
-          <Button type="submit" disabled={submitting || testing}>
-            {#if submitting}
-              <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-            {/if}
-            {editAccount ? $_('common.saveChanges') : $_('account.addAccount')}
-          </Button>
-        </div>
-      </div>
-  {/if}
+  </div>
 </form>
 
 <CertificateDialog
