@@ -342,14 +342,6 @@ export function IsReady() {
   return window['go']['app']['App']['IsReady']();
 }
 
-export function ListEnabledExtensions() {
-  return window['go']['app']['App']['ListEnabledExtensions']();
-}
-
-export function ListExtensionRailTabs() {
-  return window['go']['app']['App']['ListExtensionRailTabs']();
-}
-
 export function MarkAllFolderMessagesAsRead(arg1) {
   return window['go']['app']['App']['MarkAllFolderMessagesAsRead'](arg1);
 }

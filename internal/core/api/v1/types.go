@@ -113,7 +113,3 @@ type ContactFilter struct {
 	Limit    int    `json:"limit,omitempty"`
 	Offset   int    `json:"offset,omitempty"`
 }
-
-// Unregister is returned from rail registration calls. Callers invoke it to
-// remove the registration on shutdown.
-type Unregister func()

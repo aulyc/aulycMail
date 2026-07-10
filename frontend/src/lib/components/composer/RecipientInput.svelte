@@ -11,6 +11,8 @@
   // @ts-ignore - Wails generated imports
   import { smtp, contact } from '../../../../wailsjs/go/models'
   import { type ComposerApi, COMPOSER_API_KEY, createMainWindowApi } from '$lib/composerApi'
+  import { createDebouncer } from '$lib/utils/debounce'
+  import { parseEmailAddress } from '$lib/utils/email'
 
   interface Props {
     recipients: smtp.Address[]
@@ -49,7 +51,7 @@
   let inputIndex = $state(recipients.length)
   let inputElement = $state<HTMLInputElement | null>(null)
   let containerElement = $state<HTMLDivElement | null>(null)
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  const searchDebouncer = createDebouncer(200)
   let lastPointerX = -1
   let lastPointerY = -1
   let previousRecipientCount = recipients.length
@@ -104,13 +106,7 @@
   function handleInput() {
     if (inputComposing) return
     updateSuggestionsPosition()
-    // Debounce the search
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-    }
-    debounceTimer = setTimeout(() => {
-      searchContacts(inputValue.trim())
-    }, 200)
+    searchDebouncer.schedule(() => searchContacts(inputValue.trim()))
   }
 
   function focusInputAt(index: number) {
@@ -240,13 +236,9 @@
   }
 
   function addRecipient(value: string) {
-    // Parse email address (handle "Name <email@example.com>" format)
-    const emailRegex = /^(?:(.+?)\s*<)?([^\s<>]+@[^\s<>]+)>?$/
-    const match = value.match(emailRegex)
-
-    if (match) {
-      const name = match[1]?.trim() || ''
-      const email = match[2].toLowerCase()
+    const parsed = parseEmailAddress(value)
+    if (parsed) {
+      const { name, email } = parsed
 
       // Check if already added (handle both 'address' and 'email' field names)
       if (recipients.some(r => (r.address || (r as any).email || '').toLowerCase() === email)) {

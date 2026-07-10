@@ -13,6 +13,7 @@ import (
 	"github.com/aulyc/aulycmail/internal/logging"
 	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/aulyc/aulycmail/internal/platform"
+	"github.com/rs/zerolog"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -351,6 +352,7 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 	}
 
 	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
+	targets := make([]email.AttachmentSaveTarget, 0, len(attachments))
 	savedCount := 0
 
 	err = a.withStreamedRawMessagePath(msg, func(rawPath string) error {
@@ -360,14 +362,11 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 				log.Warn().Err(err).Str("filename", att.Filename).Msg("Skipping attachment with unsafe filename")
 				continue
 			}
-			_, _, err = saveAttachmentFromRawFile(downloader, rawPath, att, savePath)
-			if err != nil {
-				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
-				continue
-			}
-			savedCount++
+			targets = append(targets, email.AttachmentSaveTarget{Attachment: att, CustomPath: savePath})
 		}
-		return nil
+		var err error
+		savedCount, err = saveAttachmentTargetsFromRawFile(downloader, rawPath, targets, log)
+		return err
 	})
 	if err != nil {
 		return "", err
@@ -404,6 +403,7 @@ func (a *App) saveAllAttachmentsViaPortal(messageID string, attachments []*messa
 	}
 
 	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
+	targets := make([]email.AttachmentSaveTarget, 0, len(attachments))
 	savedCount := 0
 
 	err = a.withStreamedRawMessagePath(msg, func(rawPath string) error {
@@ -412,14 +412,11 @@ func (a *App) saveAllAttachmentsViaPortal(messageID string, attachments []*messa
 				break
 			}
 
-			_, _, err := saveAttachmentFromRawFile(downloader, rawPath, att, savePaths[i])
-			if err != nil {
-				log.Warn().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment")
-				continue
-			}
-			savedCount++
+			targets = append(targets, email.AttachmentSaveTarget{Attachment: att, CustomPath: savePaths[i]})
 		}
-		return nil
+		var err error
+		savedCount, err = saveAttachmentTargetsFromRawFile(downloader, rawPath, targets, log)
+		return err
 	})
 	if err != nil {
 		return "", err
@@ -458,20 +455,28 @@ func (a *App) withStreamedRawMessagePath(msg *message.Message, use func(string) 
 	return use(rawPath)
 }
 
-func extractAttachmentFromRawFile(downloader *email.AttachmentDownloader, rawPath, filename string) ([]byte, error) {
+func saveAttachmentTargetsFromRawFile(downloader *email.AttachmentDownloader, rawPath string, targets []email.AttachmentSaveTarget, log zerolog.Logger) (int, error) {
 	file, err := os.Open(rawPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open streamed message: %w", err)
+		return 0, fmt.Errorf("failed to open streamed message: %w", err)
 	}
 	defer file.Close()
-	return downloader.ExtractAttachmentContentFromReader(file, filename)
-}
 
-func saveAttachmentFromRawFile(downloader *email.AttachmentDownloader, rawPath string, att *message.Attachment, savePath string) (string, int64, error) {
-	file, err := os.Open(rawPath)
+	results, err := downloader.SaveAttachmentsFromRawReader(file, targets)
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to open streamed message: %w", err)
+		return 0, err
 	}
-	defer file.Close()
-	return downloader.SaveAttachmentFromRawReader(file, att, savePath)
+	savedCount := 0
+	for _, result := range results {
+		if result.Err == nil && result.Path != "" {
+			savedCount++
+			continue
+		}
+		filename := ""
+		if result.Attachment != nil {
+			filename = result.Attachment.Filename
+		}
+		log.Warn().Err(result.Err).Str("filename", filename).Msg("Failed to save attachment")
+	}
+	return savedCount, nil
 }

@@ -4,9 +4,9 @@
   import { Button } from '$lib/components/ui/button'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
   import Icon from '@iconify/svelte'
-  import { contactsView, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, deleteLocalContact } from '$contacts/frontend/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
-  import { formatRelativeDate } from '$lib/utils/date'
+  import { formatLocalDateTime, formatRelativeDate } from '$lib/utils/date'
   // @ts-ignore - wailsjs bindings
   import type { v1 } from '$wailsjs/go/models'
   // @ts-ignore - wailsjs bindings
@@ -298,7 +298,7 @@
 
         <dt class="text-sm text-muted-foreground">{$_('contacts.detail.labels.lastUpdated')}</dt>
         <dd class="m-0 text-foreground">
-          {contact.updatedAt ? new Date(contact.updatedAt).toLocaleString() : '—'}
+          {contact.updatedAt ? formatLocalDateTime(contact.updatedAt) : '—'}
         </dd>
       </dl>
 

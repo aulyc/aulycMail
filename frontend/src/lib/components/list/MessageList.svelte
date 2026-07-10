@@ -6,7 +6,7 @@
   import { cn } from '$lib/utils'
   import { Button } from '$lib/components/ui/button'
   // @ts-ignore - wailsjs bindings
-  import { GetConversations, GetConversationCount, SyncFolder, ForceSyncFolder, CancelFolderSync, SetMessageListSortOrder, GetUnifiedInboxConversations, GetUnifiedInboxCount, SearchConversations, SearchUnifiedInbox, GetSearchCount, GetSearchCountUnifiedInbox, GetFTSIndexStatus, IsFTSIndexing, Trash, DeletePermanently, EmptyTrash, Undo, IMAPSearchFolder, FetchServerMessage } from '../../../../wailsjs/go/app/App'
+  import { GetConversations, GetConversationCount, SyncFolder, ForceSyncFolder, CancelFolderSync, SetMessageListSortOrder, GetUnifiedInboxConversations, GetUnifiedInboxCount, GetFTSIndexStatus, IsFTSIndexing, Trash, DeletePermanently, EmptyTrash, Undo, FetchServerMessage } from '../../../../wailsjs/go/app/App'
   import { toasts } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
   import { ConfirmDialog } from '$lib/components/ui/confirm-dialog'
@@ -19,6 +19,12 @@
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { getLayoutMode, hideViewer } from '$lib/stores/layout.svelte'
   import { isDialogGuardActive, onDialogGuardChange } from '$lib/stores/dialogGuard'
+  import { createDebouncer } from '$lib/utils/debounce'
+  import {
+    loadMoreLocalMessageListSearch,
+    searchLocalMessageList,
+    searchServerMessageList,
+  } from './messageListSearch'
 
   interface Props {
     accountId?: string | null
@@ -133,7 +139,7 @@
   let searchTotalCount = $state(0)
   let searchOffset = $state(0)
   let isSearching = $state(false)
-  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  const searchDebouncer = createDebouncer(300)
 
   // Filter state
   let filterMode = $state<string>('')  // '' | 'unread' | 'starred' | 'attachments'
@@ -293,7 +299,7 @@
     eventUnsubscribers = []
     if (reloadTimer) clearTimeout(reloadTimer)
     if (syncReloadTimer) clearTimeout(syncReloadTimer)
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+    searchDebouncer.cancel()
   })
   // Check FTS index status for current folder
   async function checkFTSIndexStatus() {
@@ -561,8 +567,6 @@
 
   // Handle search input with debounce
   function handleSearchInput() {
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
-
     if (!searchQuery.trim()) {
       // Clear search immediately if query is empty
       searchResults = []
@@ -571,15 +575,14 @@
       serverSearchCount = 0
       serverSearchTotalCount = 0
       serverSearchMode = false
+      searchDebouncer.cancel()
       return
     }
 
     // In server mode, don't auto-search locally — user will press Shift+Enter
     if (serverSearchMode) return
 
-    searchDebounceTimer = setTimeout(() => {
-      performSearch()
-    }, 300)
+    searchDebouncer.schedule(performSearch)
   }
 
   // Perform the actual search
@@ -600,21 +603,15 @@
     searchOffset = 0  // Reset offset for new search
 
     try {
-      let results: any[] = []
-      let count = 0
-
-      if (isUnifiedView) {
-        ;[results, count] = await Promise.all([
-          SearchUnifiedInbox(query, 0, PAGE_SIZE, filterMode),
-          GetSearchCountUnifiedInbox(query, filterMode),
-        ])
-      } else if (accountId && folderId) {
-        ;[results, count] = await Promise.all([
-          SearchConversations(accountId, folderId, query, 0, PAGE_SIZE, filterMode),
-          GetSearchCount(accountId, folderId, query, filterMode),
-        ])
-      }
-
+      const { results, count } = await searchLocalMessageList({
+        isUnifiedView,
+        accountId,
+        folderId,
+        query,
+        offset: 0,
+        limit: PAGE_SIZE,
+        filterMode,
+      })
       searchResults = results || []
       searchTotalCount = count
       // Auto-select first search result for keyboard navigation
@@ -634,22 +631,21 @@
     const query = searchQuery.trim()
     if (!query || isSearching) return
 
-    // Cancel any pending search debounce to prevent race conditions
-    if (searchDebounceTimer) {
-      clearTimeout(searchDebounceTimer)
-      searchDebounceTimer = null
-    }
+    searchDebouncer.cancel()
 
     isSearching = true
     const newOffset = searchOffset + PAGE_SIZE
 
     try {
-      let results: any[] = []
-      if (isUnifiedView) {
-        results = await SearchUnifiedInbox(query, newOffset, PAGE_SIZE, filterMode)
-      } else if (accountId && folderId) {
-        results = await SearchConversations(accountId, folderId, query, newOffset, PAGE_SIZE, filterMode)
-      }
+      const results = await loadMoreLocalMessageListSearch({
+        isUnifiedView,
+        accountId,
+        folderId,
+        query,
+        offset: newOffset,
+        limit: PAGE_SIZE,
+        filterMode,
+      })
 
       if (results && results.length > 0) {
         searchResults = [...searchResults, ...results]
@@ -676,7 +672,7 @@
     serverSearchTotalCount = 0
     lastServerQuery = ''
     isServerSearching = false
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+    searchDebouncer.cancel()
   }
 
   // Handle keyboard events in search input
@@ -728,11 +724,11 @@
     isServerSearching = true
     error = null
     try {
-      const response = await IMAPSearchFolder(accountId, folderId, query, limit)
-      const items = (response?.results || []).map(adaptServerResult)
+      const response = await searchServerMessageList({ accountId, folderId, query, limit })
+      const items = response.results
       serverSearchResults = items
       serverSearchCount = items.length
-      serverSearchTotalCount = response?.totalCount ?? items.length
+      serverSearchTotalCount = response.totalCount
       if (items.length > 0) {
         selectedThreadId = items[0].threadId
       }
@@ -741,26 +737,6 @@
       error = $_('viewer.failedToLoadMessages')
     } finally {
       isServerSearching = false
-    }
-  }
-
-  // Map IMAPSearchResult to ConversationRow-compatible shape
-  function adaptServerResult(r: any): any {
-    return {
-      threadId: r.messageId || `server-uid-${r.uid}`,
-      subject: r.subject,
-      snippet: r.isLocal ? r.snippet : '',
-      messageCount: 1,
-      unreadCount: r.isRead ? 0 : 1,
-      hasAttachments: r.hasAttachments,
-      isStarred: r.isStarred,
-      latestDate: r.date,
-      participants: [{ name: r.fromName, email: r.fromEmail }],
-      messageIds: r.messageId ? [r.messageId] : [],
-      accountId: r.accountId,
-      folderId: r.folderId,
-      _isLocal: r.isLocal,
-      _uid: r.uid,
     }
   }
 

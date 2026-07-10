@@ -6,7 +6,7 @@
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { getCurrentDateFnsLocale } from '$lib/stores/settings.svelte'
   import { toasts, type Toast } from '$lib/stores/toast'
-  import { contactRefresh, initContactRefreshEvents } from '$extensions/contacts/frontend/stores/contactRefresh.svelte'
+  import { contactRefresh, initContactRefreshEvents } from '$contacts/frontend/stores/contactRefresh.svelte'
 
   const toastIcons = {
     success: 'mdi:check-circle',

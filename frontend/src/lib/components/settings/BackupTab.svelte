@@ -11,6 +11,7 @@
     rememberBackupDirectory,
     removeBackupDirectory,
   } from '$lib/utils/backup-directory-history'
+  import { formatLocalDateTime } from '$lib/utils/date'
   // @ts-ignore - wailsjs path
   import { GetBackupRunState, GetBackupSettings, GetBackupStatus, OpenBackupDirectory, SetBackupSettings, StartEmailBackup } from '../../../../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
@@ -79,7 +80,7 @@
   function formatLastRun(value: string | undefined): string {
     if (!value) return $_('settingsBackup.neverRun')
     try {
-      return new Date(value).toLocaleString()
+      return formatLocalDateTime(value)
     } catch {
       return value
     }

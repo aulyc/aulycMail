@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -657,15 +658,23 @@ func (a *App) fetchForwardAttachments(log zerolog.Logger, msg *message.Message, 
 	}
 
 	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
-	if err := a.withStreamedRawMessagePath(msg, func(rawPath string) error {
+	if err := a.withStreamedRawMessage(msg, func(raw io.Reader) error {
+		filenames := make([]string, 0, len(regularAtts))
 		for _, att := range regularAtts {
-			content, extractErr := extractAttachmentFromRawFile(downloader, rawPath, att.Filename)
-			if extractErr != nil {
-				log.Warn().Err(extractErr).Str("filename", att.Filename).Msg("Failed to extract attachment for forward")
+			filenames = append(filenames, att.Filename)
+		}
+		results, extractErr := downloader.ExtractAttachmentsContentFromRawReader(raw, filenames)
+		if extractErr != nil {
+			return extractErr
+		}
+		for i, result := range results {
+			att := regularAtts[i]
+			if result.Err != nil {
+				log.Warn().Err(result.Err).Str("filename", att.Filename).Msg("Failed to extract attachment for forward")
 				continue
 			}
 			*attachments = append(*attachments, smtp.Attachment{
-				Content:     content,
+				Content:     result.Content,
 				ContentType: att.ContentType,
 				Filename:    att.Filename,
 				Inline:      false,

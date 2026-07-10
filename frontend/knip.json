@@ -13,9 +13,7 @@
   "ignoreIssues": {
     "src/lib/components/ui/**/index.ts": ["exports"],
     "src/lib/keyboard/shortcuts.ts": ["exports"],
-    "src/lib/stores/extensionDeepLink.svelte.ts": ["exports"],
-    "src/lib/stores/extensionRegistry.svelte.ts": ["exports"],
-    "src/lib/stores/extensionShortcuts.svelte.ts": ["exports", "types"]
+    "src/lib/stores/paneShortcuts.svelte.ts": ["exports"]
   },
   "project": ["src/**/*.{ts,svelte}"],
   "includeEntryExports": false

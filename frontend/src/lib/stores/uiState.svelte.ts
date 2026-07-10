@@ -20,7 +20,8 @@ export interface UIState {
   expandedAccounts: Record<string, boolean>  // accountId -> isExpanded (default: true)
   unifiedInboxExpanded: boolean              // Unified Inbox section (default: true)
   collapsedFolders: Record<string, boolean>  // folderId -> isCollapsed (default: true/collapsed, false = explicitly expanded)
-  // Active extension pane: 'mail' (default) or an extension id like 'contacts'.
+  // Active rail pane: 'mail' (default) or a built-in pane id like 'contacts'.
+  // Stored as activeExtension for compatibility with existing UI state files.
   activeExtension: string
 }
 
@@ -70,11 +71,11 @@ let currentState: UIState = { ...defaultState }
 // Sidebar can depend on this to re-initialize expanded states
 let uiStateLoadedVersion = $state(0)
 
-// Reactive mirror of activeExtension specifically. The rail and the main pane
+// Reactive mirror of the active rail pane. The rail and the main pane
 // swap depend on this and live in different components, so a $state at the
 // module level keeps them in sync without prop drilling. currentState still
 // holds the persisted value; this mirror is what consumers read.
-let activeExtensionState = $state<string>('mail')
+let activePaneState = $state<string>('mail')
 
 // Clamp a value within bounds
 function clamp(value: number, min: number, max: number): number {
@@ -105,7 +106,7 @@ export async function loadUIState(): Promise<UIState> {
         collapsedFolders: state.collapsedFolders || {},
         activeExtension: state.activeExtension || 'mail',
       }
-      activeExtensionState = currentState.activeExtension
+      activePaneState = currentState.activeExtension
     }
   } catch (err) {
     console.error('Failed to load UI state:', err)
@@ -184,18 +185,18 @@ export function getUIState(): UIState {
   return currentState
 }
 
-// Active extension helpers.
+// Active pane helpers.
 //
 // Returns 'mail' by default so the existing mail UI keeps rendering when no
-// extension has ever been opened. Switching to an extension only persists the
+// secondary pane has ever been opened. Switching to Contacts only persists the
 // name — it does NOT clear the mail selection (selectedFolderId, selectedThreadId),
 // so toggling back to Mail restores the previous mail context exactly.
-export function getActiveExtension(): string {
-  return activeExtensionState
+export function getActivePane(): string {
+  return activePaneState
 }
 
-export function setActiveExtension(name: string): void {
+export function setActivePane(name: string): void {
   const value = name || 'mail'
-  activeExtensionState = value
+  activePaneState = value
   saveUIState({ activeExtension: value })
 }

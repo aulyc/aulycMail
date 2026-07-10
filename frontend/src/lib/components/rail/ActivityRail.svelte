@@ -1,15 +1,15 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
   import RailButton from './RailButton.svelte'
-  import { getRailTabs } from '$lib/stores/extensionRegistry.svelte'
-  import { getActiveExtension, setActiveExtension } from '$lib/stores/uiState.svelte'
+  import { getActivePane, setActivePane } from '$lib/stores/uiState.svelte'
+  import { BUILT_IN_RAIL_PANES } from '$lib/rail/panes'
   import { _ } from '$lib/i18n'
   import { syncLog } from '$lib/stores/syncLog.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
 
   interface Props {
     // Opens the app Settings dialog. Wired by App.svelte so the gear works
-    // from every view (Mail + non-mail rail panes).
+    // from every view (Mail + Contacts).
     onOpenSettings?: () => void
     // Opens the sync/connection log dialog.
     onOpenLog?: () => void
@@ -17,14 +17,12 @@
 
   const { onOpenSettings, onOpenLog }: Props = $props()
 
-  // Mail is always present and always first; built-in panes follow in their
-  // registered Order. The rail always renders now — it hosts the global
-  // Settings gear at the bottom, so it must be reachable from every view.
-  let active = $derived(getActiveExtension())
-  let tabs = $derived(getRailTabs())
+  // Mail is always present and always first; Contacts is a fixed built-in pane.
+  // The rail always renders because it also hosts global Settings and sync log.
+  let active = $derived(getActivePane())
 
   function select(name: string) {
-    setActiveExtension(name)
+    setActivePane(name)
   }
 
   async function toggleSync() {
@@ -50,16 +48,16 @@
     active={active === 'mail'}
     onclick={() => select('mail')}
   />
-  {#each tabs as tab (tab.extensionId)}
+  {#each BUILT_IN_RAIL_PANES as pane (pane.id)}
     <RailButton
-      icon={tab.icon || 'mdi:puzzle'}
-      label={tab.label}
-      active={active === tab.extensionId}
-      onclick={() => select(tab.extensionId)}
+      icon={pane.icon}
+      label={$_(pane.labelKey)}
+      active={active === pane.id}
+      onclick={() => select(pane.id)}
     />
   {/each}
 
-  <!-- Sync — pinned above the sync log and Settings. -->
+  <!-- Sync: pinned above the sync log and Settings. -->
   <button
     class="mt-auto relative flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
     type="button"
@@ -75,7 +73,7 @@
     />
   </button>
 
-  <!-- Sync/connection log — pinned to the bottom, just above Settings. -->
+  <!-- Sync/connection log: pinned to the bottom, just above Settings. -->
   <button
     class="relative flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
     type="button"
@@ -89,7 +87,7 @@
     {/if}
   </button>
 
-  <!-- Settings — pinned to the bottom, available from Mail and Contacts. -->
+  <!-- Settings: pinned to the bottom, available from Mail and Contacts. -->
   <button
     class="mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
     type="button"

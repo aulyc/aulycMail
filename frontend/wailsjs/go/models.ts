@@ -1836,25 +1836,4 @@ export namespace v1 {
 
 
 
-	export class RailTabRequest {
-	    extensionId: string;
-	    label: string;
-	    icon: string;
-	    component: string;
-	    order?: number;
-
-	    static createFrom(source: any = {}) {
-	        return new RailTabRequest(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.extensionId = source["extensionId"];
-	        this.label = source["label"];
-	        this.icon = source["icon"];
-	        this.component = source["component"];
-	        this.order = source["order"];
-	    }
-	}
-
 }

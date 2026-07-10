@@ -107,8 +107,8 @@ export function isInputElement(target: EventTarget | null): boolean {
  * Pane navigation registry — lets the global keyboard handler dispatch
  * Alt+J/K (and similar pane-targeted shortcuts) to whichever component
  * currently owns a given slot. Mail's panes don't use this (they're wired
- * directly via concrete refs in App.svelte); extension kit components
- * DO register on mount so Alt+J/K navigates the kit's SourceSidebar /
+ * directly via concrete refs in App.svelte); secondary pane kit components
+ * register on mount so Alt+J/K navigates the kit's SourceSidebar /
  * ListPane uniformly with how Alt+J/K navigates mail's folder list.
  */
 export interface PaneNavTarget {

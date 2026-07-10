@@ -1,6 +1,6 @@
 // Shared keyboard shortcut predicates — single source of truth for "what key
 // combination matches what action." Consumed by both aulycmail's mail UI handler
-// (App.svelte) and by extension UI components in the kit (frontend/src/lib/
+// (App.svelte) and by secondary pane components in the kit (frontend/src/lib/
 // components/kit/).
 //
 // Implementation per consumer stays separate: mail's handler dispatches to
@@ -8,8 +8,7 @@
 // tabindex + stopPropagation. The bridge is THIS file — rebinding a key
 // changes exactly one place.
 
-// Modifier-state helpers. Exported so extension shortcut files
-// (extensions/<name>/frontend/keyboard/shortcuts.ts) compose their predicates
+// Modifier-state helpers. Exported so secondary pane shortcut files compose their predicates
 // against the SAME helpers mail and the kit use — single convention for
 // "no modifiers," "ctrl-or-cmd," "alt only" across the whole app.
 export function noMods(e: KeyboardEvent): boolean {

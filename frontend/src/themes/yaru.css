@@ -25,22 +25,6 @@
     --border: 0 0% 73%;                    /* $borders_color (darken bg 18%) */
     --input: 0 0% 73%;
     --ring: 14 82% 52%;                    /* $orange */
-    /* Avatar palette: 9 distinct Yaru colors with white initials. */
-    --avatar-fg: 0 0% 100%;                /* white */
-    --avatar-1:  14 82% 52%;               /* $orange — Ubuntu brand */
-    --avatar-2:  197 86% 51%;              /* $blue #19B6EE */
-    --avatar-3:  37 95% 53%;               /* $yellow #F99B11 */
-    --avatar-4:  354 80% 43%;              /* $red #C7162B */
-    --avatar-5:  130 81% 29%;              /* $green #0E8420 */
-    --avatar-6:  305 31% 44%;              /* $aubergine #924D8B */
-    --avatar-7:  196 100% 33%;             /* $linkblue #007AA6 */
-    --avatar-8:  217 43% 35%;              /* $darkblue #335280 */
-    --avatar-9:  29 8% 65%;                /* $warm_gray #AEA79F */
-    --avatar-10: 14 82% 52%;               /* orange (repeat) */
-    --avatar-11: 197 86% 51%;              /* blue (repeat) */
-    --avatar-12: 37 95% 53%;               /* yellow (repeat) */
-    --avatar-13: 354 80% 43%;              /* red (repeat) */
-    --avatar-14: 305 31% 44%;              /* aubergine (repeat) */
   }
 
   /* Yaru Dark — $bg_color (lighten jet 8%), $base_color (lighten jet 6%, slightly
@@ -66,21 +50,5 @@
     --border: 0 0% 24%;                    /* matches secondary (aulycmail convention) */
     --input: 0 0% 24%;
     --ring: 14 82% 52%;                    /* $orange */
-    /* Avatar palette: same 9 Yaru colors as Light variant. */
-    --avatar-fg: 0 0% 100%;                /* white */
-    --avatar-1:  14 82% 52%;               /* $orange */
-    --avatar-2:  197 86% 51%;              /* $blue */
-    --avatar-3:  37 95% 53%;               /* $yellow */
-    --avatar-4:  354 80% 43%;              /* $red */
-    --avatar-5:  130 81% 29%;              /* $green */
-    --avatar-6:  305 31% 44%;              /* $aubergine */
-    --avatar-7:  196 100% 33%;             /* $linkblue */
-    --avatar-8:  217 43% 35%;              /* $darkblue */
-    --avatar-9:  29 8% 65%;                /* $warm_gray */
-    --avatar-10: 14 82% 52%;               /* orange (repeat) */
-    --avatar-11: 197 86% 51%;              /* blue (repeat) */
-    --avatar-12: 37 95% 53%;               /* yellow (repeat) */
-    --avatar-13: 354 80% 43%;              /* red (repeat) */
-    --avatar-14: 305 31% 44%;              /* aubergine (repeat) */
   }
 }

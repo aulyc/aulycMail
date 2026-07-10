@@ -19,7 +19,6 @@ import (
 	"github.com/aulyc/aulycmail/internal/credentials"
 	"github.com/aulyc/aulycmail/internal/database"
 	"github.com/aulyc/aulycmail/internal/draft"
-	extui "github.com/aulyc/aulycmail/internal/extensions/ui"
 	"github.com/aulyc/aulycmail/internal/folder"
 	"github.com/aulyc/aulycmail/internal/imap"
 	"github.com/aulyc/aulycmail/internal/logging"
@@ -202,10 +201,6 @@ type App struct {
 
 	// Certificate trust store (TOFU)
 	certStore *certificate.Store
-
-	// Built-in rail panes.
-	uiRegistry *extui.Registry // rail tab registry for Contacts
-	paneUnregs []func()        // teardown funcs returned from pane registration
 
 	// Shared draft operations
 	draftOps draftOps
@@ -490,17 +485,10 @@ func (a *App) Startup(ctx context.Context) {
 	// Start periodic WAL checkpoint routine to prevent WAL file from growing too large
 	go a.db.StartCheckpointRoutine(ctx)
 
-	// Built-in Contacts rail pane. ContactsBridge is Wails-bound and lazy:
+	// Built-in Contacts pane. ContactsBridge is Wails-bound and lazy:
 	// no contacts-specific stores are opened until a Contacts_* method is
 	// actually called.
-	a.uiRegistry = extui.NewRegistry()
 	a.initContactsExtension()
-
-	if unreg, err := extcontactsbe.RegisterRailTab(a.uiRegistry); err != nil {
-		log.Warn().Err(err).Str("module", extcontactsbe.PaneID).Msg("Failed to register built-in pane")
-	} else {
-		a.paneUnregs = append(a.paneUnregs, unreg)
-	}
 
 	// Initialize undo stack (max 50 commands, 30 second timeout)
 	a.undoStack = undo.NewStack(50, 30*time.Second)
@@ -744,13 +732,6 @@ func (a *App) Shutdown(ctx context.Context) {
 		a.notifier.Stop()
 		log.Info().Msg("Notification listener stopped")
 	}
-
-	for _, unreg := range a.paneUnregs {
-		if unreg != nil {
-			unreg()
-		}
-	}
-	a.paneUnregs = nil
 
 	// Close all IMAP connections
 	if a.imapPool != nil {

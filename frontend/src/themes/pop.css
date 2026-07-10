@@ -6,9 +6,7 @@
    Note on accent: COSMIC's default accent in Dark is cyan/teal #63D0DF
    (NOT the System76 brand orange older Pop!_OS GNOME shells used).
    Light mode uses a deep teal #00525A for proper contrast on light bg.
-
-   Avatar palette: 9 bright COSMIC accent colors (shared across both variants)
-   with dark initials. aulycmail-specific override: --ring matches --primary. */
+   aulycmail-specific override: --ring matches --primary. */
 @layer base {
   /* Pop! Light — primary.base bg, secondary.base elevated cards. */
   [data-theme="pop-light"] {
@@ -32,22 +30,6 @@
     --border: 0 0% 84%;                    /* gray_1 #D7D7D7 */
     --input: 0 0% 84%;
     --ring: 188 100% 18%;                  /* accent_blue (deep teal) */
-    /* Avatar palette: bright COSMIC Dark accents — designed to work in both modes. */
-    --avatar-fg: 0 0% 15%;                 /* primary.base from Dark — soft dark text */
-    --avatar-1:  188 67% 63%;              /* accent_blue #63D0DF */
-    --avatar-2:  213 66% 78%;              /* accent_indigo #A1C0EB */
-    --avatar-3:  290 96% 80%;              /* accent_purple #E79CFE */
-    --avatar-4:  348 100% 80%;             /* accent_pink #FF9CB1 */
-    --avatar-5:  1 95% 81%;                /* accent_red #FDA1A0 */
-    --avatar-6:  41 100% 50%;              /* accent_orange #FFAD00 */
-    --avatar-7:  52 91% 67%;               /* accent_yellow #F7E062 */
-    --avatar-8:  130 33% 69%;              /* accent_green #92CF9C */
-    --avatar-9:  15 22% 75%;               /* accent_warm_grey #CABAB4 */
-    --avatar-10: 188 67% 63%;              /* blue (repeat) */
-    --avatar-11: 290 96% 80%;              /* purple (repeat) */
-    --avatar-12: 41 100% 50%;              /* orange (repeat) */
-    --avatar-13: 130 33% 69%;              /* green (repeat) */
-    --avatar-14: 348 100% 80%;             /* pink (repeat) */
   }
 
   /* Pop! Dark — primary.base bg (the COSMIC app window color), with the iconic
@@ -73,21 +55,5 @@
     --border: 0 0% 28%;                    /* neutral_4 #484848 — visible */
     --input: 0 0% 28%;
     --ring: 188 67% 63%;                   /* accent_blue */
-    /* Avatar palette: same 9 COSMIC accents as Pop! Light. */
-    --avatar-fg: 0 0% 15%;                 /* primary.base — dark text */
-    --avatar-1:  188 67% 63%;              /* accent_blue */
-    --avatar-2:  213 66% 78%;              /* accent_indigo */
-    --avatar-3:  290 96% 80%;              /* accent_purple */
-    --avatar-4:  348 100% 80%;             /* accent_pink */
-    --avatar-5:  1 95% 81%;                /* accent_red */
-    --avatar-6:  41 100% 50%;              /* accent_orange */
-    --avatar-7:  52 91% 67%;               /* accent_yellow */
-    --avatar-8:  130 33% 69%;              /* accent_green */
-    --avatar-9:  15 22% 75%;               /* accent_warm_grey */
-    --avatar-10: 188 67% 63%;              /* blue (repeat) */
-    --avatar-11: 290 96% 80%;              /* purple (repeat) */
-    --avatar-12: 41 100% 50%;              /* orange (repeat) */
-    --avatar-13: 130 33% 69%;              /* green (repeat) */
-    --avatar-14: 348 100% 80%;             /* pink (repeat) */
   }
 }

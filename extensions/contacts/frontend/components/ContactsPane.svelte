@@ -7,10 +7,10 @@
   import AddContactDialog from './AddContactDialog.svelte'
   import ContactEditDialog from './ContactEditDialog.svelte'
   import PaneLayout from '$lib/components/kit/PaneLayout.svelte'
-  import { contactsView, reloadContacts, selectSource, activateContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, reloadContacts, selectSource, activateContact } from '$contacts/frontend/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
-  import { registerExtensionShortcut } from '$lib/stores/extensionShortcuts.svelte'
-  import { KEY } from '$extensions/contacts/frontend/keyboard/shortcuts'
+  import { registerPaneShortcut } from '$lib/stores/paneShortcuts.svelte'
+  import { KEY } from '$contacts/frontend/keyboard/shortcuts'
   // @ts-ignore - wailsjs bindings
   import { EventsOn } from '$wailsjs/runtime/runtime'
   // @ts-ignore - wailsjs bindings
@@ -67,14 +67,14 @@
   }
 
   // 'e' opens the edit dialog for the currently-selected contact. Wired via
-  // the rail-pane shortcut registry: App.svelte's global key handler calls
-  // dispatchExtensionShortcut, which only invokes this when Contacts is the
-  // active rail pane (so 'e' on the mail side stays free).
-  const unregEdit = registerExtensionShortcut('contacts', KEY.CONTACT_EDIT, () => {
+  // the rail-pane shortcut registry: App.svelte's global key handler only
+  // invokes this when Contacts is the active rail pane, so 'e' on the mail
+  // side stays free.
+  const unregEdit = registerPaneShortcut('contacts', KEY.CONTACT_EDIT, () => {
     openEdit(contactsView.detail)
   })
   // Ctrl/Cmd+N opens the new-contact dialog.
-  const unregNew = registerExtensionShortcut('contacts', KEY.CONTACT_NEW, () => {
+  const unregNew = registerPaneShortcut('contacts', KEY.CONTACT_NEW, () => {
     showAdd = true
   })
 

@@ -13,9 +13,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/aulyc/aulycmail/internal/account"
+	mailBackup "github.com/aulyc/aulycmail/internal/backup"
 	"github.com/aulyc/aulycmail/internal/platform"
 	"github.com/aulyc/aulycmail/internal/settings"
 	mailSync "github.com/aulyc/aulycmail/internal/sync"
@@ -260,7 +260,7 @@ func (a *App) SetBackupSettings(cfg BackupSettings) error {
 	directory := strings.TrimSpace(cfg.Directory)
 	if directory != "" {
 		var err error
-		directory, err = normalizeExistingDirectory(directory)
+		directory, err = mailBackup.NormalizeExistingDirectory(directory)
 		if err != nil {
 			return err
 		}
@@ -301,7 +301,7 @@ func (a *App) ChooseBackupDirectory() (string, error) {
 	if dir == "" {
 		return "", nil
 	}
-	return normalizeExistingDirectory(dir)
+	return mailBackup.NormalizeExistingDirectory(dir)
 }
 
 // OpenBackupDirectory opens the configured backup directory in the file manager.
@@ -317,11 +317,11 @@ func (a *App) OpenBackupDirectory(path string) error {
 		return errors.New("backup directory is not set")
 	}
 
-	cleanPath, err := normalizeExistingDirectory(path)
+	cleanPath, err := mailBackup.NormalizeExistingDirectory(path)
 	if err != nil {
 		return err
 	}
-	cleanSaved, err := normalizeExistingDirectory(saved)
+	cleanSaved, err := mailBackup.NormalizeExistingDirectory(saved)
 	if err != nil {
 		return err
 	}
@@ -355,7 +355,7 @@ func (a *App) GetBackupStatus(directory string) (*BackupStatus, error) {
 		return &BackupStatus{Mode: "full"}, nil
 	}
 
-	cleanDir, err := normalizeExistingDirectory(directory)
+	cleanDir, err := mailBackup.NormalizeExistingDirectory(directory)
 	if err != nil {
 		return nil, err
 	}
@@ -455,7 +455,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 	if strings.TrimSpace(options.Directory) == "" {
 		options.Directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
 	}
-	directory, err := normalizeBackupTargetDirectory(options.Directory)
+	directory, err := mailBackup.NormalizeTargetDirectory(options.Directory)
 	if err != nil {
 		return nil, err
 	}
@@ -516,7 +516,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 
 		key := backupMessageKey(row)
 		existing, indexed := idx.Messages[key]
-		if indexed && backupFileExists(directory, existing.EMLPath) {
+		if indexed && mailBackup.FileExists(directory, existing.EMLPath) {
 			existing.HasAttachments = boolPtr(row.HasAttachments)
 			idx.Messages[key] = existing
 			result.Skipped++
@@ -557,7 +557,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 				if !ok {
 					return 0, fmt.Errorf("unexpected backup UID: %d", uid)
 				}
-				return writeBackupFileFromReader(directory, backupMessageRelativePath(row), body)
+				return mailBackup.WriteFileFromReader(directory, backupMessageRelativePath(row), body)
 			})
 			if err != nil {
 				for _, row := range chunk {
@@ -636,7 +636,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 					Subject:        row.Subject,
 					Date:           row.DateRaw,
 					EMLPath:        relPath,
-					Size:           backupFileSizeInt(streamResult.BytesWritten),
+					Size:           mailBackup.FileSizeInt(streamResult.BytesWritten),
 					HasAttachments: boolPtr(row.HasAttachments),
 					ExportedAt:     time.Now().UTC().Format(time.RFC3339),
 				}
@@ -879,51 +879,8 @@ func normalizeBackupScope(scope string) string {
 	return backupScopeAll
 }
 
-func normalizeExistingDirectory(path string) (string, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return "", nil
-	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", fmt.Errorf("invalid directory: %w", err)
-	}
-	abs = filepath.Clean(abs)
-	info, err := os.Stat(abs)
-	if err != nil {
-		return "", fmt.Errorf("backup directory is not accessible: %w", err)
-	}
-	if !info.IsDir() {
-		return "", fmt.Errorf("backup path is not a directory: %s", abs)
-	}
-	return abs, nil
-}
-
-func normalizeBackupTargetDirectory(path string) (string, error) {
-	path = strings.TrimSpace(path)
-	if path == "" {
-		return "", errors.New("backup directory is not set")
-	}
-	abs, err := filepath.Abs(path)
-	if err != nil {
-		return "", fmt.Errorf("invalid backup directory: %w", err)
-	}
-	abs = filepath.Clean(abs)
-	if err := os.MkdirAll(abs, 0700); err != nil {
-		return "", fmt.Errorf("failed to create backup directory: %w", err)
-	}
-	info, err := os.Stat(abs)
-	if err != nil {
-		return "", fmt.Errorf("backup directory is not accessible: %w", err)
-	}
-	if !info.IsDir() {
-		return "", fmt.Errorf("backup path is not a directory: %s", abs)
-	}
-	return abs, nil
-}
-
 func loadBackupIndex(directory string) (*backupIndex, bool, error) {
-	path := backupIndexPath(directory)
+	path := mailBackup.IndexPath(directory)
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return &backupIndex{Version: backupIndexVersion, Messages: map[string]backupIndexMessage{}}, false, nil
@@ -942,7 +899,7 @@ func loadBackupIndex(directory string) (*backupIndex, bool, error) {
 }
 
 func saveBackupIndex(directory string, idx *backupIndex) error {
-	path := backupIndexPath(directory)
+	path := mailBackup.IndexPath(directory)
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return fmt.Errorf("failed to create backup metadata directory: %w", err)
 	}
@@ -950,7 +907,7 @@ func saveBackupIndex(directory string, idx *backupIndex) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode backup index: %w", err)
 	}
-	return writeFileAtomic(path, data, 0600)
+	return mailBackup.WriteFileAtomic(path, data, 0600)
 }
 
 func saveBackupReport(directory string, report backupReport) (string, error) {
@@ -964,178 +921,22 @@ func saveBackupReport(directory string, report backupReport) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to encode backup report: %w", err)
 	}
-	if err := writeFileAtomic(path, data, 0600); err != nil {
+	if err := mailBackup.WriteFileAtomic(path, data, 0600); err != nil {
 		return "", err
 	}
 	return path, nil
-}
-
-func backupIndexPath(directory string) string {
-	return filepath.Join(directory, ".aulycmail-backup", "index.json")
 }
 
 func backupMessageKey(row backupMessageRow) string {
 	return fmt.Sprintf("%s:%s:%d:%d", row.AccountID, row.FolderID, row.UIDValidity, row.UID)
 }
 
-func backupFileExists(baseDir, relPath string) bool {
-	if relPath == "" {
-		return false
-	}
-	info, err := os.Stat(filepath.Join(baseDir, filepath.FromSlash(relPath)))
-	return err == nil && !info.IsDir()
-}
-
 func backupMessageRelativePath(row backupMessageRow) string {
-	datePrefix := "unknown-date"
-	if !row.Date.IsZero() {
-		datePrefix = row.Date.UTC().Format("20060102-150405")
-	}
-	subject := sanitizePathSegment(row.Subject, 80)
-	if subject == "" {
-		subject = "no-subject"
-	}
-	filename := fmt.Sprintf("%s_uv%d_uid%d_%s.eml", datePrefix, row.UIDValidity, row.UID, subject)
-
-	parts := []string{"eml", sanitizePathSegment(row.AccountEmail, 80)}
-	for _, segment := range splitFolderPath(row.FolderPath) {
-		parts = append(parts, sanitizePathSegment(segment, 80))
-	}
-	parts = append(parts, filename)
-	return filepath.ToSlash(filepath.Join(parts...))
-}
-
-func splitFolderPath(path string) []string {
-	path = strings.ReplaceAll(path, "\\", "/")
-	raw := strings.Split(path, "/")
-	parts := make([]string, 0, len(raw))
-	for _, part := range raw {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			parts = append(parts, part)
-		}
-	}
-	if len(parts) == 0 {
-		return []string{"folder"}
-	}
-	return parts
-}
-
-func writeBackupFileFromStream(baseDir, relPath string, write func(io.Writer) (int64, error)) (int64, error) {
-	path := filepath.Join(baseDir, filepath.FromSlash(relPath))
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return 0, fmt.Errorf("failed to create backup folder: %w", err)
-	}
-
-	tmp := path + ".tmp"
-	file, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-	if err != nil {
-		return 0, fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	written, writeErr := write(file)
-	closeErr := file.Close()
-	if writeErr != nil {
-		_ = os.Remove(tmp)
-		return written, fmt.Errorf("failed to stream backup file: %w", writeErr)
-	}
-	if closeErr != nil {
-		_ = os.Remove(tmp)
-		return written, fmt.Errorf("failed to close temp file: %w", closeErr)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return written, fmt.Errorf("failed to replace file: %w", err)
-	}
-	return written, nil
-}
-
-func writeBackupFileFromReader(baseDir, relPath string, reader io.Reader) (int64, error) {
-	path := filepath.Join(baseDir, filepath.FromSlash(relPath))
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return 0, fmt.Errorf("failed to create backup folder: %w", err)
-	}
-
-	tmp := path + ".tmp"
-	file, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
-	if err != nil {
-		return 0, fmt.Errorf("failed to write temp file: %w", err)
-	}
-
-	written, copyErr := io.Copy(file, reader)
-	closeErr := file.Close()
-	if copyErr != nil {
-		_ = os.Remove(tmp)
-		return written, fmt.Errorf("failed to stream backup file: %w", copyErr)
-	}
-	if closeErr != nil {
-		_ = os.Remove(tmp)
-		return written, fmt.Errorf("failed to close temp file: %w", closeErr)
-	}
-	if written == 0 {
-		_ = os.Remove(tmp)
-		return written, errors.New("message body not found")
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return written, fmt.Errorf("failed to replace file: %w", err)
-	}
-	return written, nil
-}
-
-func backupFileSizeInt(size int64) int {
-	if size <= 0 {
-		return 0
-	}
-	maxInt := int64(^uint(0) >> 1)
-	if size > maxInt {
-		return int(maxInt)
-	}
-	return int(size)
+	return mailBackup.MessageRelativePath(row.AccountEmail, row.FolderPath, row.Subject, row.Date, row.UIDValidity, row.UID)
 }
 
 func boolPtr(value bool) *bool {
 	return &value
-}
-
-func writeFileAtomic(path string, content []byte, perm os.FileMode) error {
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, content, perm); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp)
-		return fmt.Errorf("failed to replace file: %w", err)
-	}
-	return nil
-}
-
-func sanitizePathSegment(value string, maxRunes int) string {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return ""
-	}
-	var b strings.Builder
-	for _, r := range value {
-		switch {
-		case r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|':
-			b.WriteRune('_')
-		case unicode.IsControl(r):
-			continue
-		default:
-			b.WriteRune(r)
-		}
-	}
-	out := strings.TrimSpace(b.String())
-	out = strings.Trim(out, ". ")
-	if out == "" {
-		return ""
-	}
-	runes := []rune(out)
-	if len(runes) > maxRunes {
-		out = string(runes[:maxRunes])
-	}
-	return out
 }
 
 func parseBackupTime(raw string) time.Time {

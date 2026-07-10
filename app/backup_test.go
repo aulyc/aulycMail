@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	mailBackup "github.com/aulyc/aulycmail/internal/backup"
 )
 
 func TestBackupMessageKeyIncludesUIDValidity(t *testing.T) {
@@ -318,13 +320,11 @@ func TestBackupViewerMessagesIncludesAttachmentCount(t *testing.T) {
 	}
 }
 
-func TestWriteBackupFileFromStreamWritesContent(t *testing.T) {
+func TestWriteBackupFileFromReaderWritesContent(t *testing.T) {
 	dir := t.TempDir()
 	content := strings.Repeat("0123456789", 1024)
 
-	written, err := writeBackupFileFromStream(dir, "eml/user@example.com/INBOX/message.eml", func(w io.Writer) (int64, error) {
-		return io.Copy(w, strings.NewReader(content))
-	})
+	written, err := mailBackup.WriteFileFromReader(dir, "eml/user@example.com/INBOX/message.eml", strings.NewReader(content))
 	if err != nil {
 		t.Fatalf("write streamed backup file: %v", err)
 	}
@@ -342,17 +342,15 @@ func TestWriteBackupFileFromStreamWritesContent(t *testing.T) {
 	}
 }
 
-func TestWriteBackupFileFromStreamRemovesPartialOnError(t *testing.T) {
+func TestWriteBackupFileFromReaderRemovesPartialOnError(t *testing.T) {
 	dir := t.TempDir()
 	boom := errors.New("stream failed")
 
-	written, err := writeBackupFileFromStream(dir, "eml/user@example.com/INBOX/message.eml", func(w io.Writer) (int64, error) {
-		n, writeErr := io.WriteString(w, "partial")
-		if writeErr != nil {
-			return int64(n), writeErr
-		}
-		return int64(n), boom
-	})
+	written, err := mailBackup.WriteFileFromReader(
+		dir,
+		"eml/user@example.com/INBOX/message.eml",
+		io.MultiReader(strings.NewReader("partial"), errorReader{err: boom}),
+	)
 	if !errors.Is(err, boom) {
 		t.Fatalf("expected stream error, got %v", err)
 	}
@@ -372,7 +370,7 @@ func TestWriteBackupFileFromStreamRemovesPartialOnError(t *testing.T) {
 func TestWriteBackupFileFromReaderRejectsEmptyContent(t *testing.T) {
 	dir := t.TempDir()
 
-	written, err := writeBackupFileFromReader(dir, "eml/user@example.com/INBOX/message.eml", strings.NewReader(""))
+	written, err := mailBackup.WriteFileFromReader(dir, "eml/user@example.com/INBOX/message.eml", strings.NewReader(""))
 	if err == nil {
 		t.Fatal("expected empty reader to fail")
 	}
@@ -384,4 +382,12 @@ func TestWriteBackupFileFromReaderRejectsEmptyContent(t *testing.T) {
 	if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
 		t.Fatalf("expected empty backup file to be removed, stat err: %v", statErr)
 	}
+}
+
+type errorReader struct {
+	err error
+}
+
+func (r errorReader) Read([]byte) (int, error) {
+	return 0, r.err
 }

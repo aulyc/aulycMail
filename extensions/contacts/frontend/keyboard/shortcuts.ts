@@ -6,9 +6,8 @@
 //
 // Composable helpers (noMods, ctrlOrMeta, altOnly) are imported from the host
 // shortcuts file so the modifier-checking conventions match mail's exactly.
-// Predicates here get registered via registerExtensionShortcut at component
-// mount; the host's global key handler dispatches them via
-// dispatchExtensionShortcut when Contacts is the active rail pane.
+// Predicates here get registered via registerPaneShortcut at component mount;
+// the host's global key handler dispatches them when Contacts is active.
 
 import { noMods, ctrlOrMeta } from '$lib/keyboard/shortcuts'
 

@@ -18,11 +18,12 @@
   import ListPane from '$lib/components/kit/ListPane.svelte'
   import ListRow from '$lib/components/kit/ListRow.svelte'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
-  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$contacts/frontend/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
+  import { createDebouncer } from '$lib/utils/debounce'
   // Canonical list toolbar — owns hamburger placement, title styling, count
-  // badge, search-mode swap. Extension just supplies label/count + per-extension
-  // search markup + trailing action buttons.
+  // badge and search-mode swap. Contacts supplies label/count plus search
+  // markup and trailing action buttons.
   import ListHeader from '$lib/components/kit/ListHeader.svelte'
   import { getUIState, getUIStateVersion } from '$lib/stores/uiState.svelte'
   // @ts-ignore - wailsjs bindings
@@ -79,14 +80,13 @@
     }
   }
 
-  let debounce: ReturnType<typeof setTimeout> | null = null
+  const searchDebouncer = createDebouncer(200)
   function onSearchInput(e: Event) {
     searchInput = (e.currentTarget as HTMLInputElement).value
-    if (debounce) clearTimeout(debounce)
-    debounce = setTimeout(() => {
+    searchDebouncer.schedule(() => {
       setSearchQuery(searchInput)
       reloadContacts()
-    }, 200)
+    })
   }
 
   function handleSearchKeydown(e: KeyboardEvent) {
@@ -107,7 +107,7 @@
     searchInput = ''
     setSearchQuery('')
     showSearch = false
-    if (debounce) clearTimeout(debounce)
+    searchDebouncer.cancel()
     reloadContacts()
   }
 
@@ -122,7 +122,7 @@
       lastSourceId = sel
       searchInput = ''
       showSearch = false
-      if (debounce) clearTimeout(debounce)
+      searchDebouncer.cancel()
     }
   })
 
@@ -132,7 +132,7 @@
       lastResetSignal = signal
       searchInput = ''
       showSearch = false
-      if (debounce) clearTimeout(debounce)
+      searchDebouncer.cancel()
     }
   })
 

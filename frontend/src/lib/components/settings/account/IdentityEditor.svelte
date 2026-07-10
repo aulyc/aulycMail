@@ -6,6 +6,7 @@
   import { Label } from '$lib/components/ui/label'
   import * as Select from '$lib/components/ui/select'
   import { _ } from '$lib/i18n'
+  import { isEmailAddress } from '$lib/utils/email'
   import SignatureEditor from './SignatureEditor.svelte'
   // @ts-ignore - wailsjs path
   import { account } from '../../../../../wailsjs/go/models'
@@ -98,7 +99,7 @@
 
     if (!email.trim()) {
       errors.email = $_('identity.emailRequired')
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    } else if (!isEmailAddress(email)) {
       errors.email = $_('identity.invalidEmailFormat')
     }
 

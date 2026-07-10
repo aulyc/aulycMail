@@ -13,6 +13,7 @@ import (
 	"sort"
 	"strings"
 
+	mailBackup "github.com/aulyc/aulycmail/internal/backup"
 	"github.com/aulyc/aulycmail/internal/email"
 	"github.com/aulyc/aulycmail/internal/message"
 	"github.com/aulyc/aulycmail/internal/platform"
@@ -92,7 +93,7 @@ func (a *App) GetBackupViewerCatalog(directory string) (*BackupViewerCatalog, er
 		return &BackupViewerCatalog{}, nil
 	}
 
-	cleanDir, err := normalizeExistingDirectory(directory)
+	cleanDir, err := mailBackup.NormalizeExistingDirectory(directory)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,7 @@ func (a *App) SearchBackupViewerMessages(directory, accountEmail, query string, 
 	if directory == "" {
 		return []BackupViewerMessageSummary{}, nil
 	}
-	cleanDir, err := normalizeExistingDirectory(directory)
+	cleanDir, err := mailBackup.NormalizeExistingDirectory(directory)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +233,7 @@ func (a *App) backupViewerIndexedMessagePath(directory, key string) (string, bac
 	if directory == "" {
 		return "", backupIndexMessage{}, errors.New("backup directory is not set")
 	}
-	cleanDir, err := normalizeExistingDirectory(directory)
+	cleanDir, err := mailBackup.NormalizeExistingDirectory(directory)
 	if err != nil {
 		return "", backupIndexMessage{}, err
 	}
@@ -263,7 +264,7 @@ func (a *App) OpenBackupViewerDirectory(directory string) error {
 	if directory == "" {
 		return errors.New("backup directory is not set")
 	}
-	cleanDir, err := normalizeExistingDirectory(directory)
+	cleanDir, err := mailBackup.NormalizeExistingDirectory(directory)
 	if err != nil {
 		return err
 	}

@@ -30,7 +30,7 @@
   overflow-hidden is critical: it clips the absolute-positioned overlays
   (sidebar slid left via translateX(-100%), viewer slid right via
   translateX(100%)) so their hit-test regions don't escape PaneLayout into
-  sibling layout (notably the ExtensionRail at the left). Without this, the
+  sibling layout (notably the ActivityRail at the left). Without this, the
   hidden sidebar's leftward-translated hit area intercepts rail clicks. Mail
   gets the same clipping for free via App.svelte's outer container.
 -->

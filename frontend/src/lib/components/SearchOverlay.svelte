@@ -8,6 +8,7 @@
   import SearchScopeCarousel from '$lib/components/search/SearchScopeCarousel.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { formatRelativeDateTime } from '$lib/utils/date'
+  import { createDebouncer } from '$lib/utils/debounce'
   // @ts-ignore - wailsjs path
   import { SearchMailInAccount, Contacts_ListContactsForBrowse } from '../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
@@ -51,7 +52,7 @@
   let activeIndex = $state(0)
   let selectedScopeId = $state('')
   let inputEl = $state<HTMLInputElement | null>(null)
-  let debounce: ReturnType<typeof setTimeout> | null = null
+  const searchDebouncer = createDebouncer(200)
   let searchSeq = 0
   // True while an IME is composing (e.g. typing pinyin before picking a hanzi).
   let composing = false
@@ -80,8 +81,8 @@
       selectedScopeId = ''
       loading = false
       setTimeout(() => inputEl?.focus(), 30)
-    } else if (debounce) {
-      clearTimeout(debounce)
+    } else {
+      searchDebouncer.cancel()
     }
   })
 
@@ -125,8 +126,7 @@
     // the input but isn't a real query yet — don't search on it. We search on
     // compositionend instead, once the hanzi is committed.
     if (composing) return
-    if (debounce) clearTimeout(debounce)
-    debounce = setTimeout(runSearch, 200)
+    searchDebouncer.schedule(runSearch)
   }
 
   function onCompositionStart() {
@@ -136,8 +136,7 @@
   function onCompositionEnd() {
     composing = false
     // The committed text is now in the input — search it.
-    if (debounce) clearTimeout(debounce)
-    debounce = setTimeout(runSearch, 200)
+    searchDebouncer.schedule(runSearch)
   }
 
   function selectScope(scopeID: string) {
@@ -147,7 +146,7 @@
     }
     selectedScopeId = scopeID
     activeIndex = 0
-    if (debounce) clearTimeout(debounce)
+    searchDebouncer.cancel()
     runSearch()
     setTimeout(() => inputEl?.focus(), 0)
   }

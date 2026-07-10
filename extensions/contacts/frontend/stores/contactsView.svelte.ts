@@ -1,4 +1,4 @@
-// View-local state for the Contacts extension's browse UI. Source selection,
+// View-local state for the Contacts pane's browse UI. Source selection,
 // search query, and selected-row id are intentionally session-local — none of
 // these need to survive across app launches.
 

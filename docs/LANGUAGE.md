@@ -11,7 +11,7 @@ Use this checklist to ensure your submission is complete:
 - [ ] **Claimed language** — filed a [Translation issue](https://github.com/aulyc/aulycmail/issues/new?template=translation.yml) to avoid duplicate efforts
 - [ ] **Core locale JSON** — `frontend/src/lib/i18n/locales/<code>.json` created with all core mail/UI keys translated
 - [ ] **Contacts locale JSON** — `extensions/contacts/frontend/i18n/locales/<code>.json` when translating the built-in Contacts pane. Optional per locale — Contacts falls back to English at runtime; see [§ Contacts translations](#contacts-translations).
-- [ ] **Register locale** — added `register()` call in `frontend/src/lib/i18n/index.ts` (core locale only; Contacts self-registers via Vite glob)
+- [ ] **Register locale** — added `register()` call in `frontend/src/lib/i18n/index.ts` (core locale only)
 - [ ] **Register Contacts locale** — if you translated Contacts, added a `register()` line in `extensions/contacts/frontend/i18n/index.ts`
 - [ ] **Supported locales** — added entry to `supportedLocales` array in `frontend/src/lib/i18n/index.ts`
 - [ ] **date-fns locale** — added `case` in `frontend/src/lib/i18n/dateFnsLocale.ts`
@@ -240,14 +240,14 @@ If you want to translate Contacts in addition to core mail:
    // extensions/contacts/frontend/i18n/index.ts
    import { register } from 'svelte-i18n'
 
-   export function registerExtensionI18n() {
+   export function registerContactsI18n() {
      register('en', () => import('./locales/en.json'))
      register('zh-HK', () => import('./locales/zh-HK.json'))   // ← Add your locale here
      // ... other locales ...
    }
    ```
 
-   **No changes needed to** `frontend/src/lib/i18n/index.ts` for Contacts locales. The core's `initI18n()` uses Vite's `import.meta.glob` to auto-discover the pane's `i18n/index.ts` at build time and call `registerExtensionI18n()`.
+   **No changes needed to** `frontend/src/lib/i18n/index.ts` for Contacts locales. The core's `initI18n()` statically calls `registerContactsI18n()`.
 
 4. **Verify in the running app**: switch the app language and confirm Contacts renders in your language.
 

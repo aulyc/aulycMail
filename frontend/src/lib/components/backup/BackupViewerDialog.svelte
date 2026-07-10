@@ -20,6 +20,8 @@
   import { getDarkMailContent, getThemeMode } from '$lib/stores/settings.svelte'
   import { buildDarkMailFilterStyles } from '$lib/utils/dark-mail'
   import { formatFileSize } from '$lib/utils/fileSize'
+  import { createDebouncer } from '$lib/utils/debounce'
+  import { formatLocalDateTime, formatLocalDateTimeShort } from '$lib/utils/date'
   import {
     rememberBackupDirectory,
     removeBackupDirectory,
@@ -61,7 +63,7 @@
   let searchActiveIndex = $state(0)
   let searchScopeEmail = $state('')
   let searchInputEl = $state<HTMLInputElement | null>(null)
-  let searchDebounce: ReturnType<typeof setTimeout> | null = null
+  const searchDebouncer = createDebouncer(200)
   let searchSeq = 0
   let composing = false
 
@@ -342,10 +344,7 @@
     searchResults = []
     searchLoading = false
     composing = false
-    if (searchDebounce) {
-      clearTimeout(searchDebounce)
-      searchDebounce = null
-    }
+    searchDebouncer.cancel()
   }
 
   function runSearch() {
@@ -375,8 +374,7 @@
 
   function onSearchInput() {
     if (composing) return
-    if (searchDebounce) clearTimeout(searchDebounce)
-    searchDebounce = setTimeout(runSearch, 200)
+    searchDebouncer.schedule(runSearch)
   }
 
   function onCompositionStart() {
@@ -385,14 +383,13 @@
 
   function onCompositionEnd() {
     composing = false
-    if (searchDebounce) clearTimeout(searchDebounce)
-    searchDebounce = setTimeout(runSearch, 200)
+    searchDebouncer.schedule(runSearch)
   }
 
   function selectSearchScope(scopeID: string) {
     searchScopeEmail = scopeID
     searchActiveIndex = 0
-    if (searchDebounce) clearTimeout(searchDebounce)
+    searchDebouncer.cancel()
     runSearch()
     setTimeout(() => searchInputEl?.focus(), 0)
   }
@@ -459,14 +456,14 @@
     if (!value) return ''
     const date = parseViewerDate(value)
     if (!date) return value
-    return date.toLocaleString()
+    return formatLocalDateTime(date)
   }
 
   function formatShortDate(value: string): string {
     if (!value) return ''
     const date = parseViewerDate(value)
     if (!date) return value
-    return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    return formatLocalDateTimeShort(date)
   }
 
   function scopeLabel(scope: Scope | undefined): string {

@@ -526,7 +526,7 @@ func (s *Store) Create(email, displayName string) error {
 }
 
 // DeleteRecord removes a contact record by ID. Cascades to contact_emails and
-// all sub-tables via FK ON DELETE CASCADE. Used by the extension API when the
+// all sub-tables via FK ON DELETE CASCADE. Used by the Contacts pane when the
 // caller has a record id (UUID). The older Delete(email) method stays for
 // back-compat with mail-side callers.
 func (s *Store) DeleteRecord(id string) error {
@@ -543,7 +543,7 @@ func (s *Store) DeleteRecord(id string) error {
 
 // UpdateRecordName sets the display name on a record and marks ALL emails on
 // it as name_overridden, so future AddOrUpdate calls don't clobber the edit
-// for any of them. Used by the extension API when the caller has a record id.
+// for any of them. Used by the Contacts pane when the caller has a record id.
 //
 // Returns nil silently when the record doesn't exist (idempotent).
 func (s *Store) UpdateRecordName(id, newName string) error {
@@ -726,7 +726,7 @@ func (s *Store) Count() (int, error) {
 }
 
 // ---------------------------------------------------------------------------
-// Record API — multi-field record reads. Used by the Contacts extension.
+// Record API — multi-field record reads. Used by the Contacts pane.
 // These are NEW methods (not preserving any legacy signature). They expose the
 // rich per-record shape that the unified schema enables.
 // ---------------------------------------------------------------------------

@@ -162,3 +162,118 @@ func TestSaveAttachmentFromRawReaderWritesDecodedFile(t *testing.T) {
 		t.Fatalf("message directory = %q, want msg-1234", filepath.Base(filepath.Dir(path)))
 	}
 }
+
+func TestSaveAttachmentsFromRawReaderWritesMultipleFilesInOnePass(t *testing.T) {
+	raw := strings.Join([]string{
+		"From: sender@example.com",
+		"To: user@example.com",
+		"Subject: attachments",
+		"Content-Type: multipart/mixed; boundary=abc",
+		"",
+		"--abc",
+		"Content-Type: text/plain",
+		"",
+		"hello",
+		"--abc",
+		"Content-Type: text/plain; name=\"one.txt\"",
+		"Content-Disposition: attachment; filename=\"one.txt\"",
+		"Content-Transfer-Encoding: base64",
+		"",
+		"b25l",
+		"--abc",
+		"Content-Type: text/plain; name=\"two.txt\"",
+		"Content-Disposition: attachment; filename=\"two.txt\"",
+		"Content-Transfer-Encoding: quoted-printable",
+		"",
+		"tw=6f",
+		"--abc--",
+		"",
+	}, "\r\n")
+
+	dir := t.TempDir()
+	downloader := NewAttachmentDownloader(t.TempDir())
+	results, err := downloader.SaveAttachmentsFromRawReader(strings.NewReader(raw), []AttachmentSaveTarget{
+		{
+			Attachment: &message.Attachment{MessageID: "msg", Filename: "one.txt"},
+			CustomPath: filepath.Join(dir, "one.txt"),
+		},
+		{
+			Attachment: &message.Attachment{MessageID: "msg", Filename: "two.txt"},
+			CustomPath: filepath.Join(dir, "two.txt"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveAttachmentsFromRawReader() error = %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("results len = %d, want 2", len(results))
+	}
+	for _, result := range results {
+		if result.Err != nil {
+			t.Fatalf("result for %s error = %v", result.Attachment.Filename, result.Err)
+		}
+	}
+
+	assertFileContent := func(name, want string) {
+		t.Helper()
+		got, err := os.ReadFile(filepath.Join(dir, name))
+		if err != nil {
+			t.Fatalf("ReadFile(%s): %v", name, err)
+		}
+		if string(got) != want {
+			t.Fatalf("%s content = %q, want %q", name, string(got), want)
+		}
+	}
+
+	assertFileContent("one.txt", "one")
+	assertFileContent("two.txt", "two")
+}
+
+func TestExtractAttachmentsContentFromRawReaderReadsMultipleAttachmentsInOnePass(t *testing.T) {
+	raw := strings.Join([]string{
+		"From: sender@example.com",
+		"To: user@example.com",
+		"Subject: attachments",
+		"Content-Type: multipart/mixed; boundary=abc",
+		"",
+		"--abc",
+		"Content-Type: text/plain",
+		"",
+		"hello",
+		"--abc",
+		"Content-Type: text/plain; name=\"one.txt\"",
+		"Content-Disposition: attachment; filename=\"one.txt\"",
+		"Content-Transfer-Encoding: base64",
+		"",
+		"b25l",
+		"--abc",
+		"Content-Type: text/plain; name=\"two.txt\"",
+		"Content-Disposition: attachment; filename=\"two.txt\"",
+		"Content-Transfer-Encoding: quoted-printable",
+		"",
+		"tw=6f",
+		"--abc--",
+		"",
+	}, "\r\n")
+
+	downloader := NewAttachmentDownloader(t.TempDir())
+	results, err := downloader.ExtractAttachmentsContentFromRawReader(strings.NewReader(raw), []string{"one.txt", "two.txt"})
+	if err != nil {
+		t.Fatalf("ExtractAttachmentsContentFromRawReader() error = %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("results len = %d, want 2", len(results))
+	}
+	if results[0].Err != nil {
+		t.Fatalf("result[0] error = %v", results[0].Err)
+	}
+	if results[1].Err != nil {
+		t.Fatalf("result[1] error = %v", results[1].Err)
+	}
+	if string(results[0].Content) != "one" {
+		t.Fatalf("first attachment = %q, want one", string(results[0].Content))
+	}
+	if string(results[1].Content) != "two" {
+		t.Fatalf("second attachment = %q, want two", string(results[1].Content))
+	}
+}

@@ -9,7 +9,7 @@
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import Icon from '@iconify/svelte'
-  import { updateContact } from '$extensions/contacts/frontend/stores/contactsView.svelte'
+  import { updateContact } from '$contacts/frontend/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import ContactFieldsForm from './fields/ContactFieldsForm.svelte'

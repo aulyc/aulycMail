@@ -29,6 +29,7 @@
     trashMessages,
     undoLastMailAction,
   } from '$lib/mailActions'
+  import { formatMessageDate } from '$lib/utils/date'
 
   interface Props {
     threadId?: string | null
@@ -593,8 +594,7 @@
   }
 
   function formatDate(dateStr: any): string {
-    const date = new Date(dateStr)
-    return `${date.toLocaleDateString()} at ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    return formatMessageDate(new Date(dateStr))
   }
 
   // Parse recipient list (JSON array format from backend)

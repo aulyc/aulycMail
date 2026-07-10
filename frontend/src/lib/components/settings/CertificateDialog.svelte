@@ -4,6 +4,7 @@
   import Icon from '@iconify/svelte'
   import { cn } from '$lib/utils'
   import { _ } from '$lib/i18n'
+  import { formatLocalDate } from '$lib/utils/date'
   // @ts-ignore - wailsjs path
   import type { certificate } from '../../../../wailsjs/go/models'
 
@@ -39,11 +40,7 @@
   function formatDate(iso: string): string {
     if (!iso) return 'N/A'
     try {
-      return new Date(iso).toLocaleDateString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-      })
+      return formatLocalDate(iso)
     } catch {
       return iso
     }

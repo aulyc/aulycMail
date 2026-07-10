@@ -11,7 +11,7 @@
   // Pane-focus store integration: when the user clicks into the list or it
   // receives DOM focus, we call setFocusedPane(focusSlot). When focusedPane
   // === focusSlot, we DOM-focus the container so subsequent keypresses route
-  // here. This lets Alt+H/L cycle uniformly across mail and extension panes.
+  // here. This lets Alt+H/L cycle uniformly across mail and secondary panes.
 
   import { onMount, type Snippet } from 'svelte'
   import { KEY } from '$lib/keyboard/shortcuts'

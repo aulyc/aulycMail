@@ -89,3 +89,18 @@ export function formatMessageDate(date: Date): string {
 
   return format(date, isZh ? 'yyyy年M月d日 HH:mm' : 'MMM d, yyyy \'at\' HH:mm', { locale })
 }
+
+export function formatLocalDate(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value)
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
+
+export function formatLocalDateTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value)
+  return date.toLocaleString()
+}
+
+export function formatLocalDateTimeShort(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value)
+  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+}

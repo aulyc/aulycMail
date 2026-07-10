@@ -21,6 +21,28 @@ type AttachmentDownloader struct {
 	attachmentsDir string
 }
 
+// AttachmentSaveTarget describes one attachment extraction target.
+type AttachmentSaveTarget struct {
+	Attachment *message.Attachment
+	CustomPath string
+}
+
+// AttachmentSaveResult is the per-attachment outcome from a batch extraction.
+type AttachmentSaveResult struct {
+	Attachment *message.Attachment
+	Path       string
+	Written    int64
+	Err        error
+}
+
+// AttachmentContentResult is the per-attachment outcome from a batch content
+// extraction.
+type AttachmentContentResult struct {
+	Filename string
+	Content  []byte
+	Err      error
+}
+
 // NewAttachmentDownloader creates a new attachment downloader
 func NewAttachmentDownloader(attachmentsDir string) *AttachmentDownloader {
 	return &AttachmentDownloader{
@@ -41,6 +63,63 @@ func (d *AttachmentDownloader) ExtractAttachmentContentFromReader(raw io.Reader,
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+// ExtractAttachmentsContentFromRawReader extracts multiple attachments in a
+// single MIME traversal. It buffers only the requested attachment bodies.
+func (d *AttachmentDownloader) ExtractAttachmentsContentFromRawReader(raw io.Reader, filenames []string) ([]AttachmentContentResult, error) {
+	results := make([]AttachmentContentResult, len(filenames))
+	pending := make(map[string][]int, len(filenames))
+
+	for i, filename := range filenames {
+		results[i].Filename = filename
+		if filename == "" {
+			results[i].Err = fmt.Errorf("attachment filename is required")
+			continue
+		}
+		pending[filename] = append(pending[filename], i)
+	}
+
+	entity, err := gomessage.Read(raw)
+	if err != nil {
+		return results, fmt.Errorf("failed to parse message: %w", err)
+	}
+
+	extractMatch := func(part *gomessage.Entity) error {
+		filename := getFilename(part)
+		indexes := pending[filename]
+		if len(indexes) == 0 {
+			return nil
+		}
+
+		resultIndex := indexes[0]
+		pending[filename] = indexes[1:]
+		var buf bytes.Buffer
+		if _, err := writeAttachmentEntityContent(part, &buf); err != nil {
+			results[resultIndex].Err = err
+			return nil
+		}
+		results[resultIndex].Content = buf.Bytes()
+		return nil
+	}
+
+	if mr := entity.MultipartReader(); mr != nil {
+		if err := walkAttachmentParts(mr, extractMatch); err != nil {
+			return results, err
+		}
+	} else if err := extractMatch(entity); err != nil {
+		return results, err
+	}
+
+	for _, indexes := range pending {
+		for _, resultIndex := range indexes {
+			if results[resultIndex].Err == nil && results[resultIndex].Content == nil {
+				results[resultIndex].Err = fmt.Errorf("attachment not found: %s", results[resultIndex].Filename)
+			}
+		}
+	}
+
+	return results, nil
 }
 
 // ExtractAttachmentContentToWriter extracts one attachment and streams decoded
@@ -245,23 +324,80 @@ func (d *AttachmentDownloader) SaveAttachmentFromRawReader(raw io.Reader, att *m
 		return "", 0, err
 	}
 
-	file, err := os.OpenFile(savePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	written, err := writeAttachmentToPath(savePath, func(dst io.Writer) (int64, error) {
+		return d.ExtractAttachmentContentToWriter(raw, att.Filename, dst)
+	})
 	if err != nil {
-		return "", 0, fmt.Errorf("failed to create attachment file: %w", err)
-	}
-
-	written, extractErr := d.ExtractAttachmentContentToWriter(raw, att.Filename, file)
-	closeErr := file.Close()
-	if extractErr != nil {
-		_ = os.Remove(savePath)
-		return "", written, fmt.Errorf("failed to extract attachment: %w", extractErr)
-	}
-	if closeErr != nil {
-		_ = os.Remove(savePath)
-		return "", written, fmt.Errorf("failed to close attachment file: %w", closeErr)
+		return "", written, err
 	}
 
 	return savePath, written, nil
+}
+
+// SaveAttachmentsFromRawReader extracts multiple attachments in a single MIME
+// traversal. This avoids reparsing the same raw message once per attachment
+// when the user saves all attachments from a message.
+func (d *AttachmentDownloader) SaveAttachmentsFromRawReader(raw io.Reader, targets []AttachmentSaveTarget) ([]AttachmentSaveResult, error) {
+	results := make([]AttachmentSaveResult, len(targets))
+	pending := make(map[string][]int, len(targets))
+
+	for i, target := range targets {
+		results[i].Attachment = target.Attachment
+		if target.Attachment == nil {
+			results[i].Err = fmt.Errorf("attachment is required")
+			continue
+		}
+
+		savePath, err := d.attachmentSavePath(target.Attachment, target.CustomPath)
+		if err != nil {
+			results[i].Err = err
+			continue
+		}
+		results[i].Path = savePath
+		pending[target.Attachment.Filename] = append(pending[target.Attachment.Filename], i)
+	}
+
+	entity, err := gomessage.Read(raw)
+	if err != nil {
+		return results, fmt.Errorf("failed to parse message: %w", err)
+	}
+
+	saveMatch := func(part *gomessage.Entity) error {
+		filename := getFilename(part)
+		indexes := pending[filename]
+		if len(indexes) == 0 {
+			return nil
+		}
+
+		resultIndex := indexes[0]
+		pending[filename] = indexes[1:]
+		written, err := writeAttachmentToPath(results[resultIndex].Path, func(dst io.Writer) (int64, error) {
+			return writeAttachmentEntityContent(part, dst)
+		})
+		results[resultIndex].Written = written
+		if err != nil {
+			results[resultIndex].Err = err
+		}
+		return nil
+	}
+
+	if mr := entity.MultipartReader(); mr != nil {
+		if err := walkAttachmentParts(mr, saveMatch); err != nil {
+			return results, err
+		}
+	} else if err := saveMatch(entity); err != nil {
+		return results, err
+	}
+
+	for _, indexes := range pending {
+		for _, resultIndex := range indexes {
+			if results[resultIndex].Err == nil {
+				results[resultIndex].Err = fmt.Errorf("attachment not found: %s", results[resultIndex].Attachment.Filename)
+			}
+		}
+	}
+
+	return results, nil
 }
 
 func (d *AttachmentDownloader) attachmentSavePath(att *message.Attachment, customPath string) (string, error) {
@@ -303,6 +439,48 @@ func decodeAttachmentContent(content []byte, encoding string) ([]byte, error) {
 
 func writeAttachmentEntityContent(entity *gomessage.Entity, dst io.Writer) (int64, error) {
 	return io.Copy(dst, entity.Body)
+}
+
+func writeAttachmentToPath(savePath string, write func(io.Writer) (int64, error)) (int64, error) {
+	file, err := os.OpenFile(savePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create attachment file: %w", err)
+	}
+
+	written, writeErr := write(file)
+	closeErr := file.Close()
+	if writeErr != nil {
+		_ = os.Remove(savePath)
+		return written, fmt.Errorf("failed to extract attachment: %w", writeErr)
+	}
+	if closeErr != nil {
+		_ = os.Remove(savePath)
+		return written, fmt.Errorf("failed to close attachment file: %w", closeErr)
+	}
+	return written, nil
+}
+
+func walkAttachmentParts(mr gomessage.MultipartReader, handle func(*gomessage.Entity) error) error {
+	for {
+		part, err := mr.NextPart()
+		if err == io.EOF {
+			return nil
+		}
+		if err != nil {
+			continue
+		}
+
+		if nestedMr := part.MultipartReader(); nestedMr != nil {
+			if err := walkAttachmentParts(nestedMr, handle); err != nil {
+				return err
+			}
+			continue
+		}
+
+		if err := handle(part); err != nil {
+			return err
+		}
+	}
 }
 
 func attachmentMessagePrefix(messageID string) string {

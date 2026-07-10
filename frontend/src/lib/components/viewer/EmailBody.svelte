@@ -9,6 +9,7 @@
   import { toasts } from '$lib/stores/toast'
   import { getAlwaysLoadImages, getThemeMode } from '$lib/stores/settings.svelte'
   import { buildDarkMailFilterStyles, getDarkMailSurfaceBackground } from '$lib/utils/dark-mail'
+  import { EMAIL_ADDRESS_PATTERN } from '$lib/utils/email'
 
   interface Props {
     messageId: string
@@ -699,13 +700,12 @@ ${processedHtml}
   function linkifyText(text: string): string {
     if (!text) return ''
     const urlPattern = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g
-    const emailPattern = /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g
     let escaped = text
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
     escaped = escaped.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline">$1</a>')
-    escaped = escaped.replace(emailPattern, '<a href="mailto:$1" class="text-primary hover:underline">$1</a>')
+    escaped = escaped.replace(EMAIL_ADDRESS_PATTERN, '<a href="mailto:$&" class="text-primary hover:underline">$&</a>')
     return escaped
   }
 

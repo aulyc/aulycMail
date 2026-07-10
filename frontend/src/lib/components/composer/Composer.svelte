@@ -10,23 +10,6 @@
   import { type ComposerApi, COMPOSER_API_KEY, createMainWindowApi } from '$lib/composerApi'
   import { isImageAllowedSync } from '$lib/stores/imageAllowlist.svelte'
   import { getAlwaysLoadImages } from '$lib/stores/settings.svelte'
-
-  // Attachment type from backend
-  interface ComposerAttachment {
-    filename: string
-    contentType: string
-    size: number
-    data: string // base64 encoded
-  }
-
-  // Inline image type - for images pasted/dropped into the editor
-  interface InlineImage {
-    cid: string  // Content-ID (e.g., "image1@aulycmail")
-    dataUrl: string  // Full data URL for display in editor
-    contentType: string
-    data: string  // Base64 data only (without data URL prefix)
-    filename: string
-  }
   import RecipientInput from './RecipientInput.svelte'
   import EditorToolbar from './EditorToolbar.svelte'
   import ComposerAttachmentList from './ComposerAttachmentList.svelte'
@@ -36,10 +19,34 @@
     htmlToPlainText,
     parseFileUris,
     plainTextToHtml,
-    readFileAsBase64,
-    readFileAsDataUrl,
     textMentionsAttachment,
   } from './composerUtils'
+  import {
+    backendAttachmentToComposerAttachment,
+    estimateBase64DecodedSize,
+    fileToDataUrl,
+    fileToComposerAttachment,
+    hasFileDropPayload,
+    isRecipientChipDrag,
+    selectedFileToComposerAttachment,
+    type ComposerAttachment,
+    type InlineImage,
+  } from './composerAttachments'
+  import {
+    filteredMentionResults,
+    findMentionToken,
+    getContactEmail,
+    getMentionLabel,
+    getPlainTextMentionSegments,
+    hasRecipient,
+    mentionKey,
+    type MentionSurface,
+  } from './composerMentions'
+  import {
+    findPlainQuoteBoundary,
+    findRichQuoteBoundary,
+    hasPlainQuoteBoundary,
+  } from './composerQuoteBoundaries'
   import {
     buildSignatureHtml,
     getSignatureSeparator,
@@ -237,7 +244,6 @@
   // Whether remote images are blocked in the composer's quoted content
   let composerImagesBlocked = $state(false)
 
-  type MentionSurface = 'plain' | 'rich'
   let mentionActive = $state(false)
   let mentionSurface = $state<MentionSurface>('plain')
   let mentionQuery = $state('')
@@ -275,23 +281,14 @@
 
   // Get only the user-composed text, excluding quoted/forwarded content
   function getUserComposedText(): string {
-    const FWD_SEPARATOR = '---------- Forwarded message ----------'
     if (isPlainTextMode) {
-      // Reply: citation line ending in "wrote:"
-      const wroteIndex = plainTextContent.search(/^.*wrote:\s*$/m)
-      // Forward: separator line
-      const fwdIndex = plainTextContent.indexOf(FWD_SEPARATOR)
-      // Take the earliest match
-      const cutoff = [wroteIndex, fwdIndex].filter(i => i > -1)
-      if (cutoff.length > 0) return plainTextContent.substring(0, Math.min(...cutoff))
+      const cutoff = findPlainQuoteBoundary(plainTextContent)
+      if (cutoff >= 0) return plainTextContent.substring(0, cutoff)
       return plainTextContent
     }
-    // In rich text, find the earliest of <blockquote (reply) or the forwarded message separator
     const html = editor?.getHTML() || ''
-    const blockquoteIndex = html.indexOf('<blockquote')
-    const fwdIndex = html.indexOf(FWD_SEPARATOR)
-    const cutoffs = [blockquoteIndex, fwdIndex].filter(i => i > -1)
-    const userHtml = cutoffs.length > 0 ? html.substring(0, Math.min(...cutoffs)) : html
+    const cutoff = findRichQuoteBoundary(html)
+    const userHtml = cutoff >= 0 ? html.substring(0, cutoff) : html
     const tmp = document.createElement('div')
     tmp.innerHTML = userHtml
     return tmp.textContent || ''
@@ -301,23 +298,6 @@
   function bodyMentionsAttachment(): boolean {
     const combinedText = getUserComposedText() + ' ' + subject
     return textMentionsAttachment(combinedText)
-  }
-
-  function getMentionLabel(c: contact.Contact): string {
-    return (c.display_name || c.email || '').trim()
-  }
-
-  function getContactEmail(c: contact.Contact): string {
-    return (c.email || '').trim().toLowerCase()
-  }
-
-  function getRecipientEmail(r: smtp.Address): string {
-    return ((r as any)?.address || (r as any)?.email || '').trim().toLowerCase()
-  }
-
-  function hasRecipient(email: string, recipients: smtp.Address[]): boolean {
-    const normalized = email.trim().toLowerCase()
-    return !!normalized && recipients.some((recipient) => getRecipientEmail(recipient) === normalized)
   }
 
   function addMentionedContactToRecipients(c: contact.Contact) {
@@ -339,59 +319,7 @@
     plainMentionLabels = [...plainMentionLabels, normalized]
   }
 
-  type PlainTextSegment = { type: 'text' | 'mention'; text: string }
-
-  function isMentionBoundary(text: string, index: number): boolean {
-    if (index === 0) return true
-    return /[\s([（【{,;，。！？!?]/u.test(text[index - 1] || '')
-  }
-
-  function getPlainTextMentionSegments(text: string): PlainTextSegment[] {
-    if (!text) return []
-
-    const labels = [...plainMentionLabels].sort((a, b) => b.length - a.length)
-    const segments: PlainTextSegment[] = []
-    let buffer = ''
-    let i = 0
-
-    const flush = () => {
-      if (!buffer) return
-      segments.push({ type: 'text', text: buffer })
-      buffer = ''
-    }
-
-    while (i < text.length) {
-      if (text[i] !== '@' || !isMentionBoundary(text, i)) {
-        buffer += text[i]
-        i += 1
-        continue
-      }
-
-      const selectedLabel = labels.find((label) => text.startsWith(`@${label}`, i))
-      if (selectedLabel) {
-        flush()
-        segments.push({ type: 'mention', text: `@${selectedLabel}` })
-        i += selectedLabel.length + 1
-        continue
-      }
-
-      const fallback = text.slice(i).match(/^@([^\s@]{1,40})/u)
-      if (fallback) {
-        flush()
-        segments.push({ type: 'mention', text: fallback[0] })
-        i += fallback[0].length
-        continue
-      }
-
-      buffer += text[i]
-      i += 1
-    }
-
-    flush()
-    return segments
-  }
-
-  const plainTextMentionSegments = $derived(getPlainTextMentionSegments(plainTextContent))
+  const plainTextMentionSegments = $derived(getPlainTextMentionSegments(plainTextContent, plainMentionLabels))
 
   function setMentionSelectedIndex(index: number, inputMode: 'keyboard' | 'mouse' | 'program' = 'program') {
     if (mentionSuggestions.length === 0) {
@@ -431,35 +359,6 @@
       clearTimeout(mentionSearchTimer)
       mentionSearchTimer = null
     }
-  }
-
-  function mentionKey(surface: MentionSurface, query: string, start: number, end: number): string {
-    return `${surface}:${start}:${end}:${query}`
-  }
-
-  function findMentionToken(textBeforeCursor: string): { query: string; startOffset: number } | null {
-    const match = textBeforeCursor.match(/(^|[\s([（【{,;，。！？!?])@([^\s@]{0,40})$/u)
-    if (!match) return null
-    const query = match[2] || ''
-    return {
-      query,
-      startOffset: textBeforeCursor.length - query.length - 1,
-    }
-  }
-
-  function filteredMentionResults(results: contact.Contact[], query: string): contact.Contact[] {
-    const needle = query.trim().toLowerCase()
-    if (!needle) return []
-    const seen = new Set<string>()
-    return (results || []).filter((item) => {
-      const email = (item.email || '').trim()
-      const label = getMentionLabel(item)
-      if (!email && !label) return false
-      const key = (email || label).toLowerCase()
-      if (seen.has(key)) return false
-      seen.add(key)
-      return label.toLowerCase().includes(needle) || email.toLowerCase().includes(needle)
-    })
   }
 
   function scheduleMentionSearch(query: string) {
@@ -1176,11 +1075,8 @@
         // Don't append if signature marker already exists in the user's compose area.
         // Only check content before the quoted section — markers inside quoted history
         // (from previous replies with signatures) should not prevent injection.
-        const quoteIdx = content.indexOf('<blockquote')
-        const wroteIdx = content.search(/wrote:\s*(<br[^>]*>)?\s*<\/p>/i)
-        const fwdIdx = content.indexOf('---------- Forwarded message ----------')
-        const boundaries = [quoteIdx, wroteIdx, fwdIdx].filter(i => i > -1)
-        const quoteBoundary = boundaries.length > 0 ? Math.min(...boundaries) : content.length
+        const quoteStart = findRichQuoteBoundary(content)
+        const quoteBoundary = quoteStart >= 0 ? quoteStart : content.length
         const preQuoteContent = content.substring(0, quoteBoundary)
         if (!hasSignatureMarker(preQuoteContent)) {
           appendSignatureForIdentity(identity)
@@ -1241,12 +1137,8 @@
       const separator = getSignatureSeparator(identity)
       if (separator) sig = separator + '\n' + sig
 
-      const fwd = '---------- Forwarded message ----------'
       const body = plainTextContent
-      const wroteIdx = body.search(/^.*wrote:\s*$/m)
-      const fwdIdx = body.indexOf(fwd)
-      const cuts = [wroteIdx, fwdIdx].filter((i) => i > -1)
-      const quoteStart = cuts.length ? Math.min(...cuts) : -1
+      const quoteStart = findPlainQuoteBoundary(body)
 
       if (quoteStart >= 0) {
         plainTextContent = body.slice(0, quoteStart).replace(/\s*$/, '\n\n') + sig + '\n\n' + body.slice(quoteStart)
@@ -1713,8 +1605,7 @@
     // drafts (whose saved body already includes the intro) and when the quote
     // boundary is gone, to avoid duplicating the body — those fall back to a
     // straight plain-text conversion.
-    const FWD_SEPARATOR = '---------- Forwarded message ----------'
-    const hasQuote = /^.*wrote:\s*$/m.test(plainTextContent) || plainTextContent.includes(FWD_SEPARATOR)
+    const hasQuote = hasPlainQuoteBoundary(plainTextContent)
     let html: string
     if (!draftId && initialRichBody && hasQuote) {
       const intro = getUserComposedText().trim()
@@ -1772,7 +1663,7 @@
     }
 
     try {
-      const dataUrl = await readFileAsDataUrl(file)
+      const dataUrl = await fileToDataUrl(file)
 
       // Dedup by content (dataUrl): same image pasted twice produces a
       // single inlineImage entry, so the sent MIME has one inline
@@ -1825,13 +1716,7 @@
   // Handle a non-image File dropped on the editor (add as attachment)
   async function handleDroppedFile(file: File) {
     try {
-      const data = await readFileAsBase64(file)
-      attachments = [...attachments, {
-        filename: file.name,
-        contentType: file.type || 'application/octet-stream',
-        size: file.size,
-        data,
-      }]
+      attachments = [...attachments, await fileToComposerAttachment(file)]
       scheduleDraftSave()
     } catch (err) {
       console.error('Failed to read dropped file:', err)
@@ -1848,7 +1733,7 @@
 
         if (att.contentType.startsWith('image/')) {
           // Check size before inserting inline
-          const imageBytes = Math.ceil((att.data.length * 3) / 4) // Estimate decoded size from base64
+          const imageBytes = estimateBase64DecodedSize(att.data)
           if (imageBytes > MAX_INLINE_IMAGE_SIZE) {
             addToast({
               type: 'error',
@@ -1879,12 +1764,7 @@
           continue
         }
         // Add as regular attachment
-        attachments = [...attachments, {
-          filename: att.filename,
-          contentType: att.contentType,
-          size: att.size,
-          data: att.data,
-        }]
+        attachments = [...attachments, backendAttachmentToComposerAttachment(att)]
       } catch {
         // Direct read failed — if Flatpak, show permission info dialog
         if (await api.isFlatpak()) {
@@ -1914,16 +1794,8 @@
       try {
         const newAttachments: typeof attachments = []
         for (const file of Array.from(fileList)) {
-          const dataUrl = await readFileAsDataUrl(file)
-          const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/)
-          if (!matches) continue
-
-          newAttachments.push({
-            filename: file.name,
-            contentType: matches[1],
-            size: file.size,
-            data: matches[2],
-          })
+          const attachment = await selectedFileToComposerAttachment(file)
+          if (attachment) newAttachments.push(attachment)
         }
         if (newAttachments.length > 0) {
           attachments = [...attachments, ...newAttachments]
@@ -1943,18 +1815,6 @@
   function removeAttachment(index: number) {
     attachments = attachments.filter((_, i) => i !== index)
     scheduleDraftSave()
-  }
-
-  // Drag and drop handlers. Ignore recipient-chip drags so the composer doesn't
-  // claim them as file drops (which would make the chip's dragend think a
-  // successful move happened and remove it from the source field).
-  function isRecipientChipDrag(e: DragEvent): boolean {
-    return !!e.dataTransfer?.types.includes('application/x-aulycmail-recipient')
-  }
-
-  function hasFileDropPayload(e: DragEvent): boolean {
-    const types = e.dataTransfer?.types
-    return !!types?.includes('Files') || !!types?.includes('text/uri-list')
   }
 
   function handleDragOver(e: DragEvent) {
@@ -1992,13 +1852,7 @@
       const newAttachments: ComposerAttachment[] = []
       for (const file of Array.from(files)) {
         try {
-          const data = await readFileAsBase64(file)
-          newAttachments.push({
-            filename: file.name,
-            contentType: file.type || 'application/octet-stream',
-            size: file.size,
-            data,
-          })
+          newAttachments.push(await fileToComposerAttachment(file))
         } catch (err) {
           console.error('Failed to read dropped file:', err)
         }
@@ -2022,12 +1876,7 @@
           try {
             const att = await api.readFileAsAttachment(filePath)
             if (!att) continue
-            attachments = [...attachments, {
-              filename: att.filename,
-              contentType: att.contentType,
-              size: att.size,
-              data: att.data,
-            }]
+            attachments = [...attachments, backendAttachmentToComposerAttachment(att)]
           } catch {
             directReadFailed = true
             break

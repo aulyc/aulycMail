@@ -27,6 +27,8 @@
   import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { _ } from '$lib/i18n'
+  import { isEmailAddress } from '$lib/utils/email'
+  import { formatLocalDate } from '$lib/utils/date'
 
   interface Props {
     /** Account to edit (null for new account) */
@@ -357,7 +359,7 @@
   function formatCertDate(iso: string): string {
     if (!iso) return 'N/A'
     try {
-      return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+      return formatLocalDate(iso)
     } catch {
       return iso
     }
@@ -539,7 +541,7 @@
 
     if (!displayName.trim()) errors.displayName = $_('account.displayNameRequired')
     if (!email.trim()) errors.email = $_('account.emailRequired')
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = $_('account.invalidEmail')
+    else if (!isEmailAddress(email)) errors.email = $_('account.invalidEmail')
 
     // Password is only required on new accounts (blank keeps the stored one when editing)
     if (!password && !editAccount) {
