@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aulyc/aulycmail/internal/database"
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 

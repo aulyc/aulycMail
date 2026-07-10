@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/message"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 )

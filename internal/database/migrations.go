@@ -1104,7 +1104,7 @@ var migrations = []Migration{
 
 			-- Existing accounts keep their local-retention behavior from the old
 			-- combined setting. Body-download behavior maps old "all" to all
-			-- content; limited old windows move to the new fixed recent window.
+			-- content; limited old ranges move to the new fixed recent range.
 			UPDATE accounts
 			SET local_retention_days = CASE
 				WHEN sync_period_days < 0 THEN 30

@@ -1,4 +1,4 @@
-// Responsive layout store for tiled/narrow windows
+// Responsive layout store for tiled/narrow viewports
 // Three modes: full (>1024px), medium (768-1024px), narrow (<768px)
 
 export type LayoutMode = 'full' | 'medium' | 'narrow'

@@ -15,7 +15,7 @@ export type ThemeMode =
   | 'light' | 'light-blue' | 'light-orange' | 'light-balanced' | 'adwaita-light' | 'breeze-light'
   | 'dark' | 'dark-gray' | 'dark-balanced' | 'adwaita-dark' | 'breeze-dark'
   | 'catppuccin-latte' | 'catppuccin-frappe' | 'catppuccin-macchiato' | 'catppuccin-mocha'
-  | 'dracula' | 'github-light' | 'github-dark' | 'github-soft-dark' | 'tokyo-night'
+  | 'dracula' | 'source-light' | 'source-dark' | 'source-soft-dark' | 'tokyo-night'
   | 'nord-light' | 'nord-dark'
   | 'pop-light' | 'pop-dark'
   | 'yaru-light' | 'yaru-dark'

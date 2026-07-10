@@ -1,9 +1,6 @@
 package app
 
-import (
-	"github.com/aulyc/aulycmail/internal/appstate"
-	"github.com/aulyc/aulycmail/internal/platform"
-)
+import "aulyc.local/aulycmail/internal/appstate"
 
 // ============================================================================
 // UI State Persistence
@@ -43,15 +40,10 @@ func (a *App) GetAppInfo() AppInfo {
 	return AppInfo{
 		Name:        "aulycmail",
 		Version:     Version,
-		Description: "An Open Source Lightweight E-Mail Client",
-		Website:     "https://github.com/aulyc/aulycmail",
-		License:     "Apache 2.0",
+		Description: "A lightweight desktop e-mail client",
+		Website:     "https://aulyc.com/aulycmail",
+		License:     "Proprietary",
 	}
-}
-
-// IsFlatpak returns true if the application is running inside a Flatpak sandbox.
-func (a *App) IsFlatpak() bool {
-	return platform.IsFlatpak()
 }
 
 // GetPendingMailto returns and clears any pending mailto: URL data.

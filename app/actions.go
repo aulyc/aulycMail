@@ -7,11 +7,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/folder"
-	"github.com/aulyc/aulycmail/internal/imap"
-	"github.com/aulyc/aulycmail/internal/logging"
-	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/undo"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/undo"
 	goImap "github.com/emersion/go-imap/v2"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )

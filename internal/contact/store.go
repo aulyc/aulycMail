@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )

@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/aulyc/aulycmail/internal/contactpane"
+	"aulyc.local/aulycmail/internal/contactpane"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"aulyc.local/aulycmail/internal/folder"
+	imapPkg "aulyc.local/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/message"
 	"github.com/emersion/go-imap/v2"
-	"github.com/aulyc/aulycmail/internal/folder"
-	imapPkg "github.com/aulyc/aulycmail/internal/imap"
-	"github.com/aulyc/aulycmail/internal/message"
 )
 
 // applyFlagsToMessage sets boolean flag fields on a Message from IMAP flags

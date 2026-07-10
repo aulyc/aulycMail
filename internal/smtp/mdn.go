@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/message"
 )
 
 // MDNDisposition represents the disposition type for an MDN

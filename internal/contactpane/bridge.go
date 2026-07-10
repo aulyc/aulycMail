@@ -4,9 +4,9 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/aulyc/aulycmail/internal/contact"
-	contactdto "github.com/aulyc/aulycmail/internal/contactdto"
-	"github.com/aulyc/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/contact"
+	contactdto "aulyc.local/aulycmail/internal/contactdto"
+	"aulyc.local/aulycmail/internal/database"
 )
 
 // ContactsBridge is the Wails-bindable surface for the built-in Contacts pane.

@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aulyc/aulycmail/internal/certificate"
-	"github.com/aulyc/aulycmail/internal/logging"
-	"github.com/aulyc/aulycmail/internal/settings"
-	"github.com/aulyc/aulycmail/internal/smtp"
+	"aulyc.local/aulycmail/internal/certificate"
+	"aulyc.local/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/settings"
+	"aulyc.local/aulycmail/internal/smtp"
 )
 
 // ============================================================================
@@ -177,10 +177,8 @@ func (a *App) GetAutostart() (bool, error) {
 }
 
 // SetAutostart sets whether aulycmail starts on login.
-// Manages the XDG autostart .desktop file or Flatpak Background portal.
 func (a *App) SetAutostart(enabled bool) error {
 	// Check current value to avoid unnecessary OS-level changes
-	// (e.g., Flatpak Background portal D-Bus calls that may fail)
 	current, _ := a.settingsStore.GetAutostart()
 
 	if err := a.settingsStore.SetAutostart(enabled); err != nil {

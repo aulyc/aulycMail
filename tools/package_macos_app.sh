@@ -8,6 +8,7 @@ BIN="$ROOT/build/bin/aulycmail"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
+LEGAL="$RESOURCES/Legal"
 
 if [ ! -x "$BIN" ]; then
   echo "Missing built binary: $BIN" >&2
@@ -15,11 +16,20 @@ if [ ! -x "$BIN" ]; then
 fi
 
 rm -rf "$APP"
-mkdir -p "$MACOS" "$RESOURCES"
+mkdir -p "$MACOS" "$RESOURCES" "$LEGAL"
 cp "$BIN" "$MACOS/aulycmail"
 chmod 0755 "$MACOS/aulycmail"
 if [ -f "$ROOT/build/menubar-icon.png" ]; then
   cp "$ROOT/build/menubar-icon.png" "$RESOURCES/MenuBarIcon.png"
+fi
+if [ -f "$ROOT/LICENSE" ]; then
+  cp "$ROOT/LICENSE" "$LEGAL/LICENSE.txt"
+fi
+if [ -f "$ROOT/THIRD_PARTY_NOTICES.md" ]; then
+  cp "$ROOT/THIRD_PARTY_NOTICES.md" "$LEGAL/THIRD_PARTY_NOTICES.md"
+fi
+if [ -f "$ROOT/frontend/src/assets/fonts/OFL.txt" ]; then
+  cp "$ROOT/frontend/src/assets/fonts/OFL.txt" "$LEGAL/Nunito-OFL.txt"
 fi
 
 cat > "$CONTENTS/Info.plist" <<'PLIST'
@@ -37,7 +47,7 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>CFBundleVersion</key>
   <string>0.3.0</string>
   <key>CFBundleGetInfoString</key>
-  <string>A modern, cross-platform email client</string>
+  <string>A lightweight desktop e-mail client</string>
   <key>CFBundleShortVersionString</key>
   <string>0.3.0</string>
   <key>CFBundleIconFile</key>

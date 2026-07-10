@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	imapPkg "github.com/aulyc/aulycmail/internal/imap"
-	"github.com/aulyc/aulycmail/internal/message"
+	imapPkg "aulyc.local/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/message"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 )

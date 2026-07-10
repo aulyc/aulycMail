@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/account"
-	"github.com/aulyc/aulycmail/internal/folder"
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 

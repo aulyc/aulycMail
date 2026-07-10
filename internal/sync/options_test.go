@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/account"
-	"github.com/aulyc/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/folder"
 )
 
 func TestShouldRunFullUIDSearch(t *testing.T) {

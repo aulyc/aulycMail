@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/aulyc/aulycmail/internal/database"
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // AttachmentStore handles attachment metadata persistence

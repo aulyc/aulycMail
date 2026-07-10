@@ -11,7 +11,7 @@
         quit-running-darwin launch-darwin uninstall-darwin help
 
 # Go module path
-MODULE := github.com/aulyc/aulycmail
+MODULE := aulyc.local/aulycmail
 
 # aulycmail is a password-auth mail client; no build-time credentials are injected.
 LDFLAGS :=
@@ -71,7 +71,7 @@ build:
 	cd frontend && npm run build
 	@echo "Compiling application..."
 	mkdir -p build/bin
-	$(DARWIN_LINK_WARN_ENV) go build -buildvcs=false -tags $(GO_BUILD_TAGS) -ldflags "$(LDFLAGS) -s -w -w -s" -o $(APP_BINARY)
+	$(DARWIN_LINK_WARN_ENV) go build -trimpath -buildvcs=false -tags $(GO_BUILD_TAGS) -ldflags "$(LDFLAGS) -s -w -w -s" -o $(APP_BINARY)
 	@echo "Packaging macOS app bundle..."
 	bash tools/package_macos_app.sh
 	@echo "Injecting macOS asset-catalog icon (fills the Liquid Glass plate on macOS 26)..."
@@ -119,7 +119,7 @@ dmg:
 		$(if $(SIGN_IDENTITY),--sign "$(SIGN_IDENTITY)") \
 		$(if $(NOTARY_PROFILE),--notary-profile "$(NOTARY_PROFILE)")
 
-# Build, Developer ID sign, notarize, and staple a GitHub-release DMG.
+# Build, Developer ID sign, notarize, and staple a release DMG.
 release-dmg: build
 	@if [ -z "$(SIGN_IDENTITY)" ]; then \
 		echo 'SIGN_IDENTITY is required, e.g. make release-dmg SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" NOTARY_PROFILE=aulycmail-notary'; \

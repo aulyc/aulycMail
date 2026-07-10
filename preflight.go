@@ -5,8 +5,8 @@ package main
 import (
 	"os"
 
-	"github.com/aulyc/aulycmail/app"
-	"github.com/aulyc/aulycmail/internal/platform"
+	"aulyc.local/aulycmail/app"
+	"aulyc.local/aulycmail/internal/platform"
 )
 
 // runPreflight performs pre-Wails startup checks (paths, DB open, migrations,

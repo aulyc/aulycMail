@@ -1,18 +1,14 @@
-# Database Rollback Guide
+# Database Recovery Guide
 
 aulycmail database migrations are forward-only. The application never downgrades
-the schema in place, and this repository no longer ships SQL scripts that
-recreate removed historical schemas.
+the schema in place.
 
 ## What This Means
 
-- If a newer aulycmail writes schema version `N`, older builds that only know an
-  earlier version will refuse to open that database.
-- Removed remote-contact, token, and extension-secret tables are not preserved
-  by current migrations. After the cleanup migration has run, those SQLite
-  objects are gone.
-- To inspect or restore data from a removed schema, use a database backup made
-  before the cleanup migration ran.
+- If a newer aulycmail build writes schema version `N`, older builds that only
+  know an earlier version will refuse to open that database.
+- To restore data from an older schema, use a database backup made before the
+  newer migration ran.
 
 ## Before Downgrading
 
@@ -21,11 +17,11 @@ recreate removed historical schemas.
 3. Restore a database backup created by the older version you want to run.
 4. Launch the older aulycmail build.
 
-Default database locations:
+Default macOS database location:
 
-- Linux: `~/.local/share/aulycmail/aulycmail.db`
-- macOS: `~/Library/Application Support/aulycmail/aulycmail.db`
-- Windows: `%LOCALAPPDATA%\aulycmail\aulycmail.db`
+```text
+~/Library/Application Support/aulycmail/aulycmail.db
+```
 
 ## If You See A Schema-Version Error
 

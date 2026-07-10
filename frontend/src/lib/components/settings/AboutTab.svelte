@@ -12,7 +12,6 @@
     version: string
     description: string
     website: string
-    license: string
   }
 
   let appInfo = $state<AppInfo | null>(null)
@@ -28,8 +27,8 @@
     }
   })
 
-  const PRIVACY_URL = 'https://github.com/aulyc/aulycmail/blob/main/docs/PRIVACY.md'
-  const TERMS_URL = 'https://github.com/aulyc/aulycmail/blob/main/docs/TERMS.md'
+  const PRIVACY_URL = 'https://aulyc.com/aulycmail/privacy'
+  const TERMS_URL = 'https://aulyc.com/aulycmail/terms'
 
   function openWebsite() {
     if (appInfo?.website) {
@@ -70,8 +69,8 @@
         onclick={openWebsite}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
       >
-        <Icon icon="mdi:github" class="w-5 h-5" />
-        <span>{$_('settingsAbout.github')}</span>
+        <Icon icon="mdi:web" class="w-5 h-5" />
+        <span>{$_('settingsAbout.website')}</span>
       </button>
       <button
         onclick={openPrivacyPolicy}

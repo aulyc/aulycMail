@@ -6,7 +6,7 @@
 4. `CHANGELOG.md` - add new release entry
 5. `wails.json` - product version
 
-## GitHub DMG Release
+## DMG Release
 
 Prerequisites on the release Mac:
 

@@ -49,7 +49,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // DarwinNetworkMonitor monitors network connectivity on macOS using NWPathMonitor

@@ -7,12 +7,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aulyc/aulycmail/app"
-	"github.com/aulyc/aulycmail/internal/platform"
+	"aulyc.local/aulycmail/app"
+	"aulyc.local/aulycmail/internal/platform"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/linux"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
@@ -22,7 +21,6 @@ var assets embed.FS
 // Command-line flags
 var (
 	debugMode   = flag.Bool("debug", false, "Enable debug logging")
-	dbusNotify  = flag.Bool("dbus-notify", false, "Use direct D-Bus notifications instead of portal (Linux only)")
 	versionFlag = flag.Bool("version", false, "Show version and exit")
 )
 
@@ -33,17 +31,11 @@ func DebugMode() bool {
 }
 
 func main() {
-	platform.MonitorGBMErrors()
 	flag.Parse()
 
 	if *versionFlag {
 		fmt.Println(app.Version)
 		return
-	}
-
-	// On Windows, GUI apps have no console. Allocate one for debug output.
-	if DebugMode() {
-		platform.AttachConsole()
 	}
 
 	// Check for mailto: URL in non-flag arguments
@@ -90,7 +82,7 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 	nativeTitleBar := true
 
 	// Create an instance of the app structure
-	application := app.NewApp(DebugMode, *dbusNotify)
+	application := app.NewApp(DebugMode)
 	application.SingleInstanceLock = lock
 
 	// Store mailto data if provided (will be used after startup)
@@ -128,10 +120,6 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 		OnBeforeClose:    application.BeforeClose,
 		Bind: []interface{}{
 			application,
-		},
-		Linux: &linux.Options{
-			WebviewGpuPolicy: linux.WebviewGpuPolicyOnDemand,
-			ProgramName:      "aulycmail",
 		},
 		// Provide a Mac options block so the green traffic-light zoom/maximize
 		// button stays enabled — Wails leaves it disabled when Mac is nil

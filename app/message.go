@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
-	"github.com/aulyc/aulycmail/internal/message"
-	mailSync "github.com/aulyc/aulycmail/internal/sync"
+	"aulyc.local/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/message"
+	mailSync "aulyc.local/aulycmail/internal/sync"
 )
 
 // ============================================================================

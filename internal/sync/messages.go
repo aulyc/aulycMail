@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/contact"
-	"github.com/aulyc/aulycmail/internal/folder"
-	imapPkg "github.com/aulyc/aulycmail/internal/imap"
-	"github.com/aulyc/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/contact"
+	"aulyc.local/aulycmail/internal/folder"
+	imapPkg "aulyc.local/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/message"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 )

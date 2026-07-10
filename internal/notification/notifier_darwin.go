@@ -21,7 +21,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 
@@ -70,8 +70,7 @@ type darwinNotifier struct {
 	log          zerolog.Logger
 }
 
-func newPlatformNotifier(appName string, useDirectDBus bool) Notifier {
-	// useDirectDBus is Linux-only, ignored on macOS
+func newPlatformNotifier(appName string) Notifier {
 	return &darwinNotifier{
 		appName: appName,
 		log:     logging.WithComponent("notification"),

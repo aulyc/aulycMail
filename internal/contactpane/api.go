@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aulyc/aulycmail/internal/contact"
-	contactdto "github.com/aulyc/aulycmail/internal/contactdto"
+	"aulyc.local/aulycmail/internal/contact"
+	contactdto "aulyc.local/aulycmail/internal/contactdto"
 	"github.com/google/uuid"
 )
 

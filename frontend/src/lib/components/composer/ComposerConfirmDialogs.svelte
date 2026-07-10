@@ -6,7 +6,6 @@
   interface Props {
     showEmptySubjectDialog: boolean
     showMissingAttachmentDialog: boolean
-    showFlatpakDndDialog: boolean
     showCloseConfirm: boolean
     closeLoading?: 'discard' | 'save' | null
     onConfirmEmptySubject: () => void
@@ -19,7 +18,6 @@
   let {
     showEmptySubjectDialog = $bindable(false),
     showMissingAttachmentDialog = $bindable(false),
-    showFlatpakDndDialog = $bindable(false),
     showCloseConfirm = $bindable(false),
     closeLoading = null,
     onConfirmEmptySubject,
@@ -56,24 +54,6 @@
     <AlertDialog.Footer>
       <AlertDialog.Cancel>{$_('common.cancel')}</AlertDialog.Cancel>
       <AlertDialog.Action onclick={onConfirmMissingAttachment}>{$_('composer.sendAnywayGeneric')}</AlertDialog.Action>
-    </AlertDialog.Footer>
-  </AlertDialog.Content>
-</AlertDialog.Root>
-
-<AlertDialog.Root bind:open={showFlatpakDndDialog}>
-  <AlertDialog.Content>
-    <AlertDialog.Header>
-      <AlertDialog.Title>{$_('composer.flatpakDndTitle')}</AlertDialog.Title>
-      <AlertDialog.Description>
-        <p class="mb-3">{$_('composer.flatpakDndDescription')}</p>
-        <p class="mb-2">{$_('composer.flatpakDndGrantExample')}</p>
-        <code class="block bg-muted px-3 py-2 rounded text-sm font-mono mb-3 select-all overflow-x-auto">flatpak override --user --filesystem=home com.aulyc.aulycmail</code>
-        <p class="mb-3 text-sm text-destructive">{$_('composer.flatpakDndSecurityWarning')}</p>
-        <p class="text-sm text-muted-foreground">{$_('composer.flatpakDndAlternative')}</p>
-      </AlertDialog.Description>
-    </AlertDialog.Header>
-    <AlertDialog.Footer>
-      <AlertDialog.Action onclick={() => showFlatpakDndDialog = false}>{$_('common.ok')}</AlertDialog.Action>
     </AlertDialog.Footer>
   </AlertDialog.Content>
 </AlertDialog.Root>

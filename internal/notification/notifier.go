@@ -1,5 +1,5 @@
-// Package notification provides cross-platform desktop notification support
-// with click handling for navigating to specific content.
+// Package notification provides desktop notification support with click
+// handling for navigating to specific content.
 package notification
 
 import "context"
@@ -22,7 +22,7 @@ type Notification struct {
 	Data  NotificationData
 }
 
-// Notifier provides cross-platform notification support with click handling
+// Notifier provides notification support with click handling
 type Notifier interface {
 	// Start begins listening for notification events
 	Start(ctx context.Context) error
@@ -38,6 +38,6 @@ type Notifier interface {
 }
 
 // New creates a platform-specific Notifier
-func New(appName string, useDirectDBus bool) Notifier {
-	return newPlatformNotifier(appName, useDirectDBus)
+func New(appName string) Notifier {
+	return newPlatformNotifier(appName)
 }

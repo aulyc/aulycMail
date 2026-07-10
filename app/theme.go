@@ -3,8 +3,8 @@ package app
 import (
 	"context"
 
-	"github.com/aulyc/aulycmail/internal/logging"
-	"github.com/aulyc/aulycmail/internal/platform"
+	"aulyc.local/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/platform"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

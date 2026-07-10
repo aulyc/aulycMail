@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 )
 

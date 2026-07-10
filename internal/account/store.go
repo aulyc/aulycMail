@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/database"
 	"github.com/google/uuid"
 )
 

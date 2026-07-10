@@ -8,10 +8,10 @@ import (
 	gosync "sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/certificate"
-	"github.com/aulyc/aulycmail/internal/folder"
-	"github.com/aulyc/aulycmail/internal/logging"
-	syncengine "github.com/aulyc/aulycmail/internal/sync"
+	"aulyc.local/aulycmail/internal/certificate"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/logging"
+	syncengine "aulyc.local/aulycmail/internal/sync"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

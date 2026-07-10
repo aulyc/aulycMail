@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-sasl"
 	"github.com/rs/zerolog"

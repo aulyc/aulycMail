@@ -9,10 +9,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/aulyc/aulycmail/internal/email"
-	"github.com/aulyc/aulycmail/internal/logging"
-	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/platform"
+	"aulyc.local/aulycmail/internal/email"
+	"aulyc.local/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/message"
 	"github.com/rs/zerolog"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -162,21 +161,6 @@ func (a *App) SaveAttachmentAs(attachmentID string) (string, error) {
 	}
 	defaultDir := filepath.Join(homeDir, "Downloads")
 
-	// In Flatpak, use portal save dialog (Wails GTK dialog doesn't route through portal)
-	if platform.IsFlatpak() {
-		savePath, err := platform.PortalSaveFile("Save Attachment", email.DefaultAttachmentFilename(att.Filename), defaultDir)
-		if err != nil {
-			log.Error().Err(err).Msg("Failed to show portal save dialog")
-			return "", fmt.Errorf("failed to show save dialog: %w", err)
-		}
-		if savePath == "" {
-			log.Debug().Msg("User cancelled save dialog")
-			return "", nil
-		}
-		return a.DownloadAttachment(attachmentID, savePath)
-	}
-
-	// Native: use Wails dialog
 	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
 		DefaultDirectory: defaultDir,
 		DefaultFilename:  email.DefaultAttachmentFilename(att.Filename),
@@ -208,32 +192,11 @@ func (a *App) SaveAttachmentAs(attachmentID string) (string, error) {
 
 // openFile opens a file with the system default application
 func (a *App) openFile(path string) error {
-	if runtime.GOOS == "linux" && platform.IsFlatpak() {
-		if platform.IsDocPortalPath(path) {
-			wailsRuntime.EventsEmit(a.ctx, "flatpak:filesystem-dialog")
-			return nil // Don't open — portal FUSE path is broken for editing
-		}
-		return platform.PortalOpenFile(path)
-	}
-
-	var cmd *exec.Cmd
-
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", path)
-	case "darwin":
-		cmd = exec.Command("open", path)
-	case "windows":
-		// ShellExecute, not `cmd /c start`: cmd re-parses `&`/`|`/`^` in the
-		// path as command separators, so an attachment filename like
-		// `x&calc.pdf` would inject commands (same class as issue #261).
-		// ShellExecute passes the path as a single arg with no shell re-parse.
-		return platform.OpenPathWindows(path)
-	default:
+	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
 
-	return cmd.Start()
+	return exec.Command("open", path).Start()
 }
 
 // validateOpenPath checks that the path is under an allowed root directory
@@ -279,27 +242,11 @@ func (a *App) OpenFolder(path string) error {
 		return err
 	}
 
-	// In Flatpak, use the OpenURI portal to resolve sandboxed paths correctly
-	if runtime.GOOS == "linux" && platform.IsFlatpak() {
-		return platform.PortalOpenDirectory(path)
-	}
-
-	var cmd *exec.Cmd
-
-	switch runtime.GOOS {
-	case "linux":
-		cmd = exec.Command("xdg-open", filepath.Dir(path))
-	case "darwin":
-		// -R reveals the file in Finder
-		cmd = exec.Command("open", "-R", path)
-	case "windows":
-		// /select highlights the file in Explorer
-		cmd = exec.Command("explorer", "/select,", path)
-	default:
+	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
 
-	return cmd.Start()
+	return exec.Command("open", "-R", path).Start()
 }
 
 // SaveAllAttachments shows a folder picker and saves all attachments from a message to that folder
@@ -323,12 +270,6 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 	}
 	defaultDir := filepath.Join(homeDir, "Downloads")
 
-	// In Flatpak, use portal save dialog (Wails GTK dialog doesn't route through portal)
-	if platform.IsFlatpak() {
-		return a.saveAllAttachmentsViaPortal(messageID, attachments, defaultDir)
-	}
-
-	// Native: use Wails folder dialog
 	saveDir, err := wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
 		DefaultDirectory: defaultDir,
 		Title:            "Save All Attachments",
@@ -374,56 +315,6 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 
 	log.Info().Int("count", savedCount).Str("folder", saveDir).Msg("Saved all attachments")
 	return saveDir, nil
-}
-
-// saveAllAttachmentsViaPortal saves all attachments using the XDG FileChooser portal.
-func (a *App) saveAllAttachmentsViaPortal(messageID string, attachments []*message.Attachment, defaultDir string) (string, error) {
-	log := logging.WithComponent("app")
-
-	filenames := make([]string, len(attachments))
-	for i, att := range attachments {
-		filenames[i] = email.DefaultAttachmentFilename(att.Filename)
-	}
-
-	savePaths, err := platform.PortalSaveFiles("Save All Attachments", filenames, defaultDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to show save dialog: %w", err)
-	}
-	if len(savePaths) == 0 {
-		return "", nil
-	}
-
-	// Get the message to find folder and UID
-	msg, err := a.messageStore.Get(messageID)
-	if err != nil {
-		return "", fmt.Errorf("failed to get message: %w", err)
-	}
-	if msg == nil {
-		return "", fmt.Errorf("message not found: %s", messageID)
-	}
-
-	downloader := email.NewAttachmentDownloader(a.paths.AttachmentsPath())
-	targets := make([]email.AttachmentSaveTarget, 0, len(attachments))
-	savedCount := 0
-
-	err = a.withStreamedRawMessagePath(msg, func(rawPath string) error {
-		for i, att := range attachments {
-			if i >= len(savePaths) {
-				break
-			}
-
-			targets = append(targets, email.AttachmentSaveTarget{Attachment: att, CustomPath: savePaths[i]})
-		}
-		var err error
-		savedCount, err = saveAttachmentTargetsFromRawFile(downloader, rawPath, targets, log)
-		return err
-	})
-	if err != nil {
-		return "", err
-	}
-
-	log.Info().Int("count", savedCount).Msg("Saved all attachments via portal")
-	return filepath.Dir(savePaths[0]), nil
 }
 
 func (a *App) withStreamedRawMessage(msg *message.Message, use func(io.Reader) error) error {

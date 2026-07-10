@@ -1,8 +1,8 @@
 package contactpane
 
 import (
-	"github.com/aulyc/aulycmail/internal/contact"
-	contactdto "github.com/aulyc/aulycmail/internal/contactdto"
+	"aulyc.local/aulycmail/internal/contact"
+	contactdto "aulyc.local/aulycmail/internal/contactdto"
 )
 
 // fromLocal converts a core contact.Contact into the API-surface Contact.

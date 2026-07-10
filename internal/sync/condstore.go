@@ -25,9 +25,9 @@ import (
 	"context"
 	"fmt"
 
+	"aulyc.local/aulycmail/internal/message"
 	"github.com/emersion/go-imap/v2"
 	imapclient "github.com/emersion/go-imap/v2/imapclient"
-	"github.com/aulyc/aulycmail/internal/message"
 )
 
 // shouldUseCondStore returns true when the current sync cycle can use the

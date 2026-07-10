@@ -13,7 +13,6 @@ import {
   GetAccount,
   GetAllAccountIdentities,
   GetIdentities,
-  IsFlatpak,
   PickAttachmentFiles,
   ReadFileAsAttachment,
   SaveDraft,
@@ -48,9 +47,6 @@ export interface ComposerApi {
 
   /** Read a file from a filesystem path as an attachment */
   readFileAsAttachment: (filePath: string) => Promise<app.ComposerAttachment | null>
-
-  /** Check if running inside a Flatpak sandbox */
-  isFlatpak: () => Promise<boolean>
 
   /** Get all accounts with their identities (for the cross-account From dropdown) */
   getAllAccountIdentities?: () => Promise<app.AccountIdentityGroup[]>
@@ -99,10 +95,6 @@ export function createMainWindowApi(): ComposerApi {
 
     readFileAsAttachment: async (filePath: string) => {
       return ReadFileAsAttachment(filePath)
-    },
-
-    isFlatpak: async () => {
-      return IsFlatpak()
     },
 
     getAllAccountIdentities: async () => {

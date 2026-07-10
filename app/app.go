@@ -11,23 +11,23 @@ import (
 	goSync "sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/account"
-	"github.com/aulyc/aulycmail/internal/appstate"
-	"github.com/aulyc/aulycmail/internal/certificate"
-	"github.com/aulyc/aulycmail/internal/contact"
-	"github.com/aulyc/aulycmail/internal/contactpane"
-	"github.com/aulyc/aulycmail/internal/credentials"
-	"github.com/aulyc/aulycmail/internal/database"
-	"github.com/aulyc/aulycmail/internal/draft"
-	"github.com/aulyc/aulycmail/internal/folder"
-	"github.com/aulyc/aulycmail/internal/imap"
-	"github.com/aulyc/aulycmail/internal/logging"
-	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/notification"
-	"github.com/aulyc/aulycmail/internal/platform"
-	"github.com/aulyc/aulycmail/internal/settings"
-	"github.com/aulyc/aulycmail/internal/sync"
-	"github.com/aulyc/aulycmail/internal/undo"
+	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/appstate"
+	"aulyc.local/aulycmail/internal/certificate"
+	"aulyc.local/aulycmail/internal/contact"
+	"aulyc.local/aulycmail/internal/contactpane"
+	"aulyc.local/aulycmail/internal/credentials"
+	"aulyc.local/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/draft"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/notification"
+	"aulyc.local/aulycmail/internal/platform"
+	"aulyc.local/aulycmail/internal/settings"
+	"aulyc.local/aulycmail/internal/sync"
+	"aulyc.local/aulycmail/internal/undo"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -243,9 +243,6 @@ type App struct {
 	// DebugMode function reference (injected from main)
 	debugMode func() bool
 
-	// UseDirectDBus forces direct D-Bus notifications instead of portal (Linux only)
-	useDirectDBus bool
-
 	// Single-instance lock (set by main before wails.Run)
 	SingleInstanceLock platform.SingleInstanceLock
 
@@ -257,10 +254,9 @@ type App struct {
 }
 
 // NewApp creates a new App application struct
-func NewApp(debugModeFn func() bool, useDirectDBus bool) *App {
+func NewApp(debugModeFn func() bool) *App {
 	return &App{
-		debugMode:     debugModeFn,
-		useDirectDBus: useDirectDBus,
+		debugMode: debugModeFn,
 	}
 }
 
@@ -280,11 +276,10 @@ type StartupDialogInfo struct {
 // message + action URL; everything else falls back to a generic message.
 //
 // URLs in the returned Text are rendered as clickable links by dialog
-// backends that support markup (currently zenity on Linux via Pango).
-// Other backends show the URL as selectable plain text and use the
-// ActionURL field to drive an "Open Docs" button.
+// backends that support markup. Other backends show the URL as selectable
+// plain text and use the ActionURL field to drive an action button.
 func StartupDialogInfoFor(err error) StartupDialogInfo {
-	const docsRollbackURL = "https://github.com/aulyc/aulycmail/blob/main/docs/SQL_ROLLBACK.md"
+	const databaseRecoveryURL = "https://aulyc.com/aulycmail/support/database-recovery"
 
 	var schemaTooNew *database.ErrSchemaTooNew
 	if errors.As(err, &schemaTooNew) {
@@ -296,13 +291,13 @@ func StartupDialogInfoFor(err error) StartupDialogInfo {
 				"database back to version %d:\n\n"+
 				"%s",
 			schemaTooNew.DBVersion, schemaTooNew.BuildVersion, schemaTooNew.BuildVersion,
-			docsRollbackURL,
+			databaseRecoveryURL,
 		)
 		return StartupDialogInfo{
 			Title:       "aulycmail could not start",
 			Text:        text,
-			ActionLabel: "Open Docs",
-			ActionURL:   docsRollbackURL,
+			ActionLabel: "Open Help",
+			ActionURL:   databaseRecoveryURL,
 		}
 	}
 	return StartupDialogInfo{
@@ -534,18 +529,16 @@ func (a *App) Startup(ctx context.Context) {
 	// skip these two lines, the UI will never load — the boot splash will
 	// stay visible forever.
 	//
-	// Placement: BEFORE the D-Bus desktop-integration inits below
-	// (initNotifications, initSleepWakeMonitor, initThemeMonitor). Those
-	// calls can block for many seconds on systems where xdg-desktop-portal
-	// isn't running — they're best-effort system integration, NOT prerequisites
-	// for the frontend. At this point the frontend has everything it needs:
-	// stores constructed, migrations applied, built-in panes registered, network
-	// monitor up, IPC server running, background sync started.
+	// Placement: BEFORE desktop integration inits below (initNotifications,
+	// initSleepWakeMonitor, initThemeMonitor). Those calls are best-effort
+	// system integration, NOT prerequisites for the frontend. At this point the
+	// frontend has everything it needs: stores constructed, migrations applied,
+	// built-in panes registered, network monitor up, IPC server running,
+	// background sync started.
 	//
-	// We do NOT poll IsReady from the frontend — Wails' IPC bridge saturates
-	// under high call rates on Linux/webkit2gtk and Flatpak. So: event for
-	// the normal case, IsReady for the "event fired before listener
-	// registered" race.
+	// We do NOT poll IsReady from the frontend because Wails' IPC bridge is
+	// unnecessary for high-rate polling. Use the event for the normal case and
+	// IsReady for the "event fired before listener registered" race.
 	a.ready = true
 	wailsRuntime.EventsEmit(a.ctx, "app:ready")
 
@@ -555,7 +548,7 @@ func (a *App) Startup(ctx context.Context) {
 	// Initialize sleep/wake monitor for auto-sync on wake
 	a.initSleepWakeMonitor(ctx)
 
-	// Initialize system theme monitor (XDG Settings Portal on Linux)
+	// Initialize system theme monitor
 	a.initThemeMonitor(ctx)
 
 	// Set up FTS progress callback to emit events to frontend
@@ -834,38 +827,13 @@ func (a *App) OpenURL(url string) error {
 		return fmt.Errorf("URL protocol not allowed for security reasons")
 	}
 
-	// On Linux, try the OpenURI portal first — works in Flatpak (where xdg-open
-	// can't reach host browsers) and triggers the host's URL-handler
-	// notification on Wayland DEs. Fall through to xdg-open on portal error.
-	if runtime.GOOS == "linux" {
-		perr := platform.PortalOpenURI(url)
-		if perr == nil {
-			return nil
-		}
-		log.Debug().Err(perr).Msg("Portal OpenURI failed, falling back to xdg-open")
-	}
-
-	var cmd *exec.Cmd
-
-	// Determine the command based on the operating system
-	switch runtime.GOOS {
-	case "linux":
-		// Use xdg-open on Linux
-		// exec.Command properly escapes the URL argument, preventing shell injection
-		cmd = exec.Command("xdg-open", url)
-	case "darwin":
-		// Use open on macOS
-		cmd = exec.Command("open", url)
-	case "windows":
-		// Use ShellExecute, not `cmd /c start`: cmd treats `&` as a command
-		// separator and truncates URLs with multiple query params (issue #261).
-		return platform.OpenURLWindows(url)
-	default:
+	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
 	}
 
 	// Start the command without waiting for it to complete
 	// Browser opening should be async - we don't need to wait
+	cmd := exec.Command("open", url)
 	if err := cmd.Start(); err != nil {
 		log.Error().Err(err).Str("url", redactURLForLog(url)).Msg("Failed to open URL in browser")
 		return fmt.Errorf("failed to open URL: %w", err)

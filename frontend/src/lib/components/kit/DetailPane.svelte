@@ -59,7 +59,7 @@
         UNCONDITIONALLY so the back button is always visible. Both medium and
         narrow render the detail pane as an overlay (per responsive-viewer-
         overlay CSS) — both need the back affordance. Using `narrow` only
-        would strand users at medium breakpoints (laptop tablet windows) with
+        would strand users at medium breakpoints (laptop/tablet viewports) with
         a visible overlay and no back button.
   -->
   {#if overlay || (!empty && header)}

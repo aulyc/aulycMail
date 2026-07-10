@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 	msgcharset "github.com/emersion/go-message/charset"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding/htmlindex"

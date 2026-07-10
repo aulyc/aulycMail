@@ -12,10 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/account"
-	mailBackup "github.com/aulyc/aulycmail/internal/backup"
-	"github.com/aulyc/aulycmail/internal/platform"
-	"github.com/aulyc/aulycmail/internal/settings"
+	"aulyc.local/aulycmail/internal/account"
+	mailBackup "aulyc.local/aulycmail/internal/backup"
+	"aulyc.local/aulycmail/internal/settings"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -251,20 +250,10 @@ func (a *App) OpenBackupDirectory(path string) error {
 		return errors.New("path is not the configured backup directory")
 	}
 
-	if stdruntime.GOOS == "linux" && platform.IsFlatpak() {
-		return platform.PortalOpenDirectory(cleanPath)
-	}
-
-	switch stdruntime.GOOS {
-	case "linux":
-		return exec.Command("xdg-open", cleanPath).Start()
-	case "darwin":
-		return exec.Command("open", cleanPath).Start()
-	case "windows":
-		return exec.Command("explorer", cleanPath).Start()
-	default:
+	if stdruntime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported platform: %s", stdruntime.GOOS)
 	}
+	return exec.Command("open", cleanPath).Start()
 }
 
 // GetBackupStatus returns whether the target directory will run as full or incremental.

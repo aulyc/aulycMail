@@ -1,6 +1,6 @@
 package app
 
-import "github.com/aulyc/aulycmail/internal/platform"
+import "aulyc.local/aulycmail/internal/platform"
 
 // refreshUnreadBadges updates native unread-count surfaces to the total number
 // of unread messages across all badge-eligible folders. Safe to call from any

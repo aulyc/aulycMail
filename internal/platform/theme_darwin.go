@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // DarwinThemeMonitor is a stub for macOS (frontend uses matchMedia fallback)

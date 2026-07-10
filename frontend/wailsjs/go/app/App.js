@@ -18,6 +18,10 @@ export function Archive(arg1) {
   return window['go']['app']['App']['Archive'](arg1);
 }
 
+export function BuildBackupViewerIndex(arg1) {
+  return window['go']['app']['App']['BuildBackupViewerIndex'](arg1);
+}
+
 export function CancelAllSyncs() {
   return window['go']['app']['App']['CancelAllSyncs']();
 }
@@ -330,16 +334,16 @@ export function IsFTSIndexing() {
   return window['go']['app']['App']['IsFTSIndexing']();
 }
 
-export function IsFlatpak() {
-  return window['go']['app']['App']['IsFlatpak']();
-}
-
 export function IsImageAllowed(arg1) {
   return window['go']['app']['App']['IsImageAllowed'](arg1);
 }
 
 export function IsReady() {
   return window['go']['app']['App']['IsReady']();
+}
+
+export function ListBackupViewerMessages(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['ListBackupViewerMessages'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function MarkAllFolderMessagesAsRead(arg1) {
@@ -470,8 +474,8 @@ export function SaveUIState(arg1) {
   return window['go']['app']['App']['SaveUIState'](arg1);
 }
 
-export function SearchBackupViewerMessages(arg1, arg2, arg3, arg4) {
-  return window['go']['app']['App']['SearchBackupViewerMessages'](arg1, arg2, arg3, arg4);
+export function SearchBackupViewerMessages(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['app']['App']['SearchBackupViewerMessages'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SearchContacts(arg1, arg2) {

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/aulyc/aulycmail/internal/database"
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 	_ "modernc.org/sqlite"
 )
@@ -77,9 +77,9 @@ const (
 	ThemeModeCatppuccinMacchiato = "catppuccin-macchiato" // Catppuccin Macchiato
 	ThemeModeCatppuccinMocha     = "catppuccin-mocha"     // Catppuccin Mocha
 	ThemeModeDracula             = "dracula"              // Dracula
-	ThemeModeGithubLight         = "github-light"         // GitHub Light
-	ThemeModeGithubDark          = "github-dark"          // GitHub Dark
-	ThemeModeGithubSoftDark      = "github-soft-dark"     // GitHub Soft Dark
+	ThemeModeSourceLight         = "source-light"         // Source Light
+	ThemeModeSourceDark          = "source-dark"          // Source Dark
+	ThemeModeSourceSoftDark      = "source-soft-dark"     // Source Soft Dark
 	ThemeModeTokyoNight          = "tokyo-night"          // Tokyo Night
 	ThemeModeNordLight           = "nord-light"           // Nord Light
 	ThemeModeNordDark            = "nord-dark"            // Nord Dark
@@ -321,12 +321,12 @@ func (s *Store) SetThemeMode(mode string) error {
 		ThemeModeAdwaitaLight, ThemeModeBreezeLight,
 		ThemeModeDark, ThemeModeDarkGray, ThemeModeDarkBalanced, ThemeModeAdwaitaDark, ThemeModeBreezeDark,
 		ThemeModeCatppuccinLatte, ThemeModeCatppuccinFrappe, ThemeModeCatppuccinMacchiato, ThemeModeCatppuccinMocha,
-		ThemeModeDracula, ThemeModeGithubLight, ThemeModeGithubDark, ThemeModeGithubSoftDark, ThemeModeTokyoNight,
+		ThemeModeDracula, ThemeModeSourceLight, ThemeModeSourceDark, ThemeModeSourceSoftDark, ThemeModeTokyoNight,
 		ThemeModeNordLight, ThemeModeNordDark, ThemeModePopLight, ThemeModePopDark,
 		ThemeModeVSCodeLight, ThemeModeVSCodeDark, ThemeModeYaruLight, ThemeModeYaruDark:
 		return s.Set(KeyThemeMode, mode)
 	default:
-		return fmt.Errorf("invalid theme mode: %s (must be 'system', 'light', 'light-blue', 'light-orange', 'light-balanced', 'adwaita-light', 'breeze-light', 'dark', 'dark-gray', 'dark-balanced', 'adwaita-dark', 'breeze-dark', 'catppuccin-latte', 'catppuccin-frappe', 'catppuccin-macchiato', 'catppuccin-mocha', 'dracula', 'github-light', 'github-dark', 'github-soft-dark', 'tokyo-night', 'nord-light', 'nord-dark', 'pop-light', 'pop-dark', 'vs-code-light', 'vs-code-dark', 'yaru-light', or 'yaru-dark')", mode)
+		return fmt.Errorf("invalid theme mode: %s (must be 'system', 'light', 'light-blue', 'light-orange', 'light-balanced', 'adwaita-light', 'breeze-light', 'dark', 'dark-gray', 'dark-balanced', 'adwaita-dark', 'breeze-dark', 'catppuccin-latte', 'catppuccin-frappe', 'catppuccin-macchiato', 'catppuccin-mocha', 'dracula', 'source-light', 'source-dark', 'source-soft-dark', 'tokyo-night', 'nord-light', 'nord-dark', 'pop-light', 'pop-dark', 'vs-code-light', 'vs-code-dark', 'yaru-light', or 'yaru-dark')", mode)
 	}
 }
 

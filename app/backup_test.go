@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	mailBackup "github.com/aulyc/aulycmail/internal/backup"
+	mailBackup "aulyc.local/aulycmail/internal/backup"
 )
 
 func TestBackupMessageKeyIncludesUIDValidity(t *testing.T) {

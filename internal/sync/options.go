@@ -3,8 +3,8 @@ package sync
 import (
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/account"
-	"github.com/aulyc/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/folder"
 )
 
 // MessageSyncOptions separates local retention from the day-to-day IMAP sync

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aulyc/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/database"
 )
 
 func openTestDB(t *testing.T) *database.DB {

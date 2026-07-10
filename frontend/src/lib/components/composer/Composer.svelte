@@ -244,7 +244,6 @@
   // Confirmation dialogs state
   let showEmptySubjectDialog = $state(false)
   let showMissingAttachmentDialog = $state(false)
-  let showFlatpakDndDialog = $state(false)
   let showCloseConfirm = $state(false)
   let closeLoading = $state<'discard' | 'save' | null>(null)
 
@@ -1440,7 +1439,6 @@
       disabled: !composerRootElement ||
         showEmptySubjectDialog ||
         showMissingAttachmentDialog ||
-        showFlatpakDndDialog ||
         showCloseConfirm,
       activeElement: document.activeElement,
     })
@@ -1632,18 +1630,13 @@
         // Add as regular attachment
         attachments = [...attachments, backendAttachmentToComposerAttachment(att)]
       } catch {
-        // Direct read failed — if Flatpak, show permission info dialog
-        if (await api.isFlatpak()) {
-          showFlatpakDndDialog = true
-        }
         return
       }
     }
     scheduleDraftSave()
   }
 
-  // Attachment handling — uses HTML file input so WebKitGTK routes through
-  // the FileChooser portal (required for Flatpak sandbox file access)
+  // Attachment handling via the browser file input.
   function handleAttachFiles() {
     // Append to DOM before clicking (required for WebKitGTK to reliably
     // open the file chooser dialog on the first click)
@@ -1749,10 +1742,6 @@
           }
         }
         if (directReadFailed) {
-          // If Flatpak, show permission info dialog
-          if (await api.isFlatpak()) {
-            showFlatpakDndDialog = true
-          }
           return
         }
         scheduleDraftSave()
@@ -2084,7 +2073,6 @@
 <ComposerConfirmDialogs
   bind:showEmptySubjectDialog
   bind:showMissingAttachmentDialog
-  bind:showFlatpakDndDialog
   bind:showCloseConfirm
   {closeLoading}
   onConfirmEmptySubject={handleConfirmEmptySubject}

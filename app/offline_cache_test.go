@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/account"
-	"github.com/aulyc/aulycmail/internal/database"
-	"github.com/aulyc/aulycmail/internal/folder"
-	"github.com/aulyc/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/message"
 )
 
 func TestClearOfflineBodyCacheClearsOnlySelectedAccount(t *testing.T) {

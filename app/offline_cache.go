@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // OfflineBodyCacheClearResult summarizes a local offline-body cleanup.

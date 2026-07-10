@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/message"
 	gomessage "github.com/emersion/go-message"
 )
 

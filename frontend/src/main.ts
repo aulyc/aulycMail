@@ -87,7 +87,7 @@ function waitForRuntime(): Promise<void> {
 // single EventsOn listener and call IsReady() once as a safety net for the
 // race where Go emits before this code runs (Startup finishes faster than
 // the bundle parses). No polling — the Wails IPC bridge saturates under
-// repeated calls on Linux/webkit2gtk (especially Flatpak).
+// repeated calls.
 //
 // Precondition: waitForRuntime() has resolved, so window.runtime is present
 // and EventsOn + IsReady are safe to call directly.

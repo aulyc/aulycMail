@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte'
+  import { onDestroy, tick } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from '$lib/i18n'
   import ModalFrame from '$lib/components/ui/ModalFrame.svelte'
@@ -8,9 +8,11 @@
   import BackupViewerToolbar from '$lib/components/backup/BackupViewerToolbar.svelte'
   // @ts-ignore - wailsjs path
   import {
+    BuildBackupViewerIndex,
     GetBackupSettings,
     GetBackupViewerCatalog,
     GetBackupViewerMessage,
+    ListBackupViewerMessages,
     OpenBackupViewerDirectory,
     SaveBackupViewerAttachmentAs,
     SearchBackupViewerMessages,
@@ -26,6 +28,7 @@
     rememberBackupDirectory,
     removeBackupDirectory,
   } from '$lib/utils/backup-directory-history'
+  import { dialogGuardClose, dialogGuardOpen } from '$lib/stores/dialogGuard'
 
   interface Props {
     open?: boolean
@@ -43,10 +46,15 @@
   let directory = $state('')
   let directoryMenuOpen = $state(false)
   let catalog = $state<app.BackupViewerCatalog | null>(null)
+  let messages = $state<app.BackupViewerMessageSummary[]>([])
+  let messagesTotal = $state(0)
   let selectedAccountEmail = $state('')
   let selectedMessageKey = $state('')
   let detail = $state<app.BackupViewerMessageDetail | null>(null)
   let loadingCatalog = $state(false)
+  let loadingMessages = $state(false)
+  let loadingMoreMessages = $state(false)
+  let buildingIndex = $state(false)
   let loadingDetail = $state(false)
   let errorMessage = $state('')
   let darkFilterEnabled = $state(false)
@@ -66,6 +74,8 @@
   const searchDebouncer = createDebouncer(200)
   let searchSeq = 0
   let composing = false
+  let guardActive = false
+  const messagePageSize = 200
 
   const accountScopes = $derived.by((): Scope[] => [
     { id: '', label: $_('backupViewer.scopeAll'), count: catalog?.messageCount ?? 0 },
@@ -77,19 +87,14 @@
   ])
   const selectedScope = $derived(accountScopes.find((scope) => scope.id === selectedAccountEmail) ?? accountScopes[0])
   const detailHeaderTitle = $derived(detail ? (detail.subject || $_('backupViewer.unknownSubject')) : '')
+  const hasMoreMessages = $derived(messages.length < messagesTotal)
   const darkFilterStyle = $derived.by(() => {
     void getThemeMode()
     if (!darkFilterEnabled) return ''
     const styles = buildDarkMailFilterStyles()
     return `background-color: ${styles.surfaceBackground}; --backup-viewer-content-filter: ${styles.contentFilter}; --backup-viewer-media-filter: ${styles.mediaFilter};`
   })
-  const visibleMessages = $derived.by(() => {
-    const source = catalog?.messages ?? []
-    const filtered = selectedAccountEmail
-      ? source.filter((message) => message.accountEmail === selectedAccountEmail)
-      : source
-    return [...filtered].sort(compareMessagesByDate)
-  })
+  const visibleMessages = $derived(messages)
 
   $effect(() => {
     if (open) {
@@ -97,6 +102,7 @@
     } else {
       resetViewerContent()
     }
+    setGuardActive(open)
   })
 
   $effect(() => {
@@ -105,17 +111,63 @@
     return () => window.removeEventListener('keydown', onDialogKeydown, { capture: true })
   })
 
+  onDestroy(() => setGuardActive(false))
+
+  function setGuardActive(active: boolean) {
+    if (active === guardActive) return
+    guardActive = active
+    if (active) {
+      dialogGuardOpen()
+    } else {
+      dialogGuardClose()
+    }
+  }
+
+  function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false
+    const tag = target.tagName
+    return tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable
+  }
+
+  function eventTargetsBackupViewer(event: KeyboardEvent): boolean {
+    const target = event.target
+    if (!(target instanceof Element)) return true
+    if (target.closest('[data-backup-viewer-root], [data-backup-viewer-search]')) return true
+    return searchOpen
+  }
+
   function onDialogKeydown(event: KeyboardEvent) {
+    if (!eventTargetsBackupViewer(event)) return
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
+      if (!catalog?.messageCount) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      if (searchOpen) {
+        searchInputEl?.focus()
+      } else {
+        openSearch()
+      }
+      return
+    }
+    if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !isEditableTarget(event.target)) {
+      if (!catalog?.messageCount) return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      openSearch()
+      return
+    }
     if (event.key !== 'Escape') return
     event.preventDefault()
     event.stopPropagation()
     event.stopImmediatePropagation()
-    if (directoryMenuOpen) {
-      directoryMenuOpen = false
-      return
-    }
     if (searchOpen) {
       closeSearch()
+      return
+    }
+    if (directoryMenuOpen) {
+      directoryMenuOpen = false
       return
     }
     closeDialog()
@@ -139,10 +191,15 @@
     directoryMenuOpen = false
     directory = ''
     catalog = null
+    messages = []
+    messagesTotal = 0
     selectedAccountEmail = ''
     selectedMessageKey = ''
     detail = null
     loadingCatalog = false
+    loadingMessages = false
+    loadingMoreMessages = false
+    buildingIndex = false
     loadingDetail = false
     errorMessage = ''
     savingAttachmentIndexes = new Set()
@@ -156,6 +213,8 @@
     loadingCatalog = true
     errorMessage = ''
     catalog = null
+    messages = []
+    messagesTotal = 0
     detail = null
     selectedMessageKey = ''
     selectedAccountEmail = ''
@@ -171,7 +230,7 @@
       if (!availableScopes.has(selectedAccountEmail)) {
         selectedAccountEmail = ''
       }
-      await selectFirstVisibleMessage()
+      await loadMessagePage({ reset: true, selectFirst: true })
     } catch (err) {
       console.error('Failed to load backup catalog:', err)
       const failedPath = dir.trim()
@@ -214,13 +273,66 @@
     await loadCatalog(directory)
   }
 
+  async function buildViewerIndex() {
+    if (!directory.trim() || buildingIndex) return
+    buildingIndex = true
+    errorMessage = ''
+    try {
+      await BuildBackupViewerIndex(directory)
+      await loadCatalog(directory)
+    } catch (err) {
+      console.error('Failed to build backup viewer index:', err)
+      errorMessage = $_('backupViewer.buildIndexFailed')
+    } finally {
+      buildingIndex = false
+    }
+  }
+
   async function selectScope(scopeID: string) {
+    if (selectedAccountEmail === scopeID) return
     selectedAccountEmail = scopeID
-    await selectFirstVisibleMessage()
+    await loadMessagePage({ reset: true, selectFirst: true })
   }
 
   function clearDirectory() {
     resetViewerContent()
+  }
+
+  async function loadMessagePage(options: { reset?: boolean; selectFirst?: boolean } = {}) {
+    if (!directory.trim() || !catalog?.messageCount) {
+      messages = []
+      messagesTotal = 0
+      return
+    }
+
+    const reset = options.reset ?? false
+    const offset = reset ? 0 : messages.length
+    if (reset) {
+      loadingMessages = true
+      messages = []
+      messagesTotal = 0
+      selectedMessageKey = ''
+      detail = null
+    } else {
+      loadingMoreMessages = true
+    }
+    errorMessage = ''
+
+    try {
+      const page = await ListBackupViewerMessages(directory, selectedAccountEmail, messageSortOrder, offset, messagePageSize)
+      const nextMessages = page?.messages ?? []
+      messages = reset ? nextMessages : [...messages, ...nextMessages]
+      messagesTotal = page?.total ?? messages.length
+      if (options.selectFirst) {
+        await selectFirstVisibleMessage()
+      }
+    } catch (err) {
+      console.error('Failed to load backup message page:', err)
+      errorMessage = $_('backupViewer.loadFailed')
+    } finally {
+      loadingMessages = false
+      loadingMoreMessages = false
+    }
   }
 
   async function selectFirstVisibleMessage() {
@@ -267,17 +379,6 @@
     return attachmentCountsByKey[message.key] ?? message.attachmentCount ?? 0
   }
 
-  function compareMessagesByDate(left: app.BackupViewerMessageSummary, right: app.BackupViewerMessageSummary): number {
-    const leftTime = parseFlexibleDate(left.date)?.getTime() ?? 0
-    const rightTime = parseFlexibleDate(right.date)?.getTime() ?? 0
-    if (leftTime !== rightTime) {
-      return messageSortOrder === 'newest' ? rightTime - leftTime : leftTime - rightTime
-    }
-    return messageSortOrder === 'newest'
-      ? right.key.localeCompare(left.key)
-      : left.key.localeCompare(right.key)
-  }
-
   function scrollMessageListToTop() {
     messageListEl?.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -292,6 +393,7 @@
   function toggleMessageSortOrder() {
     messageSortOrder = messageSortOrder === 'newest' ? 'oldest' : 'newest'
     scrollMessageListToTop()
+    void loadMessagePage({ reset: true, selectFirst: true })
   }
 
   function describeError(err: unknown): string {
@@ -308,6 +410,7 @@
   function closeDialog() {
     resetViewerContent()
     open = false
+    setGuardActive(false)
     onClose?.()
   }
 
@@ -356,10 +459,10 @@
     }
     searchLoading = true
     const seq = ++searchSeq
-    SearchBackupViewerMessages(directory, searchScopeEmail, query, 50)
-      .then((result: app.BackupViewerMessageSummary[]) => {
+    SearchBackupViewerMessages(directory, searchScopeEmail, query, 0, 50)
+      .then((page: app.BackupViewerMessagePage) => {
         if (seq !== searchSeq) return
-        searchResults = result || []
+        searchResults = page?.messages || []
         searchActiveIndex = 0
       })
       .catch((err: unknown) => {
@@ -405,6 +508,10 @@
     const message = searchResults[index]
     if (!message) return
     selectedAccountEmail = message.accountEmail
+    if (!messages.some((item) => item.key === message.key)) {
+      messages = [message, ...messages]
+      messagesTotal = Math.max(messagesTotal, messages.length)
+    }
     closeSearch()
     await tick()
     await selectMessage(message.key)
@@ -467,6 +574,7 @@
     containerClass="z-[90] flex items-center justify-center p-5"
     panelClass="flex h-[min(86vh,760px)] w-[min(94vw,1180px)] flex-col overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl"
   >
+      <div data-backup-viewer-root class="contents">
       <BackupViewerToolbar
         {directory}
         bind:directoryMenuOpen
@@ -475,6 +583,7 @@
         {selectedScope}
         {accountScopes}
         {loadingCatalog}
+        {buildingIndex}
         {errorMessage}
         bind:darkFilterEnabled
         {messageSortOrder}
@@ -487,6 +596,7 @@
         onClearDirectory={clearDirectory}
         onRefreshCatalog={refreshCatalog}
         onOpenSearch={openSearch}
+        onBuildIndex={buildViewerIndex}
         onToggleSortOrder={toggleMessageSortOrder}
         onClose={closeDialog}
         {scopeLabel}
@@ -499,7 +609,7 @@
               {scopeLabel(selectedScope)}
             </span>
           </div>
-          {#if loadingCatalog}
+          {#if loadingCatalog || loadingMessages}
             <div class="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
               <Icon icon="mdi:loading" class="mr-2 animate-spin" width="18" height="18" />
               {$_('backupViewer.loading')}
@@ -511,37 +621,59 @@
           {:else if visibleMessages.length === 0}
             <div class="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">{$_('backupViewer.noMessages')}</div>
           {:else}
-            <div bind:this={messageListEl} class="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
-              {#each visibleMessages as message (message.key)}
-                {@const hasAttachments = messageAttachmentCount(message) > 0}
-                <button
-                  type="button"
-                  data-backup-message-key={message.key}
-                  class="relative flex w-full items-start gap-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
-                  onclick={() => selectMessage(message.key)}
-                >
-                  <Icon icon="mdi:email-outline" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span class="min-w-0 flex-1">
-                    <span class="flex items-center gap-2">
-                      <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{message.subject || $_('backupViewer.unknownSubject')}</span>
-                      {#if hasAttachments}
-                        <span class="shrink-0 text-primary" title={$_('backupViewer.attachments')}>
-                          <Icon icon="mdi:paperclip" class="h-4 w-4" />
-                        </span>
-                      {/if}
-                      <span class="w-[96px] shrink-0 text-right text-xs tabular-nums text-muted-foreground">{formatShortDate(message.date)}</span>
+            <div class="flex min-h-0 flex-1 flex-col">
+              <div bind:this={messageListEl} class="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+                {#each visibleMessages as message (message.key)}
+                  {@const hasAttachments = messageAttachmentCount(message) > 0}
+                  <button
+                    type="button"
+                    data-backup-message-key={message.key}
+                    class="relative flex w-full items-start gap-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
+                    onclick={() => selectMessage(message.key)}
+                  >
+                    <Icon icon="mdi:email-outline" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span class="min-w-0 flex-1">
+                      <span class="flex items-center gap-2">
+                        <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{message.subject || $_('backupViewer.unknownSubject')}</span>
+                        {#if hasAttachments}
+                          <span class="shrink-0 text-primary" title={$_('backupViewer.attachments')}>
+                            <Icon icon="mdi:paperclip" class="h-4 w-4" />
+                          </span>
+                        {/if}
+                        <span class="w-[96px] shrink-0 text-right text-xs tabular-nums text-muted-foreground">{formatShortDate(message.date)}</span>
+                      </span>
+                      <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span class="truncate">{message.accountEmail}</span>
+                        {#if message.folderPath}
+                          <span class="shrink-0">/</span>
+                          <span class="truncate">{message.folderPath}</span>
+                        {/if}
+                      </span>
                     </span>
-                    <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                      <span class="truncate">{message.accountEmail}</span>
-                      {#if message.folderPath}
-                        <span class="shrink-0">/</span>
-                        <span class="truncate">{message.folderPath}</span>
-                      {/if}
-                    </span>
-                  </span>
-                  <span class="pointer-events-none absolute bottom-0 right-0 top-0 w-[5px] {hasAttachments ? 'bg-amber-500' : 'bg-transparent'}" aria-hidden="true"></span>
-                </button>
-              {/each}
+                    <span class="pointer-events-none absolute bottom-0 right-0 top-0 w-[5px] {hasAttachments ? 'bg-amber-500' : 'bg-transparent'}" aria-hidden="true"></span>
+                  </button>
+                {/each}
+              </div>
+              <div class="flex h-11 shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 text-xs text-muted-foreground">
+                <span class="min-w-0 truncate">
+                  {$_('backupViewer.loadedMessages', { values: { loaded: visibleMessages.length, total: messagesTotal } })}
+                </span>
+                {#if hasMoreMessages}
+                  <button
+                    type="button"
+                    class="inline-flex h-8 shrink-0 items-center rounded-md px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={loadingMoreMessages}
+                    onclick={() => loadMessagePage()}
+                  >
+                    {#if loadingMoreMessages}
+                      <Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />
+                    {/if}
+                    {$_('backupViewer.loadMore')}
+                  </button>
+                {:else}
+                  <span class="shrink-0">{$_('backupViewer.allLoaded')}</span>
+                {/if}
+              </div>
             </div>
           {/if}
         </section>
@@ -557,6 +689,7 @@
           onSaveAttachment={saveBackupAttachment}
           {formatDate}
         />
+      </div>
       </div>
   </ModalFrame>
 

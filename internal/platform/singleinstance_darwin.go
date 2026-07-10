@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // darwinSingleInstanceLock uses a Unix socket for single-instance detection.

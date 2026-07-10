@@ -4,123 +4,61 @@
 
 ## Acceptance of Terms
 
-By downloading, installing, or using aulycmail ("the Application"), you agree to be bound by these Terms of Use ("Terms"). If you do not agree to these Terms, do not use the Application.
+By downloading, installing, or using aulycmail, you agree to these Terms of Use.
+If you do not agree, do not use the application.
 
-## Description of Service
+## Description
 
-aulycmail is an open-source desktop email client. The official aulycmail website and online documentation is hosted at [https://github.com/aulyc/aulycmail](https://github.com/aulyc/aulycmail). aulycmail allows you to:
+aulycmail is a desktop e-mail client. It lets you connect to configured mail
+accounts via IMAP/SMTP, send and receive e-mail, manage local mail state, and
+use local contacts for address autocomplete.
 
-- Connect to email accounts via IMAP/SMTP
-- Send and receive emails
-- Manage email folders and organization
-- Maintain local contacts for autocomplete
-- Connect Gmail and Outlook via IMAP/SMTP using provider-supported passwords
+aulycmail runs locally on your device. It does not provide e-mail hosting, cloud
+storage, or server infrastructure.
 
-aulycmail is a local application that runs on your computer. We do not provide any cloud services, email hosting, or server infrastructure.
+## License Notices
 
-## Open Source License
-
-aulycmail is licensed under the Apache License 2.0. You can:
-
-- Use the software for any purpose
-- Distribute copies of the software
-- Modify the software and distribute your modifications
-- Use the software commercially
-
-Subject to the conditions of the Apache License 2.0, including preservation of copyright notices and disclaimers. The full license text is available in the LICENSE file included with the Application and at [https://github.com/aulyc/aulycmail](https://github.com/aulyc/aulycmail).
+The application includes third-party components and license notices. Those
+notices remain subject to their respective license terms. The application bundle
+and distribution materials should preserve required license and copyright
+notices, including the bundled legal notices where provided.
 
 ## User Responsibilities
 
 You are responsible for:
 
-1. **Account Security** - Maintaining the security of your email account credentials
-2. **Device Security** - Securing the device on which aulycmail is installed
-3. **Legal Compliance** - Using the Application in compliance with applicable laws
-4. **Email Provider Terms** - Complying with your email provider's terms of service
-5. **Backup** - Maintaining backups of important data
+1. Securing your e-mail account credentials.
+2. Securing the device on which aulycmail is installed.
+3. Using the application in compliance with applicable laws.
+4. Complying with your e-mail provider's terms of service.
+5. Maintaining backups of important data.
 
 ## Acceptable Use
 
-You agree not to use aulycmail to:
-
-- Send spam, malware, or phishing emails
-- Violate any applicable laws or regulations
-- Infringe on the rights of others
-- Attempt to gain unauthorized access to email accounts or systems
-- Engage in any activity that could damage or impair the Application
+You agree not to use aulycmail to send spam, malware, phishing messages, or
+other unlawful or harmful content.
 
 ## Disclaimer of Warranties
 
-**THE APPLICATION IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED.**
-
-To the fullest extent permitted by law, we disclaim all warranties, including but not limited to:
-
-- Implied warranties of merchantability
-- Fitness for a particular purpose
-- Non-infringement
-- Accuracy or reliability of the Application
-- That the Application will be uninterrupted, secure, or error-free
-
-**aulycmail is pre-release software currently in active development. Features may change, and bugs may exist. Use at your own risk.**
+The application is provided "as is" and "as available" without warranties of any
+kind, either express or implied.
 
 ## Limitation of Liability
 
-**TO THE MAXIMUM EXTENT PERMITTED BY LAW, IN NO EVENT SHALL THE DEVELOPERS, CONTRIBUTORS, OR SPONSORS OF AULYCMAIL BE LIABLE FOR:**
-
-- Any indirect, incidental, special, consequential, or punitive damages
-- Loss of profits, data, use, goodwill, or other intangible losses
-- Any damages arising from:
-  - Your use or inability to use the Application
-  - Any unauthorized access to or alteration of your data
-  - Loss or corruption of emails or other data
-  - Any third-party conduct or content
-  - Any bugs, viruses, or other harmful code
-
-**This limitation applies regardless of the theory of liability (contract, tort, or otherwise) and even if we have been advised of the possibility of such damages.**
-
-## Indemnification
-
-You agree to indemnify, defend, and hold harmless the developers, contributors, and sponsors of aulycmail from any claims, damages, losses, liabilities, costs, and expenses (including reasonable attorneys' fees) arising from:
-
-- Your use of the Application
-- Your violation of these Terms
-- Your violation of any rights of another party
-- Your violation of any applicable laws
+To the maximum extent permitted by law, the developers of aulycmail are not
+liable for indirect, incidental, special, consequential, or punitive damages,
+including loss of data, loss of profits, or inability to use the application.
 
 ## Third-Party Services
 
-aulycmail integrates with third-party services including:
+Your use of configured mail providers is governed by those providers' own terms
+and privacy policies.
 
-- Email providers (via IMAP/SMTP)
+## Changes
 
-Your use of these services is subject to their respective terms of service and privacy policies. We are not responsible for the availability, accuracy, or practices of these third-party services.
+These terms may be updated from time to time. The current terms are published at
+https://aulyc.com/aulycmail/terms.
 
-## Modifications to the Application
+## Contact
 
-As an open-source project, aulycmail is continuously evolving. We may:
-
-- Add, modify, or remove features at any time
-- Release updates that change functionality
-- Discontinue development
-
-We have no obligation to maintain, support, or update the Application.
-
-## Changes to These Terms
-
-We may update these Terms from time to time. Changes will be reflected in the "Last Updated" date. Your continued use of the Application after changes constitutes acceptance of the new Terms.
-
-## Severability
-
-If any provision of these Terms is found to be unenforceable, the remaining provisions will continue in effect.
-
-## Entire Agreement
-
-These Terms constitute the entire agreement between you and the developers of aulycmail regarding the use of the Application, superseding any prior agreements.
-
-## Contact Us
-
-If you have questions about these Terms of Use, please contact us at:
-
-**Email:** xaulyc@gmail.com
-
-**GitHub Issues:** [https://github.com/aulyc/aulycmail/issues](https://github.com/aulyc/aulycmail/issues)
+Email: xaulyc@gmail.com

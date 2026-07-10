@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // FTSIndexer handles background indexing of messages for full-text search

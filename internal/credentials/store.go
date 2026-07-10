@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/aulyc/aulycmail/internal/crypto"
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/crypto"
+	"aulyc.local/aulycmail/internal/logging"
 	"github.com/rs/zerolog"
 	gokeyring "github.com/zalando/go-keyring"
 )

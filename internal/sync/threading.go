@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
+	"aulyc.local/aulycmail/internal/message"
 	gomessage "github.com/emersion/go-message"
-	"github.com/aulyc/aulycmail/internal/message"
 )
 
 // computeThreadID determines the thread ID for a message

@@ -61,6 +61,7 @@
     backdropClass="bg-black/75"
     panelClass="mx-auto mt-[calc(12vh+52px)] w-[min(90vw,680px)]"
   >
+    <div data-backup-viewer-search class="contents">
     <div class="mb-3 overflow-hidden">
       <SearchScopeCarousel
         scopes={accountScopes}
@@ -114,11 +115,15 @@
                   <span class="shrink-0 text-xs text-muted-foreground">{formatShortDate(result.date)}</span>
                 </span>
                 <span class="truncate text-xs text-muted-foreground">{result.accountEmail}{result.folderPath ? ` / ${result.folderPath}` : ''}</span>
+                {#if result.snippet}
+                  <span class="mt-0.5 line-clamp-2 text-xs text-muted-foreground/80">{result.snippet}</span>
+                {/if}
               </span>
             </button>
           {/each}
         </div>
       {/if}
+    </div>
     </div>
   </ModalFrame>
 {/if}

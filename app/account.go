@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/account"
-	"github.com/aulyc/aulycmail/internal/certificate"
-	"github.com/aulyc/aulycmail/internal/imap"
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/certificate"
+	"aulyc.local/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // ============================================================================

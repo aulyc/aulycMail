@@ -20,6 +20,7 @@
     selectedScope?: Scope
     accountScopes: Scope[]
     loadingCatalog: boolean
+    buildingIndex: boolean
     errorMessage: string
     darkFilterEnabled: boolean
     messageSortOrder: 'newest' | 'oldest'
@@ -32,6 +33,7 @@
     onClearDirectory: () => void
     onRefreshCatalog: () => void | Promise<void>
     onOpenSearch: () => void
+    onBuildIndex: () => void | Promise<void>
     onToggleSortOrder: () => void
     onClose: () => void
     scopeLabel: (scope: Scope | undefined) => string
@@ -45,6 +47,7 @@
     selectedScope,
     accountScopes,
     loadingCatalog,
+    buildingIndex,
     errorMessage,
     darkFilterEnabled = $bindable(false),
     messageSortOrder,
@@ -57,6 +60,7 @@
     onClearDirectory,
     onRefreshCatalog,
     onOpenSearch,
+    onBuildIndex,
     onToggleSortOrder,
     onClose,
     scopeLabel,
@@ -151,6 +155,18 @@
       >
         <Icon icon="mdi:magnify" class="h-5 w-5 text-muted-foreground" />
       </button>
+      {#if catalog?.needsIndex}
+        <button
+          type="button"
+          class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
+          disabled={!directory || buildingIndex}
+          title={$_('backupViewer.buildIndex')}
+          aria-label={$_('backupViewer.buildIndex')}
+          onclick={onBuildIndex}
+        >
+          <Icon icon="mdi:database-search-outline" class="h-5 w-5 text-muted-foreground {buildingIndex ? 'animate-spin' : ''}" />
+        </button>
+      {/if}
       <button
         type="button"
         class="rounded-md p-2 transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"

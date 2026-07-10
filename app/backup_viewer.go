@@ -12,12 +12,11 @@ import (
 	"sort"
 	"strings"
 
-	mailBackup "github.com/aulyc/aulycmail/internal/backup"
-	"github.com/aulyc/aulycmail/internal/email"
-	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/platform"
-	"github.com/aulyc/aulycmail/internal/settings"
-	mailSync "github.com/aulyc/aulycmail/internal/sync"
+	mailBackup "aulyc.local/aulycmail/internal/backup"
+	"aulyc.local/aulycmail/internal/email"
+	"aulyc.local/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/settings"
+	mailSync "aulyc.local/aulycmail/internal/sync"
 	gomessage "github.com/emersion/go-message"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -33,6 +32,8 @@ type BackupViewerCatalog struct {
 	Accounts     []BackupViewerAccount        `json:"accounts"`
 	Messages     []BackupViewerMessageSummary `json:"messages"`
 	MessageCount int                          `json:"messageCount"`
+	IndexReady   bool                         `json:"indexReady"`
+	NeedsIndex   bool                         `json:"needsIndex"`
 }
 
 // BackupViewerAccount is an account tag in the backup viewer.
@@ -50,6 +51,14 @@ type BackupViewerMessageSummary struct {
 	Date            string `json:"date"`
 	Size            int    `json:"size"`
 	AttachmentCount int    `json:"attachmentCount"`
+	Snippet         string `json:"snippet,omitempty"`
+}
+
+// BackupViewerMessagePage is a paged list/search response for backed-up email.
+type BackupViewerMessagePage struct {
+	Messages []BackupViewerMessageSummary `json:"messages"`
+	Total    int                          `json:"total"`
+	HasMore  bool                         `json:"hasMore"`
 }
 
 // BackupViewerMessageDetail is the parsed, sanitized representation of a backed-up email.
@@ -108,21 +117,32 @@ func (a *App) GetBackupViewerCatalog(directory string) (*BackupViewerCatalog, er
 		return catalog, nil
 	}
 
-	a.hydrateBackupViewerAttachmentFlags(idx)
 	catalog.MessageCount = len(idx.Messages)
 	catalog.Accounts = backupViewerAccounts(idx)
-	catalog.Messages = backupViewerMessages(idx, "", "", 0)
+	if viewerIndex, ok, err := mailBackup.OpenExistingViewerIndex(cleanDir); err != nil {
+		return nil, err
+	} else if ok {
+		defer viewerIndex.Close()
+		if count, err := viewerIndex.MessageCount(""); err == nil && count > 0 {
+			catalog.IndexReady = true
+			catalog.MessageCount = count
+			if accounts, err := viewerIndex.Accounts(); err == nil {
+				catalog.Accounts = backupViewerAccountsFromViewerIndex(accounts)
+			}
+		}
+	}
+	catalog.NeedsIndex = catalog.MessageCount > 0 && !catalog.IndexReady
 	return catalog, nil
 }
 
-// SearchBackupViewerMessages searches the backup index without opening every EML file.
-func (a *App) SearchBackupViewerMessages(directory, accountEmail, query string, limit int) ([]BackupViewerMessageSummary, error) {
+// ListBackupViewerMessages returns one page of backed-up message summaries.
+func (a *App) ListBackupViewerMessages(directory, accountEmail, sortOrder string, offset, limit int) (*BackupViewerMessagePage, error) {
 	directory = strings.TrimSpace(directory)
 	if directory == "" {
 		directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
 	}
 	if directory == "" {
-		return []BackupViewerMessageSummary{}, nil
+		return &BackupViewerMessagePage{}, nil
 	}
 	cleanDir, err := mailBackup.NormalizeExistingDirectory(directory)
 	if err != nil {
@@ -133,10 +153,98 @@ func (a *App) SearchBackupViewerMessages(directory, accountEmail, query string, 
 		return nil, err
 	}
 	if !found {
-		return []BackupViewerMessageSummary{}, nil
+		return &BackupViewerMessagePage{}, nil
+	}
+	if viewerIndex, ok, err := mailBackup.OpenExistingViewerIndex(cleanDir); err != nil {
+		return nil, err
+	} else if ok {
+		defer viewerIndex.Close()
+		if count, err := viewerIndex.MessageCount(""); err == nil && count > 0 {
+			page, err := viewerIndex.ListMessages(accountEmail, sortOrder, offset, limit)
+			if err != nil {
+				return nil, err
+			}
+			return backupViewerPageFromViewerIndex(page), nil
+		}
+	}
+
+	a.hydrateBackupViewerAttachmentFlags(idx)
+	messages, total := backupViewerMessagesPage(idx, accountEmail, "", sortOrder, offset, limit)
+	return &BackupViewerMessagePage{
+		Messages: messages,
+		Total:    total,
+		HasMore:  offset+len(messages) < total,
+	}, nil
+}
+
+// SearchBackupViewerMessages searches the whole backup viewer index.
+func (a *App) SearchBackupViewerMessages(directory, accountEmail, query string, offset, limit int) (*BackupViewerMessagePage, error) {
+	directory = strings.TrimSpace(directory)
+	if directory == "" {
+		directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
+	}
+	if directory == "" {
+		return &BackupViewerMessagePage{}, nil
+	}
+	cleanDir, err := mailBackup.NormalizeExistingDirectory(directory)
+	if err != nil {
+		return nil, err
+	}
+	if viewerIndex, ok, err := mailBackup.OpenExistingViewerIndex(cleanDir); err != nil {
+		return nil, err
+	} else if ok {
+		defer viewerIndex.Close()
+		if count, err := viewerIndex.MessageCount(""); err == nil && count > 0 {
+			page, err := viewerIndex.SearchMessages(accountEmail, query, offset, limit)
+			if err != nil {
+				return nil, err
+			}
+			return backupViewerPageFromViewerIndex(page), nil
+		}
+	}
+
+	idx, found, err := mailBackup.LoadIndex(cleanDir)
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return &BackupViewerMessagePage{}, nil
 	}
 	a.hydrateBackupViewerAttachmentFlags(idx)
-	return backupViewerMessages(idx, accountEmail, query, limit), nil
+	messages, total := backupViewerMessagesPage(idx, accountEmail, query, "newest", offset, limit)
+	return &BackupViewerMessagePage{
+		Messages: messages,
+		Total:    total,
+		HasMore:  offset+len(messages) < total,
+	}, nil
+}
+
+// BuildBackupViewerIndex builds the SQLite summary/FTS index for an existing backup directory.
+func (a *App) BuildBackupViewerIndex(directory string) (int, error) {
+	directory = strings.TrimSpace(directory)
+	if directory == "" {
+		directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
+	}
+	if directory == "" {
+		return 0, errors.New("backup directory is not set")
+	}
+	cleanDir, err := mailBackup.NormalizeExistingDirectory(directory)
+	if err != nil {
+		return 0, err
+	}
+	idx, found, err := mailBackup.LoadIndex(cleanDir)
+	if err != nil {
+		return 0, err
+	}
+	if !found {
+		return 0, errors.New("backup index not found")
+	}
+	viewerIndex, err := mailBackup.OpenViewerIndex(cleanDir)
+	if err != nil {
+		return 0, err
+	}
+	defer viewerIndex.Close()
+	return viewerIndex.BuildFromJSONIndex(a.ctx, cleanDir, idx)
 }
 
 // GetBackupViewerMessage opens one indexed EML file and returns a sanitized detail view.
@@ -191,21 +299,13 @@ func (a *App) SaveBackupViewerAttachmentAs(directory, key string, attachmentInde
 	defaultDir := filepath.Join(homeDir, "Downloads")
 	defaultFilename := email.DefaultAttachmentFilename(attachment.Filename)
 
-	var savePath string
-	if platform.IsFlatpak() {
-		savePath, err = platform.PortalSaveFile("Save Attachment", defaultFilename, defaultDir)
-		if err != nil {
-			return "", fmt.Errorf("failed to show save dialog: %w", err)
-		}
-	} else {
-		savePath, err = wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
-			DefaultDirectory: defaultDir,
-			DefaultFilename:  defaultFilename,
-			Title:            "Save Attachment",
-		})
-		if err != nil {
-			return "", fmt.Errorf("failed to show save dialog: %w", err)
-		}
+	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+		DefaultDirectory: defaultDir,
+		DefaultFilename:  defaultFilename,
+		Title:            "Save Attachment",
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to show save dialog: %w", err)
 	}
 	if savePath == "" {
 		return "", nil
@@ -250,7 +350,7 @@ func (a *App) backupViewerIndexedMessagePath(directory, key string) (string, mai
 	if !ok {
 		return "", mailBackup.IndexMessage{}, errors.New("backup message not found")
 	}
-	emlPath, err := backupIndexedFilePath(cleanDir, entry.EMLPath)
+	emlPath, err := mailBackup.IndexedFilePath(cleanDir, entry.EMLPath)
 	if err != nil {
 		return "", mailBackup.IndexMessage{}, err
 	}
@@ -270,19 +370,10 @@ func (a *App) OpenBackupViewerDirectory(directory string) error {
 	if err != nil {
 		return err
 	}
-	if stdruntime.GOOS == "linux" && platform.IsFlatpak() {
-		return platform.PortalOpenDirectory(cleanDir)
-	}
-	switch stdruntime.GOOS {
-	case "linux":
-		return exec.Command("xdg-open", cleanDir).Start()
-	case "darwin":
-		return exec.Command("open", cleanDir).Start()
-	case "windows":
-		return exec.Command("explorer", cleanDir).Start()
-	default:
+	if stdruntime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported platform: %s", stdruntime.GOOS)
 	}
+	return exec.Command("open", cleanDir).Start()
 }
 
 func backupViewerAccounts(idx *mailBackup.Index) []BackupViewerAccount {
@@ -303,6 +394,38 @@ func backupViewerAccounts(idx *mailBackup.Index) []BackupViewerAccount {
 		return strings.ToLower(accounts[i].AccountEmail) < strings.ToLower(accounts[j].AccountEmail)
 	})
 	return accounts
+}
+
+func backupViewerAccountsFromViewerIndex(accounts []mailBackup.ViewerAccountRecord) []BackupViewerAccount {
+	out := make([]BackupViewerAccount, 0, len(accounts))
+	for _, account := range accounts {
+		out = append(out, BackupViewerAccount{
+			AccountEmail: account.AccountEmail,
+			MessageCount: account.MessageCount,
+		})
+	}
+	return out
+}
+
+func backupViewerPageFromViewerIndex(page mailBackup.ViewerMessagePage) *BackupViewerMessagePage {
+	messages := make([]BackupViewerMessageSummary, 0, len(page.Messages))
+	for _, message := range page.Messages {
+		messages = append(messages, BackupViewerMessageSummary{
+			Key:             message.Key,
+			AccountEmail:    message.AccountEmail,
+			FolderPath:      message.FolderPath,
+			Subject:         message.Subject,
+			Date:            message.Date,
+			Size:            message.Size,
+			AttachmentCount: message.AttachmentCount,
+			Snippet:         message.Snippet,
+		})
+	}
+	return &BackupViewerMessagePage{
+		Messages: messages,
+		Total:    page.Total,
+		HasMore:  page.HasMore,
+	}
 }
 
 func (a *App) hydrateBackupViewerAttachmentFlags(idx *mailBackup.Index) {
@@ -397,6 +520,33 @@ func backupViewerMessages(idx *mailBackup.Index, accountEmail, query string, lim
 	return messages
 }
 
+func backupViewerMessagesPage(idx *mailBackup.Index, accountEmail, query, sortOrder string, offset, limit int) ([]BackupViewerMessageSummary, int) {
+	if limit <= 0 {
+		limit = backupViewerDefaultLimit
+	}
+	if limit > 500 {
+		limit = 500
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	messages := backupViewerMessages(idx, accountEmail, query, 0)
+	if sortOrder == "oldest" {
+		for left, right := 0, len(messages)-1; left < right; left, right = left+1, right-1 {
+			messages[left], messages[right] = messages[right], messages[left]
+		}
+	}
+	total := len(messages)
+	if offset >= total {
+		return []BackupViewerMessageSummary{}, total
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return messages[offset:end], total
+}
+
 func backupViewerSummaryMatches(msg BackupViewerMessageSummary, query string) bool {
 	fields := []string{msg.Subject, msg.AccountEmail, msg.FolderPath, msg.Date}
 	for _, field := range fields {
@@ -415,32 +565,7 @@ func backupViewerIndexedAttachmentCount(entry mailBackup.IndexMessage) int {
 }
 
 func backupIndexedFilePath(directory, relativePath string) (string, error) {
-	relativePath = strings.TrimSpace(filepath.FromSlash(relativePath))
-	if relativePath == "" {
-		return "", errors.New("backup message path is empty")
-	}
-	if filepath.IsAbs(relativePath) {
-		return "", errors.New("backup message path must be relative")
-	}
-
-	cleanRel := filepath.Clean(relativePath)
-	if cleanRel == "." || cleanRel == ".." || strings.HasPrefix(cleanRel, ".."+string(os.PathSeparator)) {
-		return "", errors.New("backup message path escapes backup directory")
-	}
-
-	baseAbs, err := filepath.Abs(directory)
-	if err != nil {
-		return "", err
-	}
-	fullPath := filepath.Join(baseAbs, cleanRel)
-	rel, err := filepath.Rel(baseAbs, fullPath)
-	if err != nil {
-		return "", err
-	}
-	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", errors.New("backup message path escapes backup directory")
-	}
-	return fullPath, nil
+	return mailBackup.IndexedFilePath(directory, relativePath)
 }
 
 func parseBackupViewerEML(key string, entry mailBackup.IndexMessage, reader io.Reader) (*BackupViewerMessageDetail, error) {

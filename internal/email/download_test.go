@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/aulyc/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/message"
 )
 
 func TestSafeAttachmentFilenameStripsPathComponents(t *testing.T) {
@@ -19,7 +19,7 @@ func TestSafeAttachmentFilenameStripsPathComponents(t *testing.T) {
 	}{
 		{"plain", "invoice.pdf", "invoice.pdf"},
 		{"unix traversal", "../../evil.txt", "evil.txt"},
-		{"windows traversal", `..\evil.txt`, "evil.txt"},
+		{"backslash traversal", `..\evil.txt`, "evil.txt"},
 		{"absolute", "/tmp/evil.txt", "evil.txt"},
 		{"control chars", "bad\x00\nname.txt", "badname.txt"},
 	}

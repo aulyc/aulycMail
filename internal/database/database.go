@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 	_ "modernc.org/sqlite"
 
 	"github.com/rs/zerolog"
@@ -159,15 +159,14 @@ func (db *DB) Path() string {
 // ErrSchemaTooNew is returned by Migrate when the database's recorded migration
 // version is HIGHER than the highest migration this build knows about. This
 // happens when a user downgrades aulycmail after a newer version applied a
-// forward-only migration. Callers (App.Startup) surface a friendly dialog
-// pointing the user at docs/SQL_ROLLBACK.md.
+// forward-only migration. Callers surface a friendly recovery dialog.
 type ErrSchemaTooNew struct {
 	DBVersion    int
 	BuildVersion int
 }
 
 func (e *ErrSchemaTooNew) Error() string {
-	return fmt.Sprintf("database schema version %d is newer than this aulycmail build (max known: %d). See https://github.com/aulyc/aulycmail/blob/main/docs/SQL_ROLLBACK.md", e.DBVersion, e.BuildVersion)
+	return fmt.Sprintf("database schema version %d is newer than this aulycmail build (max known: %d). See https://aulyc.com/aulycmail/support/database-recovery", e.DBVersion, e.BuildVersion)
 }
 
 // Migrate runs all pending migrations

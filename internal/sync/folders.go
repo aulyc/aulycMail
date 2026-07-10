@@ -7,8 +7,8 @@ import (
 	"strings"
 	gosync "sync"
 
-	"github.com/aulyc/aulycmail/internal/folder"
-	imapPkg "github.com/aulyc/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/folder"
+	imapPkg "aulyc.local/aulycmail/internal/imap"
 )
 
 // folderStatusResult holds the result of a parallel STATUS fetch
@@ -238,8 +238,8 @@ func (e *Engine) persistAutoDetectedMappings(accountID string) {
 	}
 
 	type mapping struct {
-		current  string
-		fType    folder.Type
+		current string
+		fType   folder.Type
 	}
 
 	mappings := []mapping{

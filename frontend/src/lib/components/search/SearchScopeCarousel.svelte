@@ -59,14 +59,14 @@
 
   function buttonClass(active: boolean): string {
     const tone = active
-      ? 'border-primary/75 bg-primary/15 text-primary'
-      : 'border-border/70 bg-transparent text-muted-foreground hover:border-border hover:bg-muted/20 hover:text-foreground'
+      ? 'border-primary bg-primary text-primary-foreground'
+      : 'border-border/80 bg-popover/95 text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground dark:bg-popover/80'
     return `${maxLabelWidthClass} shrink-0 truncate rounded-md border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-sm transition-colors ${tone}`
   }
 </script>
 
-<div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 overflow-hidden">
-  <div class="flex min-w-0 justify-end gap-2 overflow-hidden">
+<div class="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 overflow-hidden px-1 py-1">
+  <div class="flex min-w-0 justify-end gap-2 overflow-hidden pr-px">
     {#each leftSlots as item (item.key)}
       <button
         type="button"
@@ -92,7 +92,7 @@
       {selectedScope.label}
     </button>
   {/if}
-  <div class="flex min-w-0 justify-start gap-2 overflow-hidden">
+  <div class="flex min-w-0 justify-start gap-2 overflow-hidden pl-px">
     {#each rightSlots as item (item.key)}
       <button
         type="button"

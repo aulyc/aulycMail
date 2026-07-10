@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/message"
-	"github.com/aulyc/aulycmail/internal/sync"
+	"aulyc.local/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/sync"
 )
 
 // ============================================================================

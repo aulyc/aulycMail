@@ -11,7 +11,7 @@
     "productName": "aulycmail",
     "productVersion": "0.3.0",
     "copyright": "Copyright © 2026 aulyc",
-    "comments": "A modern, cross-platform email client",
+    "comments": "A lightweight desktop e-mail client",
     "protocols": [
       {
         "scheme": "mailto",

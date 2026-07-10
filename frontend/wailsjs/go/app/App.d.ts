@@ -20,6 +20,8 @@ export function AddImageAllowlist(arg1:string,arg2:string):Promise<void>;
 
 export function Archive(arg1:Array<string>):Promise<void>;
 
+export function BuildBackupViewerIndex(arg1:string):Promise<number>;
+
 export function CancelAllSyncs():Promise<void>;
 
 export function CancelFolderSync(arg1:string,arg2:string):Promise<void>;
@@ -176,11 +178,11 @@ export function IgnoreReadReceipt(arg1:string,arg2:string):Promise<void>;
 
 export function IsFTSIndexing():Promise<boolean>;
 
-export function IsFlatpak():Promise<boolean>;
-
 export function IsImageAllowed(arg1:string):Promise<boolean>;
 
 export function IsReady():Promise<boolean>;
+
+export function ListBackupViewerMessages(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<app.BackupViewerMessagePage>;
 
 export function MarkAllFolderMessagesAsRead(arg1:string):Promise<void>;
 
@@ -246,7 +248,7 @@ export function SaveDraft(arg1:string,arg2:smtp.ComposeMessage,arg3:string):Prom
 
 export function SaveUIState(arg1:appstate.UIState):Promise<void>;
 
-export function SearchBackupViewerMessages(arg1:string,arg2:string,arg3:string,arg4:number):Promise<Array<app.BackupViewerMessageSummary>>;
+export function SearchBackupViewerMessages(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<app.BackupViewerMessagePage>;
 
 export function SearchContacts(arg1:string,arg2:number):Promise<Array<contact.Contact>>;
 

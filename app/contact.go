@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/aulyc/aulycmail/internal/contact"
-	"github.com/aulyc/aulycmail/internal/folder"
-	"github.com/aulyc/aulycmail/internal/logging"
-	"github.com/aulyc/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/contact"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/message"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 

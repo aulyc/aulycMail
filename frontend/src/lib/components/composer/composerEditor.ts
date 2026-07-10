@@ -345,12 +345,11 @@ export function createComposerEditor(
       },
       // Handle drop events for files (images inline, others as attachments)
       //
-      // Three-tier approach for cross-platform compatibility:
-      //  1. File objects via dataTransfer.files (macOS/Windows webviews)
+      // Three-tier approach for drag-and-drop compatibility:
+      //  1. File objects via dataTransfer.files
       //  2. File URIs via getData('text/uri-list') (standard browsers)
-      //  3. ProseMirror state cleanup (WebKitGTK fallback — neither #1 nor #2
-      //     work because WebKitGTK provides empty files/getData and instead
-      //     inserts file:/// URIs as plain text at the native GTK layer)
+      //  3. ProseMirror state cleanup for webviews that insert file:/// URIs
+      //     as plain text.
       handleDrop: (view, event, _slice, moved) => {
         if (moved) return false
 

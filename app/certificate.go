@@ -1,8 +1,8 @@
 package app
 
 import (
-	"github.com/aulyc/aulycmail/internal/certificate"
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/certificate"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // ============================================================================

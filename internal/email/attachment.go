@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aulyc/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/message"
 	gomessage "github.com/emersion/go-message"
 	"github.com/google/uuid"
 	"github.com/teamwork/tnef"

@@ -15,8 +15,8 @@
 
   let agreed = $state(false)
 
-  const PRIVACY_URL = 'https://github.com/aulyc/aulycmail/blob/main/docs/PRIVACY.md'
-  const TERMS_URL = 'https://github.com/aulyc/aulycmail/blob/main/docs/TERMS.md'
+  const PRIVACY_URL = 'https://aulyc.com/aulycmail/privacy'
+  const TERMS_URL = 'https://aulyc.com/aulycmail/terms'
 
   function openPrivacyPolicy() {
     BrowserOpenURL(PRIVACY_URL)

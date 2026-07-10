@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/account"
-	"github.com/aulyc/aulycmail/internal/folder"
-	"github.com/aulyc/aulycmail/internal/imap"
-	"github.com/aulyc/aulycmail/internal/logging"
-	"github.com/aulyc/aulycmail/internal/notification"
-	"github.com/aulyc/aulycmail/internal/platform"
-	"github.com/aulyc/aulycmail/internal/sync"
+	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/notification"
+	"aulyc.local/aulycmail/internal/platform"
+	"aulyc.local/aulycmail/internal/sync"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -356,7 +356,7 @@ func (a *App) sendSystemNotification(info sync.NewMailInfo, subject, fromName, f
 func (a *App) initNotifications(ctx context.Context) {
 	log := logging.WithComponent("app.notify")
 
-	a.notifier = notification.New("aulycmail", a.useDirectDBus)
+	a.notifier = notification.New("aulycmail")
 
 	// Set click handler for mail notifications.
 	a.notifier.SetClickHandler(func(data notification.NotificationData) {

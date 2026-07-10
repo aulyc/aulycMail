@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/database"
-	mailSync "github.com/aulyc/aulycmail/internal/sync"
+	"aulyc.local/aulycmail/internal/database"
+	mailSync "aulyc.local/aulycmail/internal/sync"
 )
 
 type Progress struct {
@@ -83,6 +83,11 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 	if idx.CreatedAt == "" {
 		idx.CreatedAt = options.StartedAt
 	}
+	viewerIndex, err := OpenViewerIndex(options.Directory)
+	if err != nil {
+		return nil, err
+	}
+	defer viewerIndex.Close()
 
 	rows, err := ListMessageRows(db, options.AccountIDs)
 	if err != nil {
@@ -112,6 +117,9 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 		if indexed && FileExists(options.Directory, existing.EMLPath) {
 			existing.HasAttachments = BoolPtr(row.HasAttachments)
 			idx.Messages[key] = existing
+			if !viewerIndex.HasMessage(key) {
+				_ = viewerIndex.UpsertMessageFromFile(options.Directory, key, existing)
+			}
 			result.Skipped++
 			processed++
 			emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), ""))
@@ -188,6 +196,7 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 					HasAttachments: BoolPtr(row.HasAttachments),
 					ExportedAt:     time.Now().UTC().Format(time.RFC3339),
 				}
+				_ = viewerIndex.UpsertMessageFromFile(options.Directory, key, idx.Messages[key])
 				result.Exported++
 				processed++
 				emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), ""))

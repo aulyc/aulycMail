@@ -3,8 +3,8 @@ package app
 import (
 	"fmt"
 
-	"github.com/aulyc/aulycmail/internal/folder"
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // ============================================================================
@@ -148,7 +148,6 @@ func (a *App) SubscribeFolder(accountID, folderID string) error {
 	if dbErr := a.folderStore.UpdateSubscribed(folderID, true); dbErr != nil {
 		log.Warn().Err(dbErr).Msg("Failed to update local subscription cache")
 	}
-
 
 	log.Info().Str("folder", f.Path).Msg("Subscribed to folder")
 	return nil

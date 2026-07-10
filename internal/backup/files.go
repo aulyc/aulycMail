@@ -66,6 +66,27 @@ func FileExists(baseDir, relPath string) bool {
 	return err == nil && !info.IsDir()
 }
 
+func IndexedFilePath(baseDir, relPath string) (string, error) {
+	relPath = strings.TrimSpace(filepath.FromSlash(relPath))
+	if relPath == "" {
+		return "", errors.New("backup message path is empty")
+	}
+	if filepath.IsAbs(relPath) {
+		return "", errors.New("backup message path must be relative")
+	}
+
+	cleanRel := filepath.Clean(relPath)
+	if cleanRel == "." || cleanRel == ".." || strings.HasPrefix(cleanRel, ".."+string(os.PathSeparator)) {
+		return "", errors.New("backup message path escapes backup directory")
+	}
+	cleanBase := filepath.Clean(baseDir)
+	joined := filepath.Join(cleanBase, cleanRel)
+	if joined != cleanBase && !strings.HasPrefix(joined, cleanBase+string(os.PathSeparator)) {
+		return "", errors.New("backup message path escapes backup directory")
+	}
+	return joined, nil
+}
+
 func MessageRelativePath(accountEmail, folderPath, subject string, date time.Time, uidValidity, uid uint32) string {
 	datePrefix := "unknown-date"
 	if !date.IsZero() {

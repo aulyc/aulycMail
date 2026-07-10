@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aulyc/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/database"
 )
 
 // newBodyFailedTestStore opens a migrated temp DB, seeds one (account, folder)

@@ -3,7 +3,7 @@ package app
 import (
 	"runtime/debug"
 
-	"github.com/aulyc/aulycmail/internal/logging"
+	"aulyc.local/aulycmail/internal/logging"
 )
 
 // recoverPanic is a deferred helper that catches panics in background goroutines
