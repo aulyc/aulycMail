@@ -364,6 +364,7 @@
     "startHiddenHelp": "Launch with the window hidden",
     "startup": "Startup",
     "autostartOnLogin": "Autostart on login",
+    "developerMode": "Developer mode",
     "autostartHelp": "Automatically start aulycmail when you log in",
     "densityMicro": "Micro",
     "densityCompact": "Small",

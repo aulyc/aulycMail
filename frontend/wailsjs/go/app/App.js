@@ -194,6 +194,10 @@ export function GetDarkMailContent() {
   return window['go']['app']['App']['GetDarkMailContent']();
 }
 
+export function GetDeveloperMode() {
+  return window['go']['app']['App']['GetDeveloperMode']();
+}
+
 export function GetDraft(arg1) {
   return window['go']['app']['App']['GetDraft'](arg1);
 }
@@ -528,6 +532,10 @@ export function SetDarkMailContent(arg1) {
 
 export function SetDefaultIdentity(arg1, arg2) {
   return window['go']['app']['App']['SetDefaultIdentity'](arg1, arg2);
+}
+
+export function SetDeveloperMode(arg1) {
+  return window['go']['app']['App']['SetDeveloperMode'](arg1);
 }
 
 export function SetLanguage(arg1) {

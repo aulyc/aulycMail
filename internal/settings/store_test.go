@@ -307,6 +307,20 @@ func TestSetGetBoolSettings(t *testing.T) {
 			value:  false,
 			defVal: false,
 		},
+		{
+			name:   "DeveloperMode_true",
+			set:    (*Store).SetDeveloperMode,
+			get:    (*Store).GetDeveloperMode,
+			value:  true,
+			defVal: false,
+		},
+		{
+			name:   "DeveloperMode_false",
+			set:    (*Store).SetDeveloperMode,
+			get:    (*Store).GetDeveloperMode,
+			value:  false,
+			defVal: false,
+		},
 	}
 
 	for _, tt := range tests {

@@ -80,6 +80,16 @@ func (a *App) SetMenuBarIcon(enabled bool) error {
 	return nil
 }
 
+// GetDeveloperMode returns whether developer/debug UI affordances are enabled.
+func (a *App) GetDeveloperMode() (bool, error) {
+	return a.settingsStore.GetDeveloperMode()
+}
+
+// SetDeveloperMode enables or disables developer/debug UI affordances.
+func (a *App) SetDeveloperMode(enabled bool) error {
+	return a.settingsStore.SetDeveloperMode(enabled)
+}
+
 // GetMessageListSortOrder returns the message list sort order setting
 func (a *App) GetMessageListSortOrder() (string, error) {
 	return a.settingsStore.GetMessageListSortOrder()

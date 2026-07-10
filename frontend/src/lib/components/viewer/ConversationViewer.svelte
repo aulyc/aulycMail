@@ -18,7 +18,7 @@
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { _ } from '$lib/i18n'
   import { isDialogGuardActive, onDialogGuardChange } from '$lib/stores/dialogGuard'
-  import { getDarkMailContent } from '$lib/stores/settings.svelte'
+  import { getDarkMailContent, getDeveloperMode } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
 
   interface Props {
@@ -1232,13 +1232,15 @@
           <Icon icon="mdi:unfold-less-horizontal" class="w-5 h-5 text-muted-foreground" />
         </button>
       {/if}
-      <button
-        class="p-2 rounded-md hover:bg-muted transition-colors"
-        title={$_('viewer.viewSource')}
-        onclick={openViewSource}
-      >
-        <Icon icon="mdi:code-tags" class="w-5 h-5 text-muted-foreground" />
-      </button>
+      {#if getDeveloperMode()}
+        <button
+          class="p-2 rounded-md hover:bg-muted transition-colors"
+          title={$_('viewer.viewSource')}
+          onclick={openViewSource}
+        >
+          <Icon icon="mdi:code-tags" class="w-5 h-5 text-muted-foreground" />
+        </button>
+      {/if}
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors"
         title={inFocusMode && focusModeKind === 'thread' ? $_('viewer.exitFocus') : $_('viewer.focusThread')}

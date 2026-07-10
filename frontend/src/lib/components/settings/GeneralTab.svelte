@@ -19,6 +19,7 @@
     onLanguageChange: (value: string) => void
     accentBarUnread: boolean
     menuBarIcon: boolean
+    developerMode: boolean
     darkMailContent: boolean
     composerFormat: string
     readReceiptResponsePolicy: string
@@ -39,6 +40,7 @@
     onLanguageChange,
     accentBarUnread = $bindable(),
     menuBarIcon = $bindable(),
+    developerMode = $bindable(),
     darkMailContent = $bindable(),
     composerFormat = $bindable(),
     readReceiptResponsePolicy = $bindable(),
@@ -239,6 +241,14 @@
       <Label for="autostart">{$_('settingsGeneral.autostartOnLogin')}</Label>
     </div>
     <BoolSelect id="autostart" bind:checked={autostart} onCheckedChange={handleAutostartChange} class="w-36" />
+  </div>
+
+  <!-- Developer mode -->
+  <div class="flex items-center justify-between gap-3">
+    <div class="space-y-0.5">
+      <Label for="developer-mode">{$_('settingsGeneral.developerMode')}</Label>
+    </div>
+    <BoolSelect id="developer-mode" bind:checked={developerMode} class="w-36" />
   </div>
 
   <!-- Default composer format (moved here from the removed "Composer" tab) -->

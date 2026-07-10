@@ -364,6 +364,7 @@
     "startHiddenHelp": "启动时隐藏窗口",
     "startup": "启动",
     "autostartOnLogin": "登录时自动启动",
+    "developerMode": "开发者模式",
     "autostartHelp": "登录时自动启动 aulycmail",
     "densityMicro": "极小",
     "densityCompact": "小",

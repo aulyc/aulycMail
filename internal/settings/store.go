@@ -31,6 +31,7 @@ const (
 	KeyDarkMailContent           = "dark_mail_content"
 	KeyAccentBarUnread           = "accent_bar_unread"
 	KeyMenuBarIcon               = "menu_bar_icon"
+	KeyDeveloperMode             = "developer_mode"
 	KeyLastSeenVersion           = "last_seen_version" // for "What's new in this version" launch dialog
 	KeyBackupDirectory           = "backup_directory"
 	KeyBackupScope               = "backup_scope"
@@ -261,6 +262,24 @@ func (s *Store) SetMenuBarIcon(enabled bool) error {
 		v = "true"
 	}
 	return s.Set(KeyMenuBarIcon, v)
+}
+
+// GetDeveloperMode returns whether developer/debug UI affordances are enabled.
+func (s *Store) GetDeveloperMode() (bool, error) {
+	value, err := s.Get(KeyDeveloperMode)
+	if err != nil {
+		return false, err
+	}
+	return value == "true", nil
+}
+
+// SetDeveloperMode enables or disables developer/debug UI affordances.
+func (s *Store) SetDeveloperMode(enabled bool) error {
+	v := "false"
+	if enabled {
+		v = "true"
+	}
+	return s.Set(KeyDeveloperMode, v)
 }
 
 // GetMessageListSortOrder returns the current message list sort order
