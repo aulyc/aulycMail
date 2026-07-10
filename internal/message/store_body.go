@@ -159,3 +159,73 @@ func (s *Store) CountMessagesWithoutBody(folderID string, sinceDate time.Time) (
 	}
 	return count, nil
 }
+
+// BodyUpdate holds body content for batch updates
+type BodyUpdate struct {
+	MessageID      string
+	BodyHTML       string
+	BodyText       string
+	Snippet        string
+	HasAttachments bool
+}
+
+// UpdateBodiesBatch updates body content for multiple messages in a single transaction
+func (s *Store) UpdateBodiesBatch(updates []BodyUpdate) error {
+	if len(updates) == 0 {
+		return nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`
+		UPDATE messages
+		SET body_html = ?, body_text = ?, snippet = ?, body_fetched = 1,
+		    has_attachments = ?
+		WHERE id = ?
+	`)
+	if err != nil {
+		return fmt.Errorf("failed to prepare statement: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, u := range updates {
+		_, err := stmt.Exec(
+			nullString(u.BodyHTML), nullString(u.BodyText), nullString(u.Snippet),
+			u.HasAttachments,
+			u.MessageID,
+		)
+		if err != nil {
+			s.log.Warn().Err(err).Str("messageID", u.MessageID).Msg("Failed to update body in batch")
+			// Continue with other updates
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return nil
+}
+
+// ClearBodiesForFolder clears body content for all messages in a folder.
+// This resets body_html, body_text, snippet to NULL and body_fetched to 0,
+// allowing the messages to be re-fetched and re-parsed during the next body sync.
+func (s *Store) ClearBodiesForFolder(folderID string) (int64, error) {
+	query := `
+		UPDATE messages
+		SET body_html = NULL, body_text = NULL, snippet = NULL, body_fetched = 0
+		WHERE folder_id = ?
+	`
+	result, err := s.db.Exec(query, folderID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to clear bodies for folder: %w", err)
+	}
+
+	affected, _ := result.RowsAffected()
+	s.log.Info().Str("folderID", folderID).Int64("affected", affected).Msg("Cleared bodies for folder")
+	return affected, nil
+}

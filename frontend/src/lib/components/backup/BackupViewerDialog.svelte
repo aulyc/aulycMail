@@ -4,6 +4,7 @@
   import { _ } from '$lib/i18n'
   import * as Select from '$lib/components/ui/select'
   import BackupDirectoryPicker from '$lib/components/backup/BackupDirectoryPicker.svelte'
+  import BackupModalFrame from '$lib/components/backup/BackupModalFrame.svelte'
   import SearchScopeCarousel from '$lib/components/search/SearchScopeCarousel.svelte'
   // @ts-ignore - wailsjs path
   import {
@@ -21,7 +22,7 @@
   import { buildDarkMailFilterStyles } from '$lib/utils/dark-mail'
   import { formatFileSize } from '$lib/utils/fileSize'
   import { createDebouncer } from '$lib/utils/debounce'
-  import { formatLocalDateTime, formatLocalDateTimeShort } from '$lib/utils/date'
+  import { formatLocalDateTime, formatLocalDateTimeShort, parseFlexibleDate } from '$lib/utils/date'
   import {
     rememberBackupDirectory,
     removeBackupDirectory,
@@ -268,8 +269,8 @@
   }
 
   function compareMessagesByDate(left: app.BackupViewerMessageSummary, right: app.BackupViewerMessageSummary): number {
-    const leftTime = parseViewerDate(left.date)?.getTime() ?? 0
-    const rightTime = parseViewerDate(right.date)?.getTime() ?? 0
+    const leftTime = parseFlexibleDate(left.date)?.getTime() ?? 0
+    const rightTime = parseFlexibleDate(right.date)?.getTime() ?? 0
     if (leftTime !== rightTime) {
       return messageSortOrder === 'newest' ? rightTime - leftTime : leftTime - rightTime
     }
@@ -441,27 +442,16 @@
     }
   }
 
-  function parseViewerDate(value: string): Date | null {
-    if (!value) return null
-    const trimmed = value.trim()
-    const goTimeMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(?:\.\d+)?\s+([+-]\d{4})\s+\S+$/)
-    const normalized = goTimeMatch
-      ? `${goTimeMatch[1]}T${goTimeMatch[2]}${goTimeMatch[3].slice(0, 3)}:${goTimeMatch[3].slice(3)}`
-      : trimmed
-    const date = new Date(normalized)
-    return Number.isNaN(date.getTime()) ? null : date
-  }
-
   function formatDate(value: string): string {
     if (!value) return ''
-    const date = parseViewerDate(value)
+    const date = parseFlexibleDate(value)
     if (!date) return value
     return formatLocalDateTime(date)
   }
 
   function formatShortDate(value: string): string {
     if (!value) return ''
-    const date = parseViewerDate(value)
+    const date = parseFlexibleDate(value)
     if (!date) return value
     return formatLocalDateTimeShort(date)
   }
@@ -472,13 +462,12 @@
 </script>
 
 {#if open}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-5" onclick={closeDialog}>
-    <div
-      class="flex h-[min(86vh,760px)] w-[min(94vw,1180px)] flex-col overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl"
-      onclick={(event) => event.stopPropagation()}
-    >
+  <BackupModalFrame
+    {open}
+    onClose={closeDialog}
+    containerClass="z-[90] flex items-center justify-center p-5"
+    panelClass="flex h-[min(86vh,760px)] w-[min(94vw,1180px)] flex-col overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-2xl"
+  >
       <header class="relative z-20 flex shrink-0 items-center gap-3 overflow-visible border-b border-border px-4 py-2">
         <h2 class="shrink-0 text-lg font-semibold">{$_('backupViewer.title')}</h2>
 
@@ -768,17 +757,16 @@
           {/if}
         </section>
       </div>
-    </div>
-  </div>
+  </BackupModalFrame>
 
   {#if searchOpen}
-    <!-- svelte-ignore a11y_click_events_have_key_events -->
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="fixed inset-0 z-[120] bg-black/75" onclick={closeSearch}>
-      <div
-        class="mx-auto mt-[calc(12vh+52px)] w-[min(90vw,680px)]"
-        onclick={(event) => event.stopPropagation()}
-      >
+    <BackupModalFrame
+      open={searchOpen}
+      onClose={closeSearch}
+      containerClass="z-[120]"
+      backdropClass="bg-black/75"
+      panelClass="mx-auto mt-[calc(12vh+52px)] w-[min(90vw,680px)]"
+    >
         <div class="mb-3 overflow-hidden">
           <SearchScopeCarousel
             scopes={accountScopes}
@@ -838,8 +826,7 @@
             </div>
           {/if}
         </div>
-      </div>
-    </div>
+    </BackupModalFrame>
   {/if}
 {/if}
 

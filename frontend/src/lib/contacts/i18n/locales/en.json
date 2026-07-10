@@ -5,38 +5,25 @@
       "cancel": "Cancel",
       "save": "Save",
       "delete": "Delete",
-      "primary": "primary",
-      "primaryLabel": "Primary",
-      "primaryTooltip": "Primary"
+      "primary": "primary"
     },
     "sidebar": {
       "title": "Contacts",
       "refresh": "Refresh contacts from mail",
-      "expand": "Expand",
-      "collapse": "Collapse",
       "all": "All Contacts",
       "roleSender": "Senders",
       "roleRecipient": "Recipients",
       "roleCc": "Cc",
       "roleBcc": "Bcc",
-      "roleCcBcc": "Cc / Bcc",
       "localAll": "Local - All",
       "localManual": "Local - Contacts",
-      "localCollected": "Local - Collected",
-      "syncing": "Syncing contacts…",
-      "idle": "Contacts",
-      "settings": "Contact settings"
+      "localCollected": "Local - Collected"
     },
-    "status": {
-      "refreshing": "Refreshing contacts…",
-      "refreshingProgress": "Refreshing contacts {scanned}/{total}"
-    },
+    "status": {},
     "list": {
       "header": "Contacts",
       "label": "Contacts",
       "searchPlaceholder": "Search contacts...",
-      "searchOpen": "Search",
-      "searchClose": "Close search",
       "searchClear": "Clear search",
       "sortAsc": "Sort: A → Z",
       "sortDesc": "Sort: Z → A",
@@ -52,8 +39,6 @@
       "relatedMail": "Related mail",
       "relatedMailLoading": "Loading…",
       "relatedMailEmpty": "No related mail",
-      "openInMail": "Open in mail",
-      "readonlyHint": "Read-only",
       "labels": {
         "displayName": "Display name",
         "email": "Email",
@@ -68,69 +53,32 @@
         "im": "IM",
         "categories": "Categories",
         "note": "Note",
-        "source": "Source",
         "lastUpdated": "Last updated"
       }
     },
     "add": {
       "title": "Add contact",
       "description": "Pick a source, then enter the contact's email and display name.",
-      "sourceLabel": "Save to",
-      "sourcePlaceholder": "Select a source",
-      "localOption": "Local contacts",
       "errorEmailRequired": "Email is required.",
       "errorEmailInvalid": "Enter a valid email address.",
       "errorEmailExists": "A contact with this email already exists."
     },
     "edit": {
       "title": "Edit contact",
-      "photoChange": "Change…",
-      "photoRemove": "Remove",
-      "photoUrlOnly": "(linked from server — pick a file to replace with an inline photo)",
       "name": "Display name",
       "nameRequired": "Display name is required.",
-      "nickname": "Nickname",
       "emails": "Emails",
       "addEmail": "Add email",
       "emailPlaceholder": "name@example.com",
       "emailInvalid": "Enter a valid email address.",
       "removeEmail": "Remove email",
-      "phones": "Phones",
-      "addPhone": "Add phone",
-      "phonePlaceholder": "+1-555-0100",
-      "removePhone": "Remove phone",
-      "addresses": "Addresses",
-      "addAddress": "Add address",
-      "removeAddress": "Remove address",
-      "addressStreet": "Street",
-      "addressCity": "City",
-      "addressRegion": "Region / State",
-      "addressPostcode": "Postcode",
-      "addressCountry": "Country",
-      "org": "Organization",
-      "titleField": "Title",
-      "urls": "URLs",
-      "addUrl": "Add URL",
-      "urlPlaceholder": "https://example.com",
-      "removeUrl": "Remove URL",
-      "impps": "Instant messaging",
-      "addImpp": "Add IM",
-      "removeImpp": "Remove IM",
-      "imppPlaceholder": "xmpp:user@chat.example",
-      "categoriesLabel": "Categories",
-      "categoriesPlaceholder": "friend, team, gym (comma-separated)",
-      "bday": "Birthday",
       "note": "Note"
     },
     "delete": {
       "title": "Delete this contact?",
       "descriptionLocal": "{name} will be removed from your local contacts. Mail you've already sent to this address is not affected."
     },
-    "settings": {
-      "title": "Contacts settings",
-      "description": "Contacts are stored locally. Manual contacts and addresses collected from sent mail are available in the Contacts view.",
-      "close": "Close"
-    },
+    "settings": {},
     "toast": {
       "refreshed": "Refreshed contacts from {count} messages",
       "conflict": "This contact was changed elsewhere. Your edit was discarded — refreshed with the latest version.",
@@ -141,8 +89,7 @@
       "updated": "Contact updated",
       "failedUpdate": "Failed to update contact.",
       "emailCopied": "Copied {email}",
-      "emailCopyFailed": "Failed to copy email.",
-      "photoFailed": "Could not process that image. Try a different file."
+      "emailCopyFailed": "Failed to copy email."
     }
   }
 }

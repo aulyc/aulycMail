@@ -104,3 +104,14 @@ export function formatLocalDateTimeShort(value: string | Date): string {
   const date = value instanceof Date ? value : new Date(value)
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 }
+
+export function parseFlexibleDate(value: string): Date | null {
+  if (!value) return null
+  const trimmed = value.trim()
+  const goTimeMatch = trimmed.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2})(?:\.\d+)?\s+([+-]\d{4})\s+\S+$/)
+  const normalized = goTimeMatch
+    ? `${goTimeMatch[1]}T${goTimeMatch[2]}${goTimeMatch[3].slice(0, 3)}:${goTimeMatch[3].slice(3)}`
+    : trimmed
+  const date = new Date(normalized)
+  return Number.isNaN(date.getTime()) ? null : date
+}

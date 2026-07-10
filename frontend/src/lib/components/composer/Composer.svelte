@@ -65,6 +65,22 @@
     type DraftSaveStatus,
     type DraftSyncStatus,
   } from './composerDraft'
+  import {
+    composerHasContent,
+    formatIdentityLabel,
+    getComposerDisplayMode,
+    widenComposerLabel,
+  } from './composerDisplay'
+  import {
+    clampMentionPosition,
+    getPlainMentionPosition,
+    MENTION_MENU_HEIGHT,
+    MENTION_VISIBLE_ROWS,
+  } from './composerMentionLayout'
+  import {
+    createInlineImageCID,
+    MAX_INLINE_IMAGE_SIZE,
+  } from './composerInlineImages'
   import * as Select from '$lib/components/ui/select'
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import { ThreeOptionDialog } from '$lib/components/ui/confirm-dialog'
@@ -89,26 +105,8 @@
 
   let { accountId, initialMessage = null, draftId = null, onClose, onSent, api: propApi, imagesLoaded = false }: Props = $props()
 
-  // Widen a 2-character CJK field label (抄送/密送/主题) with a full-width space
-  // so it lines up with the 3-character labels (发件人/收件人). Latin labels
-  // (Cc/Bcc/To/Subject) contain no CJK chars, so they pass through untouched.
-  function widenLabel(s: string): string {
-    const chars = [...s]
-    if (chars.length === 2 && /^[一-鿿]{2}$/.test(s)) {
-      return chars[0] + '　' + chars[1]
-    }
-    return s
-  }
-
-  function formatIdentityLabel(identity: account.Identity | null | undefined): string {
-    if (!identity) return ''
-
-    const email = (identity.email || '').trim()
-    const name = (identity.name || '').trim()
-    if (!name || name.toLowerCase() === email.toLowerCase()) return email
-
-    return `${name} <${email}>`
-  }
+  // Widen two-character CJK labels so they align with three-character labels.
+  const widenLabel = widenComposerLabel
 
   // Get API from context, props, or create default main window API
   const contextApi = getContext<ComposerApi | undefined>(COMPOSER_API_KEY)
@@ -211,16 +209,7 @@
   // 10-second debounce like Geary
   const DRAFT_SAVE_DELAY = 10000
 
-  // Max inline image size (10 MB) — larger files should be added as regular attachments
-  const MAX_INLINE_IMAGE_SIZE = 10 * 1024 * 1024
   const MENTION_SUGGESTION_LIMIT = 100
-  const MENTION_MENU_WIDTH = 288
-  const MENTION_ROW_HEIGHT = 52
-  const MENTION_VISIBLE_ROWS = 4
-  const MENTION_MENU_BORDER_WIDTH = 2
-  const MENTION_MENU_HEIGHT = MENTION_ROW_HEIGHT * MENTION_VISIBLE_ROWS + MENTION_MENU_BORDER_WIDTH
-  const MENTION_VIEWPORT_PADDING = 8
-  const MENTION_ANCHOR_GAP = 6
 
   // Whether remote images are blocked in the composer's quoted content
   let composerImagesBlocked = $state(false)
@@ -372,24 +361,9 @@
   }
 
   function setMentionPosition(left: number, top: number) {
-    const container = composerBodyElement
-    if (!container) {
-      mentionLeft = left
-      mentionTop = top
-      return
-    }
-    const viewportTop = container.scrollTop
-    const viewportBottom = viewportTop + container.clientHeight
-    const minTop = viewportTop + MENTION_VIEWPORT_PADDING
-    const maxTop = Math.max(minTop, viewportBottom - MENTION_MENU_HEIGHT - MENTION_VIEWPORT_PADDING)
-    const belowTop = top + MENTION_ANCHOR_GAP
-    const aboveTop = top - MENTION_MENU_HEIGHT - MENTION_ANCHOR_GAP
-    const hasRoomBelow = belowTop + MENTION_MENU_HEIGHT <= viewportBottom - MENTION_VIEWPORT_PADDING
-    const hasRoomAbove = aboveTop >= minTop
-    const nextTop = !hasRoomBelow && hasRoomAbove ? aboveTop : Math.min(Math.max(minTop, belowTop), maxTop)
-    const maxLeft = Math.max(MENTION_VIEWPORT_PADDING, container.clientWidth - MENTION_MENU_WIDTH - MENTION_VIEWPORT_PADDING)
-    mentionLeft = Math.min(Math.max(MENTION_VIEWPORT_PADDING, left), maxLeft)
-    mentionTop = nextTop
+    const position = clampMentionPosition({ left, top, container: composerBodyElement })
+    mentionLeft = position.left
+    mentionTop = position.top
   }
 
   function updatePlainMentionPosition(markerOffset: number) {
@@ -397,35 +371,8 @@
     const container = composerBodyElement
     if (!textarea || !container) return
 
-    const style = getComputedStyle(textarea)
-    const mirror = document.createElement('div')
-    mirror.style.position = 'absolute'
-    mirror.style.visibility = 'hidden'
-    mirror.style.whiteSpace = 'pre-wrap'
-    mirror.style.wordBreak = 'break-word'
-    mirror.style.overflowWrap = 'break-word'
-    mirror.style.boxSizing = style.boxSizing
-    mirror.style.width = `${textarea.clientWidth}px`
-    mirror.style.font = style.font
-    mirror.style.letterSpacing = style.letterSpacing
-    mirror.style.lineHeight = style.lineHeight
-    mirror.style.padding = style.padding
-    mirror.style.border = style.border
-
-    const markerPosition = Math.max(0, Math.min(markerOffset, textarea.value.length))
-    mirror.textContent = textarea.value.slice(0, markerPosition)
-    const marker = document.createElement('span')
-    marker.textContent = textarea.value.slice(markerPosition, markerPosition + 1) || '.'
-    mirror.appendChild(marker)
-    document.body.appendChild(mirror)
-
-    const textareaRect = textarea.getBoundingClientRect()
-    const containerRect = container.getBoundingClientRect()
-    const lineHeight = Number.parseFloat(style.lineHeight) || 20
-    const left = textareaRect.left - containerRect.left + marker.offsetLeft - textarea.scrollLeft
-    const top = textareaRect.top - containerRect.top + marker.offsetTop - textarea.scrollTop + lineHeight + container.scrollTop
-    mirror.remove()
-    setMentionPosition(left, top)
+    const position = getPlainMentionPosition({ textarea, container, markerOffset })
+    setMentionPosition(position.left, position.top)
   }
 
   function updatePlainMention() {
@@ -669,26 +616,21 @@
     }, 150)
   }
 
-  // Determine display mode from initialMessage
   function getDisplayMode(): 'new' | 'reply' | 'reply-all' | 'forward' {
-    if (!initialMessage) return 'new'
-    if (replyType) return replyType
-    if (initialMessage.subject?.startsWith('Fwd:')) return 'forward'
-    if (initialMessage.in_reply_to) {
-      // reply-all if there are multiple To recipients or any Cc
-      if ((initialMessage.to?.length || 0) > 1 || (initialMessage.cc?.length || 0) > 0) {
-        return 'reply-all'
-      }
-      return 'reply'
-    }
-    return 'new'
+    return getComposerDisplayMode({ initialMessage, replyType })
   }
 
-  // Check if the composer has any meaningful content worth saving
   function hasContent(): boolean {
-    const bodyText = isPlainTextMode ? plainTextContent.trim() : (editor?.getText()?.trim() || '')
-    return toRecipients.length > 0 || ccRecipients.length > 0 || bccRecipients.length > 0 ||
-           subject.trim() !== '' || bodyText !== '' || attachments.length > 0
+    return composerHasContent({
+      toCount: toRecipients.length,
+      ccCount: ccRecipients.length,
+      bccCount: bccRecipients.length,
+      subject,
+      isPlainTextMode,
+      plainTextContent,
+      editor,
+      attachments,
+    })
   }
 
   // Collect any images in the editor DOM that aren't tracked in inlineImages.
@@ -1582,7 +1524,7 @@
   // Generate a unique Content-ID for inline images
   function generateCID(): string {
     inlineImageCounter++
-    return `image${inlineImageCounter}-${Date.now()}@aulycmail`
+    return createInlineImageCID(inlineImageCounter)
   }
 
   // Handle an inline image file (from paste or drop)

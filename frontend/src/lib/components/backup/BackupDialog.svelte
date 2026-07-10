@@ -5,6 +5,7 @@
   import { dialogGuardOpen, dialogGuardClose } from '$lib/stores/dialogGuard'
   import { _ } from '$lib/i18n'
   import BackupTab from '$lib/components/settings/BackupTab.svelte'
+  import BackupModalFrame from './BackupModalFrame.svelte'
 
   interface Props {
     open?: boolean
@@ -53,13 +54,12 @@
 </script>
 
 {#if open}
-  <div class="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4">
-    <div
-      class="flex max-h-[85vh] w-[min(92vw,760px)] max-w-2xl flex-col overflow-hidden rounded-lg border bg-background p-6 shadow-lg"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="backup-dialog-title"
-    >
+  <BackupModalFrame
+    {open}
+    onClose={closeDialog}
+    labelledBy="backup-dialog-title"
+    panelClass="flex max-h-[85vh] w-[min(92vw,760px)] max-w-2xl flex-col overflow-hidden rounded-lg border bg-background p-6 shadow-lg"
+  >
       <div class="mb-4 flex items-center gap-3">
         <Icon icon="lucide:archive" class="h-5 w-5 shrink-0" />
         <h2 id="backup-dialog-title" class="min-w-0 flex-1 text-lg font-semibold leading-none">
@@ -84,6 +84,5 @@
           {$_('common.close')}
         </Button>
       </div>
-    </div>
-  </div>
+  </BackupModalFrame>
 {/if}

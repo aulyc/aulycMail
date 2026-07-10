@@ -5,38 +5,25 @@
       "cancel": "取消",
       "save": "保存",
       "delete": "删除",
-      "primary": "主要",
-      "primaryLabel": "主要",
-      "primaryTooltip": "主要"
+      "primary": "主要"
     },
     "sidebar": {
       "title": "联系人",
       "refresh": "从邮件刷新通讯录",
-      "expand": "展开",
-      "collapse": "收缩",
       "all": "全部联系人",
       "roleSender": "发件人",
       "roleRecipient": "收件人",
       "roleCc": "抄送",
       "roleBcc": "密送",
-      "roleCcBcc": "抄送/密送",
       "localAll": "本地 - 全部",
       "localManual": "本地 - 联系人",
-      "localCollected": "本地 - 已收集",
-      "syncing": "正在同步联系人…",
-      "idle": "联系人",
-      "settings": "联系人设置"
+      "localCollected": "本地 - 已收集"
     },
-    "status": {
-      "refreshing": "正在刷新联系人…",
-      "refreshingProgress": "正在刷新联系人 {scanned}/{total}"
-    },
+    "status": {},
     "list": {
       "header": "联系人",
       "label": "联系人",
       "searchPlaceholder": "搜索联系人...",
-      "searchOpen": "搜索",
-      "searchClose": "关闭搜索",
       "searchClear": "清除搜索",
       "sortAsc": "排序：A → Z",
       "sortDesc": "排序：Z → A",
@@ -52,8 +39,6 @@
       "relatedMail": "往来邮件",
       "relatedMailLoading": "加载中…",
       "relatedMailEmpty": "没有往来邮件",
-      "openInMail": "在邮件中打开",
-      "readonlyHint": "只读",
       "labels": {
         "displayName": "显示名称",
         "email": "电子邮件",
@@ -68,69 +53,32 @@
         "im": "即时通讯",
         "categories": "类别",
         "note": "备注",
-        "source": "来源",
         "lastUpdated": "最后更新"
       }
     },
     "add": {
       "title": "添加联系人",
       "description": "选择一个来源，然后输入联系人的电子邮件和显示名称。",
-      "sourceLabel": "保存到",
-      "sourcePlaceholder": "选择一个来源",
-      "localOption": "本地联系人",
       "errorEmailRequired": "电子邮件为必填项。",
       "errorEmailInvalid": "请输入有效的电子邮件地址。",
       "errorEmailExists": "已存在使用此电子邮件的联系人。"
     },
     "edit": {
       "title": "编辑联系人",
-      "photoChange": "更改…",
-      "photoRemove": "移除",
-      "photoUrlOnly": "（从服务器链接 — 选择一个文件以替换为内嵌照片）",
       "name": "显示名称",
       "nameRequired": "显示名称为必填项。",
-      "nickname": "昵称",
       "emails": "电子邮件",
       "addEmail": "添加电子邮件",
       "emailPlaceholder": "name@example.com",
       "emailInvalid": "请输入有效的电子邮件地址。",
       "removeEmail": "移除电子邮件",
-      "phones": "电话",
-      "addPhone": "添加电话",
-      "phonePlaceholder": "+1-555-0100",
-      "removePhone": "移除电话",
-      "addresses": "地址",
-      "addAddress": "添加地址",
-      "removeAddress": "移除地址",
-      "addressStreet": "街道",
-      "addressCity": "城市",
-      "addressRegion": "地区/州",
-      "addressPostcode": "邮政编码",
-      "addressCountry": "国家/地区",
-      "org": "组织",
-      "titleField": "职称",
-      "urls": "网址",
-      "addUrl": "添加网址",
-      "urlPlaceholder": "https://example.com",
-      "removeUrl": "移除网址",
-      "impps": "即时通讯",
-      "addImpp": "添加即时通讯",
-      "removeImpp": "移除即时通讯",
-      "imppPlaceholder": "xmpp:user@chat.example",
-      "categoriesLabel": "类别",
-      "categoriesPlaceholder": "朋友、团队、健身房（以逗号分隔）",
-      "bday": "生日",
       "note": "备注"
     },
     "delete": {
       "title": "删除此联系人？",
       "descriptionLocal": "{name} 将从您的本地联系人中移除。您已发送到此地址的邮件不受影响。"
     },
-    "settings": {
-      "title": "联系人设置",
-      "description": "联系人仅存储在本地。手动添加的联系人和从已发送邮件收集的地址会显示在联系人视图中。",
-      "close": "关闭"
-    },
+    "settings": {},
     "toast": {
       "refreshed": "已从 {count} 封邮件刷新联系人",
       "conflict": "此联系人已在别处被更改。您的编辑已被放弃 — 已刷新为最新版本。",
@@ -141,8 +89,7 @@
       "updated": "联系人已更新",
       "failedUpdate": "更新联系人失败。",
       "emailCopied": "已复制 {email}",
-      "emailCopyFailed": "复制电子邮件失败。",
-      "photoFailed": "无法处理该图片。请尝试其他文件。"
+      "emailCopyFailed": "复制电子邮件失败。"
     }
   }
 }

@@ -30,6 +30,15 @@
     getVirtualWindow as calculateVirtualWindow,
     type VirtualWindow,
   } from './messageListVirtual'
+  import {
+    createMultiRowContextMenu,
+    createSingleRowContextMenu,
+    getSelectedMessageIds as collectSelectedMessageIds,
+    hasSelectedUnread,
+    hasSelectedUnstarred,
+    toggleSetEntry,
+    type RowContextMenuState,
+  } from './messageListSelection'
 
   interface Props {
     accountId?: string | null
@@ -48,16 +57,6 @@
     isFlashing?: boolean
     showFolderToggle?: boolean
     onToggleSidebar?: () => void
-  }
-
-  type RowContextMenuState = {
-    messageIds: string[]
-    accountId: string
-    folderId: string
-    folderType: string
-    isStarred: boolean
-    isRead: boolean
-    allowReply: boolean
   }
 
   let {
@@ -362,26 +361,12 @@
   // Compute selected message IDs from all checked conversations (for multi-select context menu)
   // Check both conversations and searchResults since selections can span both
   // Use Set to deduplicate in case same conversation appears in both arrays
-  const selectedMessageIds = $derived(
-    [...new Set(
-      [...conversations, ...searchResults]
-        .filter((c) => checkedThreadIds.has(c.threadId))
-        .flatMap((c: any) => c.messageIds || c.messages?.map((m: any) => m.id) || [])
-    )]
-  )
+  const selectedMessageIds = $derived(collectSelectedMessageIds([...conversations, ...searchResults], checkedThreadIds))
 
   // Aggregated star/read state for multi-select context menu
   // Show "Star" if any selected is unstarred, show "Mark as Read" if any selected is unread
-  const selectedHasUnstarred = $derived(
-    [...conversations, ...searchResults]
-      .filter((c) => checkedThreadIds.has(c.threadId))
-      .some((c: any) => !c.isStarred)
-  )
-  const selectedHasUnread = $derived(
-    [...conversations, ...searchResults]
-      .filter((c) => checkedThreadIds.has(c.threadId))
-      .some((c: any) => (c.unreadCount || 0) > 0)
-  )
+  const selectedHasUnstarred = $derived(hasSelectedUnstarred([...conversations, ...searchResults], checkedThreadIds))
+  const selectedHasUnread = $derived(hasSelectedUnread([...conversations, ...searchResults], checkedThreadIds))
 
   // Clear multi-select (called when right-clicking on unchecked row)
   function clearSelection() {
@@ -745,14 +730,6 @@
       : totalCount
   )
 
-  function toggleSetEntry(set: Set<string>, key: string) {
-    if (set.has(key)) {
-      set.delete(key)
-      return
-    }
-    set.add(key)
-  }
-
   // A row is shown selected (highlighted) if it's in the multi-selection set;
   // when nothing is multi-selected, the single open conversation is highlighted.
   function isRowSelected(threadId: string): boolean {
@@ -976,34 +953,26 @@
     return calculateVirtualWindow(items, listViewportHeight, listScrollTop, rowHeight)
   }
 
-  function getConversationMessageIds(conversation: any): string[] {
-    return conversation.messageIds || conversation.messages?.map((m: any) => m.id) || []
-  }
-
   function prepareRowContextMenu(conversation: any, rowAccountId: string, rowFolderId: string, useMultiSelect: boolean) {
     if (useMultiSelect) {
-      rowContextMenu = {
+      rowContextMenu = createMultiRowContextMenu({
         messageIds: selectedMessageIds,
         accountId: rowAccountId,
         folderId: rowFolderId,
         folderType,
-        isStarred: !selectedHasUnstarred,
-        isRead: !selectedHasUnread,
-        allowReply: false,
-      }
+        hasUnstarred: selectedHasUnstarred,
+        hasUnread: selectedHasUnread,
+      })
       return
     }
 
     clearSelection()
-    rowContextMenu = {
-      messageIds: getConversationMessageIds(conversation),
+    rowContextMenu = createSingleRowContextMenu({
+      conversation,
       accountId: rowAccountId,
       folderId: rowFolderId,
       folderType,
-      isStarred: conversation.isStarred ?? false,
-      isRead: (conversation.unreadCount || 0) === 0,
-      allowReply: true,
-    }
+    })
   }
 
   type RowRenderOptions = {
