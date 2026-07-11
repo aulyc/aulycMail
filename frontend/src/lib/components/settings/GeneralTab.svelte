@@ -182,15 +182,13 @@
     </Select.Root>
   </div>
 
-  <!-- Dark mail content — only relevant when a dark theme is active -->
-  {#if draftThemeIsDark}
-    <div class="flex items-center justify-between gap-3">
-      <div>
-        <Label for="dark-mail-content">{$_('settingsGeneral.darkMailContent')}</Label>
-      </div>
-      <BoolSelect id="dark-mail-content" bind:checked={darkMailContent} class="w-36" />
+  <!-- Dark mail content — only configurable when a dark theme is selected. -->
+  <div class="flex items-center justify-between gap-3">
+    <div>
+      <Label for="dark-mail-content">{$_('settingsGeneral.darkMailContent')}</Label>
     </div>
-  {/if}
+    <BoolSelect id="dark-mail-content" bind:checked={darkMailContent} disabled={!draftThemeIsDark} class="w-36" />
+  </div>
 
   <!-- Accent bar for unread messages -->
   <div class="flex items-center justify-between gap-3">

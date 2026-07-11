@@ -49,6 +49,7 @@
   let loading = $state(true)
   let saving = $state(false)
   let activeTab = $state('general')
+  const settingsTabTriggerClass = 'flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-primary/25 dark:data-[state=active]:bg-primary/15'
 
   // Load settings on mount
   onMount(async () => {
@@ -207,15 +208,15 @@
     {:else}
       <Tabs.Root bind:value={activeTab} class="w-full">
         <Tabs.List class="grid w-full grid-cols-3">
-          <Tabs.Trigger value="general" class="flex items-center gap-2">
+          <Tabs.Trigger value="general" class={settingsTabTriggerClass}>
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:settings-2" width="16" height="16" /></span>
             {$_('settings.general')}
           </Tabs.Trigger>
-          <Tabs.Trigger value="images" class="flex items-center gap-2">
+          <Tabs.Trigger value="images" class={settingsTabTriggerClass}>
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:image" width="16" height="16" /></span>
             {$_('settings.images')}
           </Tabs.Trigger>
-          <Tabs.Trigger value="accounts" class="flex items-center gap-2">
+          <Tabs.Trigger value="accounts" class={settingsTabTriggerClass}>
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:mails" width="16" height="16" /></span>
             {$_('settings.accounts')}
           </Tabs.Trigger>
