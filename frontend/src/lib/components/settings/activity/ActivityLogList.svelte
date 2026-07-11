@@ -8,7 +8,7 @@
   let { store }: Props = $props()
 </script>
 
-<div class="overflow-hidden rounded-xl border border-border bg-card/70 shadow-sm">
+<div class="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-card/70 shadow-sm scrollbar-thin">
   {#if store.loading && store.entries.length === 0}
     <div class="flex justify-center py-12"><Icon icon="mdi:loading" class="h-6 w-6 animate-spin text-muted-foreground" /></div>
   {:else if store.loadFailed && store.entries.length === 0}

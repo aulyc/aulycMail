@@ -84,7 +84,7 @@
       </aside>
 
       <div class="flex min-h-0 min-w-0 flex-col bg-background">
-        <main class="min-h-0 flex-1 overflow-y-auto px-7 py-6 scrollbar-thin">
+        <main class="min-h-0 flex-1 px-7 py-6 scrollbar-thin {activePage === 'activity' ? 'overflow-hidden' : 'overflow-y-auto'}">
           {#if draft.loading}
             <div class="flex h-full items-center justify-center"><Icon icon="mdi:loading" class="h-6 w-6 animate-spin text-muted-foreground" /></div>
           {:else if activePage === 'general'}<GeneralSettingsPage {draft} />
