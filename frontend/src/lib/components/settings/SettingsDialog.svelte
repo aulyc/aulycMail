@@ -72,8 +72,8 @@
   <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0" preventCloseAutoFocus onInteractOutside={(event) => event.preventDefault()}>
     <Dialog.Title class="sr-only">{$_('settings.title')}</Dialog.Title>
     <div class="grid min-h-0 flex-1 grid-cols-[210px_minmax(0,1fr)]">
-      <aside class="flex min-h-0 flex-col border-r border-border bg-muted/35 px-3 py-5">
-        <h1 class="mb-4 px-2 text-lg font-semibold">{$_('settings.title')}</h1>
+      <aside class="flex min-h-0 flex-col border-r border-border bg-muted/35 px-3 py-6">
+        <h1 class="mb-6 flex h-5 items-center px-2 text-lg font-semibold leading-5">{$_('settings.title')}</h1>
         <nav class="space-y-1" aria-label={$_('settings.title')}>
           {#each navigation as item (item.id)}
             <button type="button" class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition-colors {activePage === item.id ? 'bg-primary/12 text-primary ring-1 ring-primary/20' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}" onclick={() => activePage = item.id}>

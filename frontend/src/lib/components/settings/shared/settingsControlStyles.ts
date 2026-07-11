@@ -1,0 +1,1 @@
+export const SETTINGS_SELECT_WIDTH_CLASS = 'w-40'

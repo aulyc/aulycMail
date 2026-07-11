@@ -4,6 +4,6 @@
   import SettingsPageHeader from '../shared/SettingsPageHeader.svelte'
 </script>
 <div class="space-y-6">
-  <SettingsPageHeader title={$_('settings.accounts')} description={$_('settingsDescriptions.accounts')} />
+  <SettingsPageHeader description={$_('settingsDescriptions.accounts')} />
   <AccountsTab />
 </div>

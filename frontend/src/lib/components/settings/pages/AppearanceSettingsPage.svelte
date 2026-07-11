@@ -6,6 +6,7 @@
   import SettingsPageHeader from '../shared/SettingsPageHeader.svelte'
   import SettingsSection from '../shared/SettingsSection.svelte'
   import SettingsRow from '../shared/SettingsRow.svelte'
+  import { SETTINGS_SELECT_WIDTH_CLASS } from '../shared/settingsControlStyles'
 
   interface Props { draft: SettingsDraft }
   let { draft }: Props = $props()
@@ -24,23 +25,23 @@
 </script>
 
 <div class="space-y-6">
-  <SettingsPageHeader title={$_('settings.appearance')} description={$_('settingsDescriptions.appearance')} />
-  <SettingsSection>
+  <SettingsPageHeader description={$_('settingsDescriptions.appearance')} />
+  <SettingsSection framed={false}>
     <SettingsRow label={$_('settingsGeneral.theme')}>
       <Select.Root value={draft.themeMode} onValueChange={(value) => value && (draft.themeMode = value)}>
-        <Select.Trigger class="w-40"><Select.Value>{themeLabel}</Select.Value></Select.Trigger>
+        <Select.Trigger class={SETTINGS_SELECT_WIDTH_CLASS}><Select.Value>{themeLabel}</Select.Value></Select.Trigger>
         <Select.Content>{#each themes as option (option.value)}<Select.Item value={option.value} label={option.label} />{/each}</Select.Content>
       </Select.Root>
     </SettingsRow>
     <SettingsRow label={$_('settingsGeneral.darkMailContent')}>
-      <BoolSelect bind:checked={draft.darkMailContent} disabled={draft.themeMode !== 'pop-dark'} class="w-36" />
+      <BoolSelect bind:checked={draft.darkMailContent} disabled={draft.themeMode !== 'pop-dark'} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>
     <SettingsRow label={$_('settingsGeneral.accentBarUnread')}>
-      <BoolSelect bind:checked={draft.accentBarUnread} class="w-36" />
+      <BoolSelect bind:checked={draft.accentBarUnread} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>
     <SettingsRow label={$_('settingsGeneral.messageListDensity')}>
       <Select.Root value={draft.messageListDensity} onValueChange={(value) => value && (draft.messageListDensity = value)}>
-        <Select.Trigger class="w-40"><Select.Value>{densityLabel}</Select.Value></Select.Trigger>
+        <Select.Trigger class={SETTINGS_SELECT_WIDTH_CLASS}><Select.Value>{densityLabel}</Select.Value></Select.Trigger>
         <Select.Content>{#each densities as option (option.value)}<Select.Item value={option.value} label={option.label} />{/each}</Select.Content>
       </Select.Root>
     </SettingsRow>

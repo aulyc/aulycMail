@@ -45,7 +45,7 @@
 </script>
 
 <div class="space-y-6">
-  <SettingsPageHeader title={$_('settingsBackup.title')} description={$_('settingsDescriptions.backup')} />
+  <SettingsPageHeader description={$_('settingsDescriptions.backup')} />
   <BackupConfigSection {draft} running={store.running} />
   <RecentBackupLog directory={draft.backupDirectory} />
   <BackupRunPanel {store} {canStart} saveBeforeStart={draft.backupDirty} onStart={start} />

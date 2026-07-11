@@ -270,8 +270,7 @@
     "mail": "设置撰写格式和邮件回执策略。",
     "imagePrivacy": "控制远程图片加载和图片白名单。",
     "accounts": "添加、编辑、排序或测试邮箱账户。",
-    "backup": "将邮件导出到本地目录并查看最近结果。",
-    "menuBarIcon": "启用后，应用会同时保持后台运行。"
+    "backup": "将邮件导出到本地目录并查看最近结果。"
   },
   "settingsGeneral": {
     "language": "语言",
@@ -310,7 +309,6 @@
     "deleteAccount": "删除账户"
   },
   "settingsBackup": {
-    "title": "备份邮件",
     "directory": "备份目录",
     "directoryPlaceholder": "请选择备份目录",
     "scope": "备份范围",
@@ -659,7 +657,6 @@
     "description": "查看邮件同步和备份任务的历史记录。",
     "sync": "同步",
     "backup": "备份",
-    "syncTitle": "同步 {target}",
     "date": "日期",
     "allDates": "全部日期",
     "empty": "暂无活动日志",
@@ -674,7 +671,7 @@
     "backupFailed": "备份失败",
     "backupCancelled": "备份已取消",
     "backupSummary": "{mode} · 完成 {completed} · 新增 {added} · 已存在 {skipped} · 缺失 {missing} · 失败 {failed}",
-    "syncSummary": "同步 {target} · 新增 {added} 封",
+    "syncSummary": "{target} · 新增 {added} 封",
     "filters": { "all": "全部", "sync": "同步", "backup": "备份", "failed": "失败" },
     "status": { "success": "成功", "partial": "部分完成", "failed": "失败", "cancelled": "已取消", "unknown": "未知" }
   },

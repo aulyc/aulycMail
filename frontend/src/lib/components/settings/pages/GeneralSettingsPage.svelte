@@ -6,6 +6,7 @@
   import SettingsPageHeader from '../shared/SettingsPageHeader.svelte'
   import SettingsSection from '../shared/SettingsSection.svelte'
   import SettingsRow from '../shared/SettingsRow.svelte'
+  import { SETTINGS_SELECT_WIDTH_CLASS } from '../shared/settingsControlStyles'
 
   interface Props { draft: SettingsDraft }
   let { draft }: Props = $props()
@@ -26,25 +27,25 @@
 </script>
 
 <div class="space-y-6">
-  <SettingsPageHeader title={$_('settings.general')} description={$_('settingsDescriptions.general')} />
-  <SettingsSection>
+  <SettingsPageHeader description={$_('settingsDescriptions.general')} />
+  <SettingsSection framed={false}>
     <SettingsRow label={$_('settingsGeneral.language')}>
       <Select.Root value={draft.language || 'en'} onValueChange={(value) => value && (draft.language = value)}>
-        <Select.Trigger class="w-40"><Select.Value>{languageLabel(draft.language || 'en')}</Select.Value></Select.Trigger>
+        <Select.Trigger class={SETTINGS_SELECT_WIDTH_CLASS}><Select.Value>{languageLabel(draft.language || 'en')}</Select.Value></Select.Trigger>
         <Select.Content>{#each supportedLocales as locale (locale.code)}<Select.Item value={locale.code} label={locale.name} />{/each}</Select.Content>
       </Select.Root>
     </SettingsRow>
     <SettingsRow label={$_('settingsGeneral.runInBackground')}>
-      <BoolSelect bind:checked={draft.runBackground} onCheckedChange={setRunBackground} class="w-36" />
+      <BoolSelect bind:checked={draft.runBackground} onCheckedChange={setRunBackground} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>
-    <SettingsRow label={$_('settingsGeneral.menuBarIcon')} description={$_('settingsDescriptions.menuBarIcon')}>
-      <BoolSelect bind:checked={draft.menuBarIcon} onCheckedChange={setMenuBarIcon} class="w-36" />
+    <SettingsRow label={$_('settingsGeneral.menuBarIcon')}>
+      <BoolSelect bind:checked={draft.menuBarIcon} onCheckedChange={setMenuBarIcon} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>
     <SettingsRow label={$_('settingsGeneral.autostartOnLogin')}>
-      <BoolSelect bind:checked={draft.autostart} class="w-36" />
+      <BoolSelect bind:checked={draft.autostart} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>
     <SettingsRow label={$_('settingsGeneral.developerMode')}>
-      <BoolSelect bind:checked={draft.developerMode} class="w-36" />
+      <BoolSelect bind:checked={draft.developerMode} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>
   </SettingsSection>
 </div>

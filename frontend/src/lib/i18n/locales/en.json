@@ -270,8 +270,7 @@
     "mail": "Set the composer format and read-receipt policy.",
     "imagePrivacy": "Control remote images and the image allowlist.",
     "accounts": "Add, edit, reorder, or test email accounts.",
-    "backup": "Export mail to a local directory and see the latest result.",
-    "menuBarIcon": "When enabled, the app also continues running in the background."
+    "backup": "Export mail to a local directory and see the latest result."
   },
   "settingsGeneral": {
     "language": "Language",
@@ -310,7 +309,6 @@
     "deleteAccount": "Delete account"
   },
   "settingsBackup": {
-    "title": "Back Up Mail",
     "directory": "Backup directory",
     "directoryPlaceholder": "Choose a backup directory",
     "scope": "Backup scope",
@@ -659,7 +657,6 @@
     "description": "Review the history of mail sync and backup tasks.",
     "sync": "Sync",
     "backup": "Backup",
-    "syncTitle": "Sync {target}",
     "date": "Date",
     "allDates": "All dates",
     "empty": "No activity logs yet",
@@ -674,7 +671,7 @@
     "backupFailed": "Backup failed",
     "backupCancelled": "Backup cancelled",
     "backupSummary": "{mode} · completed {completed} · added {added} · existing {skipped} · missing {missing} · failed {failed}",
-    "syncSummary": "Sync {target} · added {added}",
+    "syncSummary": "{target} · added {added}",
     "filters": { "all": "All", "sync": "Sync", "backup": "Backup", "failed": "Failed" },
     "status": { "success": "Success", "partial": "Partial", "failed": "Failed", "cancelled": "Cancelled", "unknown": "Unknown" }
   },

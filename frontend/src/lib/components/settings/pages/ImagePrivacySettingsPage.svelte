@@ -7,6 +7,6 @@
   let { draft }: Props = $props()
 </script>
 <div class="space-y-6">
-  <SettingsPageHeader title={$_('settings.imagePrivacy')} description={$_('settingsDescriptions.imagePrivacy')} />
+  <SettingsPageHeader description={$_('settingsDescriptions.imagePrivacy')} />
   <ImagesTab bind:alwaysLoadImages={draft.alwaysLoadImages} onAlwaysLoadImagesChange={(value) => draft.alwaysLoadImages = value} />
 </div>

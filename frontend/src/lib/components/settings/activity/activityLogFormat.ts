@@ -25,14 +25,6 @@ export function activityStatusLabel(status: string): string {
   return t('activityLog.status.unknown')
 }
 
-export function activityTitle(log: ActivityLog): string {
-  const t = get(_)
-  const payload = payloadOf(log)
-  if (log.type === 'backup') return t('settingsBackup.title')
-  if (log.type === 'sync') return t('activityLog.syncTitle', { values: { target: payload.folderName || payload.scope || '' } })
-  return log.title
-}
-
 export function activityTime(value: string): string {
   try { return formatLocalDateTime(value) } catch { return value }
 }

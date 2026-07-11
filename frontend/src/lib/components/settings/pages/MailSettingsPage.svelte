@@ -5,6 +5,7 @@
   import SettingsPageHeader from '../shared/SettingsPageHeader.svelte'
   import SettingsSection from '../shared/SettingsSection.svelte'
   import SettingsRow from '../shared/SettingsRow.svelte'
+  import { SETTINGS_SELECT_WIDTH_CLASS } from '../shared/settingsControlStyles'
 
   interface Props { draft: SettingsDraft }
   let { draft }: Props = $props()
@@ -23,17 +24,17 @@
 </script>
 
 <div class="space-y-6">
-  <SettingsPageHeader title={$_('settings.mail')} description={$_('settingsDescriptions.mail')} />
-  <SettingsSection>
+  <SettingsPageHeader description={$_('settingsDescriptions.mail')} />
+  <SettingsSection framed={false}>
     <SettingsRow label={$_('settings.composerFormat')}>
       <Select.Root value={draft.composerFormat} onValueChange={(value) => value && (draft.composerFormat = value)}>
-        <Select.Trigger class="w-40"><Select.Value>{formatLabel}</Select.Value></Select.Trigger>
+        <Select.Trigger class={SETTINGS_SELECT_WIDTH_CLASS}><Select.Value>{formatLabel}</Select.Value></Select.Trigger>
         <Select.Content>{#each formats as option (option.value)}<Select.Item value={option.value} label={option.label} />{/each}</Select.Content>
       </Select.Root>
     </SettingsRow>
     <SettingsRow label={$_('settingsGeneral.readReceiptPolicy')}>
       <Select.Root value={draft.readReceiptResponsePolicy} onValueChange={(value) => value && (draft.readReceiptResponsePolicy = value)}>
-        <Select.Trigger class="w-40"><Select.Value>{policyLabel}</Select.Value></Select.Trigger>
+        <Select.Trigger class={SETTINGS_SELECT_WIDTH_CLASS}><Select.Value>{policyLabel}</Select.Value></Select.Trigger>
         <Select.Content>{#each policies as option (option.value)}<Select.Item value={option.value} label={option.label} />{/each}</Select.Content>
       </Select.Root>
     </SettingsRow>

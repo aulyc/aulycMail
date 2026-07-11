@@ -11,7 +11,7 @@
 </script>
 
 <div class="flex h-full min-h-0 flex-col gap-5">
-  <div class="shrink-0"><SettingsPageHeader title={$_('activityLog.title')} description={$_('activityLog.description')} /></div>
+  <div class="shrink-0"><SettingsPageHeader description={$_('activityLog.description')} /></div>
   <div class="shrink-0"><ActivityLogFilters {store} /></div>
   <ActivityLogList {store} />
 </div>

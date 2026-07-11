@@ -8,6 +8,7 @@
   import { addToast } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
   import { refreshImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
+  import { SETTINGS_SELECT_WIDTH_CLASS } from './shared/settingsControlStyles'
   // @ts-ignore - wailsjs path
   import { settings } from '../../../../wailsjs/go/models'
   // @ts-ignore - wailsjs path
@@ -91,7 +92,7 @@
           id="always-load-images"
           bind:checked={alwaysLoadImages}
           onCheckedChange={handleAlwaysLoadImagesChange}
-          class="w-36"
+          class={SETTINGS_SELECT_WIDTH_CLASS}
         />
       </div>
     </div>
@@ -109,24 +110,23 @@
           {$_('images.addresses')}
           <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{addresses.length}</span>
           <Icon icon={addressesCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
+          {#if addresses.length === 0}
+            <span class="min-w-0 truncate text-sm font-normal text-muted-foreground">{$_('images.noAddresses')}</span>
+          {/if}
         </button>
 
-        {#if !addressesCollapsed}
-          {#if addresses.length === 0}
-            <p class="text-sm text-muted-foreground">{$_('images.noAddresses')}</p>
-          {:else}
-            <div class="space-y-1.5 max-h-48 overflow-y-auto">
-              {#each addresses as entry (entry.id)}
-                <div class="flex items-center gap-3 p-2 rounded-md border border-border">
-                  <Icon icon="mdi:email-outline" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <span class="text-sm flex-1 truncate">{entry.value}</span>
-                  <Button variant="ghost" size="sm" onclick={() => handleRemove(entry.id)} title={$_('images.removeButton')}>
-                    <Icon icon="mdi:close" class="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              {/each}
-            </div>
-          {/if}
+        {#if !addressesCollapsed && addresses.length > 0}
+          <div class="space-y-1.5 max-h-48 overflow-y-auto">
+            {#each addresses as entry (entry.id)}
+              <div class="flex items-center gap-3 p-2 rounded-md border border-border">
+                <Icon icon="mdi:email-outline" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span class="text-sm flex-1 truncate">{entry.value}</span>
+                <Button variant="ghost" size="sm" onclick={() => handleRemove(entry.id)} title={$_('images.removeButton')}>
+                  <Icon icon="mdi:close" class="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            {/each}
+          </div>
         {/if}
       </div>
 
@@ -139,24 +139,23 @@
           {$_('images.domains')}
           <span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">{domains.length}</span>
           <Icon icon={domainsCollapsed ? 'mdi:chevron-right' : 'mdi:chevron-down'} class="w-4 h-4 flex-shrink-0" />
+          {#if domains.length === 0}
+            <span class="min-w-0 truncate text-sm font-normal text-muted-foreground">{$_('images.noDomains')}</span>
+          {/if}
         </button>
 
-        {#if !domainsCollapsed}
-          {#if domains.length === 0}
-            <p class="text-sm text-muted-foreground">{$_('images.noDomains')}</p>
-          {:else}
-            <div class="space-y-1.5 max-h-48 overflow-y-auto">
-              {#each domains as entry (entry.id)}
-                <div class="flex items-center gap-3 p-2 rounded-md border border-border">
-                  <Icon icon="mdi:web" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <span class="text-sm flex-1 truncate">{entry.value}</span>
-                  <Button variant="ghost" size="sm" onclick={() => handleRemove(entry.id)} title={$_('images.removeButton')}>
-                    <Icon icon="mdi:close" class="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              {/each}
-            </div>
-          {/if}
+        {#if !domainsCollapsed && domains.length > 0}
+          <div class="space-y-1.5 max-h-48 overflow-y-auto">
+            {#each domains as entry (entry.id)}
+              <div class="flex items-center gap-3 p-2 rounded-md border border-border">
+                <Icon icon="mdi:web" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <span class="text-sm flex-1 truncate">{entry.value}</span>
+                <Button variant="ghost" size="sm" onclick={() => handleRemove(entry.id)} title={$_('images.removeButton')}>
+                  <Icon icon="mdi:close" class="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            {/each}
+          </div>
         {/if}
       </div>
     {/if}

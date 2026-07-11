@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte'
-  interface Props { title?: string; description?: string; children: Snippet }
-  let { title = '', description = '', children }: Props = $props()
+  interface Props { title?: string; description?: string; framed?: boolean; children: Snippet }
+  let { title = '', description = '', framed = true, children }: Props = $props()
 </script>
 
 <section class="space-y-2">
@@ -11,7 +11,7 @@
       {#if description}<p class="mt-0.5 text-xs text-muted-foreground">{description}</p>{/if}
     </div>
   {/if}
-  <div class="overflow-visible rounded-xl border border-border bg-card/70 shadow-sm">
+  <div class="overflow-visible {framed ? 'rounded-xl border border-border bg-card/70 shadow-sm' : ''}">
     {@render children()}
   </div>
 </section>
