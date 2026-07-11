@@ -8,6 +8,7 @@ import (
 	gosync "sync"
 	"time"
 
+	"aulyc.local/aulycmail/internal/activitylog"
 	"aulyc.local/aulycmail/internal/certificate"
 	"aulyc.local/aulycmail/internal/folder"
 	"aulyc.local/aulycmail/internal/logging"
@@ -61,16 +62,18 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 	// Get account to determine sync period
 	acc, err := a.accountStore.Get(accountID)
 	if err != nil {
+		a.recordSyncActivity(accountID, folderID, syncengine.MessageSyncResult{}, activitylog.StatusFailed, err)
 		return fmt.Errorf("failed to get account: %w", err)
 	}
 	syncOptions := syncengine.MessageSyncOptionsFromAccount(acc)
 
 	// Use ctx (not a.ctx) for sync operations so they can be cancelled
-	err = a.syncEngine.SyncMessagesWithOptions(ctx, accountID, folderID, syncOptions)
+	messageResult, err := a.syncEngine.SyncMessagesWithOptionsResult(ctx, accountID, folderID, syncOptions)
 	if err != nil {
 		// Check if this was a cancellation
 		if ctx.Err() != nil {
 			log.Debug().Str("account", accountID).Str("folder", folderID).Msg("Sync cancelled")
+			a.recordSyncActivity(accountID, folderID, messageResult, activitylog.StatusCancelled, ctx.Err())
 			return ctx.Err()
 		}
 		// Check for certificate error - emit special event for TOFU dialog
@@ -81,6 +84,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 				"accountId":   accountID,
 				"certificate": certErr.Info,
 			})
+			a.recordSyncActivity(accountID, folderID, messageResult, activitylog.StatusFailed, err)
 			return err
 		}
 
@@ -91,6 +95,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 			"folderId":  folderID,
 			"error":     err.Error(),
 		})
+		a.recordSyncActivity(accountID, folderID, messageResult, activitylog.StatusFailed, err)
 		return err
 	}
 
@@ -123,12 +128,13 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 			"accountId": accountID,
 			"folderId":  folderID,
 		})
+		a.recordSyncActivity(accountID, folderID, messageResult, activitylog.StatusSuccess, nil)
 		return nil
 	}
 
 	// Start background body fetching (emits progress events for "bodies" phase)
 	// Pass ctx so body fetch can also be cancelled
-	go func(syncCtx context.Context, syncDays int, cancelFn context.CancelFunc, key string) {
+	go func(syncCtx context.Context, syncDays int, cancelFn context.CancelFunc, key string, result syncengine.MessageSyncResult) {
 		// Cleanup sync context when goroutine completes
 		defer func() {
 			a.syncMu.Lock()
@@ -143,6 +149,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Error().Interface("panic", r).Str("folder", folderID).Msg("Body fetch goroutine panicked")
+				a.recordSyncActivity(accountID, folderID, result, activitylog.StatusPartial, fmt.Errorf("body fetch panic: %v", r))
 				wailsRuntime.EventsEmit(a.ctx, "folder:syncError", map[string]interface{}{
 					"accountId": accountID,
 					"folderId":  folderID,
@@ -161,6 +168,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 					"accountId": accountID,
 					"folderId":  folderID,
 				})
+				a.recordSyncActivity(accountID, folderID, result, activitylog.StatusCancelled, syncCtx.Err())
 			} else {
 				// Actual error - emit error event instead of synced
 				log.Error().Err(bodyErr).Str("folder", folderID).Msg("Background body fetch failed")
@@ -169,6 +177,7 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 					"folderId":  folderID,
 					"error":     bodyErr.Error(),
 				})
+				a.recordSyncActivity(accountID, folderID, result, activitylog.StatusPartial, bodyErr)
 			}
 		} else {
 			// Success
@@ -176,10 +185,63 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 				"accountId": accountID,
 				"folderId":  folderID,
 			})
+			a.recordSyncActivity(accountID, folderID, result, activitylog.StatusSuccess, nil)
 		}
-	}(ctx, bodyFetch.Days, cancel, syncKey)
+	}(ctx, bodyFetch.Days, cancel, syncKey, messageResult)
 
 	return nil
+}
+
+func syncActivitySummary(result syncengine.MessageSyncResult, status string) string {
+	switch status {
+	case activitylog.StatusCancelled:
+		return fmt.Sprintf("同步已取消 · 新增 %d 封 · 移除 %d 封", result.Added, result.Removed)
+	case activitylog.StatusPartial:
+		return fmt.Sprintf("部分完成 · 新增 %d 封 · 移除 %d 封", result.Added, result.Removed)
+	case activitylog.StatusFailed:
+		return "同步失败"
+	default:
+		return fmt.Sprintf("同步成功 · 新增 %d 封 · 移除 %d 封", result.Added, result.Removed)
+	}
+}
+
+func (a *App) recordSyncActivity(accountID, folderID string, result syncengine.MessageSyncResult, status string, syncErr error) {
+	if status == activitylog.StatusFailed && result.Added+result.Removed > 0 {
+		status = activitylog.StatusPartial
+	}
+	accountEmail := ""
+	if acc, err := a.accountStore.Get(accountID); err == nil && acc != nil {
+		accountEmail = acc.Email
+	}
+	folderName := folderID
+	if f, err := a.folderStore.Get(folderID); err == nil && f != nil {
+		folderName = f.Path
+	}
+	if strings.TrimSpace(folderName) == "" {
+		folderName = "邮箱"
+	}
+	detail := ""
+	if syncErr != nil {
+		detail = syncErr.Error()
+	}
+	entry := activitylog.Entry{
+		Type:    activitylog.TypeSync,
+		Status:  status,
+		Title:   "同步 " + folderName,
+		Summary: syncActivitySummary(result, status),
+		Detail:  detail,
+		Payload: map[string]any{
+			"accountEmail": accountEmail,
+			"folderName":   folderName,
+			"scope":        folderName,
+			"added":        result.Added,
+			"removed":      result.Removed,
+		},
+	}
+	if err := a.appendActivityLog(entry); err != nil {
+		log := logging.WithComponent("app.sync")
+		log.Warn().Err(err).Msg("Failed to persist sync activity log")
+	}
 }
 
 // ForceSyncFolder clears body content and attachments for a folder, then re-syncs.
@@ -219,11 +281,18 @@ func (a *App) SyncAccountComplete(accountID string) error {
 	cancelled := a.syncCancelled
 	a.syncMu.Unlock()
 	if cancelled {
-		return fmt.Errorf("sync cancelled")
+		err := context.Canceled
+		a.recordSyncActivity(accountID, "", syncengine.MessageSyncResult{}, activitylog.StatusCancelled, err)
+		return fmt.Errorf("sync cancelled: %w", err)
 	}
 
 	// 1. Sync folder list first (required for message sync)
 	if err := a.SyncFolders(accountID); err != nil {
+		status := activitylog.StatusFailed
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			status = activitylog.StatusCancelled
+		}
+		a.recordSyncActivity(accountID, "", syncengine.MessageSyncResult{}, status, err)
 		return fmt.Errorf("folder sync failed: %w", err)
 	}
 	// Reaching here means IMAP connected + authenticated — stamp last-OK.
@@ -232,6 +301,7 @@ func (a *App) SyncAccountComplete(accountID string) error {
 	// 2. Determine which folders to sync based on account settings
 	foldersToSync, err := a.getSyncFolders(accountID)
 	if err != nil {
+		a.recordSyncActivity(accountID, "", syncengine.MessageSyncResult{}, activitylog.StatusFailed, err)
 		return fmt.Errorf("failed to determine sync folders: %w", err)
 	}
 

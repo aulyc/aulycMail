@@ -109,9 +109,8 @@
     </button>
   </div>
 
-  <!-- Sync errors are no longer shown inline here; they're recorded in the
-       sync log (rail icon → log dialog). The header spinner + bottom status
-       still convey live sync state. -->
+  <!-- Sync errors are recorded in Settings → Activity Log. The header spinner
+       and bottom status still convey live sync state. -->
 
   <!-- Folder List -->
   {#if isExpanded}

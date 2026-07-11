@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"io"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"aulyc.local/aulycmail/internal/activitylog"
 	mailBackup "aulyc.local/aulycmail/internal/backup"
 )
 
@@ -386,6 +388,34 @@ func TestWriteBackupFileFromReaderRejectsEmptyContent(t *testing.T) {
 
 type errorReader struct {
 	err error
+}
+
+func TestBackupActivityStatus(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		result *BackupRunResult
+		err    error
+		want   string
+	}{
+		{name: "success", result: &BackupRunResult{Exported: 2, Skipped: 3}, want: activitylog.StatusSuccess},
+		{name: "partial missing", result: &BackupRunResult{Skipped: 3, Missing: 1}, want: activitylog.StatusPartial},
+		{name: "partial failed", result: &BackupRunResult{Exported: 2, Failed: 1}, want: activitylog.StatusPartial},
+		{name: "failed no completed", result: &BackupRunResult{Missing: 1, Failed: 1}, want: activitylog.StatusFailed},
+		{name: "fatal", err: errors.New("boom"), want: activitylog.StatusFailed},
+		{name: "cancelled", err: context.Canceled, want: activitylog.StatusCancelled},
+	}
+
+	for _, tt := range tests {
+		tc := tt
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			if got := backupActivityStatus(tc.result, tc.err); got != tc.want {
+				t.Fatalf("status = %q, want %q", got, tc.want)
+			}
+		})
+	}
 }
 
 func (r errorReader) Read([]byte) (int, error) {

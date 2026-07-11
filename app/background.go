@@ -2,10 +2,12 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/activitylog"
 	"aulyc.local/aulycmail/internal/folder"
 	"aulyc.local/aulycmail/internal/imap"
 	"aulyc.local/aulycmail/internal/logging"
@@ -33,15 +35,30 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 	})
 
 	// Set callback for sync completion (so frontend clears progress)
-	a.syncScheduler.SetSyncCompletedCallback(func(accountID, folderID string, err error) {
+	a.syncScheduler.SetSyncCompletedResultCallback(func(accountID, folderID string, result sync.MessageSyncResult, err error) {
 		if err != nil {
-			wailsRuntime.EventsEmit(a.ctx, "folder:syncError", map[string]interface{}{
-				"accountId": accountID,
-				"folderId":  folderID,
-				"error":     err.Error(),
-			})
+			status := activitylog.StatusFailed
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				status = activitylog.StatusCancelled
+			}
+			a.recordSyncActivity(accountID, folderID, result, status, err)
+			if status == activitylog.StatusCancelled && folderID != "" {
+				wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+					"accountId": accountID,
+					"folderId":  folderID,
+				})
+				return
+			}
+			if folderID != "" {
+				wailsRuntime.EventsEmit(a.ctx, "folder:syncError", map[string]interface{}{
+					"accountId": accountID,
+					"folderId":  folderID,
+					"error":     err.Error(),
+				})
+			}
 			return
 		}
+		a.recordSyncActivity(accountID, folderID, result, activitylog.StatusSuccess, nil)
 		wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
 			"accountId": accountID,
 			"folderId":  folderID,
@@ -162,10 +179,15 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 	a.syncMu.Unlock()
 
 	// Use the scheduler's blocking sync to get new mail info
-	newMailInfo, err := a.syncScheduler.SyncAccountInboxBlocking(event.AccountID)
+	newMailInfo, messageResult, err := a.syncScheduler.SyncAccountInboxBlockingWithResult(event.AccountID)
 
 	if err != nil {
 		log.Error().Err(err).Str("accountID", event.AccountID).Msg("Failed to sync after IDLE notification")
+		status := activitylog.StatusFailed
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			status = activitylog.StatusCancelled
+		}
+		a.recordSyncActivity(event.AccountID, folderID, messageResult, status, err)
 		// Emit folder:synced to clear syncing state even on error
 		if folderID != "" {
 			wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
@@ -173,6 +195,11 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 				"folderId":  folderID,
 			})
 		}
+		return
+	}
+	// The blocking scheduler reports a no-op when another account sync already
+	// owns the work. Do not fetch bodies or create a synthetic success log.
+	if !messageResult.Performed {
 		return
 	}
 
@@ -189,6 +216,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 				"accountId": event.AccountID,
 				"folderId":  folderID,
 			})
+			a.recordSyncActivity(event.AccountID, folderID, messageResult, activitylog.StatusSuccess, nil)
 		} else {
 			// Register IDLE sync context so manual sync can cancel it
 			a.syncMu.Lock()
@@ -202,7 +230,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 			a.syncContexts[syncKey] = cancel
 			a.syncMu.Unlock()
 
-			go func(syncCtx context.Context, syncDays int, fID string, key string) {
+			go func(syncCtx context.Context, syncDays int, fID string, key string, result sync.MessageSyncResult) {
 				var folderSynced bool // Track whether folder:synced was emitted (to avoid duplicate messages:updated)
 
 				// Cleanup context on completion
@@ -232,6 +260,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 				defer func() {
 					if r := recover(); r != nil {
 						log.Error().Interface("panic", r).Str("folder", fID).Msg("IDLE body fetch goroutine panicked")
+						a.recordSyncActivity(event.AccountID, fID, result, activitylog.StatusPartial, fmt.Errorf("body fetch panic: %v", r))
 						wailsRuntime.EventsEmit(a.ctx, "folder:syncError", map[string]interface{}{
 							"accountId": event.AccountID,
 							"folderId":  fID,
@@ -250,6 +279,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 							"accountId": event.AccountID,
 							"folderId":  fID,
 						})
+						a.recordSyncActivity(event.AccountID, fID, result, activitylog.StatusCancelled, syncCtx.Err())
 					} else {
 						// Actual error - emit error event
 						log.Error().Err(bodyErr).Str("folder", fID).Msg("Background body fetch failed after IDLE sync")
@@ -258,6 +288,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 							"folderId":  fID,
 							"error":     bodyErr.Error(),
 						})
+						a.recordSyncActivity(event.AccountID, fID, result, activitylog.StatusPartial, bodyErr)
 					}
 				} else {
 					// Success
@@ -266,8 +297,9 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 						"accountId": event.AccountID,
 						"folderId":  fID,
 					})
+					a.recordSyncActivity(event.AccountID, fID, result, activitylog.StatusSuccess, nil)
 				}
-			}(ctx, bodyFetch.Days, folderID, syncKey)
+			}(ctx, bodyFetch.Days, folderID, syncKey, messageResult)
 		}
 	}
 

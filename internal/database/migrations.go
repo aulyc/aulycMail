@@ -1163,4 +1163,31 @@ var migrations = []Migration{
 			ALTER TABLE contact_records DROP COLUMN vcard_raw;
 		`,
 	},
+	{
+		Version: 48,
+		SQL: `
+			-- Durable history for synchronization, backup, and future background
+			-- activities. Type-specific fields live in payload_json so adding a new
+			-- activity type does not require another schema change.
+			CREATE TABLE activity_logs (
+				id TEXT PRIMARY KEY,
+				created_at TEXT NOT NULL,
+				type TEXT NOT NULL,
+				status TEXT NOT NULL,
+				title TEXT NOT NULL,
+				summary TEXT NOT NULL,
+				detail TEXT,
+				payload_json TEXT NOT NULL DEFAULT '{}'
+			);
+
+			CREATE INDEX idx_activity_logs_created_at
+			ON activity_logs(created_at DESC);
+
+			CREATE INDEX idx_activity_logs_type_created_at
+			ON activity_logs(type, created_at DESC);
+
+			CREATE INDEX idx_activity_logs_status_created_at
+			ON activity_logs(status, created_at DESC);
+		`,
+	},
 }

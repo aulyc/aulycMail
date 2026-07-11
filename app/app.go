@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/activitylog"
 	"aulyc.local/aulycmail/internal/appstate"
 	"aulyc.local/aulycmail/internal/certificate"
 	"aulyc.local/aulycmail/internal/contact"
@@ -179,6 +180,7 @@ type App struct {
 
 	// Stores
 	accountStore        *account.Store
+	activityLogStore    *activitylog.Store
 	folderStore         *folder.Store
 	messageStore        *message.Store
 	attachmentStore     *message.AttachmentStore
@@ -406,6 +408,7 @@ func (a *App) Startup(ctx context.Context) {
 
 	// Initialize stores
 	a.accountStore = account.NewStore(db)
+	a.activityLogStore = activitylog.NewStore(db)
 	a.folderStore = folder.NewStore(db)
 	a.messageStore = message.NewStore(db)
 	a.attachmentStore = message.NewAttachmentStore(db)
@@ -422,8 +425,6 @@ func (a *App) Startup(ctx context.Context) {
 		switch action {
 		case "settings":
 			wailsRuntime.EventsEmit(a.ctx, "menu:openSettings")
-		case "backupMail":
-			wailsRuntime.EventsEmit(a.ctx, "menu:openBackupMail")
 		case "backupViewer":
 			wailsRuntime.EventsEmit(a.ctx, "menu:openBackupViewer")
 		case "about":
@@ -779,13 +780,13 @@ func (a *App) menuLabels() platform.MenuLabels {
 	}
 	if zh {
 		return platform.MenuLabels{
-			Settings: "设置", BackupMail: "备份邮件", BackupViewer: "备份查看器", About: "关于", Quit: "退出",
+			Settings: "设置", BackupViewer: "备份查看器", About: "关于", Quit: "退出",
 			Edit: "编辑", Undo: "撤销", Redo: "重做",
 			Cut: "剪切", Copy: "复制", Paste: "粘贴", Delete: "删除",
 		}
 	}
 	return platform.MenuLabels{
-		Settings: "Settings", BackupMail: "Back Up Mail", BackupViewer: "Backup Viewer", About: "About", Quit: "Quit",
+		Settings: "Settings", BackupViewer: "Backup Viewer", About: "About", Quit: "Quit",
 		Edit: "Edit", Undo: "Undo", Redo: "Redo",
 		Cut: "Cut", Copy: "Copy", Paste: "Paste", Delete: "Delete",
 	}

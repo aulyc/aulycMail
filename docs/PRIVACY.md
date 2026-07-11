@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last Updated:** January 20, 2026
+**Last Updated:** July 11, 2026
 
 ## Introduction
 
@@ -33,6 +33,10 @@ aulycmail stores these items locally on your device:
 - Passwords or app-specific passwords in the system keychain
 - Contacts you create or addresses collected locally from sent mail
 - Application settings such as theme, window state, and preferences
+- Activity-log metadata for synchronization and backup tasks, such as account
+  identifiers, folder or backup-directory names, result counts, and error text.
+  Activity logs do not contain message bodies, attachments, or credentials.
+- Standard `.eml` backup files and backup indexes in directories you select
 
 ## Data Security
 
@@ -52,6 +56,11 @@ Data remains on your device until you delete it. Removing the application may
 leave local data in the application support directory. To fully remove local
 mail data, delete the aulycmail data directory after uninstalling the
 application.
+
+Activity logs can be cleared from Settings. The application automatically keeps
+them for at most 30 days and caps the history at the newest 1,000 entries.
+Exported backup files remain in the directory you selected until you remove
+them.
 
 ## Changes
 

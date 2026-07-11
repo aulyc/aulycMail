@@ -22,6 +22,15 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 	return e.SyncMessagesWithOptions(ctx, accountID, folderID, LegacyMessageSyncOptions(syncPeriodDays))
 }
 
+// MessageSyncResult summarizes the durable message changes made by one folder
+// sync. Added and Removed count UID rows that were actually added to or removed
+// from the local store, rather than relying on the server's mailbox count.
+type MessageSyncResult struct {
+	Added     int  `json:"added"`
+	Removed   int  `json:"removed"`
+	Performed bool `json:"-"`
+}
+
 // SyncMessagesWithOptions synchronizes messages for a folder with incremental
 // sync support. options.RetentionDays determines the local retention window
 // (0 = keep all local messages).
@@ -32,16 +41,72 @@ func (e *Engine) SyncMessages(ctx context.Context, accountID, folderID string, s
 // folder at the same time. App.SyncFolder still adds UI-facing debounce,
 // cancellation, and completion events around this engine-level invariant.
 func (e *Engine) SyncMessagesWithOptions(ctx context.Context, accountID, folderID string, options MessageSyncOptions) error {
+	_, err := e.SyncMessagesWithOptionsResult(ctx, accountID, folderID, options)
+	return err
+}
+
+// SyncMessagesWithOptionsResult is the result-bearing counterpart of
+// SyncMessagesWithOptions. The original method remains as a compatibility
+// wrapper for callers that only need an error.
+func (e *Engine) SyncMessagesWithOptionsResult(ctx context.Context, accountID, folderID string, options MessageSyncOptions) (MessageSyncResult, error) {
 	// Check context at start
 	if ctx.Err() != nil {
-		return ctx.Err()
+		return MessageSyncResult{}, ctx.Err()
 	}
 
 	releaseSync, err := e.acquireMessageSync(ctx, accountID, folderID)
 	if err != nil {
-		return err
+		return MessageSyncResult{}, err
 	}
 	defer releaseSync()
+
+	beforeUIDs, snapshotErr := e.messageStore.GetAllUIDs(folderID)
+	if snapshotErr != nil {
+		return MessageSyncResult{}, fmt.Errorf("failed to snapshot local UIDs before sync: %w", snapshotErr)
+	}
+
+	syncErr := e.syncMessagesWithOptions(ctx, accountID, folderID, options)
+	afterUIDs, afterErr := e.messageStore.GetAllUIDs(folderID)
+	result := diffMessageUIDs(beforeUIDs, afterUIDs)
+	result.Performed = true
+	if afterErr != nil {
+		if syncErr != nil {
+			return result, syncErr
+		}
+		return result, fmt.Errorf("failed to snapshot local UIDs after sync: %w", afterErr)
+	}
+	return result, syncErr
+}
+
+func diffMessageUIDs(before, after []uint32) MessageSyncResult {
+	beforeSet := make(map[uint32]struct{}, len(before))
+	for _, uid := range before {
+		beforeSet[uid] = struct{}{}
+	}
+	afterSet := make(map[uint32]struct{}, len(after))
+	for _, uid := range after {
+		afterSet[uid] = struct{}{}
+	}
+
+	result := MessageSyncResult{}
+	for uid := range afterSet {
+		if _, existed := beforeSet[uid]; !existed {
+			result.Added++
+		}
+	}
+	for uid := range beforeSet {
+		if _, exists := afterSet[uid]; !exists {
+			result.Removed++
+		}
+	}
+	return result
+}
+
+func (e *Engine) syncMessagesWithOptions(ctx context.Context, accountID, folderID string, options MessageSyncOptions) error {
+	// Check context again after waiting for the per-folder serialization lock.
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 
 	// Get folder from store
 	f, err := e.folderStore.Get(folderID)

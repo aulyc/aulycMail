@@ -242,6 +242,93 @@ export namespace account {
 	}
 
 }
+
+export namespace activitylog {
+
+	export class Entry {
+	    id: string;
+	    createdAt: string;
+	    type: string;
+	    status: string;
+	    title: string;
+	    summary: string;
+	    detail?: string;
+	    payload: Record<string, any>;
+
+	    static createFrom(source: any = {}) {
+	        return new Entry(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.createdAt = source["createdAt"];
+	        this.type = source["type"];
+	        this.status = source["status"];
+	        this.title = source["title"];
+	        this.summary = source["summary"];
+	        this.detail = source["detail"];
+	        this.payload = source["payload"];
+	    }
+	}
+	export class Page {
+	    entries: Entry[];
+	    total: number;
+
+	    static createFrom(source: any = {}) {
+	        return new Page(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.entries = this.convertValues(source["entries"], Entry);
+	        this.total = source["total"];
+	    }
+
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class Query {
+	    type?: string;
+	    problemOnly?: boolean;
+	    date?: string;
+	    timezoneOffsetMinutes?: number;
+	    directory?: string;
+	    limit?: number;
+	    offset?: number;
+
+	    static createFrom(source: any = {}) {
+	        return new Query(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.problemOnly = source["problemOnly"];
+	        this.date = source["date"];
+	        this.timezoneOffsetMinutes = source["timezoneOffsetMinutes"];
+	        this.directory = source["directory"];
+	        this.limit = source["limit"];
+	        this.offset = source["offset"];
+	    }
+	}
+
+}
 export namespace app {
 
 	export class AccountIdentityGroup {

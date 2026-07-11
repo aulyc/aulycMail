@@ -34,6 +34,10 @@ export function ChooseBackupDirectory() {
   return window['go']['app']['App']['ChooseBackupDirectory']();
 }
 
+export function ClearActivityLogs(arg1) {
+  return window['go']['app']['App']['ClearActivityLogs'](arg1);
+}
+
 export function ClearOfflineBodyCache(arg1) {
   return window['go']['app']['App']['ClearOfflineBodyCache'](arg1);
 }
@@ -234,6 +238,10 @@ export function GetLanguage() {
   return window['go']['app']['App']['GetLanguage']();
 }
 
+export function GetLatestActivityLog(arg1, arg2) {
+  return window['go']['app']['App']['GetLatestActivityLog'](arg1, arg2);
+}
+
 export function GetMarkAsReadDelay() {
   return window['go']['app']['App']['GetMarkAsReadDelay']();
 }
@@ -340,6 +348,10 @@ export function IsImageAllowed(arg1) {
 
 export function IsReady() {
   return window['go']['app']['App']['IsReady']();
+}
+
+export function ListActivityLogs(arg1) {
+  return window['go']['app']['App']['ListActivityLogs'](arg1);
 }
 
 export function ListBackupViewerMessages(arg1, arg2, arg3, arg4, arg5) {

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,7 +14,9 @@ import (
 	"time"
 
 	"aulyc.local/aulycmail/internal/account"
+	"aulyc.local/aulycmail/internal/activitylog"
 	mailBackup "aulyc.local/aulycmail/internal/backup"
+	"aulyc.local/aulycmail/internal/logging"
 	"aulyc.local/aulycmail/internal/settings"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -345,6 +348,13 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (result *BackupRunResult,
 	}
 	a.emitBackupProgress(BackupProgress{Phase: "running", Current: 0, Total: 0, Message: "开始备份"})
 	defer func() {
+		if recovered := recover(); recovered != nil {
+			a.finishBackupProgress(BackupProgress{
+				Phase:   "error",
+				Message: "backup worker crashed",
+			})
+			panic(recovered)
+		}
 		if err == nil {
 			return
 		}
@@ -362,13 +372,29 @@ func (a *App) RunEmailBackup(options BackupRunOptions) (result *BackupRunResult,
 	return result, nil
 }
 
-func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*BackupRunResult, error) {
+func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (result *BackupRunResult, err error) {
+	activityMode := ""
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			a.recordBackupActivity(options, nil, fmt.Errorf("backup worker panic: %v", recovered), activityMode)
+			panic(recovered)
+		}
+		a.recordBackupActivity(options, result, err, activityMode)
+	}()
+
 	if strings.TrimSpace(options.Directory) == "" {
 		options.Directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
 	}
 	directory, err := mailBackup.NormalizeTargetDirectory(options.Directory)
 	if err != nil {
 		return nil, err
+	}
+	options.Directory = directory
+	if _, found, indexErr := mailBackup.LoadIndex(directory); indexErr == nil {
+		activityMode = "full"
+		if found {
+			activityMode = "incremental"
+		}
 	}
 	options.Scope = normalizeBackupScope(options.Scope)
 	if options.Scope == "" {
@@ -384,7 +410,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 		accountIDs = append(accountIDs, acc.ID)
 	}
 
-	result, err := mailBackup.Run(a.ctx, a.db, mailBackup.RunOptions{
+	internalResult, err := mailBackup.Run(a.ctx, a.db, mailBackup.RunOptions{
 		Directory:         directory,
 		StartedAt:         startedAt,
 		AccountIDs:        accountIDs,
@@ -397,7 +423,103 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (*Backu
 	if err != nil {
 		return nil, err
 	}
-	return backupRunResultFromInternal(result), nil
+	return backupRunResultFromInternal(internalResult), nil
+}
+
+func backupActivityStatus(result *BackupRunResult, err error) string {
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return activitylog.StatusCancelled
+	}
+	if err != nil || result == nil {
+		return activitylog.StatusFailed
+	}
+	issues := result.Missing + result.Failed
+	if issues == 0 {
+		return activitylog.StatusSuccess
+	}
+	if result.Exported+result.Skipped > 0 {
+		return activitylog.StatusPartial
+	}
+	return activitylog.StatusFailed
+}
+
+func backupActivitySummary(result *BackupRunResult, status string) string {
+	if result == nil {
+		switch status {
+		case activitylog.StatusCancelled:
+			return "备份已取消"
+		default:
+			return "备份失败"
+		}
+	}
+	mode := "全量导出"
+	if result.Mode == "incremental" {
+		mode = "增量导出"
+	}
+	return fmt.Sprintf("%s · 完成 %d · 新增 %d · 已存在 %d · 缺失 %d · 失败 %d",
+		mode, result.Exported+result.Skipped, result.Exported, result.Skipped, result.Missing, result.Failed)
+}
+
+func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunResult, runErr error, activityMode string) {
+	status := backupActivityStatus(result, runErr)
+	scope := normalizeBackupScope(options.Scope)
+	directory := strings.TrimSpace(options.Directory)
+	mode, total, completed, added, skipped, missing, failed := activityMode, 0, 0, 0, 0, 0, 0
+	if result != nil {
+		directory = result.Directory
+		mode = result.Mode
+		total = result.Total
+		added = result.Exported
+		skipped = result.Skipped
+		missing = result.Missing
+		failed = result.Failed
+		completed = added + skipped
+	} else if progress := emailBackupJob.snapshot().Progress; progress != nil {
+		total = progress.Total
+		added = progress.Exported
+		skipped = progress.Skipped
+		missing = progress.Missing
+		failed = progress.Failed
+		completed = added + skipped
+	}
+	detail := ""
+	if runErr != nil {
+		detail = runErr.Error()
+	}
+	summaryResult := result
+	if summaryResult == nil && (total > 0 || completed > 0 || missing > 0 || failed > 0) {
+		summaryResult = &BackupRunResult{
+			Directory: directory,
+			Mode:      mode,
+			Total:     total,
+			Exported:  added,
+			Skipped:   skipped,
+			Missing:   missing,
+			Failed:    failed,
+		}
+	}
+	entry := activitylog.Entry{
+		Type:    activitylog.TypeBackup,
+		Status:  status,
+		Title:   "备份邮件",
+		Summary: backupActivitySummary(summaryResult, status),
+		Detail:  detail,
+		Payload: map[string]any{
+			"mode":      mode,
+			"total":     total,
+			"completed": completed,
+			"added":     added,
+			"skipped":   skipped,
+			"missing":   missing,
+			"failed":    failed,
+			"directory": directory,
+			"scope":     scope,
+		},
+	}
+	if err := a.appendActivityLog(entry); err != nil {
+		log := logging.WithComponent("app.backup")
+		log.Warn().Err(err).Msg("Failed to persist backup activity log")
+	}
 }
 
 func (a *App) emitBackupProgress(progress BackupProgress) {

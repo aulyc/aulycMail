@@ -11,12 +11,9 @@
   import TermsDialog from './lib/components/TermsDialog.svelte'
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
   import ActivityRail from './lib/components/rail/ActivityRail.svelte'
-  import SyncLogDialog from './lib/components/SyncLogDialog.svelte'
-  import { syncLog } from '$lib/stores/syncLog.svelte'
   import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
   import AboutDialog from './lib/components/settings/AboutDialog.svelte'
   import SearchOverlay from './lib/components/SearchOverlay.svelte'
-  import BackupDialog from './lib/components/backup/BackupDialog.svelte'
   import BackupViewerDialog from './lib/components/backup/BackupViewerDialog.svelte'
   import { activateContactFromGlobalSearch } from '$contacts/stores/contactsView.svelte'
   import ContactsPane from '$contacts/components/ContactsPane.svelte'
@@ -138,9 +135,7 @@
   // any view (Mail or Contacts), not just the mail sidebar.
   let showSettings = $state(false)
   let showAbout = $state(false)
-  let showSyncLog = $state(false)
   let showSearchOverlay = $state(false)
-  let showBackupMail = $state(false)
   let showBackupViewer = $state(false)
 
   // Certificate TOFU state (for background sync cert errors)
@@ -244,31 +239,19 @@
   onMount(async () => {
     document.addEventListener('keydown', handleSelectAllInInput, true)
 
-    // Begin recording sync/connection successes + failures for the log dialog.
-    syncLog.start()
-
     // Native macOS App-menu items route here.
     EventsOn('menu:openSettings', () => {
       showAbout = false
-      showBackupMail = false
       showBackupViewer = false
       showSettings = true
-    })
-    EventsOn('menu:openBackupMail', () => {
-      showSettings = false
-      showAbout = false
-      showBackupViewer = false
-      showBackupMail = true
     })
     EventsOn('menu:openBackupViewer', () => {
       showSettings = false
       showAbout = false
-      showBackupMail = false
       showBackupViewer = true
     })
     EventsOn('menu:openAbout', () => {
       showSettings = false
-      showBackupMail = false
       showBackupViewer = false
       showAbout = true
     })
@@ -276,7 +259,7 @@
       if (data.phase === 'done') {
         const missing = data.missing ?? 0
         addToast({
-          type: data.failed > 0 ? 'warning' : 'success',
+          type: data.failed > 0 || missing > 0 ? 'warning' : 'success',
           message: missing > 0
             ? $_('settingsBackup.backupCompleteWithMissing', {
               values: {
@@ -849,10 +832,7 @@
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Main Content -->
   <div class="flex flex-1 min-h-0 overflow-hidden relative">
-    <ActivityRail
-      onOpenSettings={() => showSettings = true}
-      onOpenLog={() => showSyncLog = true}
-    />
+    <ActivityRail onOpenSettings={() => showSettings = true} />
 
     {#if getActivePane() === 'contacts'}
       <ContactsPane />
@@ -988,8 +968,6 @@
 <!-- App Settings dialog — opened from the rail's gear (works in every view) -->
 <SettingsDialog bind:open={showSettings} onClose={() => { showSettings = false }} />
 <AboutDialog bind:open={showAbout} onClose={() => { showAbout = false }} />
-<SyncLogDialog bind:open={showSyncLog} onClose={() => { showSyncLog = false }} />
-<BackupDialog bind:open={showBackupMail} onClose={() => { showBackupMail = false }} />
 <BackupViewerDialog bind:open={showBackupViewer} onClose={() => { showBackupViewer = false }} />
 
 <SearchOverlay
