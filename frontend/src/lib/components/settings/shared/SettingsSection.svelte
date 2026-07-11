@@ -11,7 +11,7 @@
       {#if description}<p class="mt-0.5 text-xs text-muted-foreground">{description}</p>{/if}
     </div>
   {/if}
-  <div class="overflow-visible {framed ? 'rounded-xl border border-border bg-card/70 shadow-sm' : ''}">
+  <div class="overflow-visible {framed ? 'rounded-xl border border-border bg-card/70 shadow-sm' : 'border-t border-border/75'}">
     {@render children()}
   </div>
 </section>

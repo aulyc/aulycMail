@@ -83,7 +83,7 @@
 {:else}
   <div class="space-y-6">
     <!-- Always Load Remote Images Toggle -->
-    <div class="space-y-2">
+    <div class="space-y-2 border-t border-border/75 pt-2.5">
       <div class="flex items-center justify-between">
         <div class="space-y-0.5">
           <Label for="always-load-images">{$_('settingsGeneral.alwaysLoadImages')}</Label>

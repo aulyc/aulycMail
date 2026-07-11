@@ -69,7 +69,7 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
-  <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0" preventCloseAutoFocus onInteractOutside={(event) => event.preventDefault()}>
+  <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0 [&>button]:hidden" preventCloseAutoFocus onInteractOutside={(event) => event.preventDefault()}>
     <Dialog.Title class="sr-only">{$_('settings.title')}</Dialog.Title>
     <div class="grid min-h-0 flex-1 grid-cols-[210px_minmax(0,1fr)]">
       <aside class="flex min-h-0 flex-col border-r border-border bg-muted/35 px-3 py-6">

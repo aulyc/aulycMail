@@ -8,7 +8,7 @@
   let { label, border = true, children }: Props = $props()
 </script>
 
-<div class="flex min-h-14 items-center justify-between gap-6 px-4 py-2.5 {border ? 'border-b border-border/75 last:border-b-0' : ''}">
+<div class="flex min-h-14 items-center justify-between gap-6 py-2.5 {border ? 'border-b border-border/75 last:border-b-0' : ''}">
   <div class="min-w-0">
     <div class="text-sm font-medium text-foreground">{label}</div>
   </div>
