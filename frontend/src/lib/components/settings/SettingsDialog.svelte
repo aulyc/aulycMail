@@ -49,7 +49,8 @@
   let loading = $state(true)
   let saving = $state(false)
   let activeTab = $state('general')
-  const settingsTabTriggerClass = 'flex items-center gap-2 data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-primary/25 dark:data-[state=active]:bg-primary/15'
+  const settingsTabListClass = 'grid w-full grid-cols-3 bg-muted-foreground/10 border border-muted-foreground/15 dark:bg-muted'
+  const settingsTabTriggerClass = 'flex items-center gap-2 data-[state=inactive]:hover:bg-background/70 data-[state=inactive]:hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:ring-1 data-[state=active]:ring-primary/25 dark:data-[state=active]:bg-primary/15'
 
   // Load settings on mount
   onMount(async () => {
@@ -207,7 +208,7 @@
       </div>
     {:else}
       <Tabs.Root bind:value={activeTab} class="w-full">
-        <Tabs.List class="grid w-full grid-cols-3">
+        <Tabs.List class={settingsTabListClass}>
           <Tabs.Trigger value="general" class={settingsTabTriggerClass}>
             <span class="inline-flex w-4 h-4 items-center justify-center shrink-0"><Icon icon="lucide:settings-2" width="16" height="16" /></span>
             {$_('settings.general')}
