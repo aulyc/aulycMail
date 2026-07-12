@@ -33,7 +33,7 @@
       onCloseAutoFocus={handleCloseAutoFocus}
       onInteractOutside={onInteractOutside}
       class={cn(
-        'relative pointer-events-auto grid w-full min-w-0 max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg',
+        'relative pointer-events-auto grid w-full min-w-0 max-w-lg gap-4 border bg-background p-6 shadow-lg duration-200 focus:outline-none focus-visible:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg',
         className
       )}
     >

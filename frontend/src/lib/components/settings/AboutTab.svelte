@@ -2,14 +2,16 @@
   import Icon from '@iconify/svelte'
   import type { app } from '../../../../wailsjs/go/models'
   import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime'
-  import logo from '../../../assets/images/logo-universal.png'
   import { _ } from '$lib/i18n'
+  import AboutInfoDialog from './AboutInfoDialog.svelte'
 
   interface Props { appInfo: app.AppInfo | null; loading?: boolean }
   let { appInfo, loading = false }: Props = $props()
 
-  const PRIVACY_URL = 'https://aulyc.com/aulycmail/privacy'
-  const TERMS_URL = 'https://aulyc.com/aulycmail/terms'
+  type InfoKind = 'product' | 'privacy' | 'terms' | 'acknowledgements'
+  interface InfoSection { title: string; body?: string; items?: string[] }
+  let infoOpen = $state(false)
+  let infoKind = $state<InfoKind>('product')
 
   function openWebsite() {
     if (appInfo?.website) {
@@ -17,13 +19,54 @@
     }
   }
 
-  function openPrivacyPolicy() {
-    BrowserOpenURL(PRIVACY_URL)
+  function openInfo(kind: InfoKind) {
+    infoKind = kind
+    infoOpen = true
   }
 
-  function openTermsOfService() {
-    BrowserOpenURL(TERMS_URL)
-  }
+  const infoContent = $derived.by((): { title: string; intro: string; sections: InfoSection[] } => {
+    if (infoKind === 'product') return {
+      title: $_('settingsAbout.product.title'),
+      intro: $_('settingsAbout.product.intro'),
+      sections: [
+        { title: $_('settingsAbout.product.positionTitle'), body: $_('settingsAbout.product.positionBody') },
+        { title: $_('settingsAbout.product.featuresTitle'), items: [$_('settingsAbout.product.featureAccounts'), $_('settingsAbout.product.featureMail'), $_('settingsAbout.product.featureSearch'), $_('settingsAbout.product.featureContacts'), $_('settingsAbout.product.featurePrivacy'), $_('settingsAbout.product.featureBackup')] },
+        { title: $_('settingsAbout.product.dataTitle'), body: $_('settingsAbout.product.dataBody') },
+      ],
+    }
+    if (infoKind === 'privacy') return {
+      title: $_('settingsAbout.privacy.title'),
+      intro: $_('settingsAbout.privacy.intro'),
+      sections: [
+        { title: $_('settingsAbout.privacy.noCollectionTitle'), items: [$_('settingsAbout.privacy.noCollectionPersonal'), $_('settingsAbout.privacy.noCollectionMail'), $_('settingsAbout.privacy.noCollectionTracking'), $_('settingsAbout.privacy.noCollectionAds'), $_('settingsAbout.privacy.noCollectionSale')] },
+        { title: $_('settingsAbout.privacy.localTitle'), items: [$_('settingsAbout.privacy.localMail'), $_('settingsAbout.privacy.localAccount'), $_('settingsAbout.privacy.localContacts'), $_('settingsAbout.privacy.localSettings'), $_('settingsAbout.privacy.localLogs'), $_('settingsAbout.privacy.localBackups')] },
+        { title: $_('settingsAbout.privacy.securityTitle'), body: $_('settingsAbout.privacy.securityBody') },
+        { title: $_('settingsAbout.privacy.retentionTitle'), body: $_('settingsAbout.privacy.retentionBody') },
+        { title: $_('settingsAbout.privacy.contactTitle'), body: $_('settingsAbout.privacy.contactBody') },
+      ],
+    }
+    if (infoKind === 'terms') return {
+      title: $_('settingsAbout.terms.title'),
+      intro: $_('settingsAbout.terms.intro'),
+      sections: [
+        { title: $_('settingsAbout.terms.descriptionTitle'), body: $_('settingsAbout.terms.descriptionBody') },
+        { title: $_('settingsAbout.terms.responsibilitiesTitle'), items: [$_('settingsAbout.terms.responsibilityCredentials'), $_('settingsAbout.terms.responsibilityDevice'), $_('settingsAbout.terms.responsibilityLaw'), $_('settingsAbout.terms.responsibilityProvider'), $_('settingsAbout.terms.responsibilityBackup')] },
+        { title: $_('settingsAbout.terms.useTitle'), body: $_('settingsAbout.terms.useBody') },
+        { title: $_('settingsAbout.terms.disclaimerTitle'), body: $_('settingsAbout.terms.disclaimerBody') },
+        { title: $_('settingsAbout.terms.thirdPartyTitle'), body: $_('settingsAbout.terms.thirdPartyBody') },
+        { title: $_('settingsAbout.terms.contactTitle'), body: $_('settingsAbout.terms.contactBody') },
+      ],
+    }
+    return {
+      title: $_('settingsAbout.acknowledgements.title'),
+      intro: $_('settingsAbout.acknowledgements.intro'),
+      sections: [
+        { title: $_('settingsAbout.acknowledgements.technologyTitle'), items: [$_('settingsAbout.acknowledgements.technologyDesktop'), $_('settingsAbout.acknowledgements.technologyEditor'), $_('settingsAbout.acknowledgements.technologyInterface'), $_('settingsAbout.acknowledgements.technologyData')] },
+        { title: $_('settingsAbout.acknowledgements.communityTitle'), body: $_('settingsAbout.acknowledgements.communityBody') },
+        { title: $_('settingsAbout.acknowledgements.licenseTitle'), body: $_('settingsAbout.acknowledgements.licenseBody') },
+      ],
+    }
+  })
 </script>
 
 <div class="flex h-full flex-col items-center justify-center space-y-6 py-6">
@@ -32,7 +75,7 @@
   {:else if appInfo}
     <!-- Logo + App Name & Version -->
     <div class="flex flex-col items-center space-y-2">
-      <img src={logo} alt="{appInfo.name} Logo" class="w-24 h-24" />
+      <Icon icon="lucide:mail" class="h-24 w-24 text-muted-foreground" aria-label={`${appInfo.name} Logo`} />
       <div class="text-center space-y-1">
         <h2 class="text-2xl font-bold text-foreground">{appInfo.name}</h2>
         <p class="text-sm text-muted-foreground">{$_('settingsAbout.version', { values: { version: appInfo.version } })}</p>
@@ -47,6 +90,15 @@
     <!-- Links -->
     <div class="flex flex-col items-center gap-2">
       <button
+        type="button"
+        onclick={() => openInfo('product')}
+        class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
+      >
+        <Icon icon="lucide:book-open-text" class="w-5 h-5" />
+        <span>{$_('settingsAbout.productDescription')}</span>
+      </button>
+      <button
+        type="button"
         onclick={openWebsite}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
       >
@@ -54,18 +106,28 @@
         <span>{$_('settingsAbout.website')}</span>
       </button>
       <button
-        onclick={openPrivacyPolicy}
+        type="button"
+        onclick={() => openInfo('privacy')}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
       >
         <Icon icon="mdi:shield-account" class="w-5 h-5" />
         <span>{$_('settingsAbout.privacyPolicy')}</span>
       </button>
       <button
-        onclick={openTermsOfService}
+        type="button"
+        onclick={() => openInfo('terms')}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
       >
         <Icon icon="mdi:file-document" class="w-5 h-5" />
         <span>{$_('settingsAbout.termsOfUse')}</span>
+      </button>
+      <button
+        type="button"
+        onclick={() => openInfo('acknowledgements')}
+        class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
+      >
+        <Icon icon="lucide:heart-handshake" class="w-5 h-5" />
+        <span>{$_('settingsAbout.acknowledgementsLabel')}</span>
       </button>
     </div>
 
@@ -73,3 +135,5 @@
     <p class="text-muted-foreground">{$_('settingsAbout.failedToLoad')}</p>
   {/if}
 </div>
+
+<AboutInfoDialog bind:open={infoOpen} title={infoContent.title} intro={infoContent.intro} sections={infoContent.sections} />
