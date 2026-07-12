@@ -1,10 +1,16 @@
 # Release Steps
 
-1. `app/state.go` - Go app version
-2. `frontend/package.json` - npm package version
-3. `frontend/package-lock.json` - auto-updates with npm install
-4. `CHANGELOG.md` - add new release entry
-5. `wails.json` - product version
+1. Update the base version in `wails.json` (`productVersion`).
+2. Keep `frontend/package.json` and `frontend/package-lock.json` aligned for npm tooling.
+3. Add the release entry to `CHANGELOG.md`.
+4. Create the Git tag (for example `v0.3.9`) only when publishing the release.
+
+The build system derives runtime and bundle versions automatically:
+
+- `make build` and `make install-darwin` use `<productVersion>-dev`;
+- `make release-dmg` and `make install-release-dmg` use `<productVersion>` with no `-dev`;
+- the injected runtime version is shown in About and by `--version`;
+- the macOS bundle keeps the numeric base version required by Apple metadata.
 
 ## DMG Release
 

@@ -5,7 +5,7 @@
 #   make dev      - Run in development mode
 #   make help     - Show all available targets
 
-.PHONY: all build dev dev-race generate clean test lint lint-go lint-frontend \
+.PHONY: all build release-build dev dev-race generate clean test lint lint-go lint-frontend \
         fmt frontend-deps frontend-update normalize-wails-bindings install uninstall \
         dmg release-dmg install-dmg install-release-dmg install-darwin \
         quit-running-darwin launch-darwin uninstall-darwin help
@@ -13,8 +13,13 @@
 # Go module path
 MODULE := aulyc.local/aulycmail
 
-# aulycmail is a password-auth mail client; no build-time credentials are injected.
-LDFLAGS :=
+# wails.json owns the base release version. Local/test builds append -dev;
+# signed release builds override APP_VERSION with the base version below.
+BASE_VERSION := $(shell awk -F'"' '/"productVersion"/ { print $$4; exit }' wails.json)
+APP_VERSION ?= $(BASE_VERSION)-dev
+
+# aulycmail is a password-auth mail client; only non-secret build metadata is injected.
+LDFLAGS := -X $(MODULE)/app.Version=$(APP_VERSION)
 
 # Wails build tags
 BUILD_TAGS := webkit2_41
@@ -73,7 +78,7 @@ build:
 	mkdir -p build/bin
 	$(DARWIN_LINK_WARN_ENV) go build -trimpath -buildvcs=false -tags $(GO_BUILD_TAGS) -ldflags "$(LDFLAGS) -s -w -w -s" -o $(APP_BINARY)
 	@echo "Packaging macOS app bundle..."
-	bash tools/package_macos_app.sh
+	BUNDLE_VERSION="$(BASE_VERSION)" bash tools/package_macos_app.sh
 	@echo "Injecting macOS asset-catalog icon (fills the Liquid Glass plate on macOS 26)..."
 	bash tools/inject_macos_icon.sh $(APP_BUNDLE) build/appicon.png
 	@echo "Ad-hoc signing aulycmail.app (required for macOS notifications)..."
@@ -90,6 +95,11 @@ build:
 dev:
 	@echo "Starting aulycmail in development mode..."
 	$(DARWIN_LINK_WARN_ENV) wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+
+# Build a release app with the numeric base version (no -dev). Kept separate
+# from build so local/test installs always retain their development marker.
+release-build:
+	@$(MAKE) build APP_VERSION="$(BASE_VERSION)"
 
 # Run in development mode with Go's race detector enabled. Builds significantly
 # slower and adds ~5-10x runtime overhead, but instruments every memory access
@@ -120,7 +130,11 @@ dmg:
 		$(if $(NOTARY_PROFILE),--notary-profile "$(NOTARY_PROFILE)")
 
 # Build, Developer ID sign, notarize, and staple a release DMG.
-release-dmg: build
+release-dmg: release-build
+	@if [ -z "$(BASE_VERSION)" ] || printf '%s' "$(BASE_VERSION)" | grep -q -- '-dev'; then \
+		echo 'release-dmg requires a numeric, non-dev productVersion in wails.json'; \
+		exit 1; \
+	fi
 	@if [ -z "$(SIGN_IDENTITY)" ]; then \
 		echo 'SIGN_IDENTITY is required, e.g. make release-dmg SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary'; \
 		exit 1; \

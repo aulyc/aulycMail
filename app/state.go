@@ -20,11 +20,10 @@ func (a *App) SaveUIState(state *appstate.UIState) error {
 // App Info API - Exposed to frontend via Wails bindings
 // ============================================================================
 
-// Version is the aulycmail release version. Bump on each release; consumed by
-// the About dialog via GetAppInfo() and by the --version CLI flag in main.go.
-// (wails.json, frontend/package.json, and metainfo.xml each carry their own
-// version strings for their respective tooling.)
-const Version = "0.3.0-dev"
+// Version is consumed by the About dialog and the --version CLI flag. The
+// default is the local/test version; release builds override it with Go
+// linker flags derived from wails.json.
+var Version = "0.3.9-dev"
 
 // AppInfo contains application metadata
 type AppInfo struct {

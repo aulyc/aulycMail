@@ -3,6 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+BUNDLE_VERSION="${BUNDLE_VERSION:-0.3.9}"
 APP="$ROOT/build/bin/aulycmail.app"
 BIN="$ROOT/build/bin/aulycmail"
 CONTENTS="$APP/Contents"
@@ -32,7 +33,7 @@ if [ -f "$ROOT/frontend/src/assets/fonts/OFL.txt" ]; then
   cp "$ROOT/frontend/src/assets/fonts/OFL.txt" "$LEGAL/Nunito-OFL.txt"
 fi
 
-cat > "$CONTENTS/Info.plist" <<'PLIST'
+cat > "$CONTENTS/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -45,11 +46,11 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key>
   <string>com.aulyc.aulycmail</string>
   <key>CFBundleVersion</key>
-  <string>0.3.0</string>
+  <string>${BUNDLE_VERSION}</string>
   <key>CFBundleGetInfoString</key>
   <string>A lightweight desktop e-mail client</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.3.0</string>
+  <string>${BUNDLE_VERSION}</string>
   <key>CFBundleIconFile</key>
   <string>AppIcon</string>
   <key>LSMinimumSystemVersion</key>

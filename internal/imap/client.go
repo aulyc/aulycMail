@@ -255,7 +255,7 @@ func (c *Client) Login() error {
 	if c.caps.Has(imap.CapID) {
 		if _, err := c.client.ID(&imap.IDData{
 			Name:    "aulycmail",
-			Version: "0.3.0",
+			Version: "0.3.9",
 			Vendor:  "aulyc",
 		}).Wait(); err != nil {
 			c.log.Warn().Err(err).Msg("IMAP ID command failed (continuing)")
