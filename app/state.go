@@ -23,7 +23,7 @@ func (a *App) SaveUIState(state *appstate.UIState) error {
 // Version is consumed by the About settings page and the --version CLI flag. The
 // default is the local/test version; release builds override it with Go
 // linker flags derived from wails.json.
-var Version = "0.3.9-dev"
+var Version = "0.3.91-dev"
 
 // AppInfo contains application metadata
 type AppInfo struct {

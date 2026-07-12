@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUNDLE_VERSION="${BUNDLE_VERSION:-0.3.9}"
+BUNDLE_VERSION="${BUNDLE_VERSION:-0.3.91}"
 APP="$ROOT/build/bin/aulycmail.app"
 BIN="$ROOT/build/bin/aulycmail"
 CONTENTS="$APP/Contents"

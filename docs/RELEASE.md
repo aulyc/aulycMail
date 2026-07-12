@@ -3,7 +3,7 @@
 1. Update the base version in `wails.json` (`productVersion`).
 2. Keep `frontend/package.json` and `frontend/package-lock.json` aligned for npm tooling.
 3. Add the release entry to `CHANGELOG.md`.
-4. Create the Git tag (for example `v0.3.9`) only when publishing the release.
+4. Create the Git tag (for example `v0.3.91`) only when publishing the release.
 
 The build system derives runtime and bundle versions automatically:
 
