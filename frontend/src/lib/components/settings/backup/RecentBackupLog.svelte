@@ -36,8 +36,8 @@
   onDestroy(unsubscribe)
 </script>
 
-<SettingsSection title={$_('settingsBackup.recentLog')}>
-  <div class="min-h-16 px-4 py-3 text-sm">
+<SettingsSection title={$_('settingsBackup.recentLog')} framed={false}>
+  <div class="min-h-16 py-3 text-sm">
     {#if loading}<Icon icon="mdi:loading" class="h-5 w-5 animate-spin text-muted-foreground" />
     {:else if log}<p>{activityTime(log.createdAt)} · {activitySummary(log)}</p>
     {:else if loadFailed}<p class="text-destructive">{$_('activityLog.loadFailed')}</p>

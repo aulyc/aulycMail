@@ -255,7 +255,6 @@
     "general": "General",
     "appearance": "Appearance",
     "mail": "Mail",
-    "imagePrivacy": "Images & Privacy",
     "backup": "Backup",
     "accounts": "Accounts",
     "about": "About",
@@ -265,12 +264,11 @@
     "composerFormatPlain": "Plain text"
   },
   "settingsDescriptions": {
-    "general": "Set language, background behavior, and startup options.",
-    "appearance": "Adjust the theme and message list display.",
-    "mail": "Set the composer format and read-receipt policy.",
-    "imagePrivacy": "Control remote images and the image allowlist.",
-    "accounts": "Add, edit, reorder, or test email accounts.",
-    "backup": "Export mail to a local directory and see the latest result."
+    "general": "Set language, background behavior, and startup options",
+    "appearance": "Adjust the theme and message list display",
+    "mail": "Set message composition, read receipts, and remote image loading",
+    "accounts": "Add, edit, reorder, or test email accounts",
+    "backup": "Export mail to a local directory and see the latest result"
   },
   "settingsGeneral": {
     "language": "Language",
@@ -316,8 +314,6 @@
     "scopeSelected": "Selected mailboxes",
     "noAccounts": "No mailboxes available for backup",
     "selectedMailboxes": "{count} mailboxes",
-    "configuration": "Backup configuration",
-    "configurationDescription": "Choose the destination and mailboxes to export.",
     "recentLog": "Latest backup log",
     "noRecentLog": "No backup log yet",
     "indexWithoutLog": "A backup index was found, but there is no recent backup log",
@@ -654,7 +650,7 @@
   },
   "activityLog": {
     "title": "Activity Log",
-    "description": "Review the history of mail sync and backup tasks.",
+    "description": "Review the history of mail sync and backup tasks",
     "sync": "Sync",
     "backup": "Backup",
     "date": "Date",

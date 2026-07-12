@@ -255,7 +255,6 @@
     "general": "常规",
     "appearance": "外观与显示",
     "mail": "邮件",
-    "imagePrivacy": "图片与隐私",
     "backup": "备份",
     "accounts": "账户",
     "about": "关于",
@@ -265,12 +264,11 @@
     "composerFormatPlain": "纯文本"
   },
   "settingsDescriptions": {
-    "general": "设置语言、后台运行和启动行为。",
-    "appearance": "调整主题和邮件列表的显示方式。",
-    "mail": "设置撰写格式和邮件回执策略。",
-    "imagePrivacy": "控制远程图片加载和图片白名单。",
-    "accounts": "添加、编辑、排序或测试邮箱账户。",
-    "backup": "将邮件导出到本地目录并查看最近结果。"
+    "general": "设置语言、后台运行和启动行为",
+    "appearance": "调整主题和邮件列表的显示方式",
+    "mail": "设置邮件撰写、回执和远程图片加载",
+    "accounts": "添加、编辑、排序或测试邮箱账户",
+    "backup": "将邮件导出到本地目录并查看最近结果"
   },
   "settingsGeneral": {
     "language": "语言",
@@ -316,8 +314,6 @@
     "scopeSelected": "选择邮箱",
     "noAccounts": "尚无可备份邮箱",
     "selectedMailboxes": "{count} 个邮箱",
-    "configuration": "备份配置",
-    "configurationDescription": "选择保存位置和需要导出的邮箱。",
     "recentLog": "最近备份日志",
     "noRecentLog": "暂无备份日志",
     "indexWithoutLog": "已检测到备份索引，暂无最近备份日志",
@@ -654,7 +650,7 @@
   },
   "activityLog": {
     "title": "活动日志",
-    "description": "查看邮件同步和备份任务的历史记录。",
+    "description": "查看邮件同步和备份任务的历史记录",
     "sync": "同步",
     "backup": "备份",
     "date": "日期",

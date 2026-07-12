@@ -2,6 +2,7 @@
   import * as Select from '$lib/components/ui/select'
   import { _ } from '$lib/i18n'
   import type { SettingsDraft } from '../settingsDraft.svelte'
+  import ImagesTab from '../ImagesTab.svelte'
   import SettingsPageHeader from '../shared/SettingsPageHeader.svelte'
   import SettingsSection from '../shared/SettingsSection.svelte'
   import SettingsRow from '../shared/SettingsRow.svelte'
@@ -38,5 +39,6 @@
         <Select.Content>{#each policies as option (option.value)}<Select.Item value={option.value} label={option.label} />{/each}</Select.Content>
       </Select.Root>
     </SettingsRow>
+    <ImagesTab bind:alwaysLoadImages={draft.alwaysLoadImages} onAlwaysLoadImagesChange={(value) => draft.alwaysLoadImages = value} />
   </SettingsSection>
 </div>

@@ -12,7 +12,6 @@
   import GeneralSettingsPage from './pages/GeneralSettingsPage.svelte'
   import AppearanceSettingsPage from './pages/AppearanceSettingsPage.svelte'
   import MailSettingsPage from './pages/MailSettingsPage.svelte'
-  import ImagePrivacySettingsPage from './pages/ImagePrivacySettingsPage.svelte'
   import AccountsSettingsPage from './pages/AccountsSettingsPage.svelte'
   import BackupSettingsPage from './backup/BackupSettingsPage.svelte'
   import ActivityLogPage from './activity/ActivityLogPage.svelte'
@@ -28,7 +27,6 @@
     { id: 'general', icon: 'lucide:settings-2', label: $_('settings.general') },
     { id: 'appearance', icon: 'lucide:palette', label: $_('settings.appearance') },
     { id: 'mail', icon: 'lucide:mail', label: $_('settings.mail') },
-    { id: 'images', icon: 'lucide:image', label: $_('settings.imagePrivacy') },
     { id: 'accounts', icon: 'lucide:mails', label: $_('settings.accounts') },
     { id: 'backup', icon: 'lucide:archive', label: $_('settings.backup') },
     { id: 'activity', icon: 'lucide:history', label: $_('activityLog.title') },
@@ -90,7 +88,6 @@
           {:else if activePage === 'general'}<GeneralSettingsPage {draft} />
           {:else if activePage === 'appearance'}<AppearanceSettingsPage {draft} />
           {:else if activePage === 'mail'}<MailSettingsPage {draft} />
-          {:else if activePage === 'images'}<ImagePrivacySettingsPage {draft} />
           {:else if activePage === 'accounts'}<AccountsSettingsPage />
           {:else if activePage === 'backup'}<BackupSettingsPage {draft} />
           {:else}<ActivityLogPage />{/if}

@@ -75,7 +75,7 @@
     showAccountDialog = true
   }
 
-  function openAdd() {
+  export function openAdd() {
     editingAccount = null
     showAccountDialog = true
   }
@@ -117,11 +117,7 @@
     </div>
   {:else if regularAccounts.length === 0}
     <div class="text-sm text-muted-foreground py-4 text-center">
-      <p class="mb-3">{$_('settingsAccounts.noAccountsConfigured')}</p>
-      <Button size="sm" onclick={openAdd}>
-        <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-        {$_('settingsAccounts.addAccount')}
-      </Button>
+      <p>{$_('settingsAccounts.noAccountsConfigured')}</p>
     </div>
   {:else}
     <div class="space-y-2">
@@ -201,12 +197,6 @@
           </Button>
         </div>
       {/each}
-
-      <!-- Add button -->
-      <Button size="sm" variant="outline" class="w-full" onclick={openAdd}>
-        <Icon icon="mdi:plus" class="w-4 h-4 mr-1" />
-        {$_('settingsAccounts.addAccount')}
-      </Button>
     </div>
   {/if}
 </div>
