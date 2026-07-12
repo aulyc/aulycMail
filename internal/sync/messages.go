@@ -219,7 +219,7 @@ func (e *Engine) syncMessagesWithOptions(ctx context.Context, accountID, folderI
 	} else if didFullUIDSearch {
 		remoteUIDs, err = e.fetchAllUIDs(ctx, conn.Client().RawClient())
 	} else {
-		remoteUIDs, err = e.fetchIncrementalUIDs(ctx, conn.Client().RawClient(), f, localUIDs, mailbox.UIDNext)
+		remoteUIDs, err = e.fetchIncrementalUIDs(ctx, conn.Client().RawClient(), localUIDs)
 	}
 	if err != nil {
 		e.log.Error().Err(err).Str("folder", f.Path).Msg("Failed to fetch UIDs from server - aborting sync to prevent data loss")
@@ -664,24 +664,10 @@ func (e *Engine) fetchAllUIDs(ctx context.Context, client *imapclient.Client) ([
 	}
 }
 
-func (e *Engine) fetchIncrementalUIDs(ctx context.Context, client *imapclient.Client, f *folder.Folder, localUIDs []uint32, mailboxUIDNext uint32) ([]uint32, error) {
+func (e *Engine) fetchIncrementalUIDs(ctx context.Context, client *imapclient.Client, localUIDs []uint32) ([]uint32, error) {
 	remoteUIDs := append([]uint32(nil), localUIDs...)
-	if f.UIDNext > 0 && mailboxUIDNext > 0 && mailboxUIDNext <= f.UIDNext {
-		e.log.Debug().
-			Str("folder", f.Path).
-			Uint32("storedUIDNext", f.UIDNext).
-			Uint32("mailboxUIDNext", mailboxUIDNext).
-			Msg("Skipping UID SEARCH; mailbox UIDNEXT unchanged")
-		return remoteUIDs, nil
-	}
-
-	highestUID := uint32(0)
-	for _, uid := range localUIDs {
-		if uid > highestUID {
-			highestUID = uid
-		}
-	}
-	if highestUID == 0 {
+	highestUID, hasLocalUID := highestLocalUID(localUIDs)
+	if !hasLocalUID {
 		return e.fetchAllUIDs(ctx, client)
 	}
 
@@ -691,6 +677,24 @@ func (e *Engine) fetchIncrementalUIDs(ctx context.Context, client *imapclient.Cl
 	}
 	remoteUIDs = append(remoteUIDs, newUIDs...)
 	return remoteUIDs, nil
+}
+
+// highestLocalUID returns the only safe high-water mark for incremental
+// message discovery. Folder refreshes persist the server's latest UIDNEXT
+// before message sync runs, so UIDNEXT cannot prove that all lower UIDs are
+// already present locally.
+func highestLocalUID(localUIDs []uint32) (uint32, bool) {
+	if len(localUIDs) == 0 {
+		return 0, false
+	}
+
+	highestUID := localUIDs[0]
+	for _, uid := range localUIDs[1:] {
+		if uid > highestUID {
+			highestUID = uid
+		}
+	}
+	return highestUID, true
 }
 
 // fetchUIDsAfter fetches UIDs greater than highestUID from the currently
