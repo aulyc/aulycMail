@@ -7,7 +7,13 @@
   import { _ } from '$lib/i18n'
   import ModalFrame from '$lib/components/ui/ModalFrame.svelte'
   import SearchScopeCarousel from '$lib/components/search/SearchScopeCarousel.svelte'
-  import { resultRowHighlightClass, type SearchResultInputMode } from '$lib/components/search/searchResultHighlight'
+  import {
+    SEARCH_RESULT_VIEWPORT_HEIGHT_PX,
+    resultRowHighlightClass,
+    searchResultScrollTopForIndex,
+    shouldActivatePointerResult,
+    type SearchResultInputMode,
+  } from '$lib/components/search/searchResultHighlight'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { formatRelativeDateTime } from '$lib/utils/date'
   import { createDebouncer } from '$lib/utils/debounce'
@@ -56,6 +62,8 @@
   let resultInputMode = $state<SearchResultInputMode>('keyboard')
   let selectedScopeId = $state('')
   let inputEl = $state<HTMLInputElement | null>(null)
+  let resultListEl = $state<HTMLDivElement | null>(null)
+  let pointerActivationSuppressedUntil = 0
   const searchDebouncer = createDebouncer(200)
   let searchSeq = 0
   // True while an IME is composing (e.g. typing pinyin before picking a hanzi).
@@ -117,6 +125,9 @@
       else contactResults = r || []
       activeIndex = 0
       resultInputMode = 'keyboard'
+      requestAnimationFrame(() => {
+        if (resultListEl) resultListEl.scrollTop = 0
+      })
     }).catch((err: unknown) => {
       if (seq !== searchSeq) return
       console.error('Search failed:', err)
@@ -186,13 +197,11 @@
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
       e.stopPropagation()
-      resultInputMode = 'keyboard'
-      activeIndex = Math.min(activeIndex + 1, resultCount - 1)
+      moveActiveResult(1)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       e.stopPropagation()
-      resultInputMode = 'keyboard'
-      activeIndex = Math.max(activeIndex - 1, 0)
+      moveActiveResult(-1)
     } else if (e.key === 'Tab') {
       e.preventDefault()
       e.stopPropagation()
@@ -215,7 +224,13 @@
     return c.emails && c.emails.length > 0 ? c.emails[0] : ''
   }
 
-  function activatePointerResult(index: number) {
+  function activatePointerResult(index: number, event: MouseEvent) {
+    if (!shouldActivatePointerResult(
+      event.movementX,
+      event.movementY,
+      performance.now(),
+      pointerActivationSuppressedUntil,
+    )) return
     resultInputMode = 'pointer'
     activeIndex = index
   }
@@ -223,6 +238,28 @@
   function clearStaleResultHighlight() {
     resultInputMode = 'idle'
     activeIndex = -1
+  }
+
+  function moveActiveResult(delta: -1 | 1) {
+    if (resultCount <= 0) return
+    resultInputMode = 'keyboard'
+    // WebKit can dispatch mousemove while programmatic scrolling moves a new
+    // row underneath a stationary pointer. Keep keyboard ownership briefly so
+    // that synthetic event cannot replace the active index with the hovered row.
+    pointerActivationSuppressedUntil = performance.now() + 250
+
+    const baseIndex = activeIndex >= 0 ? activeIndex : (delta > 0 ? -1 : 1)
+    const nextIndex = Math.max(0, Math.min(baseIndex + delta, resultCount - 1))
+    activeIndex = nextIndex
+
+    requestAnimationFrame(() => {
+      if (!resultListEl) return
+      resultListEl.scrollTop = searchResultScrollTopForIndex(
+        nextIndex,
+        resultListEl.scrollTop,
+        resultListEl.clientHeight,
+      )
+    })
   }
 </script>
 
@@ -264,38 +301,43 @@
         {#if query.trim() && resultCount === 0 && !loading}
           <div class="px-4 py-6 text-center text-sm text-muted-foreground">{$_('search.overlayNoResults')}</div>
         {:else if resultCount > 0}
-          <div class="max-h-[60vh] overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-thin py-1" onscroll={clearStaleResultHighlight}>
+          <div
+            bind:this={resultListEl}
+            class="snap-y snap-mandatory overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-thin"
+            style={`max-height: ${SEARCH_RESULT_VIEWPORT_HEIGHT_PX}px`}
+            onwheel={clearStaleResultHighlight}
+          >
             {#if mode === 'mail'}
               {#each mailResults as r, i (r.threadId + '-' + i)}
                 <button
-                  class="w-full flex items-start gap-3 px-4 py-2 text-left {resultRowHighlightClass(i, activeIndex, resultInputMode)}"
+                  class="flex h-[52px] w-full snap-start items-center gap-3 px-4 text-left {resultRowHighlightClass(i, activeIndex, resultInputMode)}"
                   onclick={() => selectIndex(i)}
-                  onmousemove={() => activatePointerResult(i)}
+                  onmousemove={(event) => activatePointerResult(i, event)}
                 >
                   <Icon
                     icon={r.incoming ? 'mdi:email-arrow-left-outline' : 'mdi:email-arrow-right-outline'}
-                    class="w-4 h-4 flex-shrink-0 text-muted-foreground mt-0.5"
+                    class="h-4 w-4 flex-shrink-0 text-muted-foreground"
                   />
-                  <span class="flex flex-col min-w-0 flex-1">
-                    <span class="flex items-baseline gap-2 min-w-0">
-                      <span class="truncate text-sm text-foreground flex-1 min-w-0">{r.subject || $_('viewer.noSubject')}</span>
-                      <span class="flex-shrink-0 text-xs text-muted-foreground whitespace-nowrap">
+                  <span class="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span class="flex min-w-0 items-baseline">
+                      <span class="min-w-0 flex-1 truncate text-sm text-foreground">{r.subject || $_('viewer.noSubject')}</span>
+                      <span class="ml-4 max-w-40 flex-shrink-0 truncate text-right text-xs text-muted-foreground">
+                        {r.fromName || r.fromEmail}
+                      </span>
+                      <span class="ml-4 flex-shrink-0 whitespace-nowrap text-xs text-muted-foreground">
                         {r.date ? formatRelativeDateTime(new Date(r.date)) : ''}
                       </span>
                     </span>
-                    <span class="truncate text-xs text-muted-foreground">{r.fromName || r.fromEmail}</span>
-                    {#if r.snippet}
-                      <span class="truncate text-xs text-muted-foreground/80">{r.snippet}</span>
-                    {/if}
+                    <span class="truncate text-xs text-muted-foreground/80">{r.snippet || '\u00A0'}</span>
                   </span>
                 </button>
               {/each}
             {:else}
               {#each contactResults as c, i (c.id + '-' + i)}
                 <button
-                  class="w-full flex items-center gap-3 px-4 py-2 text-left {resultRowHighlightClass(i, activeIndex, resultInputMode)}"
+                  class="flex h-[52px] w-full snap-start items-center gap-3 px-4 text-left {resultRowHighlightClass(i, activeIndex, resultInputMode)}"
                   onclick={() => selectIndex(i)}
-                  onmousemove={() => activatePointerResult(i)}
+                  onmousemove={(event) => activatePointerResult(i, event)}
                 >
                   <Icon icon="mdi:account-outline" class="w-4 h-4 flex-shrink-0 text-muted-foreground" />
                   <span class="flex flex-col min-w-0 flex-1">
