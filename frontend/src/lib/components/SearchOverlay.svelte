@@ -7,6 +7,7 @@
   import { _ } from '$lib/i18n'
   import ModalFrame from '$lib/components/ui/ModalFrame.svelte'
   import SearchScopeCarousel from '$lib/components/search/SearchScopeCarousel.svelte'
+  import { resultRowHighlightClass, type SearchResultInputMode } from '$lib/components/search/searchResultHighlight'
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { formatRelativeDateTime } from '$lib/utils/date'
   import { createDebouncer } from '$lib/utils/debounce'
@@ -52,6 +53,7 @@
   let contactResults = $state<contactdto.Contact[]>([])
   let loading = $state(false)
   let activeIndex = $state(0)
+  let resultInputMode = $state<SearchResultInputMode>('keyboard')
   let selectedScopeId = $state('')
   let inputEl = $state<HTMLInputElement | null>(null)
   const searchDebouncer = createDebouncer(200)
@@ -80,6 +82,7 @@
       mailResults = []
       contactResults = []
       activeIndex = 0
+      resultInputMode = 'keyboard'
       selectedScopeId = ''
       loading = false
       setTimeout(() => inputEl?.focus(), 30)
@@ -113,6 +116,7 @@
       if (currentMode === 'mail') mailResults = r || []
       else contactResults = r || []
       activeIndex = 0
+      resultInputMode = 'keyboard'
     }).catch((err: unknown) => {
       if (seq !== searchSeq) return
       console.error('Search failed:', err)
@@ -182,10 +186,12 @@
     } else if (e.key === 'ArrowDown') {
       e.preventDefault()
       e.stopPropagation()
+      resultInputMode = 'keyboard'
       activeIndex = Math.min(activeIndex + 1, resultCount - 1)
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       e.stopPropagation()
+      resultInputMode = 'keyboard'
       activeIndex = Math.max(activeIndex - 1, 0)
     } else if (e.key === 'Tab') {
       e.preventDefault()
@@ -194,7 +200,7 @@
     } else if (e.key === 'Enter') {
       e.preventDefault()
       e.stopPropagation()
-      if (resultCount > 0) selectIndex(activeIndex)
+      if (resultCount > 0 && activeIndex >= 0) selectIndex(activeIndex)
     } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
       // Select all of the input's text. The native Edit menu has no Select All
       // item (so macOS won't do this), and the global Cmd+A would otherwise be
@@ -207,6 +213,16 @@
 
   function contactEmail(c: contactdto.Contact): string {
     return c.emails && c.emails.length > 0 ? c.emails[0] : ''
+  }
+
+  function activatePointerResult(index: number) {
+    resultInputMode = 'pointer'
+    activeIndex = index
+  }
+
+  function clearStaleResultHighlight() {
+    resultInputMode = 'idle'
+    activeIndex = -1
   }
 </script>
 
@@ -248,13 +264,13 @@
         {#if query.trim() && resultCount === 0 && !loading}
           <div class="px-4 py-6 text-center text-sm text-muted-foreground">{$_('search.overlayNoResults')}</div>
         {:else if resultCount > 0}
-          <div class="max-h-[60vh] overflow-y-auto scrollbar-thin py-1">
+          <div class="max-h-[60vh] overflow-x-hidden overflow-y-auto overscroll-contain scrollbar-thin py-1" onscroll={clearStaleResultHighlight}>
             {#if mode === 'mail'}
               {#each mailResults as r, i (r.threadId + '-' + i)}
                 <button
-                  class="w-full flex items-start gap-3 px-4 py-2 text-left {i === activeIndex ? 'bg-muted' : 'hover:bg-muted/50'}"
+                  class="w-full flex items-start gap-3 px-4 py-2 text-left {resultRowHighlightClass(i, activeIndex, resultInputMode)}"
                   onclick={() => selectIndex(i)}
-                  onmousemove={() => activeIndex = i}
+                  onmousemove={() => activatePointerResult(i)}
                 >
                   <Icon
                     icon={r.incoming ? 'mdi:email-arrow-left-outline' : 'mdi:email-arrow-right-outline'}
@@ -277,9 +293,9 @@
             {:else}
               {#each contactResults as c, i (c.id + '-' + i)}
                 <button
-                  class="w-full flex items-center gap-3 px-4 py-2 text-left {i === activeIndex ? 'bg-muted' : 'hover:bg-muted/50'}"
+                  class="w-full flex items-center gap-3 px-4 py-2 text-left {resultRowHighlightClass(i, activeIndex, resultInputMode)}"
                   onclick={() => selectIndex(i)}
-                  onmousemove={() => activeIndex = i}
+                  onmousemove={() => activatePointerResult(i)}
                 >
                   <Icon icon="mdi:account-outline" class="w-4 h-4 flex-shrink-0 text-muted-foreground" />
                   <span class="flex flex-col min-w-0 flex-1">
