@@ -70,7 +70,6 @@
       await draft.saveAll()
       addToast({ type: 'success', message: $_('toast.settingsSaved') })
       if (nativeTitleBarChanged) { draft.originalNativeTitleBar = draft.nativeTitleBar; showRestartDialog = true; return }
-      close()
     } catch (error) {
       console.error('Failed to save settings:', error)
       addToast({ type: 'error', message: $_('toast.failedToSaveSettings') })
@@ -79,6 +78,12 @@
 
   function close() { open = false; onClose?.() }
   function handleOpenChange(value: boolean) { open = value; if (!value) onClose?.() }
+
+  function keepDialogFromTakingPointerFocus(event: PointerEvent) {
+    if (event.button !== 0 || !(event.target instanceof Element)) return
+    const interactive = event.target.closest('button, a, input, textarea, select, [role="button"], [role="tab"], [role="option"], [contenteditable="true"]')
+    if (!interactive) event.preventDefault()
+  }
 
   function handleNavigationKeydown(event: KeyboardEvent, currentIndex: number) {
     let nextIndex: number | null = null
@@ -97,7 +102,7 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
-  <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0 [&>button]:hidden" preventCloseAutoFocus onInteractOutside={(event) => event.preventDefault()}>
+  <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0 !outline-none focus:!outline-none focus-visible:!outline-none focus:ring-0 focus-visible:ring-0 [&>button]:hidden" preventCloseAutoFocus onpointerdown={keepDialogFromTakingPointerFocus} onInteractOutside={(event) => event.preventDefault()}>
     <Dialog.Title class="sr-only">{$_('settings.title')}</Dialog.Title>
     <div class="grid min-h-0 flex-1 grid-cols-[210px_minmax(0,1fr)]">
       <aside class="flex min-h-0 flex-col border-r border-border bg-muted/35 px-3 py-6">
@@ -156,4 +161,4 @@
   </Dialog.Content>
 </Dialog.Root>
 
-<ConfirmDialog bind:open={showRestartDialog} title={$_('settingsGeneral.restartRequired')} description={$_('settingsGeneral.restartRequiredDescription')} confirmLabel={$_('settingsGeneral.quitNow')} cancelLabel={$_('settingsGeneral.restartLater')} onConfirm={() => QuitApp()} onCancel={() => { showRestartDialog = false; close() }} />
+<ConfirmDialog bind:open={showRestartDialog} title={$_('settingsGeneral.restartRequired')} description={$_('settingsGeneral.restartRequiredDescription')} confirmLabel={$_('settingsGeneral.quitNow')} cancelLabel={$_('settingsGeneral.restartLater')} onConfirm={() => QuitApp()} onCancel={() => showRestartDialog = false} />

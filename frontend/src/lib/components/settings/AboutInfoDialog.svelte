@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from '@iconify/svelte'
   import * as Dialog from '$lib/components/ui/dialog'
   import { Button } from '$lib/components/ui/button'
   import { _ } from '$lib/i18n'
@@ -17,12 +18,32 @@
   }
 
   let { open = $bindable(false), title, intro, sections }: Props = $props()
+
+  function closeOnPointerDown(event: PointerEvent) {
+    if (event.button !== 0) return
+    event.preventDefault()
+    event.stopPropagation()
+    open = false
+  }
+
+  function closeOnKeyboardClick(event: MouseEvent) {
+    if (event.detail === 0) open = false
+  }
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Content class="max-h-[78vh] w-[min(680px,90vw)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0">
+  <Dialog.Content class="max-h-[78vh] w-[min(680px,90vw)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 !outline-none focus:!outline-none focus-visible:!outline-none focus:ring-0 focus-visible:ring-0 [&>button]:hidden">
     <header class="shrink-0 border-b border-border px-6 py-5 pr-12">
       <Dialog.Title class="text-lg font-semibold text-foreground">{title}</Dialog.Title>
+      <button
+        type="button"
+        class="absolute right-4 top-4 rounded-sm p-0.5 text-muted-foreground opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        aria-label={$_('common.close')}
+        onpointerdown={closeOnPointerDown}
+        onclick={closeOnKeyboardClick}
+      >
+        <Icon icon="mdi:close" class="h-4 w-4" />
+      </button>
     </header>
 
     <div class="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5 scrollbar-thin">
@@ -41,7 +62,7 @@
     </div>
 
     <footer class="flex shrink-0 justify-end border-t border-border px-6 py-4">
-      <Button variant="outline" onclick={() => open = false}>{$_('common.close')}</Button>
+      <Button variant="outline" onpointerdown={closeOnPointerDown} onclick={closeOnKeyboardClick}>{$_('common.close')}</Button>
     </footer>
   </Dialog.Content>
 </Dialog.Root>

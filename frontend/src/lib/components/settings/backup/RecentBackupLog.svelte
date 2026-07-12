@@ -35,12 +35,22 @@
   onDestroy(unsubscribe)
 </script>
 
-<section class="border-y border-border/75">
+<section class="border-b border-border/75">
   <div class="flex min-h-14 items-center gap-4 py-3 text-sm">
     <h3 class="shrink-0 font-semibold text-foreground">{$_('settingsBackup.recentLog')}</h3>
-    <div class="ml-auto min-w-0 flex-1 truncate text-right">
+    <div class="ml-auto min-w-0 flex-1 text-right">
       {#if loading}<Icon icon="mdi:loading" class="h-5 w-5 animate-spin text-muted-foreground" />
-      {:else if log}<span>{activityTime(log.createdAt)} · {activitySummary(log)}</span>
+      {:else if log}
+        {@const summaryParts = activitySummary(log).split(' · ')}
+        <div class="flex flex-wrap justify-end gap-x-3 gap-y-1">
+          <span>{activityTime(log.createdAt)}</span>
+          {#if summaryParts[0]}<span>{summaryParts[0]}</span>{/if}
+        </div>
+        {#if summaryParts.length > 1}
+          <div class="mt-1 flex flex-wrap justify-end gap-x-3 gap-y-1 text-muted-foreground">
+            {#each summaryParts.slice(1) as part (part)}<span>{part}</span>{/each}
+          </div>
+        {/if}
       {:else if loadFailed}<span class="text-destructive">{$_('activityLog.loadFailed')}</span>
       {:else if hasIndex}<span class="text-muted-foreground">{$_('settingsBackup.indexWithoutLog')}</span>
       {:else}<span class="text-muted-foreground">{$_('settingsBackup.noRecentLog')}</span>{/if}
