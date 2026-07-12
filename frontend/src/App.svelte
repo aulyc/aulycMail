@@ -12,7 +12,6 @@
   import CertificateDialog from './lib/components/settings/CertificateDialog.svelte'
   import ActivityRail from './lib/components/rail/ActivityRail.svelte'
   import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
-  import AboutDialog from './lib/components/settings/AboutDialog.svelte'
   import SearchOverlay from './lib/components/SearchOverlay.svelte'
   import BackupViewerDialog from './lib/components/backup/BackupViewerDialog.svelte'
   import { activateContactFromGlobalSearch } from '$contacts/stores/contactsView.svelte'
@@ -133,10 +132,17 @@
 
   // Settings dialog — hosted at app level so the rail's gear opens it from
   // any view (Mail or Contacts), not just the mail sidebar.
+  type SettingsPage = 'general' | 'appearance' | 'mail' | 'accounts' | 'backup' | 'activity' | 'about'
   let showSettings = $state(false)
-  let showAbout = $state(false)
+  let settingsPage = $state<SettingsPage>('general')
   let showSearchOverlay = $state(false)
   let showBackupViewer = $state(false)
+
+  function openSettings(page: SettingsPage = 'general') {
+    settingsPage = page
+    showBackupViewer = false
+    showSettings = true
+  }
 
   // Certificate TOFU state (for background sync cert errors)
   let showCertDialog = $state(false)
@@ -241,19 +247,14 @@
 
     // Native macOS App-menu items route here.
     EventsOn('menu:openSettings', () => {
-      showAbout = false
-      showBackupViewer = false
-      showSettings = true
+      openSettings('general')
     })
     EventsOn('menu:openBackupViewer', () => {
       showSettings = false
-      showAbout = false
       showBackupViewer = true
     })
     EventsOn('menu:openAbout', () => {
-      showSettings = false
-      showBackupViewer = false
-      showAbout = true
+      openSettings('about')
     })
     EventsOn('backup:progress', (data: BackupProgress) => {
       if (data.phase === 'done') {
@@ -832,7 +833,7 @@
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Main Content -->
   <div class="flex flex-1 min-h-0 overflow-hidden relative">
-    <ActivityRail onOpenSettings={() => showSettings = true} />
+    <ActivityRail onOpenSettings={() => openSettings()} />
 
     {#if getActivePane() === 'contacts'}
       <ContactsPane />
@@ -966,8 +967,7 @@
 <TermsDialog bind:open={showTermsDialog} onAccept={handleTermsAccepted} />
 
 <!-- App Settings dialog — opened from the rail's gear (works in every view) -->
-<SettingsDialog bind:open={showSettings} onClose={() => { showSettings = false }} />
-<AboutDialog bind:open={showAbout} onClose={() => { showAbout = false }} />
+<SettingsDialog bind:open={showSettings} bind:activePage={settingsPage} onClose={() => { showSettings = false }} />
 <BackupViewerDialog bind:open={showBackupViewer} onClose={() => { showBackupViewer = false }} />
 
 <SearchOverlay

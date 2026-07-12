@@ -20,7 +20,7 @@ func (a *App) SaveUIState(state *appstate.UIState) error {
 // App Info API - Exposed to frontend via Wails bindings
 // ============================================================================
 
-// Version is consumed by the About dialog and the --version CLI flag. The
+// Version is consumed by the About settings page and the --version CLI flag. The
 // default is the local/test version; release builds override it with Go
 // linker flags derived from wails.json.
 var Version = "0.3.9-dev"
@@ -34,7 +34,7 @@ type AppInfo struct {
 	License     string `json:"license"`
 }
 
-// GetAppInfo returns application metadata for the About dialog
+// GetAppInfo returns application metadata for the About settings page
 func (a *App) GetAppInfo() AppInfo {
 	return AppInfo{
 		Name:        "aulycmail",

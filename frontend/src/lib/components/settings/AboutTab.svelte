@@ -1,31 +1,12 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
   import Icon from '@iconify/svelte'
-  // @ts-ignore - wailsjs path
-  import { GetAppInfo } from '../../../../wailsjs/go/app/App.js'
+  import type { app } from '../../../../wailsjs/go/models'
   import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime'
   import logo from '../../../assets/images/logo-universal.png'
   import { _ } from '$lib/i18n'
 
-  interface AppInfo {
-    name: string
-    version: string
-    description: string
-    website: string
-  }
-
-  let appInfo = $state<AppInfo | null>(null)
-  let loading = $state(true)
-
-  onMount(async () => {
-    try {
-      appInfo = await GetAppInfo()
-    } catch (err) {
-      console.error('Failed to load app info:', err)
-    } finally {
-      loading = false
-    }
-  })
+  interface Props { appInfo: app.AppInfo | null; loading?: boolean }
+  let { appInfo, loading = false }: Props = $props()
 
   const PRIVACY_URL = 'https://aulyc.com/aulycmail/privacy'
   const TERMS_URL = 'https://aulyc.com/aulycmail/terms'
@@ -45,7 +26,7 @@
   }
 </script>
 
-<div class="flex flex-col items-center justify-center py-6 space-y-6">
+<div class="flex h-full flex-col items-center justify-center space-y-6 py-6">
   {#if loading}
     <Icon icon="mdi:loading" class="w-8 h-8 animate-spin text-muted-foreground" />
   {:else if appInfo}
