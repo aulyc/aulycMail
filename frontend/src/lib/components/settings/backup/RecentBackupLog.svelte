@@ -7,7 +7,6 @@
   import { GetBackupStatus, GetLatestActivityLog } from '../../../../../wailsjs/go/app/App.js'
   import type { ActivityLog } from '../activity/activityLogTypes'
   import { activitySummary, activityTime } from '../activity/activityLogFormat'
-  import SettingsSection from '../shared/SettingsSection.svelte'
   interface Props { directory: string }
   let { directory }: Props = $props()
   let log = $state<ActivityLog | null>(null)
@@ -36,12 +35,15 @@
   onDestroy(unsubscribe)
 </script>
 
-<SettingsSection title={$_('settingsBackup.recentLog')} framed={false}>
-  <div class="min-h-16 py-3 text-sm">
-    {#if loading}<Icon icon="mdi:loading" class="h-5 w-5 animate-spin text-muted-foreground" />
-    {:else if log}<p>{activityTime(log.createdAt)} · {activitySummary(log)}</p>
-    {:else if loadFailed}<p class="text-destructive">{$_('activityLog.loadFailed')}</p>
-    {:else if hasIndex}<p class="text-muted-foreground">{$_('settingsBackup.indexWithoutLog')}</p>
-    {:else}<p class="text-muted-foreground">{$_('settingsBackup.noRecentLog')}</p>{/if}
+<section class="border-y border-border/75">
+  <div class="flex min-h-14 items-center gap-4 py-3 text-sm">
+    <h3 class="shrink-0 font-semibold text-foreground">{$_('settingsBackup.recentLog')}</h3>
+    <div class="min-w-0 flex-1 truncate">
+      {#if loading}<Icon icon="mdi:loading" class="h-5 w-5 animate-spin text-muted-foreground" />
+      {:else if log}<span>{activityTime(log.createdAt)} · {activitySummary(log)}</span>
+      {:else if loadFailed}<span class="text-destructive">{$_('activityLog.loadFailed')}</span>
+      {:else if hasIndex}<span class="text-muted-foreground">{$_('settingsBackup.indexWithoutLog')}</span>
+      {:else}<span class="text-muted-foreground">{$_('settingsBackup.noRecentLog')}</span>{/if}
+    </div>
   </div>
-</SettingsSection>
+</section>

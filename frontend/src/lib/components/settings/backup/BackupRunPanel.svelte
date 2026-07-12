@@ -16,8 +16,13 @@
     {#if store.running || store.progress}
       <div class="flex items-center gap-2 text-sm"><Icon icon={store.running ? 'mdi:loading' : hasIssues ? 'mdi:alert-circle-outline' : 'mdi:check-circle-outline'} class="h-4 w-4 {store.running ? 'animate-spin text-primary' : hasIssues ? 'text-amber-500' : 'text-emerald-500'}" /><span class="font-medium tabular-nums">{store.progress?.current ?? 0}/{store.progress?.total ?? 0}</span>{#if target}<span class="truncate text-muted-foreground">· {target}</span>{/if}</div>
       <div class="h-1.5 overflow-hidden rounded-full bg-muted"><div class="h-full rounded-full bg-primary transition-all" style={`width:${percent}%`}></div></div>
-      <div class="flex flex-wrap gap-x-4 text-xs text-muted-foreground"><span>{$_('settingsBackup.progressExported')} {store.progress?.exported ?? 0}</span><span>{$_('settingsBackup.progressSkipped')} {store.progress?.skipped ?? 0}</span><span>{$_('settingsBackup.progressMissing')} {store.progress?.missing ?? 0}</span><span>{$_('settingsBackup.progressFailed')} {store.progress?.failed ?? 0}</span></div>
     {:else}<p class="text-sm text-muted-foreground">{$_('settingsBackup.noCurrentTask')}</p>{/if}
+    <dl class="grid w-full max-w-xl grid-cols-4 gap-x-4 text-xs text-muted-foreground">
+      <div class="flex items-baseline gap-1"><dt>{$_('settingsBackup.progressExported')}</dt><dd class="tabular-nums">{store.progress?.exported ?? 0}</dd></div>
+      <div class="flex items-baseline gap-1"><dt>{$_('settingsBackup.progressSkipped')}</dt><dd class="tabular-nums">{store.progress?.skipped ?? 0}</dd></div>
+      <div class="flex items-baseline gap-1"><dt>{$_('settingsBackup.progressMissing')}</dt><dd class="tabular-nums">{store.progress?.missing ?? 0}</dd></div>
+      <div class="flex items-baseline gap-1"><dt>{$_('settingsBackup.progressFailed')}</dt><dd class="tabular-nums">{store.progress?.failed ?? 0}</dd></div>
+    </dl>
     <div class="flex justify-end"><Button onclick={onStart} disabled={!canStart || store.running || store.loading}>{#if store.running}<Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />{$_('settingsBackup.backupRunning')}{:else}<Icon icon="mdi:archive-arrow-down-outline" class="mr-2 h-4 w-4" />{saveBeforeStart ? $_('settingsBackup.saveAndStart') : $_('settingsBackup.startBackup')}{/if}</Button></div>
   </div>
 </SettingsSection>

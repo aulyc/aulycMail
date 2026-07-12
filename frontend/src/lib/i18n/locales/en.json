@@ -314,7 +314,7 @@
     "scopeSelected": "Selected mailboxes",
     "noAccounts": "No mailboxes available for backup",
     "selectedMailboxes": "{count} mailboxes",
-    "recentLog": "Latest backup log",
+    "recentLog": "Latest log",
     "noRecentLog": "No backup log yet",
     "indexWithoutLog": "A backup index was found, but there is no recent backup log",
     "currentTask": "Current task",

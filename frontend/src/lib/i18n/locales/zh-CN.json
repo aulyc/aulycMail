@@ -314,7 +314,7 @@
     "scopeSelected": "选择邮箱",
     "noAccounts": "尚无可备份邮箱",
     "selectedMailboxes": "{count} 个邮箱",
-    "recentLog": "最近备份日志",
+    "recentLog": "最近日志",
     "noRecentLog": "暂无备份日志",
     "indexWithoutLog": "已检测到备份索引，暂无最近备份日志",
     "currentTask": "当前任务",
