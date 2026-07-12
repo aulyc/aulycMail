@@ -10,6 +10,7 @@
   import { accountStore } from '$lib/stores/accounts.svelte'
   import { formatRelativeDateTime } from '$lib/utils/date'
   import { createDebouncer } from '$lib/utils/debounce'
+  import { shouldShowContactEmail } from '$contacts/utils/contactPresentation'
   // @ts-ignore - wailsjs path
   import { SearchMailInAccount, Contacts_ListContactsForBrowse } from '../../../wailsjs/go/app/App'
   // @ts-ignore - wailsjs path
@@ -283,7 +284,7 @@
                   <Icon icon="mdi:account-outline" class="w-4 h-4 flex-shrink-0 text-muted-foreground" />
                   <span class="flex flex-col min-w-0 flex-1">
                     <span class="truncate text-sm text-foreground">{c.name || contactEmail(c) || $_('contacts.common.unnamed')}</span>
-                    {#if c.name && contactEmail(c)}
+                    {#if shouldShowContactEmail(c.name, contactEmail(c))}
                       <span class="truncate text-xs text-muted-foreground">{contactEmail(c)}</span>
                     {/if}
                   </span>

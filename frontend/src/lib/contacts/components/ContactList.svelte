@@ -21,6 +21,7 @@
   import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$contacts/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { createDebouncer } from '$lib/utils/debounce'
+  import { shouldShowContactEmail } from '$contacts/utils/contactPresentation'
   // Canonical list toolbar — owns hamburger placement, title styling, count
   // badge and search-mode swap. Contacts supplies label/count plus search
   // markup and trailing action buttons.
@@ -204,11 +205,7 @@
     return $_('contacts.list.header')
   })
 
-  const headerCount = $derived.by(() => {
-    const shown = contactsView.contacts.length
-    const total = contactsView.total
-    return total > shown ? `${shown}/${total}` : total
-  })
+  const headerCount = $derived(contactsView.total)
 </script>
 
 <div class="flex-shrink-0 min-h-0 flex flex-col border-r border-border bg-background" style="width: {listWidth}px">
@@ -285,7 +282,7 @@
       <ListRow {selected} onclick={() => activateContact(c.id)}>
         <span class="flex flex-col min-w-0 flex-1">
           <span class="font-medium truncate text-foreground">{c.name || primaryEmail(c) || $_('contacts.common.unnamed')}</span>
-          {#if primaryEmail(c) && primaryEmail(c) !== c.name}
+          {#if shouldShowContactEmail(c.name, primaryEmail(c))}
             <span class="text-xs text-muted-foreground truncate">{primaryEmail(c)}</span>
           {/if}
         </span>

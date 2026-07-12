@@ -223,9 +223,11 @@
 
     <form onsubmit={(e) => { e.preventDefault(); handleSave() }} class="flex-1 min-h-0 flex flex-col overflow-hidden">
       <!-- Fixed-height scroll area: keeps the dialog height constant whether or
-           not the signature section is shown. pr-3/pl-1/pt-1.5 keep the
-           scrollbar + focus rings off the inputs. -->
-      <div class="h-[460px] max-h-[calc(90vh-200px)] overflow-y-auto space-y-5 pt-1.5 pl-1 pr-3 pb-2">
+           not the signature section is shown. A stable scrollbar gutter also
+           keeps the fixed-width controls aligned when signature fields add
+           enough content to overflow. pr-3/pl-1/pt-1.5 keep the scrollbar +
+           focus rings off the inputs. -->
+      <div class="h-[460px] max-h-[calc(90vh-200px)] overflow-y-auto [scrollbar-gutter:stable] space-y-5 pt-1.5 pl-1 pr-3 pb-2">
       <!-- Email & Name (label + input on one row) -->
       <div class="space-y-4">
         {#if !identity}
