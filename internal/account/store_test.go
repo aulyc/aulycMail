@@ -3,6 +3,7 @@ package account
 import (
 	"errors"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"aulyc.local/aulycmail/internal/database"
@@ -395,6 +396,50 @@ func TestStoreList(t *testing.T) {
 	}
 	if len(accounts) != 2 {
 		t.Fatalf("List() returned %d accounts, want 2", len(accounts))
+	}
+}
+
+func TestStoreListOwnEmailAddressesIncludesAccountsAndIdentities(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db)
+
+	cfg := validAccountConfig()
+	cfg.Email = "Owner@Example.com"
+	created, err := store.Create(cfg)
+	if err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	if _, err := store.CreateIdentity(created.ID, &IdentityConfig{
+		Email: "Alias@Example.COM",
+		Name:  "Alias",
+	}); err != nil {
+		t.Fatalf("CreateIdentity() error = %v", err)
+	}
+	// Exercise normalization and de-duplication independently from the write
+	// APIs, which intentionally preserve the user's entered address casing.
+	if _, err := db.Exec(`UPDATE identities SET email = '  OWNER@example.com  ' WHERE account_id = ? AND is_default = 1`, created.ID); err != nil {
+		t.Fatalf("normalize fixture default identity: %v", err)
+	}
+
+	got, err := store.ListOwnEmailAddresses()
+	if err != nil {
+		t.Fatalf("ListOwnEmailAddresses() error = %v", err)
+	}
+	want := []string{"alias@example.com", "owner@example.com"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("ListOwnEmailAddresses() = %v, want %v", got, want)
+	}
+}
+
+func TestStoreListOwnEmailAddressesReturnsQueryError(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db)
+	if _, err := db.Exec(`DROP TABLE identities`); err != nil {
+		t.Fatalf("drop identities fixture: %v", err)
+	}
+
+	if _, err := store.ListOwnEmailAddresses(); err == nil {
+		t.Fatal("ListOwnEmailAddresses() error = nil, want query error")
 	}
 }
 

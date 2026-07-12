@@ -615,6 +615,18 @@ func (s *Store) Get(email string) (*Contact, error) {
 // AND local-collected, the record is also deleted; manual records survive so the
 // user can re-link emails. Public signature preserved.
 func (s *Store) Delete(email string) error {
+	return s.deleteEmail(email, false)
+}
+
+// PurgeOwnEmail removes an address that belongs to the user and deletes every
+// parent record left without an email, including manual records. This is
+// intentionally stricter than Delete: an empty manual shell must not remain
+// visible in the Contacts pane after an address becomes an account or alias.
+func (s *Store) PurgeOwnEmail(email string) error {
+	return s.deleteEmail(email, true)
+}
+
+func (s *Store) deleteEmail(email string, deleteAllEmptyRecords bool) error {
 	email = strings.ToLower(strings.TrimSpace(email))
 	if email == "" {
 		return nil
@@ -634,6 +646,10 @@ func (s *Store) Delete(email string) error {
 		}
 		recordIDs = append(recordIDs, id)
 	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return fmt.Errorf("failed to iterate record_ids: %w", err)
+	}
 	rows.Close()
 	if len(recordIDs) == 0 {
 		return nil
@@ -643,13 +659,21 @@ func (s *Store) Delete(email string) error {
 		return fmt.Errorf("failed to delete email: %w", err)
 	}
 
-	// Cascade-clean local-collected records that are now empty.
+	// Cascade-clean records that are now empty. The public Delete behavior keeps
+	// empty manual shells for re-linking; own-address purges remove every empty
+	// shell so it cannot remain visible in the contact list.
 	for _, recordID := range recordIDs {
 		var remaining int
 		if err := s.db.QueryRow(`SELECT COUNT(*) FROM contact_emails WHERE record_id = ?`, recordID).Scan(&remaining); err != nil {
 			continue
 		}
 		if remaining > 0 {
+			continue
+		}
+		if deleteAllEmptyRecords {
+			if _, err := s.db.Exec(`DELETE FROM contact_records WHERE id = ?`, recordID); err != nil {
+				return fmt.Errorf("failed to delete empty own-address record: %w", err)
+			}
 			continue
 		}
 		var source, kind string

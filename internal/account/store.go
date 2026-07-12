@@ -323,6 +323,40 @@ func (s *Store) List() ([]*Account, error) {
 	return accounts, nil
 }
 
+// ListOwnEmailAddresses returns every address that belongs to the user: account
+// mailbox addresses plus all sender-identity addresses (including aliases).
+// Values are normalized and de-duplicated so callers can use the result as an
+// exclusion set without repeating address canonicalization rules.
+func (s *Store) ListOwnEmailAddresses() ([]string, error) {
+	rows, err := s.db.Query(`
+		SELECT normalized_email
+		FROM (
+			SELECT LOWER(TRIM(COALESCE(email, ''))) AS normalized_email FROM accounts
+			UNION
+			SELECT LOWER(TRIM(COALESCE(email, ''))) AS normalized_email FROM identities
+		)
+		WHERE normalized_email <> ''
+		ORDER BY normalized_email
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list own email addresses: %w", err)
+	}
+	defer rows.Close()
+
+	emails := make([]string, 0)
+	for rows.Next() {
+		var email string
+		if err := rows.Scan(&email); err != nil {
+			return nil, fmt.Errorf("failed to scan own email address: %w", err)
+		}
+		emails = append(emails, email)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate own email addresses: %w", err)
+	}
+	return emails, nil
+}
+
 // ListBySharedMailboxParent returns all shared mailbox accounts linked to a parent account.
 func (s *Store) ListBySharedMailboxParent(parentID string) ([]*Account, error) {
 	rows, err := s.db.Query(`

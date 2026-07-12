@@ -283,6 +283,25 @@ func TestSearchEmpty(t *testing.T) {
 	}
 }
 
+func TestPurgeOwnEmailDeletesEmptyManualRecord(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db.DB)
+	if err := store.Create("owner@example.com", "Owner"); err != nil {
+		t.Fatalf("Create(): %v", err)
+	}
+
+	if err := store.PurgeOwnEmail(" OWNER@example.com "); err != nil {
+		t.Fatalf("PurgeOwnEmail(): %v", err)
+	}
+	records, err := store.ListRecords(RecordFilter{Source: "local"})
+	if err != nil {
+		t.Fatalf("ListRecords(): %v", err)
+	}
+	if len(records) != 0 {
+		t.Fatalf("ListRecords() = %+v, want no empty manual record", records)
+	}
+}
+
 func TestUpdateName(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db.DB)

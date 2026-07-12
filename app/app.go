@@ -744,24 +744,47 @@ func (a *App) Shutdown(ctx context.Context) {
 // updateDBConnectionPool scales the database connection pool based on account count.
 // This should be called at startup and whenever accounts are added or removed.
 // It also refreshes the contact store's own-address set so auto-collection never
-// harvests the user's own mail accounts into their address book.
+// harvests the user's own mailboxes or sender identities into the address book.
 func (a *App) updateDBConnectionPool() {
 	accounts, err := a.accountStore.List()
 	if err != nil {
 		// On error, use a reasonable default
 		a.db.UpdateIdleConns(0)
-		return
+	} else {
+		a.db.UpdateIdleConns(len(accounts))
 	}
-	a.db.UpdateIdleConns(len(accounts))
 
-	if a.contactStore != nil {
-		emails := make([]string, 0, len(accounts))
-		for _, acc := range accounts {
-			if acc != nil && acc.Email != "" {
-				emails = append(emails, acc.Email)
-			}
+	if _, err := a.refreshContactOwnEmails(); err != nil {
+		log := logging.WithComponent("app")
+		log.Warn().Err(err).Msg("Failed to refresh contact own-address exclusions")
+	}
+}
+
+// refreshContactOwnEmails atomically replaces the contact store's exclusion
+// set with all configured mailbox and sender-identity addresses, then removes
+// historical contact rows for those addresses. If the query fails,
+// SetOwnEmails is not called, preserving the previous known-good set.
+func (a *App) refreshContactOwnEmails() ([]string, error) {
+	if a.accountStore == nil || a.contactStore == nil {
+		return nil, fmt.Errorf("contact own-address stores are not ready")
+	}
+	emails, err := a.accountStore.ListOwnEmailAddresses()
+	if err != nil {
+		return nil, err
+	}
+	a.contactStore.SetOwnEmails(emails)
+	for _, email := range emails {
+		if err := a.contactStore.PurgeOwnEmail(email); err != nil {
+			return nil, fmt.Errorf("failed to purge own address from contacts: %w", err)
 		}
-		a.contactStore.SetOwnEmails(emails)
+	}
+	return emails, nil
+}
+
+func (a *App) refreshContactOwnEmailsBestEffort(operation string) {
+	if _, err := a.refreshContactOwnEmails(); err != nil {
+		log := logging.WithComponent("app")
+		log.Warn().Err(err).Str("operation", operation).Msg("Failed to refresh contact own-address exclusions")
 	}
 }
 

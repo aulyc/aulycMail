@@ -125,6 +125,7 @@ func (a *App) UpdateAccount(id string, config account.AccountConfig) (*account.A
 		log.Error().Err(err).Str("account_id", id).Msg("Failed to update account")
 		return nil, err
 	}
+	a.refreshContactOwnEmailsBestEffort("update account")
 
 	// Update password in credential store if provided
 	if config.Password != "" {
@@ -253,17 +254,31 @@ func (a *App) GetIdentities(accountID string) ([]*account.Identity, error) {
 
 // CreateIdentity creates a new email identity for an account
 func (a *App) CreateIdentity(accountID string, config account.IdentityConfig) (*account.Identity, error) {
-	return a.accountStore.CreateIdentity(accountID, &config)
+	identity, err := a.accountStore.CreateIdentity(accountID, &config)
+	if err != nil {
+		return nil, err
+	}
+	a.refreshContactOwnEmailsBestEffort("create identity")
+	return identity, nil
 }
 
 // UpdateIdentity updates an existing identity
 func (a *App) UpdateIdentity(identityID string, config account.IdentityConfig) (*account.Identity, error) {
-	return a.accountStore.UpdateIdentity(identityID, &config)
+	identity, err := a.accountStore.UpdateIdentity(identityID, &config)
+	if err != nil {
+		return nil, err
+	}
+	a.refreshContactOwnEmailsBestEffort("update identity")
+	return identity, nil
 }
 
 // DeleteIdentity deletes an identity (cannot delete the default identity)
 func (a *App) DeleteIdentity(identityID string) error {
-	return a.accountStore.DeleteIdentity(identityID)
+	if err := a.accountStore.DeleteIdentity(identityID); err != nil {
+		return err
+	}
+	a.refreshContactOwnEmailsBestEffort("delete identity")
+	return nil
 }
 
 // SetDefaultIdentity sets an identity as the default for sending
