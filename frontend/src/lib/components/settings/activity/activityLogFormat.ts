@@ -49,7 +49,8 @@ export function activitySummary(log: ActivityLog): string {
     })
   }
   if (log.type === 'sync') {
-    const target = payload.folderName || log.title
+    const folder = payload.folderName || log.title
+    const target = payload.accountEmail ? `${payload.accountEmail} · ${folder}` : folder
     return t('activityLog.syncSummary', { values: { target, added: payload.added ?? 0 } })
   }
   return log.summary

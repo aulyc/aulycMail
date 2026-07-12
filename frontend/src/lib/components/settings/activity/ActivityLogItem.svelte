@@ -10,7 +10,7 @@
 </script>
 
 <article class="border-b border-border/70 py-3 last:border-b-0">
-  <button type="button" class="flex w-full items-center gap-3 text-left disabled:cursor-default" disabled={!log.detail} onclick={() => log.detail && (expanded = !expanded)}>
+  <button type="button" class="flex w-full items-center gap-3 pr-4 text-left disabled:cursor-default" disabled={!log.detail} onclick={() => log.detail && (expanded = !expanded)}>
     <Icon icon={statusIcon} class="h-5 w-5 shrink-0 {statusClass}" />
     <span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">{activityTypeLabel(log.type)}</span>
     <span class="min-w-0 flex-1 truncate text-sm text-foreground" title={activitySummary(log)}>{activitySummary(log)}</span>
