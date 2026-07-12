@@ -64,25 +64,58 @@
 
   function close() { open = false; onClose?.() }
   function handleOpenChange(value: boolean) { open = value; if (!value) onClose?.() }
+
+  function handleNavigationKeydown(event: KeyboardEvent, currentIndex: number) {
+    let nextIndex: number | null = null
+    if (event.key === 'ArrowDown') nextIndex = (currentIndex + 1) % navigation.length
+    else if (event.key === 'ArrowUp') nextIndex = (currentIndex - 1 + navigation.length) % navigation.length
+    else if (event.key === 'Home') nextIndex = 0
+    else if (event.key === 'End') nextIndex = navigation.length - 1
+    if (nextIndex === null) return
+
+    event.preventDefault()
+    event.stopPropagation()
+    activePage = navigation[nextIndex].id
+    const nav = (event.currentTarget as HTMLButtonElement).closest('nav')
+    nav?.querySelectorAll<HTMLButtonElement>('[data-settings-page]')[nextIndex]?.focus()
+  }
 </script>
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
-  <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0 [&>button]:hidden" preventCloseAutoFocus onInteractOutside={(event) => event.preventDefault()}>
+  <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0 focus:outline-none focus-visible:outline-none [&>button]:hidden" preventCloseAutoFocus onInteractOutside={(event) => event.preventDefault()}>
     <Dialog.Title class="sr-only">{$_('settings.title')}</Dialog.Title>
     <div class="grid min-h-0 flex-1 grid-cols-[210px_minmax(0,1fr)]">
       <aside class="flex min-h-0 flex-col border-r border-border bg-muted/35 px-3 py-6">
         <h1 class="mb-6 flex h-5 items-center px-2 text-lg font-semibold leading-5">{$_('settings.title')}</h1>
-        <nav class="space-y-1" aria-label={$_('settings.title')}>
-          {#each navigation as item (item.id)}
-            <button type="button" class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition-colors {activePage === item.id ? 'bg-primary/12 text-primary ring-1 ring-primary/20' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}" onclick={() => activePage = item.id}>
-              <Icon icon={item.icon} class="h-[18px] w-[18px] shrink-0" /><span class="truncate">{item.label}</span>
-            </button>
-          {/each}
+        <nav aria-label={$_('settings.title')}>
+          <div class="space-y-1" role="tablist" aria-orientation="vertical">
+            {#each navigation as item, index (item.id)}
+              <button
+                type="button"
+                id={`settings-tab-${item.id}`}
+                data-settings-page={item.id}
+                role="tab"
+                tabindex={activePage === item.id ? 0 : -1}
+                aria-selected={activePage === item.id}
+                aria-controls={`settings-panel-${item.id}`}
+                class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition-colors focus:outline-none {activePage === item.id ? 'bg-primary/12 text-primary ring-1 ring-primary/20' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}"
+                onclick={() => activePage = item.id}
+                onkeydown={(event) => handleNavigationKeydown(event, index)}
+              >
+                <Icon icon={item.icon} class="h-[18px] w-[18px] shrink-0" /><span class="truncate">{item.label}</span>
+              </button>
+            {/each}
+          </div>
         </nav>
       </aside>
 
       <div class="flex min-h-0 min-w-0 flex-col bg-background">
-        <main class="min-h-0 flex-1 px-7 py-6 scrollbar-thin {activePage === 'activity' ? 'overflow-hidden' : 'overflow-y-auto'}">
+        <div
+          id={`settings-panel-${activePage}`}
+          role="tabpanel"
+          aria-labelledby={`settings-tab-${activePage}`}
+          class="min-h-0 flex-1 px-7 py-6 scrollbar-thin {activePage === 'activity' ? 'overflow-hidden' : 'overflow-y-auto'}"
+        >
           {#if draft.loading}
             <div class="flex h-full items-center justify-center"><Icon icon="mdi:loading" class="h-6 w-6 animate-spin text-muted-foreground" /></div>
           {:else if activePage === 'general'}<GeneralSettingsPage {draft} />
@@ -91,7 +124,7 @@
           {:else if activePage === 'accounts'}<AccountsSettingsPage />
           {:else if activePage === 'backup'}<BackupSettingsPage {draft} />
           {:else}<ActivityLogPage />{/if}
-        </main>
+        </div>
         <footer class="flex h-16 shrink-0 items-center justify-between border-t border-border bg-background/95 px-7">
           <span class="text-xs text-muted-foreground">{draft.dirty ? $_('settings.unsavedChanges') : ''}</span>
           <div class="flex items-center gap-2">

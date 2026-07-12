@@ -38,7 +38,7 @@
 <section class="border-y border-border/75">
   <div class="flex min-h-14 items-center gap-4 py-3 text-sm">
     <h3 class="shrink-0 font-semibold text-foreground">{$_('settingsBackup.recentLog')}</h3>
-    <div class="min-w-0 flex-1 truncate">
+    <div class="ml-auto min-w-0 flex-1 truncate text-right">
       {#if loading}<Icon icon="mdi:loading" class="h-5 w-5 animate-spin text-muted-foreground" />
       {:else if log}<span>{activityTime(log.createdAt)} · {activitySummary(log)}</span>
       {:else if loadFailed}<span class="text-destructive">{$_('activityLog.loadFailed')}</span>
