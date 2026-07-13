@@ -556,7 +556,7 @@ func parseViewerIndexEntity(entity *gomessage.Entity, parsed *viewerParsedMessag
 				break
 			}
 			if err != nil {
-				continue
+				return err
 			}
 			if err := parseViewerIndexEntity(part, parsed); err != nil {
 				return err
