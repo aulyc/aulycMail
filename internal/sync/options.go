@@ -83,6 +83,14 @@ func BodyFetchOptionsFromAccount(acc *account.Account) BodyFetchOptions {
 }
 
 func shouldRunFullUIDSearch(f *folder.Folder, opts MessageSyncOptions, uidValidityChanged bool, localCount int, now time.Time) bool {
+	// Drafts use append-and-replace semantics: every auto-save gets a new UID
+	// and removes the previous one. A high-water-mark-only incremental search
+	// sees the new UID but cannot see that the old UID disappeared, so stale
+	// draft versions accumulate locally. Draft folders are normally small, so
+	// always reconcile their complete UID set.
+	if f != nil && f.Type == folder.TypeDrafts {
+		return true
+	}
 	if uidValidityChanged {
 		return true
 	}

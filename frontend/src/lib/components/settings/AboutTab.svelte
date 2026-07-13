@@ -3,6 +3,7 @@
   import type { app } from '../../../../wailsjs/go/models'
   import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime'
   import { _ } from '$lib/i18n'
+  import appLogo from '$/assets/images/logo-universal.png'
   import AboutInfoDialog from './AboutInfoDialog.svelte'
 
   interface Props { appInfo: app.AppInfo | null; loading?: boolean }
@@ -86,7 +87,12 @@
   {:else if appInfo}
     <!-- Logo + App Name & Version -->
     <div class="flex flex-col items-center space-y-2">
-      <Icon icon="lucide:mail" class="h-24 w-24 text-muted-foreground" aria-label={`${appInfo.name} Logo`} />
+      <img
+        src={appLogo}
+        alt={`${appInfo.name} Logo`}
+        class="h-24 w-24 rounded-[22%] shadow-sm ring-1 ring-border/60"
+        draggable="false"
+      />
       <div class="text-center space-y-1">
         <h2 class="text-2xl font-bold text-foreground">{appInfo.name}</h2>
         <p class="text-sm text-muted-foreground">{$_('settingsAbout.version', { values: { version: appInfo.version } })}</p>

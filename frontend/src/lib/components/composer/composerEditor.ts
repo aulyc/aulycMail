@@ -2,7 +2,8 @@
  * TipTap editor configuration for the email composer
  */
 import { Editor, Extension, Node, mergeAttributes } from '@tiptap/core'
-import { TextSelection } from '@tiptap/pm/state'
+import { Plugin, TextSelection } from '@tiptap/pm/state'
+import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Underline from '@tiptap/extension-underline'
@@ -19,6 +20,10 @@ import FontSize from 'tiptap-extension-font-size'
 import { parseFileUris } from './composerUtils'
 import { get } from 'svelte/store'
 import { _ } from 'svelte-i18n'
+import {
+  getComposerDarkFilterTargetIndexes,
+  type ComposerDarkFilterMode,
+} from './composerDarkFilter'
 
 /**
  * Extended TextStyle to handle legacy <font> tags from signatures/pasted content
@@ -221,6 +226,46 @@ export interface ComposerEditorHandlers {
   onDropFile?: (file: File) => void
   onDropFilePaths?: (paths: string[]) => void
   onShiftTab?: () => void
+  getDarkFilterMode?: () => ComposerDarkFilterMode
+}
+
+function createDarkFilterTargetExtension(
+  getMode?: () => ComposerDarkFilterMode,
+): Extension {
+  return Extension.create({
+    name: 'composerDarkFilterTargets',
+
+    addProseMirrorPlugins() {
+      return [
+        new Plugin({
+          props: {
+            decorations(state) {
+              const nodes: Array<{ type: string; textContent: string }> = []
+              const positions: Array<{ from: number; to: number }> = []
+
+              state.doc.forEach((node, offset) => {
+                nodes.push({ type: node.type.name, textContent: node.textContent })
+                positions.push({ from: offset, to: offset + node.nodeSize })
+              })
+
+              const targets = getComposerDarkFilterTargetIndexes(
+                getMode?.() ?? 'new',
+                nodes,
+              )
+              const decorations = targets.map(index => {
+                const position = positions[index]
+                return Decoration.node(position.from, position.to, {
+                  class: 'composer-dark-filter-content',
+                })
+              })
+
+              return DecorationSet.create(state.doc, decorations)
+            },
+          },
+        }),
+      ]
+    },
+  })
 }
 
 /**
@@ -234,6 +279,7 @@ export function createComposerEditor(
     element,
     extensions: [
       StarterKit,
+      createDarkFilterTargetExtension(handlers.getDarkFilterMode),
       Underline,
       ContactMention,
       ExtendedTextStyle,

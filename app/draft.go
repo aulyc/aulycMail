@@ -178,28 +178,76 @@ func (ops *draftOps) latestDraft(d *draft.Draft) *draft.Draft {
 	return d
 }
 
-func (ops *draftOps) deleteDraftFromIMAP(ctx context.Context, d *draft.Draft, draftsFolder *folder.Folder) {
-	log := logging.WithComponent("draft")
+// resolveDraftReference accepts either a drafts-table ID or a messages-table
+// ID from the Drafts conversation view and returns the canonical local draft.
+// The UI works with message IDs, while save/delete operations are keyed by
+// draft IDs, so every entry point must normalize the reference first.
+func (ops *draftOps) resolveDraftReference(id string) (*draft.Draft, error) {
+	if id == "" {
+		return nil, nil
+	}
 
-	if d == nil || draftsFolder == nil || !d.IsSynced() {
-		return
+	d, err := ops.draftStore.Get(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get draft by ID: %w", err)
+	}
+	if d != nil {
+		return d, nil
+	}
+
+	msg, err := ops.messageStore.Get(id)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get draft message: %w", err)
+	}
+	if msg == nil {
+		return nil, nil
+	}
+
+	d, err = ops.draftStore.GetByIMAPUID(msg.FolderID, msg.UID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve draft by IMAP UID: %w", err)
+	}
+	return d, nil
+}
+
+// draftHasRemoteCopy is intentionally independent of SyncStatus. Updating a
+// synced draft marks it pending before replacement, but its previous IMAP UID
+// still identifies a remote message that explicit discard must remove.
+func draftHasRemoteCopy(d *draft.Draft) bool {
+	return d != nil && d.IMAPUID > 0 && d.FolderID != ""
+}
+
+func (ops *draftOps) deleteDraftFromIMAP(ctx context.Context, d *draft.Draft, draftsFolder *folder.Folder) error {
+	if draftsFolder == nil || !draftHasRemoteCopy(d) {
+		return nil
 	}
 
 	poolConn, err := ops.imapPool.GetConnection(ctx, d.AccountID)
 	if err != nil {
-		log.Warn().Err(err).Str("draftID", d.ID).Msg("Failed to get IMAP connection for draft delete")
-		return
+		return fmt.Errorf("failed to get IMAP connection for draft delete: %w", err)
 	}
 	defer ops.imapPool.Release(poolConn)
 
 	conn := poolConn.Client()
 	if _, err := conn.SelectMailbox(ctx, draftsFolder.Path); err != nil {
-		log.Warn().Err(err).Str("path", draftsFolder.Path).Msg("Failed to select Drafts mailbox for draft delete")
-		return
+		return fmt.Errorf("failed to select Drafts mailbox: %w", err)
 	}
 	if err := conn.DeleteMessageByUID(goImap.UID(d.IMAPUID)); err != nil {
-		log.Warn().Err(err).Uint32("uid", d.IMAPUID).Msg("Failed to delete draft from IMAP")
+		return fmt.Errorf("failed to delete draft UID %d from IMAP: %w", d.IMAPUID, err)
 	}
+	return nil
+}
+
+// deleteReplacedDraftMessage removes the local message row for the previous
+// server-side draft after its replacement has been appended successfully.
+// Keeping the old row until APPEND succeeds preserves the last good draft when
+// an upload fails, while deleting it here prevents auto-save versions from
+// accumulating in the conversation view.
+func (ops *draftOps) deleteReplacedDraftMessage(d *draft.Draft, newUID uint32) error {
+	if d == nil || d.FolderID == "" || d.IMAPUID == 0 || d.IMAPUID == newUID {
+		return nil
+	}
+	return ops.messageStore.DeleteByUID(d.FolderID, d.IMAPUID)
 }
 
 // deleteDraftCore deletes a draft from IMAP (if synced), cleans up the message
@@ -213,8 +261,10 @@ func (ops *draftOps) deleteDraftCore(ctx context.Context, d *draft.Draft) (*fold
 	d = ops.latestDraft(d)
 
 	draftsFolder, _ := ops.getSpecialFolder(d.AccountID, folder.TypeDrafts)
-	if d.IsSynced() && draftsFolder != nil {
-		ops.deleteDraftFromIMAP(ctx, d, draftsFolder)
+	if draftHasRemoteCopy(d) && draftsFolder != nil {
+		if err := ops.deleteDraftFromIMAP(ctx, d, draftsFolder); err != nil {
+			log.Warn().Err(err).Str("draftID", d.ID).Msg("Failed to delete draft from IMAP")
+		}
 
 		// Clean up the message row that syncDraftToIMAP's SyncFolder may have created.
 		// Done directly because the post-delete SyncFolder may be debounced (500ms)
@@ -240,7 +290,7 @@ func (ops *draftOps) deleteDraftLocalCore(d *draft.Draft) (*folder.Folder, *draf
 	d = ops.latestDraft(d)
 	draftsFolder, _ := ops.getSpecialFolder(d.AccountID, folder.TypeDrafts)
 
-	if d.IsSynced() && draftsFolder != nil {
+	if draftHasRemoteCopy(d) && draftsFolder != nil {
 		if err := ops.messageStore.DeleteByUID(draftsFolder.ID, d.IMAPUID); err != nil {
 			log.Warn().Err(err).Uint32("uid", d.IMAPUID).Str("folderID", draftsFolder.ID).Msg("Failed to clean up draft message row")
 		}
@@ -346,6 +396,13 @@ func (ops *draftOps) syncToIMAP(ctx context.Context, localDraft *draft.Draft, ms
 	// Update local draft with sync status
 	if err := ops.draftStore.UpdateSyncStatus(localDraft.ID, draft.SyncStatusSynced, uint32(uid), draftsFolder.ID, ""); err != nil {
 		log.Warn().Err(err).Msg("Failed to update draft sync status")
+	} else if err := ops.deleteReplacedDraftMessage(localDraft, uint32(uid)); err != nil {
+		log.Warn().
+			Err(err).
+			Uint32("old_uid", localDraft.IMAPUID).
+			Uint32("new_uid", uint32(uid)).
+			Str("folderID", localDraft.FolderID).
+			Msg("Failed to clean up replaced local draft message")
 	}
 	emitStatus(draft.SyncStatusSynced, uint32(uid), "")
 
@@ -403,6 +460,33 @@ func (a *App) cancelDraftSync(draftID string) {
 	cancel()
 }
 
+// cancelDraftSyncAndWait closes the race where discard can run after an
+// APPEND existence check but before the sync records its new UID. Waiting for
+// the cancelled goroutine lets discard re-read and delete the final UID.
+func (a *App) cancelDraftSyncAndWait(draftID string) error {
+	a.syncMu.Lock()
+	cancel, hasCancel := a.draftSyncContexts[draftID]
+	done := a.draftSyncDone[draftID]
+	a.syncMu.Unlock()
+
+	if !hasCancel {
+		return nil
+	}
+	cancel()
+	if done == nil {
+		return nil
+	}
+
+	timer := time.NewTimer(15 * time.Second)
+	defer timer.Stop()
+	select {
+	case <-done:
+		return nil
+	case <-timer.C:
+		return fmt.Errorf("timed out waiting for draft sync cancellation")
+	}
+}
+
 // SaveDraft saves or updates a draft email to the local database and syncs to IMAP.
 // If existingDraftID is provided and exists, updates that draft; otherwise creates a new one.
 func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraftID string) (*DraftResult, error) {
@@ -416,15 +500,15 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 
 	var localDraft *draft.Draft
 
-	// Try to load existing draft if ID provided
+	// Try to load existing draft if either a draft ID or Drafts message ID is provided.
 	if existingDraftID != "" {
-		existing, err := a.draftStore.Get(existingDraftID)
+		existing, err := a.draftOps.resolveDraftReference(existingDraftID)
 		if err != nil {
-			log.Warn().Err(err).Str("draftID", existingDraftID).Msg("Failed to load existing draft")
+			return nil, fmt.Errorf("failed to resolve existing draft: %w", err)
 		}
-		if err == nil && existing != nil {
+		if existing != nil {
 			localDraft = existing
-			log.Debug().Str("draftID", existingDraftID).Msg("Loaded existing draft for update")
+			log.Debug().Str("draftID", existing.ID).Str("referenceID", existingDraftID).Msg("Loaded existing draft for update")
 		}
 	}
 
@@ -551,22 +635,42 @@ func (a *App) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 	return a.draftOps.toComposeMessage(d)
 }
 
-// DeleteDraft discards a draft from local state immediately, then removes any
-// synced remote draft in the background so the UI does not wait on IMAP.
+// DeleteDraft accepts either a draft ID or a Drafts message ID. Explicit
+// discard waits for any in-flight auto-save and confirms remote deletion before
+// removing local state, so the composer never reports success while a server
+// draft remains behind.
 func (a *App) DeleteDraft(draftID string) error {
 	log := logging.WithComponent("app")
 
-	// Cancel any in-flight IMAP sync goroutine. The sync path re-checks local
-	// draft existence and cleans up orphaned APPENDs if cancellation lands late.
-	a.cancelDraftSync(draftID)
-
-	// Get the draft to find IMAP UID (re-read after cancel to get latest state)
-	d, err := a.draftStore.Get(draftID)
+	// Normalize list/viewer message IDs to the canonical local draft ID.
+	d, err := a.draftOps.resolveDraftReference(draftID)
 	if err != nil {
-		return fmt.Errorf("failed to get draft: %w", err)
+		return fmt.Errorf("failed to resolve draft: %w", err)
 	}
 	if d == nil {
 		return nil // Already deleted
+	}
+
+	// Cancel and join any in-flight sync under the canonical ID. This closes the
+	// post-APPEND race where discard could otherwise miss the newest remote UID.
+	if err := a.cancelDraftSyncAndWait(d.ID); err != nil {
+		return err
+	}
+	d = a.draftOps.latestDraft(d)
+
+	// Explicit discard is success-sensitive: keep local state and return an
+	// error if the server draft could not be removed.
+	draftsFolder, err := a.draftOps.getSpecialFolder(d.AccountID, folder.TypeDrafts)
+	if err != nil {
+		return fmt.Errorf("failed to get Drafts folder: %w", err)
+	}
+	if draftHasRemoteCopy(d) {
+		if draftsFolder == nil {
+			return fmt.Errorf("Drafts folder not found for synced draft")
+		}
+		if err := a.draftOps.deleteDraftFromIMAP(a.ctx, d, draftsFolder); err != nil {
+			return err
+		}
 	}
 
 	draftsFolder, deletedDraft, err := a.draftOps.deleteDraftLocalCore(d)
@@ -580,15 +684,15 @@ func (a *App) DeleteDraft(draftID string) error {
 
 	if draftsFolder != nil {
 		nextTotal := draftsFolder.TotalCount
-		if deletedDraft.IsSynced() && nextTotal > 0 {
+		if draftHasRemoteCopy(deletedDraft) && nextTotal > 0 {
 			nextTotal--
 		}
 		if err := a.folderStore.UpdateCounts(draftsFolder.ID, nextTotal, draftsFolder.UnreadCount); err != nil {
 			log.Warn().Err(err).Str("folderID", draftsFolder.ID).Msg("Failed to update Drafts count after local delete")
 		}
 
-		// Notify frontend immediately so the Drafts list and total-count badge
-		// reflect the discarded draft before the remote IMAP delete completes.
+		// Notify frontend immediately after confirmed remote deletion and local
+		// cleanup so the Drafts list and total-count badge stay in sync.
 		wailsRuntime.EventsEmit(a.ctx, "messages:updated", map[string]interface{}{
 			"accountId": deletedDraft.AccountID,
 			"folderId":  draftsFolder.ID,
@@ -599,13 +703,11 @@ func (a *App) DeleteDraft(draftID string) error {
 		})
 	}
 
-	if draftsFolder != nil && deletedDraft.IsSynced() {
-		draftSnapshot := *deletedDraft
+	if draftsFolder != nil {
 		folderSnapshot := *draftsFolder
 		go func() {
-			defer recoverPanic("app.draft", "delete remote draft after local discard")
-			a.draftOps.deleteDraftFromIMAP(a.ctx, &draftSnapshot, &folderSnapshot)
-			if err := a.SyncFolder(draftSnapshot.AccountID, folderSnapshot.ID); err != nil {
+			defer recoverPanic("app.draft", "sync Drafts after discard")
+			if err := a.SyncFolder(deletedDraft.AccountID, folderSnapshot.ID); err != nil {
 				log.Warn().Err(err).Str("folderID", folderSnapshot.ID).Msg("Failed to sync Drafts folder after draft delete")
 			}
 		}()
@@ -620,13 +722,13 @@ func (a *App) DeleteDraft(draftID string) error {
 func (a *App) GetDraft(id string) (*smtp.ComposeMessage, error) {
 	log := logging.WithComponent("app")
 
-	// First, try to get it as a draft ID
-	d, err := a.draftStore.Get(id)
+	// Resolve either a canonical draft ID or a Drafts message ID.
+	d, err := a.draftOps.resolveDraftReference(id)
 	if err != nil {
 		return nil, err
 	}
 	if d != nil {
-		log.Debug().Str("draftID", id).Msg("Found draft by draft ID")
+		log.Debug().Str("referenceID", id).Str("draftID", d.ID).Msg("Resolved local draft")
 		return a.draftToComposeMessage(d), nil
 	}
 
@@ -638,16 +740,6 @@ func (a *App) GetDraft(id string) (*smtp.ComposeMessage, error) {
 	}
 	if msg == nil {
 		return nil, nil
-	}
-
-	// Look up draft by IMAP UID and folder
-	d, err = a.draftStore.GetByIMAPUID(msg.FolderID, msg.UID)
-	if err != nil {
-		return nil, err
-	}
-	if d != nil {
-		log.Debug().Str("messageID", id).Str("draftID", d.ID).Msg("Found draft by message IMAP UID")
-		return a.draftToComposeMessage(d), nil
 	}
 
 	// No draft found - this might be a draft that was created outside aulycmail

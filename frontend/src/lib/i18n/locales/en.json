@@ -160,6 +160,7 @@
     "failedToSend": "Failed to send.",
     "noRecipients": "Please add at least one recipient",
     "failedToLoadDraft": "Failed to load draft",
+    "failedToDiscardDraft": "Failed to discard draft. The message remains open so you can try again.",
     "close": "Close",
     "attachFiles": "Attach files",
     "filesAttached": "{count} file(s) attached",

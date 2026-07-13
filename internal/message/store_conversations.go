@@ -339,7 +339,9 @@ func (s *Store) CountConversationsByFolder(folderID, filter string) (int, error)
 	return count, nil
 }
 
-// GetConversation returns messages in a conversation/thread from the specified folder plus Sent and Drafts
+// GetConversation returns messages in a conversation/thread. Drafts are scoped
+// strictly to the selected Drafts folder; other folders also include Sent to
+// preserve the full exchanged-message context.
 func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error) {
 	s.log.Debug().
 		Str("threadID", threadID).
@@ -373,8 +375,8 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		Str("accountID", accountID).
 		Msg("GetConversation normalized")
 
-	// Get conversation summary from current folder + Sent + Drafts
-	// This gives full conversation context without cross-folder bleed
+	// Get the conversation summary from the current folder and, outside Drafts,
+	// Sent for exchanged-message context.
 	// Exclude messages in Trash folder unless we're viewing Trash
 	// Use COALESCE to handle NULL values from aggregate functions when no rows match
 	trashFilter := ""
@@ -382,11 +384,13 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		trashFilter = "AND f.folder_type != 'trash'"
 	}
 
-	// Scope to the current folder + Sent (for full conversation context). Drafts
-	// are folded in ONLY when actually viewing the Drafts folder — otherwise an
-	// unsent draft reply would show inline inside the inbox thread as if it had
-	// been sent. When viewing Drafts, the draft already matches via m.folder_id.
+	// Drafts is an editing workspace, so its list count and detail count must both
+	// describe only drafts in that folder. Other folders retain the historical
+	// current-folder + Sent behavior for full exchanged-message context.
 	folderFilter := "AND (m.folder_id = ? OR f.folder_type = 'sent')"
+	if folderType == "drafts" {
+		folderFilter = "AND m.folder_id = ?"
+	}
 
 	summaryQuery := fmt.Sprintf(`
 		SELECT
@@ -429,8 +433,8 @@ func (s *Store) GetConversation(threadID, folderID string) (*Conversation, error
 		c.LatestDate = parseTimeString(latestDateStr.String)
 	}
 
-	// Get messages in the thread from current folder + Sent + Drafts
-	// This gives full conversation context without cross-folder bleed
+	// Get messages using the same folder scope as the summary so the displayed
+	// cards and message count cannot diverge.
 	// Exclude messages in Trash folder unless we're viewing Trash
 	messagesQuery := fmt.Sprintf(`
 		SELECT m.id, m.account_id, m.folder_id, m.uid, m.message_id, m.in_reply_to, m.references_list, m.thread_id,

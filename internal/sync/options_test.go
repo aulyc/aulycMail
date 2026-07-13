@@ -81,6 +81,19 @@ func TestShouldRunFullUIDSearch(t *testing.T) {
 			localCount: 20,
 			want:       false,
 		},
+		{
+			name: "drafts always reconcile deleted UIDs",
+			f: &folder.Folder{
+				Type:         folder.TypeDrafts,
+				LastFullSync: &yesterday,
+			},
+			opts: MessageSyncOptions{
+				Strategy:              account.SyncStrategyIncremental,
+				FullCheckIntervalDays: 30,
+			},
+			localCount: 13,
+			want:       true,
+		},
 	}
 
 	for _, tt := range tests {

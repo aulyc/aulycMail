@@ -36,7 +36,7 @@
 </script>
 
 <section class="border-b border-border/75">
-  <div class="flex min-h-14 items-center gap-4 py-3 text-sm">
+  <div class="flex min-h-14 items-center gap-4 py-1.5 text-sm">
     <h3 class="shrink-0 font-semibold text-foreground">{$_('settingsBackup.recentLog')}</h3>
     <div class="ml-auto min-w-0 flex-1 text-right">
       {#if loading}<Icon icon="mdi:loading" class="h-5 w-5 animate-spin text-muted-foreground" />

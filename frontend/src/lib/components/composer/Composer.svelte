@@ -66,6 +66,7 @@
     type DraftSaveStatus,
     type DraftSyncStatus,
   } from './composerDraft'
+  import { discardDraftBeforeClose } from './composerDiscard'
   import {
     composerHasContent,
     formatIdentityLabel,
@@ -649,7 +650,7 @@
   function composerEditorStyle(): string {
     if (!composerDarkFilterActive()) return ''
     const styles = buildDarkMailFilterStyles()
-    return `background: #fff; color: #000; filter: ${styles.contentFilter}; --composer-dark-media-filter: ${styles.mediaFilter};`
+    return `--composer-dark-content-filter: ${styles.contentFilter}; --composer-dark-media-filter: ${styles.mediaFilter};`
   }
 
   function hasContent(): boolean {
@@ -1397,17 +1398,21 @@
     await savingComplete
     closeLoading = 'discard'
     try {
-      if (currentDraftId) {
-        await api.deleteDraft(currentDraftId)
+      await discardDraftBeforeClose(currentDraftId, api.deleteDraft, () => {
         currentDraftId = null
-      }
+        showCloseConfirm = false
+        onClose?.()
+      })
     } catch (err) {
       console.error('Failed to delete draft:', err)
-      // Still close even if delete fails
+      discarding = false
+      addToast({
+        type: 'error',
+        message: $_('composer.failedToDiscardDraft'),
+      })
+    } finally {
+      closeLoading = null
     }
-    showCloseConfirm = false
-    closeLoading = null
-    onClose?.()
   }
 
   // Save & Close: Save current content as draft, then close
@@ -1489,6 +1494,7 @@
       onDropFile: handleDroppedFile,
       onDropFilePaths: handleDroppedFilePaths,
       onShiftTab: () => document.getElementById('composer-subject')?.focus(),
+      getDarkFilterMode: getDisplayMode,
     })
   }
 
@@ -2158,12 +2164,19 @@
     font-weight: 600;
   }
 
-  /* The editor wrapper carries the visual-only dark filter. Re-applying the
-     inverse filter to media keeps images and embedded content natural. */
-  :global(.composer-dark-filter img:not([data-original-src])),
-  :global(.composer-dark-filter video),
-  :global(.composer-dark-filter iframe),
-  :global(.composer-dark-filter [data-no-invert]) {
+  /* Only quoted/original mail is filtered. Composer-owned content above it
+     keeps native theme colors so the caret, selection, signature and forward
+     header remain readable in WebKit. */
+  :global(.composer-dark-filter .composer-dark-filter-content) {
+    background: #fff;
+    color: #000;
+    filter: var(--composer-dark-content-filter);
+  }
+
+  :global(.composer-dark-filter .composer-dark-filter-content img:not([data-original-src])),
+  :global(.composer-dark-filter .composer-dark-filter-content video),
+  :global(.composer-dark-filter .composer-dark-filter-content iframe),
+  :global(.composer-dark-filter .composer-dark-filter-content [data-no-invert]) {
     filter: var(--composer-dark-media-filter);
   }
 </style>

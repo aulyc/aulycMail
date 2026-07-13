@@ -160,6 +160,7 @@
     "failedToSend": "发送失败。",
     "noRecipients": "请至少添加一位收件人",
     "failedToLoadDraft": "加载草稿失败",
+    "failedToDiscardDraft": "丢弃草稿失败，窗口已保留，请重试。",
     "close": "关闭",
     "attachFiles": "附加文件",
     "filesAttached": "已附加 {count} 个文件",

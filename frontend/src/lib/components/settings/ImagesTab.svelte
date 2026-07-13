@@ -92,7 +92,7 @@
     </SettingsRow>
 
     {#if !alwaysLoadImages}
-      <div class="space-y-6 pt-6">
+      <div class="space-y-6 py-6">
         <!-- Addresses Section -->
         <div class="space-y-3">
           <button
