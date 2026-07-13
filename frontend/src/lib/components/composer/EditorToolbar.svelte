@@ -8,9 +8,20 @@
     isPlainTextMode?: boolean
     onTogglePlainText?: () => void
     onInsertImage?: () => void
+    showDarkFilter?: boolean
+    darkFilterEnabled?: boolean
+    onToggleDarkFilter?: () => void
   }
 
-  let { editor, isPlainTextMode = false, onTogglePlainText, onInsertImage }: Props = $props()
+  let {
+    editor,
+    isPlainTextMode = false,
+    onTogglePlainText,
+    onInsertImage,
+    showDarkFilter = false,
+    darkFilterEnabled = false,
+    onToggleDarkFilter,
+  }: Props = $props()
 
   // Hint mode state (Alt+T shows numbered hints on buttons)
   let hintMode = $state(false)
@@ -529,20 +540,41 @@
     {/if}
   </div>
 
-  <!-- Plain text toggle — pinned to the far left; mr-auto pushes the rest right -->
-  <div class="relative order-first mr-auto">
-    <button
-      onclick={onTogglePlainText}
-      class="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-1.5 text-xs"
-      class:bg-muted={isPlainTextMode}
-      tabindex="-1"
-      title={isPlainTextMode ? $_('editor.switchToRichText') : $_('editor.switchToPlainText')}
-    >
-      <Icon icon={isPlainTextMode ? 'mdi:text' : 'mdi:format-text'} class="w-5 h-5" />
-      <span class="hidden sm:inline">{isPlainTextMode ? $_('editor.plainText') : $_('editor.richText')}</span>
-    </button>
-    {#if hintMode}
-      <span class="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded z-20">f</span>
+  <!-- Composer display controls — pinned left; mr-auto pushes formatting right. -->
+  <div class="order-first mr-auto flex items-center gap-1">
+    <div class="relative">
+      <button
+        onclick={onTogglePlainText}
+        class="p-1.5 rounded hover:bg-muted transition-colors flex items-center gap-1.5 text-xs"
+        class:bg-muted={isPlainTextMode}
+        tabindex="-1"
+        title={isPlainTextMode ? $_('editor.switchToRichText') : $_('editor.switchToPlainText')}
+      >
+        <Icon icon={isPlainTextMode ? 'mdi:text' : 'mdi:format-text'} class="w-5 h-5" />
+        <span class="hidden sm:inline">{isPlainTextMode ? $_('editor.plainText') : $_('editor.richText')}</span>
+      </button>
+      {#if hintMode}
+        <span class="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded z-20">f</span>
+      {/if}
+    </div>
+
+    {#if showDarkFilter}
+      <div class="relative">
+        <button
+          onclick={onToggleDarkFilter}
+          class="p-1.5 rounded hover:bg-muted transition-colors"
+          class:bg-muted={darkFilterEnabled}
+          aria-pressed={darkFilterEnabled}
+          aria-label={darkFilterEnabled ? $_('editor.disableDarkFilter') : $_('editor.enableDarkFilter')}
+          tabindex="-1"
+          title={darkFilterEnabled ? $_('editor.disableDarkFilter') : $_('editor.enableDarkFilter')}
+        >
+          <Icon icon={darkFilterEnabled ? 'mdi:weather-night' : 'mdi:white-balance-sunny'} class="w-5 h-5" />
+        </button>
+        {#if hintMode}
+          <span class="absolute -top-1 -left-1 bg-primary text-primary-foreground text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded z-20">g</span>
+        {/if}
+      </div>
     {/if}
   </div>
 </div>

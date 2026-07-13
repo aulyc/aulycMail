@@ -86,7 +86,9 @@
   } from './composerInlineImages'
   import * as Select from '$lib/components/ui/select'
   import { addToast } from '$lib/stores/toast'
-  import { getComposerFormat } from '$lib/stores/settings.svelte'
+  import { getComposerFormat, getDarkMailContent } from '$lib/stores/settings.svelte'
+  import { getIsDarkActive } from '$lib/stores/theme.svelte'
+  import { buildDarkMailFilterStyles, getDarkMailSurfaceBackground } from '$lib/utils/dark-mail'
   import { _ } from '$lib/i18n'
 
   // Props
@@ -164,6 +166,9 @@
 
   // Plain text mode toggle (default from user setting, can be toggled per-message)
   let isPlainTextMode = $state(getComposerFormat() === 'plain')
+  // Runtime-only preview toggle. The filter is applied to the editor DOM and is
+  // never serialized into the outgoing message HTML.
+  let composerDarkFilterEnabled = $state(true)
   let plainTextContent = $state('')  // Store plain text when in plain text mode
   let plainTextRef = $state<HTMLTextAreaElement | null>(null)  // textarea element (plain text mode)
   let plainTextScrollTop = $state(0)
@@ -618,6 +623,33 @@
 
   function getDisplayMode(): 'new' | 'reply' | 'reply-all' | 'forward' {
     return getComposerDisplayMode({ initialMessage, replyType })
+  }
+
+  function composerDarkFilterAvailable(): boolean {
+    return getDisplayMode() !== 'new' &&
+      !isPlainTextMode &&
+      getDarkMailContent() &&
+      getIsDarkActive()
+  }
+
+  function composerDarkFilterActive(): boolean {
+    return composerDarkFilterAvailable() && composerDarkFilterEnabled
+  }
+
+  function toggleComposerDarkFilter() {
+    composerDarkFilterEnabled = !composerDarkFilterEnabled
+  }
+
+  function composerBodyStyle(): string {
+    return composerDarkFilterActive()
+      ? `background-color: ${getDarkMailSurfaceBackground()};`
+      : ''
+  }
+
+  function composerEditorStyle(): string {
+    if (!composerDarkFilterActive()) return ''
+    const styles = buildDarkMailFilterStyles()
+    return `background: #fff; color: #000; filter: ${styles.contentFilter}; --composer-dark-media-filter: ${styles.mediaFilter};`
   }
 
   function hasContent(): boolean {
@@ -1911,6 +1943,9 @@
       {isPlainTextMode}
       onTogglePlainText={togglePlainTextMode}
       onInsertImage={insertImage}
+      showDarkFilter={composerDarkFilterAvailable()}
+      darkFilterEnabled={composerDarkFilterActive()}
+      onToggleDarkFilter={toggleComposerDarkFilter}
     />
 
     <!-- Remote images blocked bar -->
@@ -1931,6 +1966,7 @@
     <div
       bind:this={composerBodyElement}
       class="relative flex-1 bg-white dark:bg-zinc-900 {isPlainTextMode ? 'overflow-hidden' : 'overflow-auto'}"
+      style={composerBodyStyle()}
     >
       <!-- Both surfaces stay mounted; we toggle visibility instead of using
            {#if}/{:else}. Unmounting the editor <div> orphaned the TipTap
@@ -1968,7 +2004,8 @@
       ></textarea>
       <div
         bind:this={editorElement}
-        class="h-full {isPlainTextMode ? 'hidden' : ''}"
+        class="h-full {isPlainTextMode ? 'hidden' : ''} {composerDarkFilterActive() ? 'composer-dark-filter' : ''}"
+        style={composerEditorStyle()}
         role="textbox"
         aria-multiline="true"
         aria-label={$_('composer.writePlaceholder')}
@@ -2119,5 +2156,14 @@
   :global(.composer-editor th) {
     background-color: hsl(var(--muted));
     font-weight: 600;
+  }
+
+  /* The editor wrapper carries the visual-only dark filter. Re-applying the
+     inverse filter to media keeps images and embedded content natural. */
+  :global(.composer-dark-filter img:not([data-original-src])),
+  :global(.composer-dark-filter video),
+  :global(.composer-dark-filter iframe),
+  :global(.composer-dark-filter [data-no-invert]) {
+    filter: var(--composer-dark-media-filter);
   }
 </style>

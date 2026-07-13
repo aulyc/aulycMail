@@ -672,6 +672,8 @@
     "plainText": "纯文本",
     "switchToRichText": "切换至富文本",
     "switchToPlainText": "切换至纯文本",
+    "enableDarkFilter": "对此回复或转发应用深色滤镜",
+    "disableDarkFilter": "不对此回复或转发应用深色滤镜",
     "insertImageUrl": "从网址插入图片",
     "insertImageFile": "从文件插入图片",
     "removeLink": "移除链接",

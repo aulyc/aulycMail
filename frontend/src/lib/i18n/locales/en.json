@@ -672,6 +672,8 @@
     "plainText": "Plain text",
     "switchToRichText": "Switch to rich text",
     "switchToPlainText": "Switch to plain text",
+    "enableDarkFilter": "Apply dark filter to this reply or forward",
+    "disableDarkFilter": "Show this reply or forward without dark filter",
     "insertImageUrl": "Insert Image from URL",
     "insertImageFile": "Insert Image from File",
     "removeLink": "Remove Link",
