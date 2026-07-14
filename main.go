@@ -34,7 +34,7 @@ func main() {
 	flag.Parse()
 
 	if *versionFlag {
-		fmt.Println(app.Version)
+		fmt.Println(app.VersionLabel())
 		return
 	}
 

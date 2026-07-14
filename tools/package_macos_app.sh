@@ -3,13 +3,33 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BUNDLE_VERSION="${BUNDLE_VERSION:-0.3.91}"
+SEMANTIC_VERSION="${SEMANTIC_VERSION:?SEMANTIC_VERSION is required}"
+SHORT_VERSION="${SHORT_VERSION:?SHORT_VERSION is required}"
+BUILD_NUMBER="${BUILD_NUMBER:-0}"
+COMMIT_SHA="${COMMIT_SHA:-unknown}"
 APP="$ROOT/build/bin/aulycmail.app"
 BIN="$ROOT/build/bin/aulycmail"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
 LEGAL="$RESOURCES/Legal"
+
+if [[ ! "$SEMANTIC_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?([+][0-9A-Za-z.-]+)?$ ]]; then
+  echo "Invalid semantic version: $SEMANTIC_VERSION" >&2
+  exit 1
+fi
+if [[ ! "$SHORT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Invalid short version: $SHORT_VERSION" >&2
+  exit 1
+fi
+if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+  echo "Invalid build number: $BUILD_NUMBER" >&2
+  exit 1
+fi
+if [[ "$COMMIT_SHA" != "unknown" && ! "$COMMIT_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+  echo "Invalid commit SHA: $COMMIT_SHA" >&2
+  exit 1
+fi
 
 if [ ! -x "$BIN" ]; then
   echo "Missing built binary: $BIN" >&2
@@ -46,11 +66,15 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key>
   <string>com.aulyc.aulycmail</string>
   <key>CFBundleVersion</key>
-  <string>${BUNDLE_VERSION}</string>
+  <string>${BUILD_NUMBER}</string>
   <key>CFBundleGetInfoString</key>
-  <string>A lightweight desktop e-mail client</string>
+  <string>aulycmail ${SEMANTIC_VERSION} (build ${BUILD_NUMBER})</string>
   <key>CFBundleShortVersionString</key>
-  <string>${BUNDLE_VERSION}</string>
+  <string>${SHORT_VERSION}</string>
+  <key>AULYCSemanticVersion</key>
+  <string>${SEMANTIC_VERSION}</string>
+  <key>AULYCCommitSHA</key>
+  <string>${COMMIT_SHA}</string>
   <key>CFBundleIconFile</key>
   <string>AppIcon</string>
   <key>LSMinimumSystemVersion</key>

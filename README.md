@@ -27,13 +27,31 @@ This checkout targets the macOS desktop build.
 make build
 ```
 
-## Release DMG
+`version.json` is the single version source. Local builds include the source
+commit in the runtime version and do not allocate a public build number. See
+[Versioning Policy](docs/VERSIONING.md).
+
+## Releases
+
+Internal ad-hoc signed test release:
 
 ```bash
-make release-dmg \
+make release-test
+```
+
+Developer ID signed and Apple-notarized formal release:
+
+```bash
+make release-formal \
   SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" \
   NOTARY_PROFILE=aulyc-notary
 ```
+
+Both commands require functional changes to be committed, then automatically
+select the SemVer version, increment the build, create the release commit and
+immutable tag, build a versioned DMG, install it, and verify its identity. See
+the complete
+[Release Process](docs/RELEASE.md).
 
 ## Product Links
 

@@ -95,7 +95,7 @@
       />
       <div class="text-center space-y-1">
         <h2 class="text-2xl font-bold text-foreground">{appInfo.name}</h2>
-        <p class="text-sm text-muted-foreground">{$_('settingsAbout.version', { values: { version: appInfo.version } })}</p>
+        <p class="text-sm text-muted-foreground">{$_('settingsAbout.version', { values: { version: appInfo.displayVersion } })}</p>
       </div>
     </div>
 

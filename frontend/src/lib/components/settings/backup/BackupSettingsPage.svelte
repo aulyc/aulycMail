@@ -49,6 +49,6 @@
   <div>
     <BackupConfigSection {draft} running={store.running} />
     <RecentBackupLog directory={draft.backupDirectory} />
+    <BackupRunPanel {store} {canStart} saveBeforeStart={draft.backupDirty} onStart={start} />
   </div>
-  <BackupRunPanel {store} {canStart} saveBeforeStart={draft.backupDirty} onStart={start} />
 </div>

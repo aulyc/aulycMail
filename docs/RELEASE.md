@@ -1,77 +1,115 @@
-# Release Steps
+# Release Process
 
-1. Update the base version in `wails.json` (`productVersion`).
-2. Keep `frontend/package.json` and `frontend/package-lock.json` aligned for npm tooling.
-3. Add the release entry to `CHANGELOG.md`.
-4. Create the Git tag (for example `v0.3.91`) only when publishing the release.
+See [VERSIONING.md](VERSIONING.md) for the version contract.
 
-The build system derives runtime and bundle versions automatically:
+## Common prerequisite
 
-- `make build` and `make install-darwin` use `<productVersion>-dev`;
-- `make release-dmg` and `make install-release-dmg` use `<productVersion>` with no `-dev`;
-- the injected runtime version is shown in About and by `--version`;
-- the macOS bundle keeps the numeric base version required by Apple metadata.
+Commit all feature, fix, test, and documentation changes first:
 
-## DMG Release
+```bash
+git status --short
+```
 
-Prerequisites on the release Mac:
+Both release entrypoints refuse a dirty worktree. They automatically update the
+version/build, promote `CHANGELOG.md` notes, create the dedicated release
+commit, run quality gates, create the annotated no-`v` tag, build the DMG,
+install it, and verify the installed version.
 
-- `Developer ID Application` certificate installed in the login keychain.
-- `notarytool` credentials stored in Keychain, e.g. `aulyc-notary`.
-- Use a repository-local Go cache in sandboxed Codex sessions.
+If automatic commit classification is ambiguous, pass
+`RELEASE_BUMP=patch|minor|major`. The default is `auto`.
 
-Create a signed, notarized drag-to-Applications DMG in `dist/aulycmail.dmg`:
+## Test release: ad-hoc signed
+
+Run:
 
 ```bash
 GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
-  make release-dmg \
+  make release-test
+```
+
+This normally converts `0.3.92-dev` to `0.3.92-beta.1`, increments the build
+number, creates `chore: release 0.3.92-beta.1`, runs all checks, creates tag
+`0.3.92-beta.1`, rebuilds the exact tagged app, ad-hoc signs the app and DMG,
+and installs the test DMG into `/Applications`.
+
+The manifest records `signatureType: "adhoc"` and has no notarization ID. The
+installer requires the explicit internal `--allow-adhoc` path, verifies the
+ad-hoc signatures, checksum, bundle version/build/commit, and binary
+`--version`. It deliberately skips Gatekeeper assessment because an ad-hoc
+signature is not an Apple trust assertion. The normal/formal installer refuses
+this signature type.
+
+Use this channel for internal testing only. It does not upload anything to
+Apple and must never be described as signed with Developer ID or notarized.
+
+## Formal release: Developer ID and notarization
+
+Prerequisites:
+
+- `Developer ID Application` certificate installed in the login keychain;
+- `notarytool` credentials stored under the `aulyc-notary` Keychain profile.
+
+Run:
+
+```bash
+GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
+  make release-formal \
   SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" \
   NOTARY_PROFILE=aulyc-notary
 ```
 
-The DMG packaging script:
+When the current version is a beta/RC, preparation promotes the same base to
+stable (`0.3.92-beta.1 -> 0.3.92`) and allocates a new build. The command then
+creates the stable release commit/tag, reruns every gate, Developer ID signs
+the app and DMG, uploads the DMG to Apple, requires notarization status
+`Accepted`, staples and validates the ticket, verifies Gatekeeper, installs the
+DMG, and verifies the installed runtime identity.
 
-- stages `build/bin/aulycmail.app`;
-- creates an `Applications -> /Applications` symlink;
-- writes a small Finder icon-view layout with equal horizontal spacing;
-- compresses as `UDZO`;
-- signs the app and DMG with Developer ID when `SIGN_IDENTITY` is set;
-- submits to Apple notarization and staples the ticket when `NOTARY_PROFILE` is
-  set;
-- verifies Gatekeeper status with `spctl`.
+Credentials remain in Keychain and are never written to logs or manifests.
 
-Publish the DMG and include its checksum:
+## Automatic release gates
 
-```bash
-shasum -a 256 dist/aulycmail.dmg
+Both channels run:
+
+- version source and derived-file verification;
+- release version/build/changelog verification;
+- clean-worktree verification;
+- version and release-preparation unit tests;
+- all Go tests and Go lint/vet;
+- frontend unit tests, Svelte checks, i18n checks, ESLint, and knip;
+- production frontend and Go build;
+- exact annotated tag verification.
+
+Formal release adds Developer ID, notarization, stapling, and Gatekeeper gates.
+
+## Safe retry behavior
+
+- Before a tag exists, a failed gate reuses the same unpublished version and
+  build. After fixes are committed, rerunning creates a fresh release commit
+  without needlessly consuming another version.
+- If the exact tag already exists at the current release commit, rerunning
+  verifies and reuses it; the tag is never moved.
+- After a release is published/tagged, subsequent changes create a new beta/RC
+  or stable version and increment the build.
+
+## Lower-level targets
+
+The all-in-one commands above are the normal interface. These targets remain
+available for diagnosis or controlled recovery:
+
+```text
+make prepare-test-release
+make prepare-formal-release
+make release-check
+make release-tag
+make test-release-dmg
+make release-dmg
+make install-test-release-dmg
+make install-release-dmg
 ```
 
-## Local Signed Reinstall
+`make install-darwin` remains a local developer installation and is not a test
+release.
 
-When reinstalling this Mac from a signed release build, package a DMG into
-`dist/` first, then install from that DMG into `/Applications`:
-
-```bash
-GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
-  make install-release-dmg \
-  SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" \
-  NOTARY_PROFILE=aulyc-notary
-```
-
-This target runs `release-dmg`, quits a running `aulycmail`, mounts
-`dist/aulycmail.dmg`, verifies the DMG and app signatures, replaces
-`/Applications/aulycmail.app`, verifies the installed app, and launches it.
-
-Before replacing a local install for the first time, make a copy of the local
-data directory while the app is not running:
-
-```bash
-rsync -a "$HOME/Library/Application Support/aulycmail/" \
-  "$HOME/Desktop/aulycmail-data-backup-$(date +%Y%m%d-%H%M%S)/"
-```
-
-The local mail database lives in `~/Library/Application Support/aulycmail`, not
-inside `/Applications/aulycmail.app`, so replacing the app bundle should not
-remove local mail data. If macOS prompts for Keychain access after moving from
-an ad-hoc build to Developer ID, allow the new signed build to access the
-existing `aulycmail` keychain items.
+Replacing `/Applications/aulycmail.app` does not replace local mail data in
+`~/Library/Application Support/aulycmail`.

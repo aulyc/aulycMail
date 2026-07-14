@@ -1,6 +1,10 @@
 package app
 
-import "aulyc.local/aulycmail/internal/appstate"
+import (
+	"fmt"
+
+	"aulyc.local/aulycmail/internal/appstate"
+)
 
 // ============================================================================
 // UI State Persistence
@@ -20,28 +24,46 @@ func (a *App) SaveUIState(state *appstate.UIState) error {
 // App Info API - Exposed to frontend via Wails bindings
 // ============================================================================
 
-// Version is consumed by the About settings page and the --version CLI flag. The
-// default is the local/test version; release builds override it with Go
-// linker flags derived from wails.json.
-var Version = "0.3.91-dev"
+// Build metadata defaults are intentionally generic. Make injects the values
+// derived from version.json and Git into every normal or release build.
+var (
+	Version     = "0.0.0-dev"
+	BuildNumber = "0"
+	CommitSHA   = "unknown"
+)
+
+// VersionLabel returns the user-facing version. A zero build number identifies
+// an ad-hoc local build and is omitted from the label.
+func VersionLabel() string {
+	if BuildNumber == "" || BuildNumber == "0" {
+		return Version
+	}
+	return fmt.Sprintf("%s (build %s)", Version, BuildNumber)
+}
 
 // AppInfo contains application metadata
 type AppInfo struct {
-	Name        string `json:"name"`
-	Version     string `json:"version"`
-	Description string `json:"description"`
-	Website     string `json:"website"`
-	License     string `json:"license"`
+	Name           string `json:"name"`
+	Version        string `json:"version"`
+	BuildNumber    string `json:"buildNumber"`
+	CommitSHA      string `json:"commitSHA"`
+	DisplayVersion string `json:"displayVersion"`
+	Description    string `json:"description"`
+	Website        string `json:"website"`
+	License        string `json:"license"`
 }
 
 // GetAppInfo returns application metadata for the About settings page
 func (a *App) GetAppInfo() AppInfo {
 	return AppInfo{
-		Name:        "aulycmail",
-		Version:     Version,
-		Description: "A lightweight desktop e-mail client",
-		Website:     "https://aulyc.com/aulycmail",
-		License:     "Proprietary",
+		Name:           "aulycmail",
+		Version:        Version,
+		BuildNumber:    BuildNumber,
+		CommitSHA:      CommitSHA,
+		DisplayVersion: VersionLabel(),
+		Description:    "A lightweight desktop e-mail client",
+		Website:        "https://aulyc.com/aulycmail",
+		License:        "Proprietary",
 	}
 }
 

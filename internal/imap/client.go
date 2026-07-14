@@ -18,6 +18,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// ClientVersion is injected from version.json at build time so the IMAP ID
+// command identifies the same binary version shown by the application.
+var ClientVersion = "0.0.0-dev"
+
 // deadlineConn wraps a net.Conn to automatically set read/write deadlines
 // before each operation. This prevents indefinite blocking on slow or dead
 // connections that go-imap v2 doesn't handle with built-in timeouts.
@@ -255,7 +259,7 @@ func (c *Client) Login() error {
 	if c.caps.Has(imap.CapID) {
 		if _, err := c.client.ID(&imap.IDData{
 			Name:    "aulycmail",
-			Version: "0.3.91",
+			Version: ClientVersion,
 			Vendor:  "aulyc",
 		}).Wait(); err != nil {
 			c.log.Warn().Err(err).Msg("IMAP ID command failed (continuing)")
