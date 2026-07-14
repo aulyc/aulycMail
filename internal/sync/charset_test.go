@@ -10,11 +10,11 @@ func TestUnquotePhrase(t *testing.T) {
 		{`火山引擎`, "火山引擎"},
 		{`Anaconda`, "Anaconda"},
 		{`""`, ""},
-		{`"`, `"`},                       // lone quote — not a quoted-string
-		{`"a"b"`, `a"b`},                 // unescaped inner quote tolerated
-		{`"say \"hi\""`, `say "hi"`},     // escaped quotes unescaped
+		{`"`, `"`},                      // lone quote — not a quoted-string
+		{`"a"b"`, `a"b`},                // unescaped inner quote tolerated
+		{`"say \"hi\""`, `say "hi"`},    // escaped quotes unescaped
 		{`"back\\slash"`, `back\slash`}, // escaped backslash
-		{`  "  spaced  "  `, "spaced"},   // outer + inner whitespace trimmed
+		{`  "  spaced  "  `, "spaced"},  // outer + inner whitespace trimmed
 		{``, ``},
 	}
 	for _, c := range cases {

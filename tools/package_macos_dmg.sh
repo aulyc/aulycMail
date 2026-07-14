@@ -1,40 +1,42 @@
 #!/bin/bash
-# Build a drag-to-Applications macOS DMG from an existing aulycmail.app bundle.
+# Package an existing aulycmail.app and derive release identity from Git and the real app.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SOURCE_ROOT="$ROOT"
 APP="$ROOT/build/bin/aulycmail.app"
 DMG_PATH="$ROOT/dist/aulycmail.dmg"
 VOLUME_NAME="aulycmail Installer"
+RELEASE_CHANNEL="local"
+TAG=""
 SIGN_IDENTITY="${SIGN_IDENTITY:-}"
 NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 ADHOC_SIGN=0
-SEMANTIC_VERSION=""
-BUILD_NUMBER=""
-COMMIT_SHA=""
-TAG=""
 
 usage() {
   cat <<'EOF'
 Usage: tools/package_macos_dmg.sh [options]
 
 Options:
+  --source-root PATH     Git source used to build the app
   --app PATH             App bundle to package (default: build/bin/aulycmail.app)
   --output PATH          DMG output path (default: dist/aulycmail.dmg)
-  --volume-name NAME     Mounted DMG volume name (default: aulycmail Installer)
-  --version VERSION      Runtime SemVer embedded in the app
-  --build-number NUMBER  Independent macOS build number
-  --commit SHA           Git commit used to build the app
-  --tag TAG              Immutable public release tag, when applicable
-  --adhoc-sign           Ad-hoc sign the app and DMG for a local test release
-  --sign IDENTITY        Developer ID Application identity for app and DMG signing
-  --notary-profile NAME  notarytool keychain profile; notarizes and staples the DMG
+  --volume-name NAME     Mounted DMG volume name
+  --release-channel NAME local, test, or formal
+  --tag TAG              Exact annotated tag for test/formal releases
+  --adhoc-sign           Ad-hoc sign the app and DMG for a test release
+  --sign IDENTITY        Developer ID Application identity
+  --notary-profile NAME  notarytool Keychain profile
   -h, --help             Show this help
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --source-root)
+      SOURCE_ROOT="$2"
+      shift 2
+      ;;
     --app)
       APP="$2"
       shift 2
@@ -47,16 +49,8 @@ while [[ $# -gt 0 ]]; do
       VOLUME_NAME="$2"
       shift 2
       ;;
-    --version)
-      SEMANTIC_VERSION="$2"
-      shift 2
-      ;;
-    --build-number)
-      BUILD_NUMBER="$2"
-      shift 2
-      ;;
-    --commit)
-      COMMIT_SHA="$2"
+    --release-channel)
+      RELEASE_CHANNEL="$2"
       shift 2
       ;;
     --tag)
@@ -91,87 +85,143 @@ if [[ ! -d "$APP" ]]; then
   echo "Missing app bundle: $APP" >&2
   exit 1
 fi
-if [[ ! "$SEMANTIC_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?([+][0-9A-Za-z.-]+)?$ ]]; then
-  echo "Invalid or missing --version: $SEMANTIC_VERSION" >&2
+if [[ ! -d "$SOURCE_ROOT" ]]; then
+  echo "Missing source root: $SOURCE_ROOT" >&2
   exit 1
 fi
-if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-  echo "Invalid or missing --build-number: $BUILD_NUMBER" >&2
+SOURCE_ROOT="$(cd "$SOURCE_ROOT" && pwd)"
+if [[ "$RELEASE_CHANNEL" != "local" && "$RELEASE_CHANNEL" != "test" && "$RELEASE_CHANNEL" != "formal" ]]; then
+  echo "--release-channel must be local, test, or formal." >&2
   exit 1
 fi
-if [[ ! "$COMMIT_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
-  echo "Invalid or missing --commit: $COMMIT_SHA" >&2
-  exit 1
-fi
-if [[ -n "$TAG" && "$TAG" != "$SEMANTIC_VERSION" ]]; then
-  echo "Release tag must exactly match the runtime version." >&2
-  exit 1
-fi
-if [[ -n "$TAG" && "$BUILD_NUMBER" == "0" ]]; then
-  echo "A tagged public artifact requires a positive build number." >&2
-  exit 1
-fi
-if [[ -n "$NOTARY_PROFILE" && -z "$SIGN_IDENTITY" ]]; then
-  echo "--notary-profile requires --sign." >&2
-  exit 1
-fi
-if [[ "$ADHOC_SIGN" == "1" && -n "$SIGN_IDENTITY" ]]; then
-  echo "--adhoc-sign and --sign are mutually exclusive." >&2
+if [[ "$RELEASE_CHANNEL" == "test" ]]; then
+  if [[ -z "$TAG" || "$ADHOC_SIGN" != "1" || -n "$SIGN_IDENTITY" || -n "$NOTARY_PROFILE" ]]; then
+    echo "Test releases require an exact tag and --adhoc-sign, without Developer ID or notarization." >&2
+    exit 1
+  fi
+elif [[ "$RELEASE_CHANNEL" == "formal" ]]; then
+  if [[ -z "$TAG" || -z "$SIGN_IDENTITY" || -z "$NOTARY_PROFILE" || "$ADHOC_SIGN" == "1" ]]; then
+    echo "Formal releases require an exact tag, --sign, and --notary-profile." >&2
+    exit 1
+  fi
+elif [[ -n "$TAG" || "$ADHOC_SIGN" == "1" || -n "$SIGN_IDENTITY" || -n "$NOTARY_PROFILE" ]]; then
+  echo "Local DMGs must not claim a release tag, release signature, or notarization." >&2
   exit 1
 fi
 
-SIGNATURE_TYPE="unsigned"
-if [[ "$ADHOC_SIGN" == "1" ]]; then
-  SIGNATURE_TYPE="adhoc"
-elif [[ -n "$SIGN_IDENTITY" ]]; then
-  SIGNATURE_TYPE="developer-id"
+if [[ "$RELEASE_CHANNEL" != "local" ]]; then
+  node "$SOURCE_ROOT/tools/release-identity.mjs" verify-source --root "$SOURCE_ROOT" --tag "$TAG"
+fi
+
+APP_INFO="$APP/Contents/Info.plist"
+APP_EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_INFO")"
+APP_EXECUTABLE="$APP/Contents/MacOS/$APP_EXECUTABLE_NAME"
+SEMANTIC_VERSION="$(/usr/bin/plutil -extract AULYCSemanticVersion raw -o - "$APP_INFO")"
+BUILD_NUMBER="$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$APP_INFO")"
+COMMIT_SHA="$(/usr/bin/plutil -extract AULYCCommitSHA raw -o - "$APP_INFO")"
+BUNDLE_IDENTIFIER="$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$APP_INFO")"
+MINIMUM_SYSTEM_VERSION="$(/usr/bin/plutil -extract LSMinimumSystemVersion raw -o - "$APP_INFO")"
+ARCHITECTURE="$(lipo -archs "$APP_EXECUTABLE")"
+DIRTY=false
+if [[ -n "$(git -C "$SOURCE_ROOT" status --porcelain --untracked-files=all)" ]]; then
+  DIRTY=true
+fi
+
+if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ || ! "$COMMIT_SHA" =~ ^[0-9a-f]{7,64}$ ]]; then
+  echo "App bundle contains an invalid build number or commit." >&2
+  exit 1
+fi
+if [[ "$ARCHITECTURE" != "arm64" || "$BUNDLE_IDENTIFIER" != "com.aulyc.aulycmail" ]]; then
+  echo "Only the arm64 com.aulyc.aulycmail bundle can be packaged." >&2
+  exit 1
+fi
+
+if [[ "$RELEASE_CHANNEL" != "local" ]]; then
+  SOURCE_VERSION="$(node "$SOURCE_ROOT/tools/version-bump.mjs" get version)"
+  SOURCE_BUILD="$(node "$SOURCE_ROOT/tools/version-bump.mjs" get build)"
+  SOURCE_COMMIT="$(git -C "$SOURCE_ROOT" rev-parse HEAD)"
+  if [[ "$DIRTY" != "false" || "$SEMANTIC_VERSION" != "$SOURCE_VERSION" || \
+        "$BUILD_NUMBER" != "$SOURCE_BUILD" || "$COMMIT_SHA" != "$SOURCE_COMMIT" || "$TAG" != "$SOURCE_VERSION" ]]; then
+    echo "App identity does not match the clean tagged release source." >&2
+    exit 1
+  fi
+  # The requested tag has already been verified as annotated and exact. Record
+  # the tag derived from the isolated source identity, not the caller's input.
+  TAG="$SOURCE_VERSION"
+fi
+
+mkdir -p "$(dirname "$DMG_PATH")"
+DMG_PATH="$(cd "$(dirname "$DMG_PATH")" && pwd)/$(basename "$DMG_PATH")"
+MANIFEST_PATH="${DMG_PATH%.dmg}.manifest.json"
+if [[ -e "$DMG_PATH" || -e "$MANIFEST_PATH" ]]; then
+  echo "Refusing to overwrite existing artifact or manifest: $DMG_PATH" >&2
+  exit 1
 fi
 
 APP_NAME="$(basename "$APP")"
-mkdir -p "$(dirname "$DMG_PATH")"
-DMG_PATH="$(cd "$(dirname "$DMG_PATH")" && pwd)/$(basename "$DMG_PATH")"
-DIST_DIR="$(dirname "$DMG_PATH")"
-MANIFEST_PATH="${DMG_PATH%.dmg}.manifest.json"
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/aulycmail-dmg.XXXXXX")"
 STAGING_DIR="$WORK_DIR/staging"
 RW_DMG="$WORK_DIR/$VOLUME_NAME-rw.dmg"
 MOUNT_POINT=""
+OUTPUT_CREATED=0
 NOTARY_SUBMISSION_ID=""
+NOTARIZED=false
 
 cleanup() {
+  local status=$?
+  set +e
   if [[ -n "$MOUNT_POINT" && -d "$MOUNT_POINT" ]]; then
-    for _ in 1 2 3 4 5; do
-      if hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null; then
-        break
-      fi
-      sleep 1
-    done
-    if [[ -d "$MOUNT_POINT" ]]; then
-      hdiutil detach "$MOUNT_POINT" -force -quiet 2>/dev/null || true
-    fi
+    hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || hdiutil detach "$MOUNT_POINT" -force -quiet 2>/dev/null || true
   fi
   rm -rf "$WORK_DIR"
+  if [[ "$status" -ne 0 && "$OUTPUT_CREATED" == "1" ]]; then
+    rm -f "$DMG_PATH" "$MANIFEST_PATH"
+  fi
+  return "$status"
 }
 trap cleanup EXIT
 
-mkdir -p "$DIST_DIR" "$STAGING_DIR"
-
+mkdir -p "$STAGING_DIR"
 echo "Staging $APP_NAME..."
 ditto "$APP" "$STAGING_DIR/$APP_NAME"
 ln -s /Applications "$STAGING_DIR/Applications"
+STAGED_APP="$STAGING_DIR/$APP_NAME"
 
-APP_EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Contents/Info.plist")"
-APP_EXECUTABLE="$APP/Contents/MacOS/$APP_EXECUTABLE_NAME"
-ARCHITECTURE="$(lipo -archs "$APP_EXECUTABLE" 2>/dev/null || printf unknown)"
-
-if [[ -n "$SIGN_IDENTITY" ]]; then
+if [[ "$RELEASE_CHANNEL" == "formal" ]]; then
   echo "Signing app with $SIGN_IDENTITY..."
-  codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$STAGING_DIR/$APP_NAME"
-  codesign --verify --deep --strict --verbose=2 "$STAGING_DIR/$APP_NAME"
-elif [[ "$ADHOC_SIGN" == "1" ]]; then
+  codesign --force --deep --options runtime --timestamp --sign "$SIGN_IDENTITY" "$STAGED_APP"
+elif [[ "$RELEASE_CHANNEL" == "test" ]]; then
   echo "Ad-hoc signing app for test release..."
-  codesign --force --deep --sign - "$STAGING_DIR/$APP_NAME"
-  codesign --verify --deep --strict --verbose=2 "$STAGING_DIR/$APP_NAME"
+  codesign --force --deep --sign - "$STAGED_APP"
+fi
+codesign --verify --deep --strict --verbose=2 "$STAGED_APP"
+
+CODESIGN_INFO="$(codesign -dv --verbose=4 "$STAGED_APP" 2>&1)"
+TEAM_IDENTIFIER="$(printf '%s\n' "$CODESIGN_INFO" | sed -n 's/^TeamIdentifier=//p' | head -n 1)"
+[[ "$TEAM_IDENTIFIER" == "not set" ]] && TEAM_IDENTIFIER=""
+SIGNATURE_TYPE="unknown"
+if printf '%s\n' "$CODESIGN_INFO" | grep -q '^Signature=adhoc$'; then
+  SIGNATURE_TYPE="adhoc"
+elif printf '%s\n' "$CODESIGN_INFO" | grep -q '^Authority=Developer ID Application:'; then
+  SIGNATURE_TYPE="developer-id"
+fi
+HARDENED_RUNTIME=false
+if printf '%s\n' "$CODESIGN_INFO" | grep -q '^CodeDirectory .*flags=.*runtime'; then
+  HARDENED_RUNTIME=true
+fi
+
+if [[ "$RELEASE_CHANNEL" == "test" && ( "$SIGNATURE_TYPE" != "adhoc" || -n "$TEAM_IDENTIFIER" || "$HARDENED_RUNTIME" != "false" ) ]]; then
+  echo "Test app signing identity is not plain ad-hoc." >&2
+  exit 1
+fi
+if [[ "$RELEASE_CHANNEL" == "formal" && ( "$SIGNATURE_TYPE" != "developer-id" || -z "$TEAM_IDENTIFIER" || "$HARDENED_RUNTIME" != "true" ) ]]; then
+  echo "Formal app is missing Developer ID, Team ID, or Hardened Runtime." >&2
+  exit 1
+fi
+if [[ "$RELEASE_CHANNEL" == "local" ]]; then
+  SIGNATURE_TYPE="unsigned"
+  TEAM_IDENTIFIER=""
+  HARDENED_RUNTIME=false
 fi
 
 echo "Creating read/write DMG..."
@@ -188,7 +238,6 @@ ATTACH_OUTPUT="$(hdiutil attach "$RW_DMG" -readwrite -noverify -noautoopen)"
 MOUNT_POINT="$(printf '%s\n' "$ATTACH_OUTPUT" | sed -n 's|^.*\(/Volumes/.*\)$|\1|p' | head -n 1)"
 if [[ -z "$MOUNT_POINT" || ! -d "$MOUNT_POINT" ]]; then
   echo "Failed to locate mounted DMG volume." >&2
-  printf '%s\n' "$ATTACH_OUTPUT" >&2
   exit 1
 fi
 
@@ -225,24 +274,22 @@ hdiutil detach "$MOUNT_POINT" -quiet
 MOUNT_POINT=""
 
 echo "Compressing DMG..."
-hdiutil convert "$RW_DMG" \
-  -format UDZO \
-  -imagekey zlib-level=9 \
-  -ov \
-  -o "$DMG_PATH" >/dev/null
+hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_PATH" >/dev/null
+OUTPUT_CREATED=1
 
-if [[ -n "$SIGN_IDENTITY" ]]; then
+if [[ "$RELEASE_CHANNEL" == "formal" ]]; then
   echo "Signing DMG with $SIGN_IDENTITY..."
   codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG_PATH"
-  codesign --verify --verbose=2 "$DMG_PATH"
-elif [[ "$ADHOC_SIGN" == "1" ]]; then
+elif [[ "$RELEASE_CHANNEL" == "test" ]]; then
   echo "Ad-hoc signing DMG for test release..."
   codesign --force --sign - "$DMG_PATH"
+fi
+if [[ "$RELEASE_CHANNEL" != "local" ]]; then
   codesign --verify --verbose=2 "$DMG_PATH"
 fi
 
-if [[ -n "$NOTARY_PROFILE" ]]; then
-  echo "Submitting DMG for notarization using keychain profile $NOTARY_PROFILE..."
+if [[ "$RELEASE_CHANNEL" == "formal" ]]; then
+  echo "Submitting DMG for notarization using Keychain profile $NOTARY_PROFILE..."
   NOTARY_RESULT="$WORK_DIR/notary-result.json"
   xcrun notarytool submit "$DMG_PATH" \
     --keychain-profile "$NOTARY_PROFILE" \
@@ -254,48 +301,62 @@ if [[ -n "$NOTARY_PROFILE" ]]; then
     echo "Notarization failed with status: $NOTARY_STATUS" >&2
     exit 1
   fi
+  NOTARIZED=true
   echo "Notarization accepted: $NOTARY_SUBMISSION_ID"
   xcrun stapler staple "$DMG_PATH"
   xcrun stapler validate "$DMG_PATH"
   spctl -a -vvv -t open --context context:primary-signature "$DMG_PATH"
 fi
 
+if [[ "$RELEASE_CHANNEL" != "local" ]]; then
+  node "$SOURCE_ROOT/tools/release-identity.mjs" verify-source --root "$SOURCE_ROOT" --tag "$TAG"
+fi
+
 DMG_SHA256="$(shasum -a 256 "$DMG_PATH" | awk '{print $1}')"
 BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-node --input-type=module - "$MANIFEST_PATH" "$SEMANTIC_VERSION" "$BUILD_NUMBER" "$TAG" "$SIGNATURE_TYPE" \
-  "$COMMIT_SHA" "$DMG_SHA256" "$ARCHITECTURE" "$NOTARY_SUBMISSION_ID" \
-  "$BUILT_AT" "$(basename "$DMG_PATH")" <<'NODE'
+node --input-type=module - "$MANIFEST_PATH" "$SEMANTIC_VERSION" "$BUILD_NUMBER" "$RELEASE_CHANNEL" \
+  "$TAG" "$COMMIT_SHA" "$DIRTY" "$(basename "$DMG_PATH")" "$DMG_SHA256" "$ARCHITECTURE" \
+  "$BUNDLE_IDENTIFIER" "$TEAM_IDENTIFIER" "$MINIMUM_SYSTEM_VERSION" "$SIGNATURE_TYPE" \
+  "$HARDENED_RUNTIME" "$NOTARIZED" "$NOTARY_SUBMISSION_ID" "$BUILT_AT" <<'NODE'
 import fs from 'node:fs'
 
 const [
-  manifestPath,
-  version,
-  buildNumber,
-  tag,
-  signatureType,
-  commit,
-  sha256,
-  architecture,
-  notarizationSubmissionId,
-  builtAt,
-  artifact,
+  manifestPath, version, buildNumber, releaseChannel, tag, commit, dirty,
+  artifact, sha256, architecture, bundleIdentifier, teamIdentifier,
+  minimumSystemVersion, signatureType, hardenedRuntime, notarized,
+  notarizationSubmissionId, builtAt,
 ] = process.argv.slice(2)
 
 const manifest = {
   application: 'aulycmail',
   version,
   buildNumber: Number(buildNumber),
+  releaseChannel,
   tag: tag || null,
-  signatureType,
   commit,
+  dirty: dirty === 'true',
+  artifact,
   sha256,
   architecture,
+  bundleIdentifier,
+  teamIdentifier: teamIdentifier || null,
+  minimumSystemVersion,
+  signatureType,
+  hardenedRuntime: hardenedRuntime === 'true',
+  notarized: notarized === 'true',
   notarizationSubmissionId: notarizationSubmissionId || null,
   builtAt,
-  artifact,
 }
 fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 NODE
+
+node "$SOURCE_ROOT/tools/release-identity.mjs" verify-manifest \
+  --manifest "$MANIFEST_PATH" --repo "$SOURCE_ROOT" --dmg "$DMG_PATH"
+if [[ "$RELEASE_CHANNEL" != "local" ]]; then
+  bash "$SOURCE_ROOT/tools/verify_release_artifact.sh" \
+    --dmg "$DMG_PATH" --repo "$SOURCE_ROOT" --channel "$RELEASE_CHANNEL"
+  node "$SOURCE_ROOT/tools/release-identity.mjs" verify-source --root "$SOURCE_ROOT" --tag "$TAG"
+fi
 
 echo "Created $DMG_PATH"
 echo "Created $MANIFEST_PATH"

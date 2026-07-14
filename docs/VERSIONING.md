@@ -1,10 +1,12 @@
 # Versioning Policy
 
-This policy applies to the macOS aulycmail application and its Wails frontend.
+This policy is the aulycmail project profile for the shared
+`general-release-versioning` Skill. It defines how the common baseline maps to
+the Apple Silicon macOS Wails application.
 
-## 1. Single version source
+## Single version source
 
-`version.json` is the only version source:
+`version.json` is authoritative:
 
 ```json
 {
@@ -13,149 +15,112 @@ This policy applies to the macOS aulycmail application and its Wails frontend.
 }
 ```
 
-The version is canonical SemVer. The build is the last allocated release build
-number. `tools/version-bump.mjs` synchronizes the derived values in
-`wails.json`, `frontend/package.json`, and `frontend/package-lock.json`; do not
-edit those derived fields by hand.
+`tools/version-bump.mjs` derives and verifies:
 
-## 2. SemVer
+- `wails.json` `info.productVersion`;
+- `frontend/package.json` `version`;
+- root entries in `frontend/package-lock.json`.
 
-Stable versions use `MAJOR.MINOR.PATCH`:
+Do not edit those derived version fields manually. Use `make version-check` and
+`make version-test` to detect drift and validate version behavior.
 
-- `MAJOR`: incompatible behavior or a major architecture change;
-- `MINOR`: a backward-compatible feature;
-- `PATCH`: a bug, security, or performance fix.
+## SemVer and release classes
 
-Segments may exceed 9: `2.0.9` advances to `2.0.10`, not `2.1.0`.
+Stable releases use `MAJOR.MINOR.PATCH`. Supported development and prerelease
+forms are `-dev`, `-alpha.N`, `-beta.N`, and `-rc.N`. Segments are integers, so
+`2.0.9` advances to `2.0.10` for a patch.
 
-Supported lifecycle forms are:
+| Class | Identity | Build | Commit/tag | Trust |
+|---|---|---:|---|---|
+| Local build/install | `-dev+<commit>[.dirty]` | `0` | none | ad-hoc app |
+| Test release | `alpha.N`/`beta.N`/`rc.N` | positive | release commit + annotated tag | ad-hoc app/DMG, no notarization |
+| Formal release | stable SemVer | positive | release commit + annotated tag | Developer ID, Hardened Runtime, notarization, Gatekeeper |
 
-```text
-MAJOR.MINOR.PATCH-dev
-MAJOR.MINOR.PATCH-alpha.N
-MAJOR.MINOR.PATCH-beta.N
-MAJOR.MINOR.PATCH-rc.N
-MAJOR.MINOR.PATCH
-```
+`make install-darwin` is always a local development installation, even when it
+uses a production-mode binary. It is not a test release.
 
-Published versions are never overwritten. Every new test package advances its
-prerelease sequence or starts a new bumped base version.
+## Automatic version selection
 
-## 3. Three build classes
+Release preparation uses the current lifecycle first:
 
-### Local development installation
-
-`make install-darwin` is only a developer convenience. It may represent a
-dirty worktree, uses bundle build `0`, adds the commit and optional `.dirty`
-marker to the runtime version, creates no release commit or tag, and does not
-count as a release.
-
-### Test release
-
-`make release-test` creates and installs a test release:
-
-- version: `MAJOR.MINOR.PATCH-beta.N` (or the next `rc.N` when already in RC);
-- positive, globally increasing build number;
-- dedicated `chore: release <version>` commit;
-- immutable annotated no-`v` tag;
-- ad-hoc signatures on both app and DMG;
-- no Developer ID, Apple upload, notarization, or Gatekeeper acceptance claim.
-
-### Formal release
-
-`make release-formal` creates and installs a stable release:
-
-- version: `MAJOR.MINOR.PATCH`;
-- positive, globally increasing build number;
-- dedicated release commit and immutable annotated tag;
-- Developer ID signing, hardened runtime, Apple notarization, stapling, and
-  Gatekeeper verification.
-
-Both release classes produce a versioned DMG and manifest and must pass the same
-repository quality gates.
-
-## 4. Automatic version selection
-
-All functional changes must already be committed before either release command
-runs. Release preparation then selects the version automatically:
-
-| Current version | Test release | Formal release |
+| Current version | Test | Formal |
 |---|---|---|
 | `0.3.92-dev` | `0.3.92-beta.1` | `0.3.92` |
 | `0.3.92-beta.1` | `0.3.92-beta.2` | `0.3.92` |
 | `0.3.92-rc.1` | `0.3.92-rc.2` | `0.3.92` |
-| `2.0.9` + fixes | `2.0.10-beta.1` | `2.0.10` |
-| `2.0.9` + feature | `2.1.0-beta.1` | `2.1.0` |
-| `2.0.9` + breaking change | `3.0.0-beta.1` | `3.0.0` |
 
-Automatic impact detection uses commits since the current stable tag:
+From a stable version, `BREAKING CHANGE`/`type!:` selects major, `feat:`
+selects minor, and other committed changes default to patch because this
+repository contains historical non-Conventional commit subjects. Override an
+ambiguous result with `RELEASE_BUMP=patch|minor|major`.
 
-- `BREAKING CHANGE` or `type!:` -> `MAJOR`;
-- `feat:` -> `MINOR`;
-- all other committed changes -> `PATCH`.
+Every test or formal release increments the independent build number exactly
+once. An unpublished, untagged failed preparation may reuse its version/build;
+an already tagged or distributed identity never moves or repeats.
 
-This repository contains older non-Conventional commit subjects, so unrecognized
-commits intentionally default to `PATCH`. Override an ambiguous release with:
+## Release commit and tag
 
-```bash
-make release-test RELEASE_BUMP=minor
-make release-formal RELEASE_BUMP=major \
-  SIGN_IDENTITY="Developer ID Application: ..." \
-  NOTARY_PROFILE=aulyc-notary
-```
+Functional changes must be committed first. Release preparation creates
+`chore: release <version>` containing only:
 
-The override accepts `patch`, `minor`, or `major`. Once a version is already in
-`dev`, `beta`, or `rc`, lifecycle promotion takes precedence over a new base
-bump.
+- `version.json`;
+- `wails.json`;
+- `frontend/package.json`;
+- `frontend/package-lock.json`;
+- `CHANGELOG.md`.
 
-## 5. Build numbers
+The tag is annotated, exactly equals the version, has no `v` prefix, points to
+that release commit, and is never moved or overwritten.
 
-Build numbers are independent from SemVer and never decrease or repeat for a
-published test or formal package. Release preparation increments the counter
-exactly once. A failed release that has not created its tag reuses the same
-unpublished version/build when retried; a published/tagged release always
-advances to a new identity.
+Before tag creation, `make release-check` runs shared checks and builds a
+production candidate with the same `arm64` target, Wails/Go production tags,
+linker metadata, Bundle ID, minimum macOS version, and bundle packaging used by
+the final artifact. Signing and notarization remain post-tag operations.
 
-## 6. Release commits and tags
+## Isolated tagged-source build
 
-The release commands first refuse a dirty worktree. They then:
+Final test and formal DMGs are not built in the caller's daily worktree.
+`tools/release-worktree.mjs`:
 
-1. select the next version and build;
-2. move `[Unreleased]` notes under an exact dated version heading;
-3. synchronize all derived version files;
-4. create `chore: release <version>` automatically;
-5. run all quality gates;
-6. create or verify the exact annotated tag;
-7. rebuild the artifact from that tag.
+1. verifies the caller is clean and the exact annotated tag points to `HEAD`;
+2. creates a temporary detached Git worktree at the tag;
+3. verifies tagged `version.json`, release commit, commit ID, and clean state;
+4. installs frontend dependencies from the tagged lockfile when necessary;
+5. builds and packages inside that worktree;
+6. verifies the worktree remains clean after generation, build, and packaging;
+7. removes only the owned temporary worktree.
 
-Tags contain no `v`, exactly match the version, point at the release commit,
-and are never moved, replaced, or reused.
+The release manifest obtains tag/commit from that Git state and obtains
+version, build, architecture, Bundle ID, minimum system version, signature,
+Team ID, and Hardened Runtime from the real app. It obtains the artifact name
+and SHA-256 from the real DMG. Formal notarization values come from the accepted
+`notarytool` result and are independently checked with stapler and Gatekeeper.
 
-## 7. Platform mapping and artifact identity
+## Runtime and artifact mapping
 
-| Location | Value |
+| Consumer | Value |
 |---|---|
 | About page, `--version`, IMAP client ID | exact runtime SemVer |
-| `CFBundleShortVersionString` | numeric `MAJOR.MINOR.PATCH` base |
-| `CFBundleVersion` | `0` for local builds; allocated build for releases |
+| `CFBundleShortVersionString` | numeric SemVer base |
+| `CFBundleVersion` | `0` local; allocated release build |
 | `AULYCSemanticVersion` | exact runtime SemVer |
 | `AULYCCommitSHA` | exact source commit |
-| Wails `productVersion` | numeric base |
-| npm package metadata | canonical version |
+| Bundle identifier | `com.aulyc.aulycmail` |
+| Minimum macOS version | `11.0` |
+| Architecture | `arm64` |
 
-Release artifacts use:
+Release files are immutable:
 
 ```text
 aulycmail-<version>-build.<build>.dmg
 aulycmail-<version>-build.<build>.manifest.json
 ```
 
-The manifest records version, build, tag, commit, architecture, signature type,
-Apple notarization submission ID when applicable, UTC build time, artifact
-name, and SHA-256. The installer verifies the checksum, signatures, bundle
-metadata, and runtime version. Gatekeeper assessment is mandatory only for the
-Developer ID formal channel; the ad-hoc test channel is explicitly identified
-and never reported as notarized.
+The manifest includes application, version, build number, release channel,
+tag, commit, dirty state, artifact, SHA-256, architecture, Bundle ID, Team ID,
+minimum system version, signature type, Hardened Runtime, notarization state,
+submission ID, and UTC build time. Test and formal manifests require
+`dirty: false`.
 
-User databases, settings, credentials, and mail data are never part of the app
-replacement or release manifest.
+Mail databases, attachments, settings, passwords, tokens, Keychain data, and
+other user data are never release metadata or app-replacement payloads.

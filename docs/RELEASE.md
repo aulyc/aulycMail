@@ -1,55 +1,63 @@
 # Release Process
 
-See [VERSIONING.md](VERSIONING.md) for the version contract.
+Read [VERSIONING.md](VERSIONING.md) first. The global
+`general-release-versioning` Skill supplies the shared baseline; this document
+describes the executable aulycmail flow.
 
-## Common prerequisite
-
-Commit all feature, fix, test, and documentation changes first:
+## Non-release quality entrypoints
 
 ```bash
-git status --short
+make check   # version, release-tool, Go, and frontend gates
+make ci      # make check plus a complete production build
 ```
 
-Both release entrypoints refuse a dirty worktree. They automatically update the
-version/build, promote `CHANGELOG.md` notes, create the dedicated release
-commit, run quality gates, create the annotated no-`v` tag, build the DMG,
-install it, and verify the installed version.
+These commands do not create a release commit/tag, sign with Developer ID,
+notarize, install, or publish. A future CI provider should invoke `make ci` for
+normal changes. Formal signing, notarization, installation, and publication
+must not run in ordinary pull-request CI.
 
-If automatic commit classification is ambiguous, pass
-`RELEASE_BUMP=patch|minor|major`. The default is `auto`.
+## Common release sequence
 
-## Test release: ad-hoc signed
+Both release channels perform the same identity steps:
 
-Run:
+1. Refuse uncommitted functional changes.
+2. Select version/build and update only allowed release metadata.
+3. Create `chore: release <version>` and require a clean worktree.
+4. Run `make release-check`, including `make check` and a same-configuration
+   production candidate build.
+5. Create or verify the immutable annotated tag exactly matching the version.
+6. Create a temporary detached worktree at that exact tag.
+7. Verify tag, commit, `version.json`, release-only commit contents, and clean
+   isolated source before and after generation/build/package.
+8. Build the final app and DMG in the isolated worktree. The caller worktree is
+   never used as the final artifact source.
+9. Derive and validate the manifest against Git and the actual artifact.
+10. Verify the DMG and contained app, install to
+    `/Applications/aulycmail.app`, verify the installed app, then launch.
+
+Existing same-version DMGs or manifests are not overwritten. To reuse an
+existing artifact, verify and install that unchanged artifact. If content or
+identity differs, prepare a new prerelease or patch version/build.
+
+## Test release
 
 ```bash
 GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
   make release-test
 ```
 
-This normally converts `0.3.92-dev` to `0.3.92-beta.1`, increments the build
-number, creates `chore: release 0.3.92-beta.1`, runs all checks, creates tag
-`0.3.92-beta.1`, rebuilds the exact tagged app, ad-hoc signs the app and DMG,
-and installs the test DMG into `/Applications`.
+The test channel uses `alpha.N`, `beta.N`, or `rc.N`, a positive build number,
+and ad-hoc signatures on both app and DMG. It never supplies Developer ID or
+notary credentials, never uploads to Apple, records `notarized: false`, and
+does not run or claim formal Gatekeeper trust. Installation requires the
+explicit internal `--allow-adhoc` path.
 
-The manifest records `signatureType: "adhoc"` and has no notarization ID. The
-installer requires the explicit internal `--allow-adhoc` path, verifies the
-ad-hoc signatures, checksum, bundle version/build/commit, and binary
-`--version`. It deliberately skips Gatekeeper assessment because an ad-hoc
-signature is not an Apple trust assertion. The normal/formal installer refuses
-this signature type.
-
-Use this channel for internal testing only. It does not upload anything to
-Apple and must never be described as signed with Developer ID or notarized.
-
-## Formal release: Developer ID and notarization
+## Formal release
 
 Prerequisites:
 
-- `Developer ID Application` certificate installed in the login keychain;
-- `notarytool` credentials stored under the `aulyc-notary` Keychain profile.
-
-Run:
+- the Developer ID Application certificate is available in Keychain;
+- `notarytool` credentials exist under the `aulyc-notary` Keychain profile.
 
 ```bash
 GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
@@ -58,44 +66,52 @@ GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
   NOTARY_PROFILE=aulyc-notary
 ```
 
-When the current version is a beta/RC, preparation promotes the same base to
-stable (`0.3.92-beta.1 -> 0.3.92`) and allocates a new build. The command then
-creates the stable release commit/tag, reruns every gate, Developer ID signs
-the app and DMG, uploads the DMG to Apple, requires notarization status
-`Accepted`, staples and validates the ticket, verifies Gatekeeper, installs the
-DMG, and verifies the installed runtime identity.
+The isolated tagged app is Developer ID signed with Hardened Runtime. The DMG
+is signed, submitted with `notarytool --wait`, and must return `Accepted`.
+Stapling, `stapler validate`, DMG Gatekeeper assessment, contained-app
+assessment, installed-app assessment, and manifest verification must all pass.
+Credentials remain in Keychain and are not written to logs or manifests.
 
-Credentials remain in Keychain and are never written to logs or manifests.
+## Manifest and artifact verification
 
-## Automatic release gates
+Every test/formal manifest contains:
 
-Both channels run:
+```text
+application, version, buildNumber, releaseChannel, tag, commit, dirty,
+artifact, sha256, architecture, bundleIdentifier, teamIdentifier,
+minimumSystemVersion, signatureType, hardenedRuntime, notarized,
+notarizationSubmissionId, builtAt
+```
 
-- version source and derived-file verification;
-- release version/build/changelog verification;
-- clean-worktree verification;
-- version and release-preparation unit tests;
-- all Go tests and Go lint/vet;
-- frontend unit tests, Svelte checks, i18n checks, ESLint, and knip;
-- production frontend and Go build;
-- exact annotated tag verification.
+Validation does not trust those values alone. The release and installation
+tools cross-check:
 
-Formal release adds Developer ID, notarization, stapling, and Gatekeeper gates.
+- annotated Git tag, target commit, tagged `version.json`, and release commit;
+- DMG filename and SHA-256;
+- app Info.plist version/build/commit, Bundle ID, and minimum macOS version;
+- app executable `--version`;
+- `lipo` and `file` arm64 results;
+- app and DMG code-signing type and Team ID;
+- Hardened Runtime flags;
+- formal stapler and Gatekeeper results;
+- the final `/Applications/aulycmail.app` path and installed identity.
 
-## Safe retry behavior
+## Failure and retry
 
-- Before a tag exists, a failed gate reuses the same unpublished version and
-  build. After fixes are committed, rerunning creates a fresh release commit
-  without needlessly consuming another version.
-- If the exact tag already exists at the current release commit, rerunning
-  verifies and reuses it; the tag is never moved.
-- After a release is published/tagged, subsequent changes create a new beta/RC
-  or stable version and increment the build.
+- Before a tag exists, fix and commit the failure; the unpublished prepared
+  version/build may be reused and new Unreleased notes folded into it.
+- An existing tag is accepted only when it is annotated and still points to the
+  same release commit. It is never moved or replaced.
+- A partial failed package created by the current run is removed safely. An
+  artifact that already existed before the run is never overwritten.
+- After a tag or artifact is distributed, fixes require a new prerelease or
+  stable patch identity and a new build number.
+- Temporary worktree cleanup is restricted to the path created by the release
+  tool and must not modify the caller worktree.
 
-## Lower-level targets
+## Lower-level recovery commands
 
-The all-in-one commands above are the normal interface. These targets remain
-available for diagnosis or controlled recovery:
+Use these only for diagnosis or controlled recovery:
 
 ```text
 make prepare-test-release
@@ -108,8 +124,6 @@ make install-test-release-dmg
 make install-release-dmg
 ```
 
-`make install-darwin` remains a local developer installation and is not a test
-release.
-
-Replacing `/Applications/aulycmail.app` does not replace local mail data in
-`~/Library/Application Support/aulycmail`.
+`make install-darwin` remains a local development install and does not allocate
+a release identity. Replacing the app bundle does not replace local mail data
+under `~/Library/Application Support/aulycmail` or Keychain credentials.

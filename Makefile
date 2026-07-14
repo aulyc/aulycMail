@@ -5,8 +5,9 @@
 #   make dev      - Run in development mode
 #   make help     - Show all available targets
 
-.PHONY: all build release-build dev dev-race generate clean test lint lint-go lint-frontend \
-        fmt frontend-deps frontend-update normalize-wails-bindings install uninstall \
+.PHONY: all build build-app dev dev-race generate clean test lint lint-go lint-frontend \
+        fmt fmt-check check-go check-frontend check ci release-candidate isolated-release-artifact \
+        frontend-deps frontend-update normalize-wails-bindings install uninstall \
         dmg release-dmg test-release-dmg install-dmg install-release-dmg install-test-release-dmg install-darwin \
         quit-running-darwin launch-darwin uninstall-darwin version-check version-test \
         prepare-test-release prepare-formal-release release-preflight release-check \
@@ -44,6 +45,9 @@ DMG_VOLUME_NAME ?= aulycmail Installer
 SIGN_IDENTITY ?=
 NOTARY_PROFILE ?=
 RELEASE_BUMP ?= auto
+RELEASE_CHANNEL ?=
+RELEASE_TAG ?= $(VERSION)
+RELEASE_OUTPUT_DIR ?= $(abspath dist)
 RELEASE_METADATA_FILES := version.json wails.json frontend/package.json \
 	frontend/package-lock.json CHANGELOG.md
 
@@ -78,13 +82,21 @@ all: build
 
 # Build production binary (aulycmail.app) and ad-hoc sign it
 # (ad-hoc signature is required for macOS notifications to work).
-build: version-check
+build: version-check build-app
+
+# Internal production build shared by local CI, the pre-tag release candidate,
+# and the isolated tagged-source build. Callers provide the runtime identity.
+build-app:
+	@if [ "$$(uname -m)" != "arm64" ]; then \
+		echo 'aulycmail supports Apple Silicon arm64 builds only.'; \
+		exit 1; \
+	fi
 	@echo "Building aulycmail..."
 	$(DARWIN_LINK_WARN_ENV) wails generate module
 	@tools/normalize_wails_bindings.sh
 	@if [ ! -d frontend/node_modules ]; then \
-		echo "Installing frontend dependencies..."; \
-		cd frontend && npm install; \
+		echo "Installing frontend dependencies from package-lock.json..."; \
+		cd frontend && npm ci; \
 	else \
 		echo "Skipping npm install"; \
 	fi
@@ -92,7 +104,7 @@ build: version-check
 	cd frontend && npm run build
 	@echo "Compiling application..."
 	mkdir -p build/bin
-	$(DARWIN_LINK_WARN_ENV) go build -trimpath -buildvcs=false -tags $(GO_BUILD_TAGS) -ldflags "$(LDFLAGS) -s -w" -o $(APP_BINARY)
+	GOARCH=arm64 $(DARWIN_LINK_WARN_ENV) go build -trimpath -buildvcs=false -tags $(GO_BUILD_TAGS) -ldflags "$(LDFLAGS) -s -w" -o $(APP_BINARY)
 	@echo "Packaging macOS app bundle..."
 	SEMANTIC_VERSION="$(APP_VERSION)" SHORT_VERSION="$(BASE_VERSION)" \
 		BUILD_NUMBER="$(BUNDLE_BUILD_NUMBER)" COMMIT_SHA="$(COMMIT_SHA)" \
@@ -114,10 +126,6 @@ dev:
 	@echo "Starting aulycmail in development mode..."
 	$(DARWIN_LINK_WARN_ENV) wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
 
-# Build the public app from the exact immutable version tag.
-release-build: release-check release-tag-check
-	@$(MAKE) build APP_VERSION="$(VERSION)" BUNDLE_BUILD_NUMBER="$(BUILD_NUMBER)"
-
 # Run in development mode with Go's race detector enabled. Builds significantly
 # slower and adds ~5-10x runtime overhead, but instruments every memory access
 # and prints exactly which line + goroutines collide on any unsynchronized
@@ -138,19 +146,15 @@ generate:
 normalize-wails-bindings:
 	@tools/normalize_wails_bindings.sh
 
-# Package the current app bundle as a drag-to-Applications DMG. Pass
-# SIGN_IDENTITY to sign the staged app and DMG, and NOTARY_PROFILE to notarize.
+# Package the current local app bundle as a non-release DMG.
 dmg:
 	@./tools/package_macos_dmg.sh --output "$(DMG_PATH)" \
 		--volume-name "$(DMG_VOLUME_NAME)" \
-		--version "$(APP_VERSION)" \
-		--build-number "$(BUNDLE_BUILD_NUMBER)" \
-		--commit "$(COMMIT_SHA)" \
-		$(if $(SIGN_IDENTITY),--sign "$(SIGN_IDENTITY)") \
-		$(if $(NOTARY_PROFILE),--notary-profile "$(NOTARY_PROFILE)")
+		--source-root "$(CURDIR)" \
+		--release-channel local
 
-# Build, Developer ID sign, notarize, and staple a release DMG.
-release-dmg: release-build
+# Build from an isolated exact tag, Developer ID sign, notarize, and staple.
+release-dmg: release-tag-check
 	@if [ -z "$(SIGN_IDENTITY)" ]; then \
 		echo 'SIGN_IDENTITY is required, e.g. make release-dmg SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary'; \
 		exit 1; \
@@ -159,24 +163,41 @@ release-dmg: release-build
 		echo 'NOTARY_PROFILE is required, e.g. NOTARY_PROFILE=aulyc-notary'; \
 		exit 1; \
 	fi
-	@./tools/package_macos_dmg.sh --output "$(RELEASE_DMG_PATH)" \
-		--volume-name "$(DMG_VOLUME_NAME)" \
-		--version "$(VERSION)" \
-		--build-number "$(BUILD_NUMBER)" \
-		--commit "$(COMMIT_SHA)" \
+	@node tools/release-worktree.mjs build \
+		--repo "$(CURDIR)" \
 		--tag "$(VERSION)" \
-		--sign "$(SIGN_IDENTITY)" \
+		--channel formal \
+		--output-dir "$(RELEASE_OUTPUT_DIR)" \
+		--sign-identity "$(SIGN_IDENTITY)" \
 		--notary-profile "$(NOTARY_PROFILE)"
 
-# Build an exact tagged test-release DMG with explicit ad-hoc signatures.
-test-release-dmg: release-build
-	@./tools/package_macos_dmg.sh --output "$(RELEASE_DMG_PATH)" \
-		--volume-name "$(DMG_VOLUME_NAME)" \
-		--version "$(VERSION)" \
-		--build-number "$(BUILD_NUMBER)" \
-		--commit "$(COMMIT_SHA)" \
+# Build an exact tagged test-release DMG from an isolated detached worktree.
+test-release-dmg: release-tag-check
+	@node tools/release-worktree.mjs build \
+		--repo "$(CURDIR)" \
 		--tag "$(VERSION)" \
-		--adhoc-sign
+		--channel test \
+		--output-dir "$(RELEASE_OUTPUT_DIR)"
+
+# Runs only inside the temporary detached worktree created above.
+isolated-release-artifact:
+	@if [ "$(RELEASE_CHANNEL)" != "test" ] && [ "$(RELEASE_CHANNEL)" != "formal" ]; then \
+		echo 'RELEASE_CHANNEL must be test or formal.'; \
+		exit 1; \
+	fi
+	@node tools/release-identity.mjs verify-source --root "$(CURDIR)" --tag "$(RELEASE_TAG)"
+	@$(MAKE) build-app APP_VERSION="$(VERSION)" BUNDLE_BUILD_NUMBER="$(BUILD_NUMBER)"
+	@node tools/release-identity.mjs verify-source --root "$(CURDIR)" --tag "$(RELEASE_TAG)"
+	@./tools/package_macos_dmg.sh \
+		--source-root "$(CURDIR)" \
+		--app "$(APP_BUNDLE)" \
+		--output "$(RELEASE_OUTPUT_DIR)/aulycmail-$(VERSION)-build.$(BUILD_NUMBER).dmg" \
+		--volume-name "$(DMG_VOLUME_NAME)" \
+		--release-channel "$(RELEASE_CHANNEL)" \
+		--tag "$(RELEASE_TAG)" \
+		$(if $(filter test,$(RELEASE_CHANNEL)),--adhoc-sign) \
+		$(if $(filter formal,$(RELEASE_CHANNEL)),--sign "$(SIGN_IDENTITY)" --notary-profile "$(NOTARY_PROFILE)")
+	@node tools/release-identity.mjs verify-source --root "$(CURDIR)" --tag "$(RELEASE_TAG)"
 
 # Install the current signed/notarized DMG into /Applications and launch it.
 install-dmg: quit-running-darwin
@@ -219,7 +240,41 @@ version-check:
 
 # Test the version parser and synchronization behavior.
 version-test:
-	@node --test tools/version-bump.test.mjs tools/release-prepare.test.mjs
+	@node --test tools/*.test.mjs
+
+# Non-mutating Go formatting gate.
+fmt-check:
+	@files="$$(find . \
+		-path './.git' -prune -o \
+		-path './frontend/node_modules' -prune -o \
+		-path './frontend/dist' -prune -o \
+		-path './build/bin' -prune -o \
+		-name '*.go' -print)"; \
+	unformatted="$$(test -z "$$files" || gofmt -l $$files)"; \
+	if [ -n "$$unformatted" ]; then \
+		echo 'Go files require gofmt:'; \
+		printf '%s\n' "$$unformatted"; \
+		exit 1; \
+	fi; \
+	echo 'Go formatting verified.'
+
+# Go-only quality gate. golangci-lint degrades explicitly to go vet.
+check-go: fmt-check test lint-go
+
+# Frontend-only quality gate.
+check-frontend:
+	@cd frontend && npm run test:unit
+	@cd frontend && npm run check
+	@cd frontend && npm run i18n:check
+	@cd frontend && npm run lint
+	@cd frontend && npm run knip
+
+# Platform-neutral development gate used before review and by CI.
+check: version-check version-test check-go check-frontend
+
+# Complete non-release CI entrypoint: all checks followed by a production build.
+ci: check
+	@$(MAKE) build-app
 
 # Automatic release preparation requires all functional changes to be committed.
 # It updates only release metadata, then creates the dedicated release commit.
@@ -257,39 +312,28 @@ prepare-formal-release:
 		exit 1; \
 	fi
 
-# Validate release metadata and refuse dirty release commits.
-release-preflight: version-check
-	@node tools/version-bump.mjs verify-release
-	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then \
-		echo 'Release requires a clean Git worktree:'; \
-		git status --short; \
-		exit 1; \
-	fi
+# Validate release metadata, release-only commit contents, and a clean worktree.
+release-preflight:
+	@node tools/release-identity.mjs verify-preflight --root "$(CURDIR)"
 
-# Run all repository quality gates before creating the release tag.
-release-check: release-preflight version-test test lint-go
-	@cd frontend && npm run test:unit
-	@cd frontend && npm run check
-	@cd frontend && npm run i18n:check
-	@cd frontend && npm run lint
-	@cd frontend && npm run knip
-	@$(MAKE) build APP_VERSION="$(VERSION)" BUNDLE_BUILD_NUMBER="$(BUILD_NUMBER)"
+# Build the same production configuration used in the isolated final build,
+# before a tag is allowed to be created.
+release-candidate:
+	@$(MAKE) build-app APP_VERSION="$(VERSION)" BUNDLE_BUILD_NUMBER="$(BUILD_NUMBER)"
+	@bash tools/verify_release_candidate.sh --source-root "$(CURDIR)" --app "$(APP_BUNDLE)"
+
+# Run the shared gates once, then build and verify the pre-tag candidate.
+release-check: release-preflight check
+	@$(MAKE) release-candidate
 	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then \
 		echo 'Quality checks changed tracked files; review and commit them before tagging:'; \
 		git status --short; \
 		exit 1; \
 	fi
 
-# Public artifacts must be rebuilt from an annotated, no-v tag matching VERSION.
-release-tag-check: release-preflight
-	@if [ "$$(git cat-file -t "$(VERSION)" 2>/dev/null || true)" != tag ]; then \
-		echo 'Release requires an annotated tag named exactly $(VERSION) (without v).'; \
-		exit 1; \
-	fi
-	@if [ "$$(git rev-list -n 1 "$(VERSION)")" != "$$(git rev-parse HEAD)" ]; then \
-		echo 'Release tag $(VERSION) does not point at HEAD.'; \
-		exit 1; \
-	fi
+# Public artifacts require an exact annotated tag at the release commit.
+release-tag-check:
+	@node tools/release-identity.mjs verify-tag --root "$(CURDIR)" --tag "$(VERSION)"
 
 # Create the annotated release tag once; existing tags are never overwritten.
 release-tag: release-check
@@ -426,23 +470,30 @@ help:
 	@echo "  make dev          - Run in development mode with hot reload"
 	@echo "  make dev-race     - Run in development mode with race detector"
 	@echo "  make generate     - Generate Wails TypeScript bindings"
-	@echo "  make dmg          - Package the current app bundle as a drag-to-Applications DMG"
+	@echo "  make dmg          - Package the current app bundle as a non-release local DMG"
 	@echo "  make release-test - Auto-version, commit, tag, ad-hoc sign, and install a test release"
 	@echo "  make release-formal - Auto-version, commit, tag, notarize, and install a stable release"
-	@echo "  make release-check - Run all gates before creating an immutable release tag"
+	@echo "  make release-check - Run shared gates and the pre-tag production candidate build"
 	@echo "  make release-tag  - Create the annotated no-v tag after release checks pass"
-	@echo "  make release-dmg  - Build, Developer ID sign, notarize, and staple a release DMG"
+	@echo "  make test-release-dmg - Build an ad-hoc test DMG from an isolated exact tag"
+	@echo "  make release-dmg  - Build a formal notarized DMG from an isolated exact tag"
 	@echo ""
 	@echo "Installation:"
 	@echo "  make install      - Build, install, and launch aulycmail from /Applications"
-	@echo "  make install-dmg  - Install the versioned DMG from dist/ into /Applications"
+	@echo "  make install-dmg  - Verify and install DMG_PATH into /Applications"
+	@echo "  make install-test-release-dmg - Build and install the exact tagged test DMG"
 	@echo "  make install-release-dmg - Build signed DMG, install it, and launch aulycmail"
 	@echo "  make uninstall    - Uninstall aulycmail from /Applications"
 	@echo ""
 	@echo "Code Quality:"
+	@echo "  make fmt-check     - Verify Go formatting without modifying files"
+	@echo "  make check-go      - Run Go formatting, tests, and lint/vet"
+	@echo "  make check-frontend - Run frontend unit/type/i18n/lint/knip checks"
+	@echo "  make check         - Run version, Go, frontend, and release-tool tests"
+	@echo "  make ci            - Run make check, then a full production build"
 	@echo "  make test          - Run Go tests"
 	@echo "  make lint          - Run all linters (Go + frontend)"
-	@echo "  make lint-go       - Run Go linter only (requires golangci-lint)"
+	@echo "  make lint-go       - Run golangci-lint, or explicitly fall back to go vet"
 	@echo "  make lint-frontend - Run frontend linter only (ESLint)"
 	@echo "  make version-check - Verify files derived from version.json"
 	@echo "  make version-test  - Test version parsing and synchronization"
