@@ -5,6 +5,33 @@ import (
 	"time"
 )
 
+func TestGetMessageUIDsAndFolderIncludesRFCMessageID(t *testing.T) {
+	s, accountID, inboxID := newBodyFailedTestStore(t)
+	now := time.Now().UTC()
+	if err := s.Upsert(&Message{
+		ID:        "message-1",
+		AccountID: accountID,
+		FolderID:  inboxID,
+		UID:       42,
+		MessageID: "expected@example.com",
+		Date:      now,
+	}); err != nil {
+		t.Fatalf("seed message: %v", err)
+	}
+
+	infos, err := s.GetMessageUIDsAndFolder([]string{"message-1"})
+	if err != nil {
+		t.Fatalf("GetMessageUIDsAndFolder: %v", err)
+	}
+	info, ok := infos["message-1"]
+	if !ok {
+		t.Fatal("missing message-1 UID info")
+	}
+	if info.UID != 42 || info.FolderID != inboxID || info.RFCMessageID != "expected@example.com" {
+		t.Fatalf("unexpected UID info: %+v", info)
+	}
+}
+
 func TestUIDsWithCopiesInFolderTypes(t *testing.T) {
 	s, accountID, inboxID := newBodyFailedTestStore(t)
 	if _, err := s.db.Exec(`

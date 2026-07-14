@@ -1,10 +1,58 @@
 package sync
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
 )
+
+func TestValidateFetchedMessageIdentityAcceptsMatchingMessageID(t *testing.T) {
+	raw := []byte("From: sender@example.com\r\nMessage-ID: <expected@example.com>\r\n\r\nbody")
+
+	if err := validateFetchedMessageIdentity(42, "expected@example.com", raw); err != nil {
+		t.Fatalf("expected matching Message-ID to succeed, got %v", err)
+	}
+}
+
+func TestValidateFetchedMessageIdentityRejectsDifferentMessageID(t *testing.T) {
+	raw := []byte("From: sender@example.com\r\nMessage-ID: <actual@example.com>\r\n\r\nbody")
+
+	err := validateFetchedMessageIdentity(42, "expected@example.com", raw)
+	if err == nil {
+		t.Fatal("expected mismatched Message-ID to fail")
+	}
+
+	var mismatch MessageIdentityMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("expected MessageIdentityMismatchError, got %T %v", err, err)
+	}
+	if mismatch.UID != 42 || mismatch.Expected != "expected@example.com" || mismatch.Actual != "actual@example.com" {
+		t.Fatalf("unexpected mismatch details: %+v", mismatch)
+	}
+}
+
+func TestValidateFetchedMessageIdentityRejectsMissingMessageID(t *testing.T) {
+	raw := []byte("From: sender@example.com\r\nSubject: no id\r\n\r\nbody")
+
+	err := validateFetchedMessageIdentity(42, "expected@example.com", raw)
+	if err == nil {
+		t.Fatal("expected missing Message-ID to fail when local metadata has one")
+	}
+
+	var mismatch MessageIdentityMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("expected MessageIdentityMismatchError, got %T %v", err, err)
+	}
+}
+
+func TestValidateFetchedMessageIdentityAllowsMissingExpectedMessageID(t *testing.T) {
+	raw := []byte("From: sender@example.com\r\nMessage-ID: <actual@example.com>\r\n\r\nbody")
+
+	if err := validateFetchedMessageIdentity(42, "", raw); err != nil {
+		t.Fatalf("messages without local Message-ID cannot be validated and should remain readable: %v", err)
+	}
+}
 
 func TestRawMessageStreamErrorAllowsServerSizeMismatch(t *testing.T) {
 	result := &RawMessageStreamResult{

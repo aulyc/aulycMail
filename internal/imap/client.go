@@ -632,6 +632,14 @@ func (c *Client) SelectMailbox(ctx context.Context, name string) (*Mailbox, erro
 	select {
 	case <-ctx.Done():
 		c.log.Debug().Str("mailbox", name).Msg("Select cancelled by context")
+		// SELECT changes connection-scoped mailbox state. Wait() is still running
+		// in the goroutine above when the context wins this race, so this client
+		// must never return to the pool: the late SELECT result could otherwise
+		// change the mailbox underneath the next borrower and make folder-scoped
+		// UIDs resolve to unrelated messages.
+		if err := c.ForceClose(); err != nil {
+			c.log.Debug().Err(err).Str("mailbox", name).Msg("Failed to close cancelled SELECT connection")
+		}
 		return nil, ctx.Err()
 	case result := <-resultCh:
 		if result.err != nil {

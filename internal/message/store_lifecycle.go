@@ -209,13 +209,16 @@ func (s *Store) GetMessageUIDAndFolder(messageID string) (uint32, string, error)
 	return uint32(uidI64), folderID, nil
 }
 
-// UIDInfo holds UID and folder information for a message
+// UIDInfo holds the folder-scoped UID and stable RFC 822 identity needed to
+// fetch and verify a message body.
 type UIDInfo struct {
-	UID      uint32
-	FolderID string
+	UID          uint32
+	FolderID     string
+	RFCMessageID string
 }
 
-// GetMessageUIDsAndFolder returns UIDs and folder_ids for multiple messages in one query
+// GetMessageUIDsAndFolder returns UIDs, folder IDs, and RFC 822 Message-IDs for
+// multiple messages in one query.
 func (s *Store) GetMessageUIDsAndFolder(messageIDs []string) (map[string]UIDInfo, error) {
 	if len(messageIDs) == 0 {
 		return make(map[string]UIDInfo), nil
@@ -230,7 +233,7 @@ func (s *Store) GetMessageUIDsAndFolder(messageIDs []string) (map[string]UIDInfo
 	}
 
 	query := fmt.Sprintf(
-		"SELECT id, uid, folder_id FROM messages WHERE id IN (%s)",
+		"SELECT id, uid, folder_id, COALESCE(message_id, '') FROM messages WHERE id IN (%s)",
 		strings.Join(placeholders, ", "),
 	)
 
@@ -245,10 +248,11 @@ func (s *Store) GetMessageUIDsAndFolder(messageIDs []string) (map[string]UIDInfo
 		var id string
 		var uidI64 int64
 		var folderID string
-		if err := rows.Scan(&id, &uidI64, &folderID); err != nil {
+		var rfcMessageID string
+		if err := rows.Scan(&id, &uidI64, &folderID, &rfcMessageID); err != nil {
 			return nil, fmt.Errorf("failed to scan message UID: %w", err)
 		}
-		result[id] = UIDInfo{UID: uint32(uidI64), FolderID: folderID}
+		result[id] = UIDInfo{UID: uint32(uidI64), FolderID: folderID, RFCMessageID: rfcMessageID}
 	}
 
 	return result, nil

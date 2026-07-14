@@ -1,11 +1,13 @@
 package sync
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -13,7 +15,13 @@ import (
 	"aulyc.local/aulycmail/internal/message"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
+	gomessage "github.com/emersion/go-message"
 )
+
+type bodyFetchTarget struct {
+	LocalMessageID string
+	RFCMessageID   string
+}
 
 // ProcessedBody holds the parsed body content and attachments for a message
 type ProcessedBody struct {
@@ -63,6 +71,50 @@ type RawMessageNotFoundError struct {
 
 func (e RawMessageNotFoundError) Error() string {
 	return fmt.Sprintf("message not found: UID %d", e.UID)
+}
+
+// MessageIdentityMismatchError means BODY[] returned a different RFC 822
+// message than the local row requested for the selected mailbox UID. Persisting
+// it would corrupt the local cache, so callers must discard the IMAP connection.
+type MessageIdentityMismatchError struct {
+	UID      uint32
+	Expected string
+	Actual   string
+}
+
+func (e MessageIdentityMismatchError) Error() string {
+	return fmt.Sprintf("message identity mismatch for UID %d: expected %q, got %q", e.UID, e.Expected, e.Actual)
+}
+
+func IsMessageIdentityMismatchError(err error) bool {
+	var target MessageIdentityMismatchError
+	return errors.As(err, &target)
+}
+
+func normalizeRFCMessageID(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, "<")
+	value = strings.TrimSuffix(value, ">")
+	return strings.TrimSpace(value)
+}
+
+func validateFetchedMessageIdentity(uid uint32, expected string, raw []byte) error {
+	expected = normalizeRFCMessageID(expected)
+	if expected == "" {
+		// Legacy and malformed messages may legitimately have no Message-ID in
+		// the cached envelope, leaving no stable identity to cross-check.
+		return nil
+	}
+
+	entity, err := gomessage.Read(bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("failed to parse message identity for UID %d: %w", uid, err)
+	}
+	actual := normalizeRFCMessageID(entity.Header.Get("Message-ID"))
+	if actual != expected {
+		return MessageIdentityMismatchError{UID: uid, Expected: expected, Actual: actual}
+	}
+	return nil
 }
 
 func IsRawMessageNotFoundError(err error) bool {
@@ -146,11 +198,14 @@ func readHeaderLiteralWithLimit(literal io.Reader) ([]byte, error) {
 // FetchMessageBody fetches the body for a single message on-demand.
 // Uses streaming fetch internally to avoid blocking on .Collect().
 func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID string) (*message.Message, error) {
-	// Get message from store to get UID and folder
-	uid, folderID, err := e.messageStore.GetMessageUIDAndFolder(messageID)
+	// Get the complete local identity so BODY[] can be cross-checked before it
+	// is allowed to update this row.
+	localMessage, err := e.messageStore.Get(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message info: %w", err)
 	}
+	uid := localMessage.UID
+	folderID := localMessage.FolderID
 
 	// Get folder to get path
 	f, err := e.folderStore.Get(folderID)
@@ -169,7 +224,14 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to get connection: %w", err)
 	}
-	defer e.pool.Release(conn)
+	discardConnection := false
+	defer func() {
+		if discardConnection {
+			e.pool.Discard(conn)
+		} else {
+			e.pool.Release(conn)
+		}
+	}()
 
 	// Select the mailbox
 	_, err = conn.Client().SelectMailbox(ctx, f.Path)
@@ -178,9 +240,14 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	}
 
 	// Use fetchMessageBodiesBatch for streaming fetch (avoids .Collect() blocking)
-	uidToMessageID := map[uint32]string{uid: messageID}
-	results, skipped, err := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
+	targets := map[uint32]bodyFetchTarget{
+		uid: {LocalMessageID: messageID, RFCMessageID: localMessage.MessageID},
+	}
+	results, skipped, err := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), targets)
 	if err != nil {
+		if IsMessageIdentityMismatchError(err) || imapPkg.IsConnectionError(err) {
+			discardConnection = true
+		}
 		return nil, fmt.Errorf("fetch body failed: %w", err)
 	}
 
@@ -223,8 +290,8 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 // - Avoid indefinite blocking if connection hangs
 // - Allow context cancellation between messages
 // - Return partial results if connection dies mid-batch
-func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient.Client, uidToMessageID map[uint32]string) (map[uint32]*ProcessedBody, map[uint32]bodyFetchSkipped, error) {
-	if len(uidToMessageID) == 0 {
+func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient.Client, targets map[uint32]bodyFetchTarget) (map[uint32]*ProcessedBody, map[uint32]bodyFetchSkipped, error) {
+	if len(targets) == 0 {
 		return make(map[uint32]*ProcessedBody), make(map[uint32]bodyFetchSkipped), nil
 	}
 
@@ -235,12 +302,12 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 
 	// Build UID set for batch fetch
 	uidSet := imap.UIDSet{}
-	for uid := range uidToMessageID {
+	for uid := range targets {
 		uidSet.AddNum(imap.UID(uid))
 	}
 
 	e.log.Debug().
-		Int("count", len(uidToMessageID)).
+		Int("count", len(targets)).
 		Msg("Fetching message bodies in batch")
 
 	fetchOptions := &imap.FetchOptions{
@@ -266,7 +333,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			fetchCmd.Close()
 			e.log.Warn().
 				Int("fetched", len(results)).
-				Int("requested", len(uidToMessageID)).
+				Int("requested", len(targets)).
 				Msg("Fetch cancelled, returning partial results")
 			return results, skipped, ctx.Err()
 		}
@@ -345,7 +412,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			continue
 		}
 
-		messageID, ok := uidToMessageID[uid]
+		target, ok := targets[uid]
 		if !ok {
 			e.log.Warn().Uint32("uid", uid).Msg("Received unexpected UID in batch response")
 			continue
@@ -360,7 +427,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 				}
 				continue
 			}
-			e.log.Warn().Uint32("uid", uid).Str("messageID", messageID).Msg("Empty message body returned by IMAP")
+			e.log.Warn().Uint32("uid", uid).Str("messageID", target.LocalMessageID).Msg("Empty message body returned by IMAP")
 			skipped[uid] = bodyFetchSkipped{
 				Reason:        bodyFetchSkipEmpty,
 				ReportedSize:  reportedSize,
@@ -374,8 +441,17 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			Int("bodySize", len(rawBytes)).
 			Msg("Processing message body")
 
+		if err := validateFetchedMessageIdentity(uid, target.RFCMessageID, rawBytes); err != nil {
+			e.log.Error().Err(err).
+				Str("localMessageID", target.LocalMessageID).
+				Msg("Refusing to persist body returned for a different message")
+			// Do not wait for the rest of this command: callers discard the
+			// connection on this error, which safely terminates the in-flight FETCH.
+			return nil, nil, err
+		}
+
 		// Parse body content with timeout, extracting attachments in the same pass
-		parsed := e.parseMessageBodyFull(rawBytes, messageID, 30*time.Second)
+		parsed := e.parseMessageBodyFull(rawBytes, target.LocalMessageID, 30*time.Second)
 
 		// Sanitize HTML
 		bodyHTML := parsed.BodyHTML
@@ -392,7 +468,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 		}
 
 		results[uid] = &ProcessedBody{
-			MessageID:      messageID,
+			MessageID:      target.LocalMessageID,
 			BodyHTML:       bodyHTML,
 			BodyText:       parsed.BodyText,
 			Snippet:        snippet,
@@ -407,7 +483,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 	if err := fetchCmd.Close(); err != nil {
 		e.log.Warn().Err(err).
 			Int("fetched", len(results)).
-			Int("requested", len(uidToMessageID)).
+			Int("requested", len(targets)).
 			Msg("Fetch close error, returning partial results")
 		// Return what we have, don't fail completely
 		// Partial content is better than no content
@@ -415,7 +491,7 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 
 	e.log.Debug().
 		Int("fetched", len(results)).
-		Int("requested", len(uidToMessageID)).
+		Int("requested", len(targets)).
 		Msg("Batch fetch complete")
 
 	return results, skipped, nil
@@ -827,8 +903,21 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 
 		// Build UID -> messageID map for batch fetch
 		uidToMessageID := make(map[uint32]string)
+		fetchTargets := make(map[uint32]bodyFetchTarget)
 		for msgID, info := range uidInfos {
+			if info.FolderID != folderID {
+				e.log.Warn().
+					Str("messageID", msgID).
+					Str("expectedFolderID", folderID).
+					Str("actualFolderID", info.FolderID).
+					Msg("Skipping body candidate that moved to another folder")
+				continue
+			}
 			uidToMessageID[info.UID] = msgID
+			fetchTargets[info.UID] = bodyFetchTarget{
+				LocalMessageID: msgID,
+				RFCMessageID:   info.RFCMessageID,
+			}
 		}
 
 		if len(uidToMessageID) == 0 {
@@ -837,25 +926,29 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 		}
 
 		// Step 4: Fetch bodies via IMAP - single round-trip for all messages in batch
-		bodies, skipped, fetchErr := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), uidToMessageID)
+		bodies, skipped, fetchErr := e.fetchMessageBodiesBatch(ctx, conn.Client().RawClient(), fetchTargets)
 		if fetchErr != nil {
-			// Check if this is a connection error
-			if imapPkg.IsConnectionError(fetchErr) {
+			// A mismatched Message-ID proves that this connection is selected on
+			// the wrong mailbox (or returned corrupted data). Treat it exactly like
+			// a broken connection: discard it and retry the batch after SELECT on a
+			// fresh connection.
+			if imapPkg.IsConnectionError(fetchErr) || IsMessageIdentityMismatchError(fetchErr) {
 				connectionFailures++
 
 				// Check if we've exhausted connection recovery attempts
 				if connectionFailures > maxConnectionRetries {
 					e.log.Error().
+						Err(fetchErr).
 						Int("connectionFailures", connectionFailures).
 						Msg("Body fetch aborted - connection recovery failed")
 					e.pool.Discard(conn)
-					return fmt.Errorf("connection recovery failed after %d attempts", connectionFailures)
+					return fmt.Errorf("body fetch recovery failed after %d attempts: %w", connectionFailures, fetchErr)
 				}
 
 				e.log.Debug().
 					Err(fetchErr).
 					Int("attempt", connectionFailures).
-					Msg("Connection error during batch fetch, attempting recovery")
+					Msg("Body fetch connection is unusable, attempting recovery")
 
 				// Discard dead connection and get a new one
 				e.pool.Discard(conn)

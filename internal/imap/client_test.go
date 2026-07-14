@@ -1,10 +1,96 @@
 package imap
 
 import (
+	"bufio"
+	"context"
 	"errors"
+	"net"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/emersion/go-imap/v2/imapclient"
+	"github.com/rs/zerolog"
 )
+
+func TestSelectMailboxCancellationClosesConnection(t *testing.T) {
+	clientConn, serverConn := net.Pipe()
+	defer serverConn.Close()
+
+	rawClient := imapclient.New(clientConn, nil)
+	command := make(chan string, 1)
+	go func() {
+		if _, err := serverConn.Write([]byte("* OK test server ready\r\n")); err != nil {
+			return
+		}
+		reader := bufio.NewReader(serverConn)
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				return
+			}
+			if strings.Contains(line, " CAPABILITY") {
+				fields := strings.Fields(line)
+				if len(fields) == 0 {
+					return
+				}
+				response := "* CAPABILITY IMAP4rev1\r\n" + fields[0] + " OK CAPABILITY completed\r\n"
+				if _, err := serverConn.Write([]byte(response)); err != nil {
+					return
+				}
+				continue
+			}
+			if strings.Contains(line, " SELECT ") {
+				command <- line
+				// Deliberately withhold the tagged SELECT response until the
+				// client cancels and closes this connection.
+			}
+		}
+	}()
+	if err := rawClient.WaitGreeting(); err != nil {
+		t.Fatalf("wait for greeting: %v", err)
+	}
+
+	client := &Client{client: rawClient, log: zerolog.Nop()}
+	ctx, cancel := context.WithCancel(context.Background())
+	selectErr := make(chan error, 1)
+	go func() {
+		_, err := client.SelectMailbox(ctx, "INBOX")
+		selectErr <- err
+	}()
+
+	select {
+	case line := <-command:
+		if !strings.Contains(line, " SELECT ") {
+			t.Fatalf("expected SELECT command, got %q", line)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for SELECT command")
+	}
+
+	cancel()
+	select {
+	case err := <-selectErr:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context cancellation, got %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancelled SELECT did not return")
+	}
+
+	noopErr := make(chan error, 1)
+	go func() {
+		noopErr <- rawClient.Noop().Wait()
+	}()
+	select {
+	case err := <-noopErr:
+		if err == nil {
+			t.Fatal("expected cancelled SELECT connection to be unusable")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("closed connection did not reject NOOP")
+	}
+}
 
 func TestIsConnectionError(t *testing.T) {
 	tests := []struct {
