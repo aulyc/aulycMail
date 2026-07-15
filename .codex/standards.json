@@ -1,0 +1,157 @@
+{
+  "$schema": "urn:codex-engineering-standards:project-adoption:1",
+  "schemaVersion": 1,
+  "projectId": "aulycmail",
+  "applicability": "applicable",
+  "coreVersion": "1.0.0",
+  "artifacts": [
+    {
+      "id": "aulycmail-macos-app",
+      "type": "macos-arm64-app",
+      "profile": "macos-arm64-app",
+      "profileVersion": "1.0.0"
+    }
+  ],
+  "ruleBindings": [
+    {
+      "ruleId": "REL-001",
+      "evidence": ["AGENTS.md#versioning-and-release-profile"]
+    },
+    {
+      "ruleId": "REL-002",
+      "evidence": ["docs/VERSIONING.md#single-version-source"]
+    },
+    {
+      "ruleId": "REL-003",
+      "evidence": ["docs/VERSIONING.md#semver-and-release-classes"]
+    },
+    {
+      "ruleId": "REL-004",
+      "evidence": ["docs/VERSIONING.md#release-commit-and-tag"]
+    },
+    {
+      "ruleId": "REL-005",
+      "evidence": ["docs/VERSIONING.md#release-commit-and-tag"]
+    },
+    {
+      "ruleId": "REL-006",
+      "evidence": ["docs/VERSIONING.md#release-commit-and-tag"]
+    },
+    {
+      "ruleId": "REL-007",
+      "evidence": ["docs/VERSIONING.md#isolated-tagged-source-build"]
+    },
+    {
+      "ruleId": "REL-008",
+      "evidence": ["docs/VERSIONING.md#runtime-and-artifact-mapping"]
+    },
+    {
+      "ruleId": "REL-009",
+      "evidence": ["docs/RELEASE.md#formal-release"]
+    },
+    {
+      "ruleId": "REL-010",
+      "evidence": ["docs/RELEASE.md#release-provenance-and-artifact-verification"]
+    },
+    {
+      "ruleId": "REL-011",
+      "evidence": ["AGENTS.md#logging-and-sensitive-information"]
+    },
+    {
+      "ruleId": "REL-012",
+      "evidence": [".codex/standards.json"]
+    },
+    {
+      "ruleId": "REL-013",
+      "evidence": [".codex/standards.json"]
+    },
+    {
+      "ruleId": "MAC-001",
+      "evidence": ["AGENTS.md#versioning-and-release-profile"]
+    },
+    {
+      "ruleId": "MAC-002",
+      "evidence": ["docs/VERSIONING.md#single-version-source"]
+    },
+    {
+      "ruleId": "MAC-003",
+      "evidence": ["docs/VERSIONING.md#release-commit-and-tag"]
+    },
+    {
+      "ruleId": "MAC-004",
+      "evidence": ["docs/RELEASE.md#formal-release"]
+    },
+    {
+      "ruleId": "MAC-005",
+      "evidence": ["docs/RELEASE.md#release-provenance-and-artifact-verification"]
+    },
+    {
+      "ruleId": "MAC-006",
+      "evidence": ["docs/RELEASE.md#release-provenance-and-artifact-verification"]
+    }
+  ],
+  "exceptions": [],
+  "trackedFiles": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "20e6aa8db3db3fb254067ea1bc77fb4c2d0e395f48194ccc1e7d1cdcefba8c67"
+    },
+    {
+      "path": "docs/VERSIONING.md",
+      "sha256": "5c32f98deefe91ed5b09620c78f8abf4a459cf8a13652760d7d94107a0299943"
+    },
+    {
+      "path": "docs/RELEASE.md",
+      "sha256": "2feabf4daa4ca445a0594e0a1dc9bfb44142d31a6ce9a58ac6743290b79b6390"
+    },
+    {
+      "path": "Makefile",
+      "sha256": "f18b803607d0293364ee11646de1782e2b0e1b65de9a97cc0d6e228f5d5c4942"
+    },
+    {
+      "path": "tools/version-bump.mjs",
+      "sha256": "dd971721fd64514e53321e90bbab6ee398bfb015c185aad0f01288bd0c9f5629"
+    },
+    {
+      "path": "tools/release-prepare.mjs",
+      "sha256": "255ba04a1830a8eb25e01adea973a221a0e60409bbbf58500e864f947277b599"
+    },
+    {
+      "path": "tools/release-identity.mjs",
+      "sha256": "a74507c4e15f45b1568e6b4fc36e4c1619ed7351ef24ad488d5542fb09576950"
+    },
+    {
+      "path": "tools/release-worktree.mjs",
+      "sha256": "640213e22d93729b133021c89d05bdc15e1ff0822cbeb0f3c0ce9953686add4f"
+    },
+    {
+      "path": "tools/package_macos_dmg.sh",
+      "sha256": "4ebc31cc69716a14f5480ff1bbdf172c646defe1bcd89917920b9d3dcb8300a2"
+    },
+    {
+      "path": "tools/install_macos_dmg.sh",
+      "sha256": "faa8b35a8e09ec92546f4decc9cb0c2b97ef905cfd2883f82abec355d043c36e"
+    }
+  ],
+  "releaseSignals": {
+    "versionSources": [
+      "version.json"
+    ],
+    "releaseFiles": [
+      "AGENTS.md",
+      "CHANGELOG.md",
+      "docs/VERSIONING.md",
+      "docs/RELEASE.md",
+      "Makefile",
+      "tools/version-bump.mjs",
+      "tools/release-prepare.mjs",
+      "tools/release-identity.mjs",
+      "tools/release-worktree.mjs",
+      "tools/package_macos_dmg.sh",
+      "tools/install_macos_dmg.sh"
+    ],
+    "ciPaths": [
+      "Makefile"
+    ]
+  }
+}
