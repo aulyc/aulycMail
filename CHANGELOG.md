@@ -12,6 +12,7 @@ All notable changes to aulycmail are documented here.
 - Added automatic test/formal release preparation, release commits, version selection, and channel-specific signing.
 - Added installed-version verification across runtime, macOS bundle metadata, Git commit, and release checksum.
 - Refined backup settings row layout and spacing.
+- Fixed formal release builds from clean tagged checkouts where ignored frontend output is initially absent.
 
 ## [0.3.0] — 2026
 

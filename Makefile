@@ -92,6 +92,7 @@ build-app:
 		exit 1; \
 	fi
 	@echo "Building aulycmail..."
+	@node tools/ensure-frontend-dist.mjs
 	$(DARWIN_LINK_WARN_ENV) wails generate module
 	@tools/normalize_wails_bindings.sh
 	@if [ ! -d frontend/node_modules ]; then \
