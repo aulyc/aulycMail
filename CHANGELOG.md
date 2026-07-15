@@ -4,6 +4,8 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+## [0.3.97] — 2026-07-15
+
 - Restored message bodies, original sources, and attachment downloads for
   legacy local records left under IMAP hierarchy-only folders by resolving
   their verified `.eml` counterparts from the backup index.
