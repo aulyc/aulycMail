@@ -4,6 +4,9 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+- Fixed release verification for mounted DMG paths whose volume names contain
+  spaces.
+
 ## [0.3.94] — 2026-07-15
 
 - Fixed formal release validation so clean frontend dependency installs are

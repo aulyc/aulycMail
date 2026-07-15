@@ -64,7 +64,7 @@ ACTUAL_BUNDLE_ID="$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$INFO"
 ACTUAL_MIN_SYSTEM="$(/usr/bin/plutil -extract LSMinimumSystemVersion raw -o - "$INFO")"
 ACTUAL_ARCH="$(lipo -archs "$EXECUTABLE")"
 FILE_DESCRIPTION="$(file "$EXECUTABLE")"
-RUNTIME_VERSION="$($EXECUTABLE --version)"
+RUNTIME_VERSION="$("$EXECUTABLE" --version)"
 EXPECTED_SHORT="${EXPECTED_VERSION%%[-+]*}"
 
 if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" || "$ACTUAL_SHORT" != "$EXPECTED_SHORT" || \
