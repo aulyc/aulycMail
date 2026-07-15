@@ -4,6 +4,10 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+## [0.3.93] — 2026-07-15
+
+- Stable release.
+
 ## [0.3.92] — 2026-07-15
 
 ### Changed
