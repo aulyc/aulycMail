@@ -14,6 +14,7 @@ import {
 function testManifest(overrides = {}) {
   return {
     application: 'aulycmail',
+    releaseProfile: 'macos-arm64-app',
     version: '1.2.3-beta.1',
     buildNumber: 7,
     releaseChannel: 'test',
@@ -95,6 +96,10 @@ test('manifest validation rejects missing fields, dirty releases, and channel im
   assert.throws(() => validateManifest(testManifest({ dirty: true })), /dirty=false/)
   assert.throws(() => validateManifest(testManifest({ signatureType: 'developer-id' })), /signatureType=adhoc/)
   assert.throws(() => validateManifest(testManifest({ architecture: 'x86_64' })), /arm64 only/)
+  assert.throws(
+    () => validateManifest(testManifest({ releaseProfile: 'obsidian-plugin' })),
+    /releaseProfile must be macos-arm64-app/,
+  )
 })
 
 test('manifest Git verification binds tag, commit, version, build, and release commit', () => {

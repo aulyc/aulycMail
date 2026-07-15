@@ -329,6 +329,7 @@ const [
 
 const manifest = {
   application: 'aulycmail',
+  releaseProfile: 'macos-arm64-app',
   version,
   buildNumber: Number(buildNumber),
   releaseChannel,

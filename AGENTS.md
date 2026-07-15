@@ -114,6 +114,18 @@ successful aggregate target unless diagnosing a failure.
 
 - Load and follow the global `general-release-versioning` Skill for every
   version, package, installation, test-release, or formal-release task.
+- Release profile: `macos-arm64-app`.
+- Architecture and distribution: Apple Silicon `arm64` only; test releases use
+  ad-hoc App/DMG signing, while formal releases use a Developer ID DMG with
+  Hardened Runtime and Apple notarization.
+- Authoritative version and build-number source: `version.json`; every test and
+  formal release requires a new positive build number.
+- Product metadata: the built App's `Info.plist`, Mach-O executable, Wails
+  metadata, embedded frontend assets, and code-signing identity.
+- Release provenance: historical `*.manifest.json` files generated beside each
+  DMG. They are release provenance evidence, not product metadata; the filename
+  remains for compatibility and every new file must declare
+  `releaseProfile: macos-arm64-app`.
 - Local `make install-darwin` may use dirty development identity, build `0`, and
   ad-hoc signing; it is never a test release.
 - Test and formal releases require a clean release-only metadata commit, a
@@ -122,7 +134,7 @@ successful aggregate target unless diagnosing a failure.
 - Test releases are ad-hoc signed, never notarized, and never claim Gatekeeper
   trust. Formal releases require Developer ID, Hardened Runtime, notarization
   `Accepted`, stapling, stapler validation, and Gatekeeper verification.
-- Release manifests must be derived from and cross-checked against Git, the DMG,
+- Release provenance must be derived from and cross-checked against Git, the DMG,
   Info.plist, the executable, architecture tools, code signing, notarization,
   and the actual `/Applications/aulycmail.app` installation.
 - Published tags and artifacts are immutable and must not be overwritten.

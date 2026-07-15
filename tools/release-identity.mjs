@@ -21,6 +21,7 @@ export const RELEASE_METADATA_FILES = new Set([
 
 export const REQUIRED_MANIFEST_FIELDS = [
   'application',
+  'releaseProfile',
   'version',
   'buildNumber',
   'releaseChannel',
@@ -179,6 +180,7 @@ export function validateManifest(manifest) {
   }
 
   requireString(manifest.application, 'application')
+  requireString(manifest.releaseProfile, 'releaseProfile')
   requireString(manifest.version, 'version')
   requireString(manifest.commit, 'commit')
   requireString(manifest.artifact, 'artifact')
@@ -193,6 +195,9 @@ export function validateManifest(manifest) {
   requireBoolean(manifest.notarized, 'notarized')
 
   if (manifest.application !== 'aulycmail') fail('Manifest application must be aulycmail.')
+  if (manifest.releaseProfile !== 'macos-arm64-app') {
+    fail('Manifest releaseProfile must be macos-arm64-app.')
+  }
   if (!Number.isSafeInteger(manifest.buildNumber) || manifest.buildNumber < 0) {
     fail('Manifest buildNumber must be a non-negative integer.')
   }

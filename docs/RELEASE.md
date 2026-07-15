@@ -2,7 +2,7 @@
 
 Read [VERSIONING.md](VERSIONING.md) first. The global
 `general-release-versioning` Skill supplies the shared baseline; this document
-describes the executable aulycmail flow.
+describes the executable aulycmail `macos-arm64-app` flow.
 
 ## Non-release quality entrypoints
 
@@ -31,11 +31,11 @@ Both release channels perform the same identity steps:
    isolated source before and after generation/build/package.
 8. Build the final app and DMG in the isolated worktree. The caller worktree is
    never used as the final artifact source.
-9. Derive and validate the manifest against Git and the actual artifact.
+9. Derive and validate release provenance against Git and the actual artifact.
 10. Verify the DMG and contained app, install to
     `/Applications/aulycmail.app`, verify the installed app, then launch.
 
-Existing same-version DMGs or manifests are not overwritten. To reuse an
+Existing same-version DMGs or provenance files are not overwritten. To reuse an
 existing artifact, verify and install that unchanged artifact. If content or
 identity differs, prepare a new prerelease or patch version/build.
 
@@ -70,14 +70,16 @@ The isolated tagged app is Developer ID signed with Hardened Runtime. The DMG
 is signed, submitted with `notarytool --wait`, and must return `Accepted`.
 Stapling, `stapler validate`, DMG Gatekeeper assessment, contained-app
 assessment, installed-app assessment, and manifest verification must all pass.
-Credentials remain in Keychain and are not written to logs or manifests.
+Credentials remain in Keychain and are not written to logs or release provenance.
 
-## Manifest and artifact verification
+## Release provenance and artifact verification
 
-Every test/formal manifest contains:
+Every test/formal DMG has a matching `.manifest.json`. The historical filename
+is retained for compatibility, but the file is release provenance rather than
+App product metadata. Every provenance file contains:
 
 ```text
-application, version, buildNumber, releaseChannel, tag, commit, dirty,
+releaseProfile, application, version, buildNumber, releaseChannel, tag, commit, dirty,
 artifact, sha256, architecture, bundleIdentifier, teamIdentifier,
 minimumSystemVersion, signatureType, hardenedRuntime, notarized,
 notarizationSubmissionId, builtAt

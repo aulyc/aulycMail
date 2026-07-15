@@ -4,6 +4,11 @@ This policy is the aulycmail project profile for the shared
 `general-release-versioning` Skill. It defines how the common baseline maps to
 the Apple Silicon macOS Wails application.
 
+- Release Profile: `macos-arm64-app`.
+- Architecture: Apple Silicon `arm64` only.
+- Distribution: ad-hoc DMG for test releases; Developer ID, Hardened Runtime,
+  notarization and Gatekeeper verification for formal releases.
+
 ## Single version source
 
 `version.json` is authoritative:
@@ -92,7 +97,7 @@ Final test and formal DMGs are not built in the caller's daily worktree.
 6. verifies the worktree remains clean after generation, build, and packaging;
 7. removes only the owned temporary worktree.
 
-The release manifest obtains tag/commit from that Git state and obtains
+The release provenance obtains tag/commit from that Git state and obtains
 version, build, architecture, Bundle ID, minimum system version, signature,
 Team ID, and Hardened Runtime from the real app. It obtains the artifact name
 and SHA-256 from the real DMG. Formal notarization values come from the accepted
@@ -118,7 +123,11 @@ aulycmail-<version>-build.<build>.dmg
 aulycmail-<version>-build.<build>.manifest.json
 ```
 
-The manifest includes application, version, build number, release channel,
+The historical `.manifest.json` filename is retained for compatibility. It is
+release provenance, not App product metadata, and cannot replace `Info.plist`.
+
+The release provenance includes `releaseProfile: macos-arm64-app`, application,
+version, build number, release channel,
 tag, commit, dirty state, artifact, SHA-256, architecture, Bundle ID, Team ID,
 minimum system version, signature type, Hardened Runtime, notarization state,
 submission ID, and UTC build time. Test and formal manifests require
