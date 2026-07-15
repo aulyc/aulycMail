@@ -61,7 +61,7 @@ func (s *Store) GetUnifiedInboxUnreadCount() (int, error) {
 		SELECT f.id, f.name, f.folder_type, f.unread_count, a.name as account_name, a.enabled
 		FROM folders f
 		INNER JOIN accounts a ON f.account_id = a.id
-		WHERE f.folder_type = 'inbox'
+		WHERE f.folder_type = 'inbox' AND f.selectable = 1
 	`
 	rows, err := s.db.Query(debugQuery)
 	if err == nil {
@@ -87,7 +87,7 @@ func (s *Store) GetUnifiedInboxUnreadCount() (int, error) {
 		SELECT COALESCE(SUM(f.unread_count), 0)
 		FROM folders f
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
-		WHERE f.folder_type = 'inbox'
+		WHERE f.folder_type = 'inbox' AND f.selectable = 1
 	`
 
 	var count int
@@ -111,7 +111,7 @@ func (s *Store) GetBadgeUnreadCount() (int, error) {
 		SELECT COALESCE(SUM(f.unread_count), 0)
 		FROM folders f
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
-		WHERE f.folder_type IN ('inbox', 'folder')
+		WHERE f.folder_type IN ('inbox', 'folder') AND f.selectable = 1
 	`
 	var count int
 	if err := s.db.QueryRow(query).Scan(&count); err != nil {

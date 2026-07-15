@@ -24,6 +24,13 @@ import (
 func (a *App) SyncFolder(accountID, folderID string) error {
 	const debounceMs = 500
 	log := logging.WithComponent("app")
+	folderObj, err := a.requireSelectableFolder(folderID)
+	if err != nil {
+		return err
+	}
+	if folderObj.AccountID != accountID {
+		return fmt.Errorf("folder %s does not belong to account %s", folderID, accountID)
+	}
 
 	// Use composite key to allow multiple folders to sync concurrently
 	syncKey := accountID + ":" + folderID
@@ -360,7 +367,7 @@ func (a *App) getSyncFolders(accountID string) ([]*folder.Folder, error) {
 		return nil, err
 	}
 	if acct.SyncAllFolders {
-		return a.folderStore.List(accountID)
+		return a.folderStore.ListSelectable(accountID)
 	}
 	if acct.SyncFoldersEnabled {
 		return a.folderStore.ListSubscribed(accountID)

@@ -118,9 +118,12 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 
 		// Convert IMAP folder type to our folder type
 		folderType := convertFolderType(mb.Type)
+		if mb.NoSelect {
+			folderType = folder.TypeFolder
+		}
 
 		// Override with account folder mapping if configured
-		if override, ok := pathTypeOverrides[mb.Name]; ok {
+		if override, ok := pathTypeOverrides[mb.Name]; ok && !mb.NoSelect {
 			folderType = override
 		}
 
@@ -140,6 +143,7 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 			// Update existing folder
 			existing.Name = extractFolderName(mb.Name, mb.Delimiter)
 			existing.Type = folderType
+			existing.NoSelect = mb.NoSelect
 			// Only update subscription state when the server returned data.
 			// Some servers (Microsoft 365) reject LIST-EXTENDED (SUBSCRIBED);
 			// when subscribedSet is nil, preserve local state set by the user
@@ -159,12 +163,19 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 				}
 			}
 
-			if status != nil {
+			if mb.NoSelect {
+				existing.UIDValidity = 0
+				existing.UIDNext = 0
+				existing.HighestModSeq = 0
+				existing.TotalCount = 0
+				existing.UnreadCount = 0
+			} else if status != nil {
 				existing.UIDValidity = status.UIDValidity
 				existing.UIDNext = status.UIDNext
 				existing.HighestModSeq = status.HighestModSeq
 				existing.TotalCount = int(status.Messages)
 				existing.UnreadCount = int(status.Unseen)
+				e.preserveLocalCountsForEmptyServerFolder(existing)
 			}
 
 			if err := e.folderStore.Update(existing); err != nil {
@@ -178,8 +189,9 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 				Path:       mb.Name,
 				Type:       folderType,
 				Subscribed: isSubscribed,
+				NoSelect:   mb.NoSelect,
 			}
-			if status != nil {
+			if !mb.NoSelect && status != nil {
 				f.UIDValidity = status.UIDValidity
 				f.UIDNext = status.UIDNext
 				f.HighestModSeq = status.HighestModSeq
@@ -291,6 +303,10 @@ func (e *Engine) fetchFolderStatusParallel(ctx context.Context, accountID string
 	var wg gosync.WaitGroup
 
 	for i, mb := range mailboxes {
+		if mb.NoSelect {
+			results[i] = folderStatusResult{mailbox: mb}
+			continue
+		}
 		wg.Add(1)
 		go func(idx int, mailbox *imapPkg.Mailbox) {
 			defer wg.Done()

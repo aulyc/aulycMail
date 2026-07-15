@@ -319,6 +319,10 @@ class AccountStore {
     try {
       const folderTree = await GetFolderTree(accountId)
       acc.folders = folderTree || []
+      if (this.selectedFolder?.accountId === accountId) {
+        const selected = this.findFolderById(acc.folders, this.selectedFolder.folderId)
+        if (selected?.noSelect) this.selectedFolder = null
+      }
     } catch (err) {
       acc.error = err instanceof Error ? err.message : String(err)
       console.error(`Failed to load folders for account ${accountId}:`, err)
@@ -495,6 +499,9 @@ class AccountStore {
     folderPath: string,
     folderName: string
   ): void {
+    const acc = this.accounts.find((item) => item.account.id === accountId)
+    const selected = acc ? this.findFolderById(acc.folders || [], folderId) : null
+    if (selected?.noSelect) return
     this.selectedFolder = {
       accountId,
       folderId,

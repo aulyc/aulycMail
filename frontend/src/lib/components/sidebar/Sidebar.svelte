@@ -199,7 +199,7 @@
       if (expandedAccounts[accWithFolders.account.id]) {
         const flattenFolders = (trees: folder.FolderTree[]) => {
           for (const tree of trees) {
-            if (tree.folder) {
+            if (tree.folder && !tree.folder.noSelect) {
               items.push({
                 type: 'folder',
                 accountId: accWithFolders.account.id,

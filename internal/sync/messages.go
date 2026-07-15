@@ -116,6 +116,9 @@ func (e *Engine) syncMessagesWithOptions(ctx context.Context, accountID, folderI
 	if f == nil {
 		return fmt.Errorf("folder not found: %s", folderID)
 	}
+	if err := f.RequireSelectable(); err != nil {
+		return err
+	}
 
 	e.log.Debug().
 		Str("account", accountID).
@@ -240,7 +243,12 @@ func (e *Engine) syncMessagesWithOptions(ctx context.Context, accountID, folderI
 			Str("folder", f.Path).
 			Int("localCount", len(localUIDs)).
 			Msg("Server returned 0 messages but we have local messages - skipping deletion to prevent data loss")
-		// Still try to update folder metadata but don't delete anything
+		// Keep both cached counts aligned with the local records we preserve.
+		// Otherwise a broken/empty server response leaves total_count at 0 while
+		// the message list and unread_count still reflect retained local mail.
+		e.setFolderCountsFromLocal(f, int(mailbox.Messages), mailboxUnreadFallback(f.UnreadCount, mailboxStatus))
+
+		// Still try to update folder metadata but don't delete anything.
 		now := time.Now()
 		f.LastSync = &now
 		if err := e.folderStore.Update(f); err != nil {
@@ -447,19 +455,13 @@ func (e *Engine) syncMessagesWithOptions(ctx context.Context, accountID, folderI
 	// baseline after a partial failure silently skips whatever the failed
 	// cycle missed. See nextModSeq in condstore.go.
 	f.HighestModSeq = nextModSeq(flagSyncOK, mailbox.HighestModSeq, prevModSeq)
-	f.TotalCount = int(mailbox.Messages)
 	f.LastSync = &now
 
-	// Derive the unread badge from the LOCAL is_read state, not the IMAP
-	// server's UNSEEN, so the sidebar badge always matches what the message
-	// list shows (which is driven by local flags). Server UNSEEN can drift
-	// from local reality (e.g. 163 reports stale UNSEEN, or a flag change
-	// hasn't synced back yet), which otherwise leaves badge ≠ list header.
-	if unreadCount, err := e.messageStore.CountUnreadByFolder(folderID); err == nil {
-		f.UnreadCount = unreadCount
-	} else if mailboxStatus != nil {
-		f.UnreadCount = int(mailboxStatus.Unseen)
-	}
+	// Derive both cached counts from LOCAL message state so folder metadata,
+	// list contents, and sidebar badges describe the same data. Some servers
+	// return stale or internally inconsistent STATUS/SELECT counts; use those
+	// values only as fallbacks if a local count query fails.
+	e.setFolderCountsFromLocal(f, int(mailbox.Messages), mailboxUnreadFallback(f.UnreadCount, mailboxStatus))
 
 	if err := e.folderStore.Update(f); err != nil {
 		e.log.Warn().Err(err).Msg("Failed to update folder sync state")
@@ -472,6 +474,76 @@ func (e *Engine) syncMessagesWithOptions(ctx context.Context, accountID, folderI
 		Msg("Message sync complete (headers)")
 
 	return nil
+}
+
+func mailboxUnreadFallback(current int, status *imapPkg.Mailbox) int {
+	if status != nil {
+		return int(status.Unseen)
+	}
+	return current
+}
+
+// setFolderCountsFromLocal makes the folder counters describe the same local
+// records that the message list renders. Server counts remain fallbacks for a
+// database error, but must not overwrite retained local mail with zero.
+func (e *Engine) setFolderCountsFromLocal(f *folder.Folder, fallbackTotal, fallbackUnread int) {
+	if f.NoSelect {
+		f.TotalCount = 0
+		f.UnreadCount = 0
+		return
+	}
+
+	f.TotalCount = fallbackTotal
+	f.UnreadCount = fallbackUnread
+
+	if totalCount, err := e.messageStore.CountByFolder(f.ID); err == nil {
+		f.TotalCount = totalCount
+	} else {
+		e.log.Warn().Err(err).Str("folder", f.Path).Msg("Failed to count local messages for folder total")
+	}
+
+	if unreadCount, err := e.messageStore.CountUnreadByFolder(f.ID); err == nil {
+		f.UnreadCount = unreadCount
+	} else {
+		e.log.Warn().Err(err).Str("folder", f.Path).Msg("Failed to count local unread messages")
+	}
+}
+
+// preserveLocalCountsForEmptyServerFolder prevents a folder-list refresh from
+// temporarily replacing retained local counts with an empty server STATUS.
+// Message sync applies the same local-source-of-truth policy unconditionally
+// after it has reconciled the folder contents.
+func (e *Engine) preserveLocalCountsForEmptyServerFolder(f *folder.Folder) {
+	if f.NoSelect {
+		f.TotalCount = 0
+		f.UnreadCount = 0
+		return
+	}
+
+	if f.TotalCount != 0 {
+		return
+	}
+
+	localTotal, err := e.messageStore.CountByFolder(f.ID)
+	if err != nil {
+		e.log.Warn().Err(err).Str("folder", f.Path).Msg("Failed to verify empty server folder against local messages")
+		return
+	}
+	if localTotal == 0 {
+		return
+	}
+
+	f.TotalCount = localTotal
+	if localUnread, err := e.messageStore.CountUnreadByFolder(f.ID); err == nil {
+		f.UnreadCount = localUnread
+	} else {
+		e.log.Warn().Err(err).Str("folder", f.Path).Msg("Failed to count retained local unread messages")
+	}
+
+	e.log.Warn().
+		Str("folder", f.Path).
+		Int("localCount", localTotal).
+		Msg("Server reported an empty folder; preserving local folder counts")
 }
 
 // syncMessageFlags fetches and updates flags for existing messages from the IMAP server.

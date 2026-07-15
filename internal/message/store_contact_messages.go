@@ -50,7 +50,7 @@ func (s *Store) ListByParticipant(email string, limit int) ([]*ContactMessage, e
 		FROM messages m
 		JOIN folders f ON m.folder_id = f.id
 		JOIN accounts a ON f.account_id = a.id
-		WHERE f.folder_type != 'drafts'
+		WHERE f.folder_type != 'drafts' AND f.selectable = 1
 		  AND (
 		    LOWER(m.from_email) = ?
 		    OR `+fmt.Sprintf(jsonAddressMatch, "m.to_list", "m.to_list")+`
@@ -104,7 +104,7 @@ func (s *Store) SearchMessagesInFolder(folderID, query string, limit int) ([]*Co
 		FROM messages m
 		JOIN folders f ON m.folder_id = f.id
 		JOIN accounts a ON f.account_id = a.id
-		WHERE m.folder_id = ?
+		WHERE m.folder_id = ? AND f.selectable = 1
 		  AND (
 		    LOWER(COALESCE(m.subject, '')) LIKE ?
 		    OR LOWER(COALESCE(m.from_name, '')) LIKE ?
@@ -159,7 +159,8 @@ func (s *Store) SearchMessagesInAccount(accountID, query string, limit int) ([]*
 		FROM messages m
 		JOIN folders f ON m.folder_id = f.id
 		JOIN accounts a ON f.account_id = a.id
-		WHERE (? = '' OR f.account_id = ?)
+		WHERE f.selectable = 1
+		  AND (? = '' OR f.account_id = ?)
 		  AND (
 		    LOWER(COALESCE(m.subject, '')) LIKE ?
 		    OR LOWER(COALESCE(m.from_name, '')) LIKE ?

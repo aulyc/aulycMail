@@ -46,7 +46,7 @@ func (f *FTSIndexer) IndexAllFolders(ctx context.Context) error {
 	logging.Info().Msg("Starting background FTS indexing for all folders")
 
 	// Get all folder IDs
-	rows, err := f.db.QueryContext(ctx, `SELECT id FROM folders`)
+	rows, err := f.db.QueryContext(ctx, `SELECT id FROM folders WHERE selectable = 1`)
 	if err != nil {
 		return fmt.Errorf("failed to get folders: %w", err)
 	}

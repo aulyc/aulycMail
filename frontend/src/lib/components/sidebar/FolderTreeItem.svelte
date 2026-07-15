@@ -54,6 +54,7 @@
   }
 
   let hasChildren = $derived(tree.children && tree.children.length > 0)
+  let isDirectoryOnly = $derived(tree.folder?.noSelect === true)
 
   // Recursively sum unread across a subtree (folder + all descendants).
   function sumTreeUnread(trees: folder.FolderTree[]): number {
@@ -87,7 +88,7 @@
   let isDragOver = $state(false)
 
   function hasMessagesPayload(e: DragEvent): boolean {
-    return !!e.dataTransfer?.types.includes('application/x-aulycmail-messages')
+    return !isDirectoryOnly && !!e.dataTransfer?.types.includes('application/x-aulycmail-messages')
   }
 
   function handleDragEnter(e: DragEvent) {
@@ -109,7 +110,7 @@
   async function handleDrop(e: DragEvent) {
     isDragOver = false
     const raw = e.dataTransfer?.getData('application/x-aulycmail-messages')
-    if (!raw || !tree.folder) return
+    if (!raw || !tree.folder || isDirectoryOnly) return
     e.preventDefault()
 
     let payload: { messageIds: string[]; sourceAccountId: string }
@@ -146,19 +147,32 @@
       toasts.error($_('toast.undoFailed'))
     }
   }
+
+  function handleFolderClick() {
+    if (!tree.folder) return
+    if (isDirectoryOnly) {
+      if (hasChildren) onToggleCollapse?.(tree.folder.id)
+      return
+    }
+    onFolderSelect?.(tree.folder)
+  }
 </script>
 
 {#if tree.folder}
-  <FolderContextMenu folderId={tree.folder.id}>
+  <FolderContextMenu folderId={tree.folder.id} disabled={isDirectoryOnly}>
     <button
       class="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors {isFolderSelected(tree.folder.id)
         ? 'bg-primary/10 text-primary font-medium'
-        : 'text-foreground hover:bg-muted/50'} {isDragOver ? 'ring-2 ring-primary ring-inset' : ''}"
+        : isDirectoryOnly
+          ? 'text-muted-foreground hover:bg-muted/50'
+          : 'text-foreground hover:bg-muted/50'} {isDragOver ? 'ring-2 ring-primary ring-inset' : ''}"
       data-sidebar-item="folder"
       data-account-id={accountId}
       data-folder-id={tree.folder.id}
       data-has-children={hasChildren ? 'true' : undefined}
-      onclick={() => onFolderSelect?.(tree.folder!)}
+      data-selectable={isDirectoryOnly ? 'false' : 'true'}
+      aria-expanded={hasChildren ? !isCollapsed : undefined}
+      onclick={handleFolderClick}
       ondragenter={handleDragEnter}
       ondragover={handleDragOver}
       ondragleave={handleDragLeave}

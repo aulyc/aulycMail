@@ -86,6 +86,9 @@ func (e *Engine) IMAPSearch(ctx context.Context, accountID, folderID, query stri
 	if f == nil {
 		return nil, fmt.Errorf("folder not found: %s", folderID)
 	}
+	if err := f.RequireSelectable(); err != nil {
+		return nil, err
+	}
 
 	// Acquire connection
 	conn, err := e.pool.GetConnection(ctx, accountID)
@@ -309,6 +312,9 @@ func (e *Engine) FetchServerMessage(ctx context.Context, accountID, folderID str
 	}
 	if f == nil {
 		return nil, fmt.Errorf("folder not found: %s", folderID)
+	}
+	if err := f.RequireSelectable(); err != nil {
+		return nil, err
 	}
 
 	// Check if already exists locally

@@ -16,11 +16,13 @@
 
   interface Props {
     folderId: string
+    disabled?: boolean
     children?: Snippet
   }
 
   let {
     folderId,
+    disabled = false,
     children,
   }: Props = $props()
 
@@ -55,21 +57,27 @@
   }
 </script>
 
-<ContextMenuPrimitive.Root>
-  <ContextMenuPrimitive.Trigger>
-    {#if children}
-      {@render children()}
-    {/if}
-  </ContextMenuPrimitive.Trigger>
+{#if disabled}
+  {#if children}
+    {@render children()}
+  {/if}
+{:else}
+  <ContextMenuPrimitive.Root>
+    <ContextMenuPrimitive.Trigger>
+      {#if children}
+        {@render children()}
+      {/if}
+    </ContextMenuPrimitive.Trigger>
 
-  <ContextMenuContent>
-    <ContextMenuItem onSelect={handleMarkAllRead}>
-      <Icon icon="mdi:email-check-outline" class="mr-2 h-4 w-4" />
-      {$_('contextMenu.markAllAsRead')}
-    </ContextMenuItem>
-    <ContextMenuItem onSelect={handleMarkAllUnread}>
-      <Icon icon="mdi:email-outline" class="mr-2 h-4 w-4" />
-      {$_('contextMenu.markAllAsUnread')}
-    </ContextMenuItem>
-  </ContextMenuContent>
-</ContextMenuPrimitive.Root>
+    <ContextMenuContent>
+      <ContextMenuItem onSelect={handleMarkAllRead}>
+        <Icon icon="mdi:email-check-outline" class="mr-2 h-4 w-4" />
+        {$_('contextMenu.markAllAsRead')}
+      </ContextMenuItem>
+      <ContextMenuItem onSelect={handleMarkAllUnread}>
+        <Icon icon="mdi:email-outline" class="mr-2 h-4 w-4" />
+        {$_('contextMenu.markAllAsUnread')}
+      </ContextMenuItem>
+    </ContextMenuContent>
+  </ContextMenuPrimitive.Root>
+{/if}

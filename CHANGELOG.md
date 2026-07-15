@@ -4,6 +4,9 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+- Updated vulnerable frontend build and editor dependencies within their
+  existing compatible major versions.
+
 ## [0.3.95] — 2026-07-15
 
 - Fixed release verification for mounted DMG paths whose volume names contain

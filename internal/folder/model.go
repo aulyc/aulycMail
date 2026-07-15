@@ -2,6 +2,8 @@
 package folder
 
 import (
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -42,6 +44,26 @@ type Folder struct {
 	LastSync     *time.Time `json:"lastSync,omitempty" ts_type:"string"`
 	LastFullSync *time.Time `json:"lastFullSync,omitempty" ts_type:"string"`
 	Subscribed   bool       `json:"subscribed"` // IMAP subscription state
+	NoSelect     bool       `json:"noSelect"`   // IMAP \\Noselect: hierarchy-only, not a real mailbox
+}
+
+var ErrNotSelectable = errors.New("folder is not selectable")
+
+// IsSelectable reports whether IMAP operations may SELECT this folder.
+func (f *Folder) IsSelectable() bool {
+	return f != nil && !f.NoSelect
+}
+
+// RequireSelectable validates the server-side mailbox contract. Keeping this
+// check in the domain model lets backend APIs defend against stale/older UIs.
+func (f *Folder) RequireSelectable() error {
+	if f == nil {
+		return errors.New("folder is nil")
+	}
+	if f.NoSelect {
+		return fmt.Errorf("%w: %s", ErrNotSelectable, f.Path)
+	}
+	return nil
 }
 
 // IsSpecial returns true if this is a special folder (inbox, sent, etc.)

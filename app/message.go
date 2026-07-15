@@ -37,6 +37,9 @@ func (a *App) GetMessageSource(messageID string) (*MessageSourceResult, error) {
 	if msg == nil {
 		return nil, fmt.Errorf("message not found: %s", messageID)
 	}
+	if _, err := a.requireSelectableFolder(msg.FolderID); err != nil {
+		return nil, err
+	}
 
 	if msg.Size > maxInlineMessageSourceBytes {
 		path, size, err := a.writeMessageSourceFile(msg)
@@ -121,6 +124,9 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 	if msg == nil {
 		return nil, fmt.Errorf("message not found: %s", messageID)
 	}
+	if _, err := a.requireSelectableFolder(msg.FolderID); err != nil {
+		return nil, err
+	}
 
 	// If body is already fetched, just return it
 	if msg.BodyFetched {
@@ -140,11 +146,17 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 // sortOrder can be "newest" (default) or "oldest"
 // filter can be "" (all), "unread", "starred", or "attachments"
 func (a *App) GetConversations(accountID, folderID string, offset, limit int, sortOrder, filter string) ([]*message.Conversation, error) {
+	if _, err := a.requireSelectableFolder(folderID); err != nil {
+		return nil, err
+	}
 	return a.messageStore.ListConversationsByFolder(folderID, offset, limit, sortOrder, filter)
 }
 
 // GetConversationCount returns the total conversation count for a folder
 func (a *App) GetConversationCount(accountID, folderID, filter string) (int, error) {
+	if _, err := a.requireSelectableFolder(folderID); err != nil {
+		return 0, err
+	}
 	return a.messageStore.CountConversationsByFolder(folderID, filter)
 }
 
@@ -165,6 +177,9 @@ func (a *App) GetConversation(threadID, folderID string) (*message.Conversation,
 		Str("threadID", threadID).
 		Str("folderID", folderID).
 		Msg("GetConversation called")
+	if _, err := a.requireSelectableFolder(folderID); err != nil {
+		return nil, err
+	}
 
 	conv, err := a.messageStore.GetConversation(threadID, folderID)
 	if err != nil {

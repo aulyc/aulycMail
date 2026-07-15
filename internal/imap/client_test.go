@@ -9,9 +9,20 @@ import (
 	"testing"
 	"time"
 
+	imapv2 "github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 	"github.com/rs/zerolog"
 )
+
+func TestHasMailboxAttribute(t *testing.T) {
+	attrs := []imapv2.MailboxAttr{imapv2.MailboxAttrHasChildren, imapv2.MailboxAttrNoSelect}
+	if !hasMailboxAttribute(attrs, imapv2.MailboxAttrNoSelect) {
+		t.Fatal("expected \\Noselect attribute to be detected")
+	}
+	if hasMailboxAttribute(attrs, imapv2.MailboxAttrNoInferiors) {
+		t.Fatal("did not expect an absent attribute to be detected")
+	}
+}
 
 func TestSelectMailboxCancellationClosesConnection(t *testing.T) {
 	clientConn, serverConn := net.Pipe()

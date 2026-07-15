@@ -144,7 +144,7 @@ func (s *Store) SearchConversationsUnifiedInbox(query string, offset, limit int,
 		SELECT COUNT(DISTINCT COALESCE(m.thread_id, m.id) || '-' || a.id)
 		FROM messages m
 		JOIN messages_fts fts ON m.rowid = fts.rowid
-		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
+		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox' AND f.selectable = 1
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
 		WHERE messages_fts MATCH ?
 	` + filterWhereClause(filter, "m.")
@@ -181,7 +181,7 @@ func (s *Store) SearchConversationsUnifiedInbox(query string, offset, limit int,
 			json_group_array(DISTINCT json_object('name', m.from_name, 'email', m.from_email)) as participants_json
 		FROM messages m
 		JOIN messages_fts fts ON m.rowid = fts.rowid
-		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
+		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox' AND f.selectable = 1
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
 		WHERE messages_fts MATCH ?
 		GROUP BY COALESCE(m.thread_id, m.id), a.id` +

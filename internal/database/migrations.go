@@ -1190,4 +1190,14 @@ var migrations = []Migration{
 			ON activity_logs(status, created_at DESC);
 		`,
 	},
+	{
+		Version: 49,
+		SQL: `
+			-- Persist whether an IMAP LIST entry can be SELECTed. Hierarchy-only
+			-- containers carry \Noselect and must remain visible in the folder tree
+			-- without exposing stale local message rows as a real mailbox.
+			-- This migration is intentionally additive and preserves every message.
+			ALTER TABLE folders ADD COLUMN selectable INTEGER NOT NULL DEFAULT 1;
+		`,
+	},
 }

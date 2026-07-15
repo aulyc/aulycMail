@@ -17,101 +17,32 @@ type Store struct {
 	log zerolog.Logger
 }
 
-// NewStore creates a new folder store
-func NewStore(db *database.DB) *Store {
-	return &Store{
-		db:  db,
-		log: logging.WithComponent("folder-store"),
-	}
+const folderSelectColumns = `
+	id, account_id, name, path, folder_type, parent_id,
+	uid_validity, uid_next, highest_mod_seq,
+	total_count, unread_count, last_sync, last_full_sync, subscribed, selectable`
+
+type folderScanner interface {
+	Scan(dest ...any) error
 }
 
-// List returns all folders for an account
-func (s *Store) List(accountID string) ([]*Folder, error) {
-	query := `
-		SELECT id, account_id, name, path, folder_type, parent_id,
-		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, last_full_sync, subscribed
-		FROM folders
-		WHERE account_id = ?
-		ORDER BY name
-	`
-
-	rows, err := s.db.Query(query, accountID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query folders: %w", err)
-	}
-	defer rows.Close()
-
-	var folders []*Folder
-	for rows.Next() {
-		f := &Folder{}
-		var parentID sql.NullString
-		var lastSync, lastFullSync sql.NullTime
-		var uidValidity, uidNext sql.NullInt64
-		var highestModSeq sql.NullInt64
-
-		err := rows.Scan(
-			&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
-			&uidValidity, &uidNext, &highestModSeq,
-			&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan folder: %w", err)
-		}
-
-		if parentID.Valid {
-			f.ParentID = parentID.String
-		}
-		if lastSync.Valid {
-			f.LastSync = &lastSync.Time
-		}
-		if lastFullSync.Valid {
-			f.LastFullSync = &lastFullSync.Time
-		}
-		if uidValidity.Valid {
-			f.UIDValidity = uint32(uidValidity.Int64)
-		}
-		if uidNext.Valid {
-			f.UIDNext = uint32(uidNext.Int64)
-		}
-		if highestModSeq.Valid {
-			f.HighestModSeq = uint64(highestModSeq.Int64)
-		}
-
-		folders = append(folders, f)
-	}
-
-	return folders, nil
-}
-
-// Get returns a folder by ID
-func (s *Store) Get(id string) (*Folder, error) {
-	query := `
-		SELECT id, account_id, name, path, folder_type, parent_id,
-		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, last_full_sync, subscribed
-		FROM folders
-		WHERE id = ?
-	`
-
+func scanFolder(scanner folderScanner) (*Folder, error) {
 	f := &Folder{}
 	var parentID sql.NullString
 	var lastSync, lastFullSync sql.NullTime
 	var uidValidity, uidNext sql.NullInt64
 	var highestModSeq sql.NullInt64
+	var selectable bool
 
-	err := s.db.QueryRow(query, id).Scan(
+	if err := scanner.Scan(
 		&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
 		&uidValidity, &uidNext, &highestModSeq,
-		&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("failed to get folder: %w", err)
+		&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed, &selectable,
+	); err != nil {
+		return nil, err
 	}
 
+	f.NoSelect = !selectable
 	if parentID.Valid {
 		f.ParentID = parentID.String
 	}
@@ -134,27 +65,73 @@ func (s *Store) Get(id string) (*Folder, error) {
 	return f, nil
 }
 
-// GetByPath returns a folder by account ID and path
-func (s *Store) GetByPath(accountID, path string) (*Folder, error) {
-	query := `
-		SELECT id, account_id, name, path, folder_type, parent_id,
-		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, last_full_sync, subscribed
+// NewStore creates a new folder store
+func NewStore(db *database.DB) *Store {
+	return &Store{
+		db:  db,
+		log: logging.WithComponent("folder-store"),
+	}
+}
+
+// List returns all folders for an account
+func (s *Store) List(accountID string) ([]*Folder, error) {
+	query := `SELECT ` + folderSelectColumns + `
 		FROM folders
-		WHERE account_id = ? AND path = ?
+		WHERE account_id = ?
+		ORDER BY name
 	`
 
-	f := &Folder{}
-	var parentID sql.NullString
-	var lastSync, lastFullSync sql.NullTime
-	var uidValidity, uidNext sql.NullInt64
-	var highestModSeq sql.NullInt64
+	rows, err := s.db.Query(query, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query folders: %w", err)
+	}
+	defer rows.Close()
 
-	err := s.db.QueryRow(query, accountID, path).Scan(
-		&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
-		&uidValidity, &uidNext, &highestModSeq,
-		&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
-	)
+	var folders []*Folder
+	for rows.Next() {
+		f, err := scanFolder(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan folder: %w", err)
+		}
+
+		folders = append(folders, f)
+	}
+
+	return folders, rows.Err()
+}
+
+// ListSelectable returns only real mailboxes that IMAP permits clients to SELECT.
+func (s *Store) ListSelectable(accountID string) ([]*Folder, error) {
+	query := `SELECT ` + folderSelectColumns + `
+		FROM folders
+		WHERE account_id = ? AND selectable = 1
+		ORDER BY name`
+
+	rows, err := s.db.Query(query, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query selectable folders: %w", err)
+	}
+	defer rows.Close()
+
+	var folders []*Folder
+	for rows.Next() {
+		f, err := scanFolder(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan selectable folder: %w", err)
+		}
+		folders = append(folders, f)
+	}
+	return folders, rows.Err()
+}
+
+// Get returns a folder by ID
+func (s *Store) Get(id string) (*Folder, error) {
+	query := `SELECT ` + folderSelectColumns + `
+		FROM folders
+		WHERE id = ?
+	`
+
+	f, err := scanFolder(s.db.QueryRow(query, id))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -162,23 +139,22 @@ func (s *Store) GetByPath(accountID, path string) (*Folder, error) {
 		return nil, fmt.Errorf("failed to get folder: %w", err)
 	}
 
-	if parentID.Valid {
-		f.ParentID = parentID.String
+	return f, nil
+}
+
+// GetByPath returns a folder by account ID and path
+func (s *Store) GetByPath(accountID, path string) (*Folder, error) {
+	query := `SELECT ` + folderSelectColumns + `
+		FROM folders
+		WHERE account_id = ? AND path = ?
+	`
+
+	f, err := scanFolder(s.db.QueryRow(query, accountID, path))
+	if err == sql.ErrNoRows {
+		return nil, nil
 	}
-	if lastSync.Valid {
-		f.LastSync = &lastSync.Time
-	}
-	if lastFullSync.Valid {
-		f.LastFullSync = &lastFullSync.Time
-	}
-	if uidValidity.Valid {
-		f.UIDValidity = uint32(uidValidity.Int64)
-	}
-	if uidNext.Valid {
-		f.UIDNext = uint32(uidNext.Int64)
-	}
-	if highestModSeq.Valid {
-		f.HighestModSeq = uint64(highestModSeq.Int64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get folder: %w", err)
 	}
 
 	return f, nil
@@ -193,8 +169,8 @@ func (s *Store) Create(f *Folder) error {
 	query := `
 		INSERT INTO folders (id, account_id, name, path, folder_type, parent_id,
 		                     uid_validity, uid_next, highest_mod_seq,
-		                     total_count, unread_count, last_sync, last_full_sync, subscribed)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		                     total_count, unread_count, last_sync, last_full_sync, subscribed, selectable)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	var parentID interface{}
@@ -214,7 +190,7 @@ func (s *Store) Create(f *Folder) error {
 	_, err := s.db.Exec(query,
 		f.ID, f.AccountID, f.Name, f.Path, f.Type, parentID,
 		f.UIDValidity, f.UIDNext, f.HighestModSeq,
-		f.TotalCount, f.UnreadCount, lastSync, lastFullSync, f.Subscribed,
+		f.TotalCount, f.UnreadCount, lastSync, lastFullSync, f.Subscribed, !f.NoSelect,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create folder: %w", err)
@@ -242,7 +218,8 @@ func (s *Store) Update(f *Folder) error {
 			unread_count = ?,
 			last_sync = ?,
 			last_full_sync = ?,
-			subscribed = ?
+			subscribed = ?,
+			selectable = ?
 		WHERE id = ?
 	`
 
@@ -263,7 +240,7 @@ func (s *Store) Update(f *Folder) error {
 	_, err := s.db.Exec(query,
 		f.Name, f.Type, parentID,
 		f.UIDValidity, f.UIDNext, f.HighestModSeq,
-		f.TotalCount, f.UnreadCount, lastSync, lastFullSync, f.Subscribed,
+		f.TotalCount, f.UnreadCount, lastSync, lastFullSync, f.Subscribed, !f.NoSelect,
 		f.ID,
 	)
 	if err != nil {
@@ -342,50 +319,18 @@ func (s *Store) Upsert(f *Folder) error {
 
 // GetByType returns a folder by account ID and folder type
 func (s *Store) GetByType(accountID string, folderType Type) (*Folder, error) {
-	query := `
-		SELECT id, account_id, name, path, folder_type, parent_id,
-		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, last_full_sync, subscribed
+	query := `SELECT ` + folderSelectColumns + `
 		FROM folders
-		WHERE account_id = ? AND folder_type = ?
+		WHERE account_id = ? AND folder_type = ? AND selectable = 1
 		LIMIT 1
 	`
 
-	f := &Folder{}
-	var parentID sql.NullString
-	var lastSync, lastFullSync sql.NullTime
-	var uidValidity, uidNext sql.NullInt64
-	var highestModSeq sql.NullInt64
-
-	err := s.db.QueryRow(query, accountID, folderType).Scan(
-		&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
-		&uidValidity, &uidNext, &highestModSeq,
-		&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
-	)
+	f, err := scanFolder(s.db.QueryRow(query, accountID, folderType))
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder by type: %w", err)
-	}
-
-	if parentID.Valid {
-		f.ParentID = parentID.String
-	}
-	if lastSync.Valid {
-		f.LastSync = &lastSync.Time
-	}
-	if lastFullSync.Valid {
-		f.LastFullSync = &lastFullSync.Time
-	}
-	if uidValidity.Valid {
-		f.UIDValidity = uint32(uidValidity.Int64)
-	}
-	if uidNext.Valid {
-		f.UIDNext = uint32(uidNext.Int64)
-	}
-	if highestModSeq.Valid {
-		f.HighestModSeq = uint64(highestModSeq.Int64)
 	}
 
 	return f, nil
@@ -394,12 +339,10 @@ func (s *Store) GetByType(accountID string, folderType Type) (*Folder, error) {
 // ListSubscribed returns only subscribed folders for an account.
 // Core folders (Inbox, Drafts, Sent) are always included regardless of subscription state.
 func (s *Store) ListSubscribed(accountID string) ([]*Folder, error) {
-	query := `
-		SELECT id, account_id, name, path, folder_type, parent_id,
-		       uid_validity, uid_next, highest_mod_seq,
-		       total_count, unread_count, last_sync, last_full_sync, subscribed
+	query := `SELECT ` + folderSelectColumns + `
 		FROM folders
-		WHERE account_id = ? AND (subscribed = 1 OR folder_type IN ('inbox', 'drafts', 'sent'))
+		WHERE account_id = ? AND selectable = 1
+		  AND (subscribed = 1 OR folder_type IN ('inbox', 'drafts', 'sent'))
 		ORDER BY name
 	`
 
@@ -411,44 +354,15 @@ func (s *Store) ListSubscribed(accountID string) ([]*Folder, error) {
 
 	var folders []*Folder
 	for rows.Next() {
-		f := &Folder{}
-		var parentID sql.NullString
-		var lastSync, lastFullSync sql.NullTime
-		var uidValidity, uidNext sql.NullInt64
-		var highestModSeq sql.NullInt64
-
-		err := rows.Scan(
-			&f.ID, &f.AccountID, &f.Name, &f.Path, &f.Type, &parentID,
-			&uidValidity, &uidNext, &highestModSeq,
-			&f.TotalCount, &f.UnreadCount, &lastSync, &lastFullSync, &f.Subscribed,
-		)
+		f, err := scanFolder(rows)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan folder: %w", err)
-		}
-
-		if parentID.Valid {
-			f.ParentID = parentID.String
-		}
-		if lastSync.Valid {
-			f.LastSync = &lastSync.Time
-		}
-		if lastFullSync.Valid {
-			f.LastFullSync = &lastFullSync.Time
-		}
-		if uidValidity.Valid {
-			f.UIDValidity = uint32(uidValidity.Int64)
-		}
-		if uidNext.Valid {
-			f.UIDNext = uint32(uidNext.Int64)
-		}
-		if highestModSeq.Valid {
-			f.HighestModSeq = uint64(highestModSeq.Int64)
 		}
 
 		folders = append(folders, f)
 	}
 
-	return folders, nil
+	return folders, rows.Err()
 }
 
 // UpdateSubscribed updates the IMAP subscription state for a folder.

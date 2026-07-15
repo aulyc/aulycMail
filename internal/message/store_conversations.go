@@ -44,7 +44,7 @@ func (s *Store) ListConversationsUnifiedInbox(offset, limit int, sortOrder, filt
 			END) as compose_status_rank,
 			json_group_array(DISTINCT json_object('name', m.from_name, 'email', m.from_email)) as participants_json
 		FROM messages m
-		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
+		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox' AND f.selectable = 1
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
 		LEFT JOIN message_compose_status mcs ON mcs.source_message_id = m.id
 		GROUP BY COALESCE(m.thread_id, m.id), a.id` +
@@ -126,7 +126,7 @@ func (s *Store) CountConversationsUnifiedInbox(filter string) (int, error) {
 	query := `
 		SELECT COUNT(DISTINCT COALESCE(m.thread_id, m.id) || '-' || a.id)
 		FROM messages m
-		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox'
+		INNER JOIN folders f ON m.folder_id = f.id AND f.folder_type = 'inbox' AND f.selectable = 1
 		INNER JOIN accounts a ON f.account_id = a.id AND a.enabled = 1
 	` + wherePart
 

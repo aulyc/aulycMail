@@ -365,6 +365,7 @@ type Mailbox struct {
 	Delimiter  string
 	Attributes []string
 	Type       FolderType
+	NoSelect   bool
 
 	// Status info (populated by Status or Select)
 	UIDValidity   uint32
@@ -411,6 +412,7 @@ func (c *Client) ListMailboxes() ([]*Mailbox, error) {
 			Name:       mbox.Mailbox,
 			Delimiter:  string(mbox.Delim),
 			Attributes: make([]string, len(mbox.Attrs)),
+			NoSelect:   hasMailboxAttribute(mbox.Attrs, imap.MailboxAttrNoSelect),
 		}
 
 		for i, attr := range mbox.Attrs {
@@ -458,6 +460,15 @@ func (c *Client) ListMailboxes() ([]*Mailbox, error) {
 	c.log.Debug().Int("count", len(mailboxes)).Msg("Listed mailboxes")
 
 	return mailboxes, nil
+}
+
+func hasMailboxAttribute(attrs []imap.MailboxAttr, target imap.MailboxAttr) bool {
+	for _, attr := range attrs {
+		if attr == target {
+			return true
+		}
+	}
+	return false
 }
 
 // Subscribe sends an IMAP SUBSCRIBE command for the given mailbox.

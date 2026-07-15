@@ -309,6 +309,46 @@ func TestMigrationV47_RemovesLegacyColumnsAndNonLocalContacts(t *testing.T) {
 	}
 }
 
+func TestMigrationV49AddsSelectableWithoutDeletingMessages(t *testing.T) {
+	db := openTestDBAtMigration(t, 48)
+
+	if _, err := db.Exec(`
+		INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
+		VALUES ('acct-49', 'Test', 'v49@example.com', 'imap.example.com', 'smtp.example.com', 'v49@example.com');
+
+		INSERT INTO folders (id, account_id, name, path, folder_type)
+		VALUES ('folder-49', 'acct-49', 'Other', 'Other', 'folder');
+
+		INSERT INTO messages (id, account_id, folder_id, uid, subject)
+		VALUES ('message-49', 'acct-49', 'folder-49', 1, 'Preserved');
+	`); err != nil {
+		t.Fatalf("seed pre-v49 data: %v", err)
+	}
+
+	if err := db.Migrate(); err != nil {
+		t.Fatalf("migrate to v49: %v", err)
+	}
+	if !columnExists(t, db, "folders", "selectable") {
+		t.Fatal("folders.selectable should exist after migration 49")
+	}
+
+	var selectable int
+	if err := db.QueryRow(`SELECT selectable FROM folders WHERE id = 'folder-49'`).Scan(&selectable); err != nil {
+		t.Fatalf("read migrated selectable value: %v", err)
+	}
+	if selectable != 1 {
+		t.Fatalf("selectable = %d, want default 1", selectable)
+	}
+
+	var messageCount int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM messages WHERE id = 'message-49'`).Scan(&messageCount); err != nil {
+		t.Fatalf("count preserved messages: %v", err)
+	}
+	if messageCount != 1 {
+		t.Fatalf("message count = %d, want 1", messageCount)
+	}
+}
+
 // TestMigrationV32_LocalRecordIDsRewrittenToUUIDs verifies that migration 32
 // transforms "local-<email>" record IDs into canonical UUIDv4s while keeping
 // the contact_emails references intact. Simulates the upgrade path for a user

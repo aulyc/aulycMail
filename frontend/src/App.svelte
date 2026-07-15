@@ -204,14 +204,19 @@
   }
 
   // Helper to find folder info by ID from account store
-  function findFolderById(accountId: string, folderId: string): { name: string; type: string; path: string } | null {
+  function findFolderById(accountId: string, folderId: string): { name: string; type: string; path: string; noSelect: boolean } | null {
     const acc = accountStore.accounts.find(a => a.account.id === accountId)
     if (!acc) return null
 
-    function searchTree(trees: folder.FolderTree[]): { name: string; type: string; path: string } | null {
+    function searchTree(trees: folder.FolderTree[]): { name: string; type: string; path: string; noSelect: boolean } | null {
       for (const tree of trees) {
         if (tree.folder?.id === folderId) {
-          return { name: tree.folder.name, type: tree.folder.type, path: tree.folder.path }
+          return {
+            name: tree.folder.name,
+            type: tree.folder.type,
+            path: tree.folder.path,
+            noSelect: tree.folder.noSelect === true,
+          }
         }
         if (tree.children) {
           const found = searchTree(tree.children)
@@ -225,6 +230,33 @@
     if (!acc.folders || acc.folders.length === 0) return null
     return searchTree(acc.folders)
   }
+
+  // A folder can become hierarchy-only after the first live IMAP LIST following
+  // an upgrade. Drop a persisted/stale selection as soon as that fact is known.
+  $effect(() => {
+    if (!selectedAccountId || !selectedFolderId || selectionSource !== 'account') return
+    const selected = findFolderById(selectedAccountId, selectedFolderId)
+    if (!selected?.noSelect) return
+
+    selectedAccountId = null
+    selectedFolderId = null
+    selectedFolderName = 'Inbox'
+    selectedFolderType = null
+    selectionSource = null
+    selectedThreadId = null
+    selectedConversationFolderId = null
+    selectedConversationAccountId = null
+    accountStore.selectedFolder = null
+    saveUIState({
+      selectedAccountId: null,
+      selectedFolderId: null,
+      selectedFolderName: 'Inbox',
+      selectedFolderType: null,
+      selectedThreadId: null,
+      selectedConversationAccountId: null,
+      selectedConversationFolderId: null,
+    })
+  })
 
   // Cmd/Ctrl+A inside any text field selects that field's text. Registered on
   // document in the CAPTURE phase so it fires before bits-ui dialogs (which can
@@ -438,6 +470,7 @@
     folderName: string,
     folderType: string
   ) {
+    if (findFolderById(accountId, folderId)?.noSelect) return
     selectedAccountId = accountId
     selectedFolderId = folderId
     selectedFolderName = folderName
@@ -472,6 +505,7 @@
 
   function selectMailFolder(accountId: string, folderId: string) {
     const folderInfo = findFolderById(accountId, folderId)
+    if (folderInfo?.noSelect) return null
     const folderName = folderInfo?.name || 'Inbox'
     const folderType = folderInfo?.type || 'inbox'
 
@@ -513,7 +547,9 @@
   function openMailConversation(data: { accountId: string; folderId: string; threadId: string }) {
     setActivePane('mail')
 
-    const { folderName, folderType } = selectMailFolder(data.accountId, data.folderId)
+    const selected = selectMailFolder(data.accountId, data.folderId)
+    if (!selected) return
+    const { folderName, folderType } = selected
 
     selectedThreadId = data.threadId
     selectedConversationAccountId = data.accountId

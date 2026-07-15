@@ -394,7 +394,7 @@ func (s *Scheduler) syncAdditionalFolders(ctx context.Context, acc *account.Acco
 // getAccountSyncFolders returns the folders to sync for an account.
 func (s *Scheduler) getAccountSyncFolders(acc *account.Account) ([]*folder.Folder, error) {
 	if acc.SyncAllFolders {
-		return s.folderStore.List(acc.ID)
+		return s.folderStore.ListSelectable(acc.ID)
 	}
 	if acc.SyncFoldersEnabled {
 		return s.folderStore.ListSubscribed(acc.ID)

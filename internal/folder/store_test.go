@@ -1,11 +1,24 @@
 package folder
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
 
 	"aulyc.local/aulycmail/internal/database"
 )
+
+func TestRequireSelectable(t *testing.T) {
+	selectable := &Folder{Path: "INBOX"}
+	if err := selectable.RequireSelectable(); err != nil {
+		t.Fatalf("selectable folder rejected: %v", err)
+	}
+
+	directory := &Folder{Path: "Other", NoSelect: true}
+	if err := directory.RequireSelectable(); !errors.Is(err, ErrNotSelectable) {
+		t.Fatalf("RequireSelectable error = %v, want ErrNotSelectable", err)
+	}
+}
 
 func openTestDB(t *testing.T) *database.DB {
 	t.Helper()
@@ -131,6 +144,57 @@ func TestList(t *testing.T) {
 	}
 	if len(folders) != 2 {
 		t.Errorf("got %d folders, want 2", len(folders))
+	}
+}
+
+func TestNoSelectFolderRoundTripAndSelectableQueries(t *testing.T) {
+	db := openTestDB(t)
+	createTestAccount(t, db, "acc1")
+	store := NewStore(db)
+
+	directory := &Folder{
+		AccountID:  "acc1",
+		Name:       "Other",
+		Path:       "Other",
+		Type:       TypeFolder,
+		Subscribed: true,
+		NoSelect:   true,
+	}
+	selectable := &Folder{
+		AccountID:  "acc1",
+		Name:       "Child",
+		Path:       "Other/Child",
+		Type:       TypeFolder,
+		Subscribed: true,
+	}
+	for _, f := range []*Folder{directory, selectable} {
+		if err := store.Create(f); err != nil {
+			t.Fatalf("Create(%s): %v", f.Path, err)
+		}
+	}
+
+	got, err := store.Get(directory.ID)
+	if err != nil {
+		t.Fatalf("Get directory: %v", err)
+	}
+	if !got.NoSelect {
+		t.Fatal("NoSelect was not preserved by the store")
+	}
+
+	selectableFolders, err := store.ListSelectable("acc1")
+	if err != nil {
+		t.Fatalf("ListSelectable: %v", err)
+	}
+	if len(selectableFolders) != 1 || selectableFolders[0].ID != selectable.ID {
+		t.Fatalf("ListSelectable = %#v, want only %s", selectableFolders, selectable.ID)
+	}
+
+	subscribed, err := store.ListSubscribed("acc1")
+	if err != nil {
+		t.Fatalf("ListSubscribed: %v", err)
+	}
+	if len(subscribed) != 1 || subscribed[0].ID != selectable.ID {
+		t.Fatalf("ListSubscribed = %#v, want only selectable folder", subscribed)
 	}
 }
 

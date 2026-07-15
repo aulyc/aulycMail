@@ -1407,6 +1407,7 @@ export namespace folder {
 	    lastSync?: string;
 	    lastFullSync?: string;
 	    subscribed: boolean;
+	    noSelect: boolean;
 
 	    static createFrom(source: any = {}) {
 	        return new Folder(source);
@@ -1428,6 +1429,7 @@ export namespace folder {
 	        this.lastSync = source["lastSync"];
 	        this.lastFullSync = source["lastFullSync"];
 	        this.subscribed = source["subscribed"];
+	        this.noSelect = source["noSelect"];
 	    }
 	}
 	export class FolderTree {

@@ -15,6 +15,9 @@ import (
 // SearchConversations searches for conversations in a folder using full-text search
 // Returns matching conversations with highlighted text
 func (a *App) SearchConversations(accountID, folderID, query string, offset, limit int, filter string) ([]*message.ConversationSearchResult, error) {
+	if _, err := a.requireSelectableFolder(folderID); err != nil {
+		return nil, err
+	}
 	results, _, err := a.messageStore.SearchConversations(folderID, query, offset, limit, filter)
 	return results, err
 }
@@ -33,6 +36,9 @@ func (a *App) SearchMailInAccount(accountID, query string, limit int) ([]*messag
 
 // GetSearchCount returns the total count of search results in a folder
 func (a *App) GetSearchCount(accountID, folderID, query, filter string) (int, error) {
+	if _, err := a.requireSelectableFolder(folderID); err != nil {
+		return 0, err
+	}
 	_, count, err := a.messageStore.SearchConversations(folderID, query, 0, 0, filter)
 	return count, err
 }

@@ -437,6 +437,9 @@ func (a *App) PrepareReply(messageID, mode string) (*smtp.ComposeMessage, error)
 	if msg == nil {
 		return nil, fmt.Errorf("message not found: %s", messageID)
 	}
+	if _, err := a.requireSelectableFolder(msg.FolderID); err != nil {
+		return nil, err
+	}
 
 	// Get account and identities
 	identities, err := a.accountStore.GetIdentities(msg.AccountID)

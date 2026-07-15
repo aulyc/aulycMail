@@ -51,6 +51,23 @@ func (a *App) withIMAPRetry(accountID string, op func(conn *imap.Client) error) 
 	return op(poolConn.Client())
 }
 
+func (a *App) requireSelectableMessageFolders(messages []*message.Message) error {
+	seen := make(map[string]struct{})
+	for _, msg := range messages {
+		if msg == nil || msg.FolderID == "" {
+			continue
+		}
+		if _, ok := seen[msg.FolderID]; ok {
+			continue
+		}
+		seen[msg.FolderID] = struct{}{}
+		if _, err := a.requireSelectableFolder(msg.FolderID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // ============================================================================
 // Message Actions API - Exposed to frontend via Wails bindings
 // ============================================================================
@@ -62,6 +79,9 @@ func (a *App) MarkAsRead(messageIDs []string) error {
 
 // MarkAllFolderMessagesAsRead marks all unread messages in a folder as read
 func (a *App) MarkAllFolderMessagesAsRead(folderID string) error {
+	if _, err := a.requireSelectableFolder(folderID); err != nil {
+		return err
+	}
 	ids, err := a.messageStore.GetUnreadMessageIDsByFolder(folderID)
 	if err != nil {
 		return fmt.Errorf("failed to get unread messages: %w", err)
@@ -74,6 +94,9 @@ func (a *App) MarkAllFolderMessagesAsRead(folderID string) error {
 
 // MarkAllFolderMessagesAsUnread marks all read messages in a folder as unread
 func (a *App) MarkAllFolderMessagesAsUnread(folderID string) error {
+	if _, err := a.requireSelectableFolder(folderID); err != nil {
+		return err
+	}
 	ids, err := a.messageStore.GetReadMessageIDsByFolder(folderID)
 	if err != nil {
 		return fmt.Errorf("failed to get read messages: %w", err)
@@ -103,6 +126,9 @@ func (a *App) setReadStatus(messageIDs []string, isRead bool) error {
 	}
 	if len(messages) == 0 {
 		return nil
+	}
+	if err := a.requireSelectableMessageFolders(messages); err != nil {
+		return err
 	}
 
 	// Group by folder for IMAP operations
@@ -205,6 +231,9 @@ func (a *App) setStarredStatus(messageIDs []string, isStarred bool) error {
 	if len(messages) == 0 {
 		return nil
 	}
+	if err := a.requireSelectableMessageFolders(messages); err != nil {
+		return err
+	}
 
 	byFolder := make(map[string][]*message.Message)
 	for _, m := range messages {
@@ -249,10 +278,16 @@ func (a *App) syncFlagsToIMAP(messages []*message.Message, folderID, flagType st
 	if len(messages) == 0 {
 		return nil
 	}
+	if err := a.requireSelectableMessageFolders(messages); err != nil {
+		return err
+	}
 
 	folderObj, err := a.folderStore.Get(folderID)
 	if err != nil || folderObj == nil {
 		return fmt.Errorf("folder not found: %s", folderID)
+	}
+	if err := folderObj.RequireSelectable(); err != nil {
+		return err
 	}
 
 	uids := make([]goImap.UID, len(messages))
@@ -305,10 +340,16 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 	if len(messages) == 0 {
 		return nil
 	}
+	if err := a.requireSelectableMessageFolders(messages); err != nil {
+		return err
+	}
 
 	destFolder, err := a.folderStore.Get(destFolderID)
 	if err != nil || destFolder == nil {
 		return fmt.Errorf("destination folder not found: %s", destFolderID)
+	}
+	if err := destFolder.RequireSelectable(); err != nil {
+		return err
 	}
 
 	// Cross-account move: APPEND raw bytes to destination first, then route source
@@ -482,6 +523,12 @@ func (a *App) moveMessagesToIMAP(messages []*message.Message, sourceFolderID str
 	if err != nil || sourceFolder == nil {
 		return fmt.Errorf("source folder not found")
 	}
+	if err := sourceFolder.RequireSelectable(); err != nil {
+		return err
+	}
+	if err := destFolder.RequireSelectable(); err != nil {
+		return err
+	}
 
 	// Collect UIDs for logging
 	uidList := make([]uint32, len(messages))
@@ -600,10 +647,16 @@ func (a *App) CopyToFolder(messageIDs []string, destFolderID string) error {
 	if len(messages) == 0 {
 		return nil
 	}
+	if err := a.requireSelectableMessageFolders(messages); err != nil {
+		return err
+	}
 
 	destFolder, err := a.folderStore.Get(destFolderID)
 	if err != nil || destFolder == nil {
 		return fmt.Errorf("destination folder not found: %s", destFolderID)
+	}
+	if err := destFolder.RequireSelectable(); err != nil {
+		return err
 	}
 
 	// Cross-account copy: APPEND raw bytes to destination. Fire-and-forget to
@@ -671,6 +724,12 @@ func (a *App) copyMessagesToIMAP(messages []*message.Message, sourceFolderID str
 	if err != nil || sourceFolder == nil {
 		return fmt.Errorf("source folder not found")
 	}
+	if err := sourceFolder.RequireSelectable(); err != nil {
+		return err
+	}
+	if err := destFolder.RequireSelectable(); err != nil {
+		return err
+	}
 
 	uids := make([]goImap.UID, len(messages))
 	for i, m := range messages {
@@ -722,6 +781,9 @@ func (a *App) copyMessagesAcrossAccounts(messages []*message.Message, destFolder
 
 	if len(messages) == 0 {
 		return nil
+	}
+	if err := destFolder.RequireSelectable(); err != nil {
+		return err
 	}
 
 	log.Info().
@@ -953,6 +1015,9 @@ func (a *App) gmailRemoveLabel(messages []*message.Message) error {
 	if len(messages) == 0 {
 		return nil
 	}
+	if err := a.requireSelectableMessageFolders(messages); err != nil {
+		return err
+	}
 
 	// Group by source folder
 	byFolder := make(map[string][]*message.Message)
@@ -1023,10 +1088,16 @@ func (a *App) removeFromIMAPFolder(messages []*message.Message, folderID string)
 	if len(messages) == 0 {
 		return nil
 	}
+	if err := a.requireSelectableMessageFolders(messages); err != nil {
+		return err
+	}
 
 	folderObj, err := a.folderStore.Get(folderID)
 	if err != nil || folderObj == nil {
 		return fmt.Errorf("folder not found")
+	}
+	if err := folderObj.RequireSelectable(); err != nil {
+		return err
 	}
 
 	var uids []goImap.UID
@@ -1143,6 +1214,9 @@ func (a *App) DeletePermanently(messageIDs []string) error {
 	if len(messages) == 0 {
 		return nil
 	}
+	if err := a.requireSelectableMessageFolders(messages); err != nil {
+		return err
+	}
 
 	// Group by folder
 	byFolder := make(map[string][]*message.Message)
@@ -1214,6 +1288,9 @@ func (a *App) deleteMessagesFromIMAP(messages []*message.Message, folderID strin
 	folderObj, err := a.folderStore.Get(folderID)
 	if err != nil || folderObj == nil {
 		return fmt.Errorf("folder not found")
+	}
+	if err := folderObj.RequireSelectable(); err != nil {
+		return err
 	}
 
 	accountID := messages[0].AccountID

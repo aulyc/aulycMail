@@ -204,6 +204,9 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message info: %w", err)
 	}
+	if localMessage == nil {
+		return nil, fmt.Errorf("message not found: %s", messageID)
+	}
 	uid := localMessage.UID
 	folderID := localMessage.FolderID
 
@@ -211,6 +214,12 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 	f, err := e.folderStore.Get(folderID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get folder: %w", err)
+	}
+	if f == nil {
+		return nil, fmt.Errorf("folder not found: %s", folderID)
+	}
+	if err := f.RequireSelectable(); err != nil {
+		return nil, err
 	}
 
 	e.log.Debug().
@@ -646,6 +655,12 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 	f, err := e.folderStore.Get(folderID)
 	if err != nil {
 		return fmt.Errorf("failed to get folder: %w", err)
+	}
+	if f == nil {
+		return fmt.Errorf("folder not found: %s", folderID)
+	}
+	if err := f.RequireSelectable(); err != nil {
+		return err
 	}
 
 	// Calculate sync date cutoff
@@ -1113,6 +1128,9 @@ func (e *Engine) FetchRawMessage(ctx context.Context, accountID, folderID string
 	if f == nil {
 		return nil, fmt.Errorf("folder not found: %s", folderID)
 	}
+	if err := f.RequireSelectable(); err != nil {
+		return nil, err
+	}
 
 	// Get a connection from the pool
 	conn, err := e.pool.GetConnection(ctx, accountID)
@@ -1190,6 +1208,9 @@ func (e *Engine) StreamRawMessage(ctx context.Context, accountID, folderID strin
 	}
 	if f == nil {
 		return nil, fmt.Errorf("folder not found: %s", folderID)
+	}
+	if err := f.RequireSelectable(); err != nil {
+		return nil, err
 	}
 
 	conn, err := e.pool.GetConnection(ctx, accountID)
@@ -1285,6 +1306,9 @@ func (e *Engine) StreamRawMessages(ctx context.Context, accountID, folderID stri
 	}
 	if f == nil {
 		return nil, nil, fmt.Errorf("folder not found: %s", folderID)
+	}
+	if err := f.RequireSelectable(); err != nil {
+		return nil, nil, err
 	}
 
 	conn, err := e.pool.GetConnection(ctx, accountID)
