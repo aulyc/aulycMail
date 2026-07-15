@@ -99,6 +99,10 @@ func normalizeRFCMessageID(value string) string {
 }
 
 func validateFetchedMessageIdentity(uid uint32, expected string, raw []byte) error {
+	return validateFetchedMessageIdentityFromReader(uid, expected, bytes.NewReader(raw))
+}
+
+func validateFetchedMessageIdentityFromReader(uid uint32, expected string, raw io.Reader) error {
 	expected = normalizeRFCMessageID(expected)
 	if expected == "" {
 		// Legacy and malformed messages may legitimately have no Message-ID in
@@ -106,7 +110,7 @@ func validateFetchedMessageIdentity(uid uint32, expected string, raw []byte) err
 		return nil
 	}
 
-	entity, err := gomessage.Read(bytes.NewReader(raw))
+	entity, err := gomessage.Read(raw)
 	if err != nil {
 		return fmt.Errorf("failed to parse message identity for UID %d: %w", uid, err)
 	}
@@ -271,18 +275,10 @@ func (e *Engine) FetchMessageBody(ctx context.Context, accountID, messageID stri
 		return nil, RawMessageNotFoundError{UID: uid}
 	}
 
-	// Update message in store
-	if err := e.messageStore.UpdateBody(messageID, result.BodyHTML, result.BodyText, result.Snippet, result.HasAttachments); err != nil {
+	// Replace body and attachment metadata together so a successful re-fetch
+	// cannot leave stale or duplicated attachment records behind.
+	if err := e.messageStore.RestoreBody(messageID, result.BodyHTML, result.BodyText, result.Snippet, result.HasAttachments, result.Attachments); err != nil {
 		return nil, fmt.Errorf("failed to update message body: %w", err)
-	}
-
-	// Store attachments if present
-	if result.HasAttachments && e.attachmentStore != nil {
-		for _, att := range result.Attachments {
-			if err := e.attachmentStore.Create(att); err != nil {
-				e.log.Debug().Err(err).Str("filename", att.Filename).Msg("Failed to save attachment metadata")
-			}
-		}
 	}
 
 	// Return updated message
@@ -459,34 +455,9 @@ func (e *Engine) fetchMessageBodiesBatch(ctx context.Context, client *imapclient
 			return nil, nil, err
 		}
 
-		// Parse body content with timeout, extracting attachments in the same pass
-		parsed := e.parseMessageBodyFull(rawBytes, target.LocalMessageID, 30*time.Second)
-
-		// Sanitize HTML
-		bodyHTML := parsed.BodyHTML
-		if bodyHTML != "" {
-			bodyHTML = e.sanitizer.Sanitize(bodyHTML)
-		}
-
-		// Generate snippet
-		var snippet string
-		if parsed.BodyText != "" {
-			snippet = generateSnippet(parsed.BodyText, 200)
-		} else if bodyHTML != "" {
-			snippet = generateSnippet(stripHTMLTags(bodyHTML), 200)
-		}
-
-		results[uid] = &ProcessedBody{
-			MessageID:      target.LocalMessageID,
-			BodyHTML:       bodyHTML,
-			BodyText:       parsed.BodyText,
-			Snippet:        snippet,
-			HasAttachments: parsed.HasAttachments,
-			Attachments:    parsed.Attachments,
-			RawBytes:       rawBytes,
-			ReportedSize:   reportedSize,
-			ReceivedBytes:  int64(len(rawBytes)),
-		}
+		processed := e.processRawMessageBody(rawBytes, target.LocalMessageID)
+		processed.ReportedSize = reportedSize
+		results[uid] = processed
 	}
 
 	if err := fetchCmd.Close(); err != nil {

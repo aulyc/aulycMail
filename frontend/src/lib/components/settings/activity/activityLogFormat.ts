@@ -44,6 +44,7 @@ export function activitySummary(log: ActivityLog): string {
         added: payload.added ?? 0,
         skipped: payload.skipped ?? 0,
         missing: payload.missing ?? 0,
+        unavailable: payload.unavailable ?? 0,
         failed: payload.failed ?? 0,
       },
     })

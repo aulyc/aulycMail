@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 	"unicode"
@@ -62,8 +63,8 @@ func FileExists(baseDir, relPath string) bool {
 	if relPath == "" {
 		return false
 	}
-	info, err := os.Stat(filepath.Join(baseDir, filepath.FromSlash(relPath)))
-	return err == nil && !info.IsDir()
+	_, found, err := validateIndexedMessageFile(baseDir, relPath)
+	return err == nil && found
 }
 
 func IndexedFilePath(baseDir, relPath string) (string, error) {
@@ -85,6 +86,107 @@ func IndexedFilePath(baseDir, relPath string) (string, error) {
 		return "", errors.New("backup message path escapes backup directory")
 	}
 	return joined, nil
+}
+
+// FindIndexedMessageFile resolves a raw RFC822 backup by the same immutable
+// mailbox identity used by the backup index. It returns found=false when the
+// index or file is absent. Indexed paths are confined to the configured backup
+// directory, including after symlink resolution.
+func FindIndexedMessageFile(directory, accountID, folderID string, uidValidity, uid uint32, messageID string) (string, bool, error) {
+	cleanDir, err := NormalizeExistingDirectory(directory)
+	if err != nil {
+		return "", false, err
+	}
+	if cleanDir == "" {
+		return "", false, nil
+	}
+
+	idx, found, err := LoadIndex(cleanDir)
+	if err != nil || !found {
+		return "", false, err
+	}
+	row := MessageRow{
+		AccountID:   accountID,
+		FolderID:    folderID,
+		UIDValidity: uidValidity,
+		UID:         uid,
+		MessageID:   messageID,
+	}
+	return findIndexedMessageFile(cleanDir, idx, row)
+}
+
+func findIndexedMessageFile(directory string, idx *Index, row MessageRow) (string, bool, error) {
+	candidates := make([]IndexMessage, 0, 2)
+	seenPaths := make(map[string]bool)
+	addCandidate := func(entry IndexMessage) {
+		if entry.EMLPath == "" || seenPaths[entry.EMLPath] {
+			return
+		}
+		seenPaths[entry.EMLPath] = true
+		candidates = append(candidates, entry)
+	}
+	if entry, ok := idx.Messages[MessageKey(row)]; ok {
+		addCandidate(entry)
+	}
+	normalizedMessageID := normalizeMessageID(row.MessageID)
+	if normalizedMessageID != "" {
+		for _, entry := range idx.Messages {
+			if entry.AccountID == row.AccountID && normalizeMessageID(entry.MessageID) == normalizedMessageID {
+				addCandidate(entry)
+			}
+		}
+	}
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].EMLPath < candidates[j].EMLPath })
+	for _, entry := range candidates {
+		path, found, err := validateIndexedMessageFile(directory, entry.EMLPath)
+		if err != nil {
+			return "", false, err
+		}
+		if found {
+			return path, true, nil
+		}
+	}
+	return "", false, nil
+}
+
+func validateIndexedMessageFile(directory, relativePath string) (string, bool, error) {
+	path, err := IndexedFilePath(directory, relativePath)
+
+	if err != nil {
+		return "", false, fmt.Errorf("invalid indexed backup message path: %w", err)
+	}
+	info, err := os.Stat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("failed to inspect indexed backup message: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		return "", false, errors.New("indexed backup message is not a regular file")
+	}
+
+	realBase, err := filepath.EvalSymlinks(directory)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to resolve backup directory: %w", err)
+	}
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to resolve indexed backup message: %w", err)
+	}
+	realBase = filepath.Clean(realBase)
+	realPath = filepath.Clean(realPath)
+	if realPath != realBase && !strings.HasPrefix(realPath, realBase+string(os.PathSeparator)) {
+		return "", false, errors.New("indexed backup message resolves outside backup directory")
+	}
+	return path, true, nil
+}
+
+func normalizeMessageID(value string) string {
+	value = strings.TrimSpace(value)
+	value = strings.TrimPrefix(value, "<")
+	value = strings.TrimSuffix(value, ">")
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 func MessageRelativePath(accountEmail, folderPath, subject string, date time.Time, uidValidity, uid uint32) string {

@@ -118,6 +118,7 @@
     "failedToLoadSource": "Failed to load message source",
     "failedToLoadMessages": "Failed to load messages.",
     "failedToFetchBody": "Message content could not be downloaded. The local record was kept.",
+    "localContentUnavailable": "Only the local message index remains; neither the server mailbox nor the backup contains usable source or attachments.",
     "bodyTooLarge": "This message is too large to download into the viewer. The local record was kept.",
     "noContent": "No content available",
     "downloadingContent": "Downloading message content...",
@@ -329,12 +330,12 @@
     "progressExported": "Exported",
     "progressSkipped": "Skipped",
     "progressMissing": "Missing",
+    "progressUnavailable": "Source unavailable",
     "progressFailed": "Failed",
     "chooseDirectoryFailed": "Failed to choose backup directory",
     "openDirectoryFailed": "Failed to open backup directory",
     "backupStartedInBackground": "Backup started in the background",
-    "backupComplete": "Backup complete: exported {exported}, skipped {skipped}, failed {failed}",
-    "backupCompleteWithMissing": "Backup complete: exported {exported}, skipped {skipped}, missing {missing}, failed {failed}",
+    "backupComplete": "Backup complete: exported {exported}, skipped {skipped}, missing {missing}, source unavailable {unavailable}, failed {failed}",
     "backupFailed": "Backup failed"
   },
   "backupViewer": {
@@ -742,7 +743,7 @@
     "clearFailed": "Failed to clear logs",
     "backupFailed": "Backup failed",
     "backupCancelled": "Backup cancelled",
-    "backupSummary": "{mode} · completed {completed} · added {added} · existing {skipped} · missing {missing} · failed {failed}",
+    "backupSummary": "{mode} · completed {completed} · added {added} · existing {skipped} · missing {missing} · source unavailable {unavailable} · failed {failed}",
     "syncSummary": "{target} · added {added}",
     "filters": { "all": "All", "sync": "Sync", "backup": "Backup", "failed": "Failed" },
     "status": { "success": "Success", "partial": "Partial", "failed": "Failed", "cancelled": "Cancelled", "unknown": "Unknown" }

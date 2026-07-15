@@ -329,6 +329,36 @@ func (a *App) withStreamedRawMessage(msg *message.Message, use func(io.Reader) e
 }
 
 func (a *App) withStreamedRawMessagePath(msg *message.Message, use func(string) error) error {
+	backupPath, found, err := a.indexedBackupMessagePath(msg)
+	if err != nil {
+		return err
+	}
+	if found {
+		file, err := os.Open(backupPath)
+		if err != nil {
+			return fmt.Errorf("failed to open indexed backup message: %w", err)
+		}
+		validateErr := a.syncEngine.ValidateMessageIdentityFromReader(a.ctx, msg.ID, file)
+		closeErr := file.Close()
+		if validateErr != nil {
+			return fmt.Errorf("indexed backup message failed identity validation: %w", validateErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("failed to close indexed backup message: %w", closeErr)
+		}
+		return use(backupPath)
+	}
+	f, err := a.folderStore.Get(msg.FolderID)
+	if err != nil {
+		return fmt.Errorf("failed to get message folder: %w", err)
+	}
+	if f == nil {
+		return fmt.Errorf("folder not found: %s", msg.FolderID)
+	}
+	if !f.IsSelectable() {
+		return unavailableLocalMessageSourceError()
+	}
+
 	tmp, err := os.CreateTemp("", "aulycmail-raw-*.eml")
 	if err != nil {
 		return fmt.Errorf("failed to create temp message file: %w", err)

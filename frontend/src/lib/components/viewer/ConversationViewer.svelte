@@ -527,6 +527,9 @@
 
 	  function describeBodyFetchError(err: unknown): string {
 	    const raw = String(err instanceof Error ? err.message : err ?? '')
+	    if (raw.toLowerCase().includes('local message source unavailable')) {
+	      return $_('viewer.localContentUnavailable')
+	    }
 	    if (raw.toLowerCase().includes('too large')) {
 	      return $_('viewer.bodyTooLarge')
 	    }

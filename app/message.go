@@ -1,14 +1,15 @@
 package app
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 
 	"aulyc.local/aulycmail/internal/logging"
 	"aulyc.local/aulycmail/internal/message"
-	mailSync "aulyc.local/aulycmail/internal/sync"
 )
 
 // ============================================================================
@@ -16,6 +17,8 @@ import (
 // ============================================================================
 
 const maxInlineMessageSourceBytes = 25 * 1024 * 1024
+
+var errInlineMessageSourceTooLarge = errors.New("message source is too large for inline display")
 
 type MessageSourceResult struct {
 	Content  string `json:"content,omitempty"`
@@ -37,10 +40,6 @@ func (a *App) GetMessageSource(messageID string) (*MessageSourceResult, error) {
 	if msg == nil {
 		return nil, fmt.Errorf("message not found: %s", messageID)
 	}
-	if _, err := a.requireSelectableFolder(msg.FolderID); err != nil {
-		return nil, err
-	}
-
 	if msg.Size > maxInlineMessageSourceBytes {
 		path, size, err := a.writeMessageSourceFile(msg)
 		if err != nil {
@@ -49,10 +48,22 @@ func (a *App) GetMessageSource(messageID string) (*MessageSourceResult, error) {
 		return &MessageSourceResult{FilePath: path, Size: size, TooLarge: true}, nil
 	}
 
-	// Fetch raw message from IMAP
-	rawBytes, err := a.syncEngine.FetchRawMessage(a.ctx, msg.AccountID, msg.FolderID, msg.UID)
+	var rawBytes []byte
+	var sourceSize int64
+	err = a.withStreamedRawMessagePath(msg, func(path string) error {
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		sourceSize = info.Size()
+		if sourceSize > maxInlineMessageSourceBytes {
+			return errInlineMessageSourceTooLarge
+		}
+		rawBytes, err = os.ReadFile(path)
+		return err
+	})
 	if err != nil {
-		if mailSync.IsRawMessageTooLargeError(err) {
+		if errors.Is(err, errInlineMessageSourceTooLarge) {
 			path, size, streamErr := a.writeMessageSourceFile(msg)
 			if streamErr != nil {
 				return nil, fmt.Errorf("failed to write message source file: %w", streamErr)
@@ -62,7 +73,7 @@ func (a *App) GetMessageSource(messageID string) (*MessageSourceResult, error) {
 		return nil, fmt.Errorf("failed to fetch message source: %w", err)
 	}
 
-	return &MessageSourceResult{Content: string(rawBytes), Size: int64(len(rawBytes))}, nil
+	return &MessageSourceResult{Content: string(rawBytes), Size: sourceSize}, nil
 }
 
 func (a *App) writeMessageSourceFile(msg *message.Message) (string, int64, error) {
@@ -78,7 +89,12 @@ func (a *App) writeMessageSourceFile(msg *message.Message) (string, int64, error
 	}
 	path := tmp.Name()
 
-	result, streamErr := a.syncEngine.StreamRawMessage(a.ctx, msg.AccountID, msg.FolderID, msg.UID, tmp)
+	var size int64
+	streamErr := a.withStreamedRawMessage(msg, func(raw io.Reader) error {
+		var err error
+		size, err = io.Copy(tmp, raw)
+		return err
+	})
 	closeErr := tmp.Close()
 	if streamErr != nil {
 		_ = os.Remove(path)
@@ -88,7 +104,7 @@ func (a *App) writeMessageSourceFile(msg *message.Message) (string, int64, error
 		_ = os.Remove(path)
 		return "", 0, closeErr
 	}
-	return path, result.BytesWritten, nil
+	return path, size, nil
 }
 
 func cleanupOldMessageSourceFiles(dir string, maxAge time.Duration) {
@@ -124,22 +140,43 @@ func (a *App) FetchMessageBody(messageID string) (*message.Message, error) {
 	if msg == nil {
 		return nil, fmt.Errorf("message not found: %s", messageID)
 	}
-	if _, err := a.requireSelectableFolder(msg.FolderID); err != nil {
-		return nil, err
-	}
 
 	// If body is already fetched, just return it
 	if msg.BodyFetched {
 		return msg, nil
 	}
+	f, err := a.folderStore.Get(msg.FolderID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get message folder: %w", err)
+	}
+	if f == nil {
+		return nil, fmt.Errorf("folder not found: %s", msg.FolderID)
+	}
+	if !f.IsSelectable() {
+		updated, found, restoreErr := a.restoreMessageBodyFromBackup(msg)
+		if restoreErr != nil {
+			return nil, restoreErr
+		}
+		if found {
+			return updated, nil
+		}
+		return nil, unavailableLocalMessageSourceError()
+	}
 
 	// Fetch the body from IMAP
 	updatedMsg, err := a.syncEngine.FetchMessageBody(a.ctx, msg.AccountID, messageID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch message body: %w", err)
+	if err == nil {
+		return updatedMsg, nil
 	}
-
-	return updatedMsg, nil
+	serverErr := err
+	updatedMsg, found, restoreErr := a.restoreMessageBodyFromBackup(msg)
+	if restoreErr != nil {
+		return nil, fmt.Errorf("failed to fetch message body from server (%v) and backup recovery failed: %w", serverErr, restoreErr)
+	}
+	if found {
+		return updatedMsg, nil
+	}
+	return nil, fmt.Errorf("failed to fetch message body: %w", serverErr)
 }
 
 // GetConversations returns conversations (threaded messages) for a folder with pagination

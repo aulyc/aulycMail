@@ -118,6 +118,7 @@
     "failedToLoadSource": "加载邮件源码失败",
     "failedToLoadMessages": "加载邮件失败。",
     "failedToFetchBody": "无法下载邮件内容。本地记录已保留。",
+    "localContentUnavailable": "该邮件仅保留本地索引；服务器邮箱与备份中均无可用原文或附件。",
     "bodyTooLarge": "这封邮件太大，无法直接下载到阅读器。本地记录已保留。",
     "noContent": "无可用内容",
     "downloadingContent": "正在下载邮件内容...",
@@ -329,12 +330,12 @@
     "progressExported": "新增",
     "progressSkipped": "跳过",
     "progressMissing": "未找到",
+    "progressUnavailable": "原文不可获取",
     "progressFailed": "失败",
     "chooseDirectoryFailed": "选择备份目录失败",
     "openDirectoryFailed": "打开备份目录失败",
     "backupStartedInBackground": "备份已在后台开始",
-    "backupComplete": "备份完成：新增 {exported}，跳过 {skipped}，失败 {failed}",
-    "backupCompleteWithMissing": "备份完成：新增 {exported}，跳过 {skipped}，未找到 {missing}，失败 {failed}",
+    "backupComplete": "备份完成：新增 {exported}，跳过 {skipped}，未找到 {missing}，原文不可获取 {unavailable}，失败 {failed}",
     "backupFailed": "备份失败"
   },
   "backupViewer": {
@@ -742,7 +743,7 @@
     "clearFailed": "清理日志失败",
     "backupFailed": "备份失败",
     "backupCancelled": "备份已取消",
-    "backupSummary": "{mode} · 完成 {completed} · 新增 {added} · 已存在 {skipped} · 缺失 {missing} · 失败 {failed}",
+    "backupSummary": "{mode} · 完成 {completed} · 新增 {added} · 已存在 {skipped} · 缺失 {missing} · 原文不可获取 {unavailable} · 失败 {failed}",
     "syncSummary": "{target} · 新增 {added} 封",
     "filters": { "all": "全部", "sync": "同步", "backup": "备份", "failed": "失败" },
     "status": { "success": "成功", "partial": "部分完成", "failed": "失败", "cancelled": "已取消", "unknown": "未知" }

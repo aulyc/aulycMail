@@ -56,3 +56,66 @@ func TestNoSelectFoldersAreExcludedFromGlobalMailSurfaces(t *testing.T) {
 		t.Fatalf("badge count = %d, want selectable-folder count 2", badge)
 	}
 }
+
+func TestFindUniqueSelectableEquivalentRequiresFullEnvelopeUniqueness(t *testing.T) {
+	store, accountID, selectableFolderID := newBodyFailedTestStore(t)
+	const directoryID = "folder-directory-equivalent"
+	if _, err := store.db.Exec(
+		`INSERT INTO folders
+		 (id, account_id, name, path, folder_type, selectable)
+		 VALUES (?, ?, 'Other', 'Other', 'folder', 0)`,
+		directoryID, accountID,
+	); err != nil {
+		t.Fatalf("seed no-select folder: %v", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	target := &Message{
+		ID: "stale-equivalent", AccountID: accountID, FolderID: directoryID, UID: 10,
+		Subject: "Same envelope", FromName: "Sender", FromEmail: "sender@example.com",
+		ToList: `["recipient@example.com"]`, CcList: `[]`, BccList: `[]`,
+		ReplyTo: "reply@example.com", Date: now, Size: 1234,
+	}
+	candidate := *target
+	candidate.ID = "selectable-equivalent"
+	candidate.FolderID = selectableFolderID
+	candidate.UID = 20
+	for _, msg := range []*Message{target, &candidate} {
+		if err := store.Create(msg); err != nil {
+			t.Fatalf("Create(%s): %v", msg.ID, err)
+		}
+	}
+
+	got, err := store.FindUniqueSelectableEquivalent(target.ID)
+	if err != nil {
+		t.Fatalf("FindUniqueSelectableEquivalent: %v", err)
+	}
+	if got == nil || got.ID != candidate.ID {
+		t.Fatalf("equivalent = %#v, want %s", got, candidate.ID)
+	}
+
+	secondFolderID := "selectable-equivalent-2"
+	if _, err := store.db.Exec(
+		`INSERT INTO folders
+		 (id, account_id, name, path, folder_type, selectable)
+		 VALUES (?, ?, 'POC', 'POC', 'folder', 1)`,
+		secondFolderID, accountID,
+	); err != nil {
+		t.Fatalf("seed second selectable folder: %v", err)
+	}
+	duplicate := candidate
+	duplicate.ID = "ambiguous-equivalent"
+	duplicate.FolderID = secondFolderID
+	duplicate.UID = 30
+	if err := store.Create(&duplicate); err != nil {
+		t.Fatalf("Create ambiguous equivalent: %v", err)
+	}
+
+	got, err = store.FindUniqueSelectableEquivalent(target.ID)
+	if err != nil {
+		t.Fatalf("FindUniqueSelectableEquivalent ambiguous: %v", err)
+	}
+	if got != nil {
+		t.Fatalf("ambiguous equivalent should be rejected, got %#v", got)
+	}
+}

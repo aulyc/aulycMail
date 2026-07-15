@@ -154,13 +154,17 @@ func TestBackupRunTrackerFinishPreservesLastProgress(t *testing.T) {
 
 func TestBackupDoneProgressIncludesMissingCount(t *testing.T) {
 	progress := backupDoneProgress(&BackupRunResult{
-		Total:    10,
-		Exported: 7,
-		Skipped:  2,
-		Missing:  1,
+		Total:       10,
+		Exported:    6,
+		Skipped:     2,
+		Missing:     1,
+		Unavailable: 1,
 	})
 	if progress.Missing != 1 {
 		t.Fatalf("missing count was not preserved: %#v", progress)
+	}
+	if progress.Unavailable != 1 {
+		t.Fatalf("unavailable count was not preserved: %#v", progress)
 	}
 }
 
@@ -172,6 +176,10 @@ func TestFormatBackupRunResultIncludesMissingOnlyWhenPresent(t *testing.T) {
 	withoutMissing := mailBackup.FormatRunResult(mailBackup.IndexRun{Exported: 7, Skipped: 3})
 	if strings.Contains(withoutMissing, "missing") {
 		t.Fatalf("did not expect missing count in result: %s", withoutMissing)
+	}
+	withUnavailable := mailBackup.FormatRunResult(mailBackup.IndexRun{Exported: 7, Skipped: 2, Unavailable: 1})
+	if !strings.Contains(withUnavailable, "1 unavailable") {
+		t.Fatalf("expected unavailable count in result: %s", withUnavailable)
 	}
 }
 
@@ -402,6 +410,7 @@ func TestBackupActivityStatus(t *testing.T) {
 		{name: "success", result: &BackupRunResult{Exported: 2, Skipped: 3}, want: activitylog.StatusSuccess},
 		{name: "partial missing", result: &BackupRunResult{Skipped: 3, Missing: 1}, want: activitylog.StatusPartial},
 		{name: "partial failed", result: &BackupRunResult{Exported: 2, Failed: 1}, want: activitylog.StatusPartial},
+		{name: "partial unavailable", result: &BackupRunResult{Skipped: 3, Unavailable: 1}, want: activitylog.StatusPartial},
 		{name: "failed no completed", result: &BackupRunResult{Missing: 1, Failed: 1}, want: activitylog.StatusFailed},
 		{name: "fatal", err: errors.New("boom"), want: activitylog.StatusFailed},
 		{name: "cancelled", err: context.Canceled, want: activitylog.StatusCancelled},

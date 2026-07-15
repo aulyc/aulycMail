@@ -1,6 +1,5 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
-  import { onMount } from 'svelte'
   import AccountSection from './AccountSection.svelte'
   import AccountDialog from '$lib/components/settings/AccountDialog.svelte'
   import { Button } from '$lib/components/ui/button'
@@ -125,18 +124,6 @@
   // Dialog state
   let showAccountDialog = $state(false)
   let editingAccount = $state<account.Account | null>(null)
-
-  // Load accounts on mount
-  onMount(() => {
-    // Load accounts, then trigger comprehensive sync on launch
-    accountStore.load().then(async () => {
-      try {
-        await accountStore.syncAllComplete()
-      } catch (err) {
-        console.error('Failed to sync on launch:', err)
-      }
-    })
-  })
 
   // Handle folder selection
   function handleFolderSelect(accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) {

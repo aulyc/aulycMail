@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"aulyc.local/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/message"
 	mailSync "aulyc.local/aulycmail/internal/sync"
 )
 
@@ -21,6 +23,7 @@ type Progress struct {
 	Exported     int
 	Skipped      int
 	Missing      int
+	Unavailable  int
 	Failed       int
 	Message      string
 }
@@ -42,14 +45,15 @@ type RunOptions struct {
 }
 
 type RunResult struct {
-	Directory  string
-	Mode       string
-	Total      int
-	Exported   int
-	Skipped    int
-	Missing    int
-	Failed     int
-	ReportPath string
+	Directory   string
+	Mode        string
+	Total       int
+	Exported    int
+	Skipped     int
+	Missing     int
+	Unavailable int
+	Failed      int
+	ReportPath  string
 }
 
 func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, error) {
@@ -101,9 +105,12 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 	}
 	failures := make([]Failure, 0)
 	missing := make([]Failure, 0)
+	unavailable := make([]Failure, 0)
 	emitBackupProgress(options.EmitProgress, Progress{Phase: "running", Total: len(rows), Message: "开始备份"})
 
 	pendingRows := make([]MessageRow, 0, len(rows))
+	recoveryMessageStore := message.NewStore(db)
+	recoveryFolderStore := folder.NewStore(db)
 	processed := 0
 	for _, row := range rows {
 		select {
@@ -123,6 +130,48 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 			result.Skipped++
 			processed++
 			emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), ""))
+			continue
+		}
+		if !row.Selectable {
+			_, recoverable, lookupErr := findIndexedMessageFile(options.Directory, idx, row)
+			if lookupErr == nil && !recoverable {
+				equivalent, equivalentErr := recoveryMessageStore.FindUniqueSelectableEquivalent(row.ID)
+				if equivalentErr != nil {
+					lookupErr = equivalentErr
+				} else if equivalent != nil {
+					equivalentFolder, folderErr := recoveryFolderStore.Get(equivalent.FolderID)
+					if folderErr != nil {
+						lookupErr = folderErr
+					} else if equivalentFolder != nil && equivalentFolder.IsSelectable() {
+						_, recoverable, lookupErr = findIndexedMessageFile(options.Directory, idx, MessageRow{
+							ID:          equivalent.ID,
+							AccountID:   equivalent.AccountID,
+							FolderID:    equivalent.FolderID,
+							UIDValidity: equivalentFolder.UIDValidity,
+							UID:         equivalent.UID,
+							MessageID:   equivalent.MessageID,
+						})
+					}
+				}
+			}
+			if lookupErr != nil {
+				result.Failed++
+				failures = append(failures, FailureFromRow(row, lookupErr))
+				processed++
+				emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), lookupErr.Error()))
+				continue
+			}
+			if recoverable {
+				result.Skipped++
+				processed++
+				emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), ""))
+				continue
+			}
+			reason := fmt.Errorf("raw message unavailable: hierarchy-only folder has no indexed backup file")
+			result.Unavailable++
+			unavailable = append(unavailable, FailureFromRow(row, reason))
+			processed++
+			emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), reason.Error()))
 			continue
 		}
 
@@ -205,14 +254,15 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 	}
 
 	run := IndexRun{
-		StartedAt:  options.StartedAt,
-		FinishedAt: time.Now().UTC().Format(time.RFC3339),
-		Mode:       mode,
-		Total:      result.Total,
-		Exported:   result.Exported,
-		Skipped:    result.Skipped,
-		Missing:    result.Missing,
-		Failed:     result.Failed,
+		StartedAt:   options.StartedAt,
+		FinishedAt:  time.Now().UTC().Format(time.RFC3339),
+		Mode:        mode,
+		Total:       result.Total,
+		Exported:    result.Exported,
+		Skipped:     result.Skipped,
+		Missing:     result.Missing,
+		Unavailable: result.Unavailable,
+		Failed:      result.Failed,
 	}
 	idx.Version = IndexVersion
 	idx.UpdatedAt = run.FinishedAt
@@ -222,10 +272,11 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 		return nil, err
 	}
 	reportPath, err := SaveReport(options.Directory, Report{
-		IndexRun:        run,
-		Directory:       options.Directory,
-		MissingMessages: missing,
-		Failures:        failures,
+		IndexRun:            run,
+		Directory:           options.Directory,
+		MissingMessages:     missing,
+		UnavailableMessages: unavailable,
+		Failures:            failures,
 	})
 	if err != nil {
 		return nil, err
@@ -258,7 +309,8 @@ func ListMessageRows(db *database.DB, accountIDs []string) ([]MessageRow, error)
 			COALESCE(m.subject, ''),
 			COALESCE(m.date, ''),
 			COALESCE(m.size, 0),
-			COALESCE(m.has_attachments, 0)
+			COALESCE(m.has_attachments, 0),
+			COALESCE(f.selectable, 1)
 		FROM messages m
 		INNER JOIN accounts a ON a.id = m.account_id
 		INNER JOIN folders f ON f.id = m.folder_id
@@ -278,6 +330,7 @@ func ListMessageRows(db *database.DB, accountIDs []string) ([]MessageRow, error)
 		var uid, uidValidity int64
 		var size int64
 		var hasAttachments bool
+		var selectable bool
 		var dateRaw sql.NullString
 		if err := rows.Scan(
 			&row.ID,
@@ -293,6 +346,7 @@ func ListMessageRows(db *database.DB, accountIDs []string) ([]MessageRow, error)
 			&dateRaw,
 			&size,
 			&hasAttachments,
+			&selectable,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan backup message: %w", err)
 		}
@@ -300,6 +354,7 @@ func ListMessageRows(db *database.DB, accountIDs []string) ([]MessageRow, error)
 		row.UIDValidity = uint32(uidValidity)
 		row.Size = int(size)
 		row.HasAttachments = hasAttachments
+		row.Selectable = selectable
 		if dateRaw.Valid {
 			row.DateRaw = dateRaw.String
 			row.Date = ParseMessageTime(dateRaw.String)
@@ -325,6 +380,7 @@ func progressForRow(row MessageRow, result *RunResult, current, total int, messa
 		Exported:     result.Exported,
 		Skipped:      result.Skipped,
 		Missing:      result.Missing,
+		Unavailable:  result.Unavailable,
 		Failed:       result.Failed,
 		Message:      message,
 	}

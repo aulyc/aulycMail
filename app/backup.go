@@ -60,14 +60,15 @@ type BackupRunOptions struct {
 
 // BackupRunResult is returned after a backup run finishes.
 type BackupRunResult struct {
-	Directory  string `json:"directory"`
-	Mode       string `json:"mode"`
-	Total      int    `json:"total"`
-	Exported   int    `json:"exported"`
-	Skipped    int    `json:"skipped"`
-	Missing    int    `json:"missing"`
-	Failed     int    `json:"failed"`
-	ReportPath string `json:"reportPath,omitempty"`
+	Directory   string `json:"directory"`
+	Mode        string `json:"mode"`
+	Total       int    `json:"total"`
+	Exported    int    `json:"exported"`
+	Skipped     int    `json:"skipped"`
+	Missing     int    `json:"missing"`
+	Unavailable int    `json:"unavailable"`
+	Failed      int    `json:"failed"`
+	ReportPath  string `json:"reportPath,omitempty"`
 }
 
 // BackupProgress is emitted as backup:progress while RunEmailBackup executes.
@@ -80,6 +81,7 @@ type BackupProgress struct {
 	Exported     int    `json:"exported"`
 	Skipped      int    `json:"skipped"`
 	Missing      int    `json:"missing"`
+	Unavailable  int    `json:"unavailable"`
 	Failed       int    `json:"failed"`
 	Message      string `json:"message,omitempty"`
 }
@@ -433,7 +435,7 @@ func backupActivityStatus(result *BackupRunResult, err error) string {
 	if err != nil || result == nil {
 		return activitylog.StatusFailed
 	}
-	issues := result.Missing + result.Failed
+	issues := result.Missing + result.Unavailable + result.Failed
 	if issues == 0 {
 		return activitylog.StatusSuccess
 	}
@@ -456,15 +458,15 @@ func backupActivitySummary(result *BackupRunResult, status string) string {
 	if result.Mode == "incremental" {
 		mode = "增量导出"
 	}
-	return fmt.Sprintf("%s · 完成 %d · 新增 %d · 已存在 %d · 缺失 %d · 失败 %d",
-		mode, result.Exported+result.Skipped, result.Exported, result.Skipped, result.Missing, result.Failed)
+	return fmt.Sprintf("%s · 完成 %d · 新增 %d · 已存在 %d · 缺失 %d · 原文不可获取 %d · 失败 %d",
+		mode, result.Exported+result.Skipped, result.Exported, result.Skipped, result.Missing, result.Unavailable, result.Failed)
 }
 
 func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunResult, runErr error, activityMode string) {
 	status := backupActivityStatus(result, runErr)
 	scope := normalizeBackupScope(options.Scope)
 	directory := strings.TrimSpace(options.Directory)
-	mode, total, completed, added, skipped, missing, failed := activityMode, 0, 0, 0, 0, 0, 0
+	mode, total, completed, added, skipped, missing, unavailable, failed := activityMode, 0, 0, 0, 0, 0, 0, 0
 	if result != nil {
 		directory = result.Directory
 		mode = result.Mode
@@ -472,6 +474,7 @@ func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunRe
 		added = result.Exported
 		skipped = result.Skipped
 		missing = result.Missing
+		unavailable = result.Unavailable
 		failed = result.Failed
 		completed = added + skipped
 	} else if progress := emailBackupJob.snapshot().Progress; progress != nil {
@@ -479,6 +482,7 @@ func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunRe
 		added = progress.Exported
 		skipped = progress.Skipped
 		missing = progress.Missing
+		unavailable = progress.Unavailable
 		failed = progress.Failed
 		completed = added + skipped
 	}
@@ -487,15 +491,16 @@ func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunRe
 		detail = runErr.Error()
 	}
 	summaryResult := result
-	if summaryResult == nil && (total > 0 || completed > 0 || missing > 0 || failed > 0) {
+	if summaryResult == nil && (total > 0 || completed > 0 || missing > 0 || unavailable > 0 || failed > 0) {
 		summaryResult = &BackupRunResult{
-			Directory: directory,
-			Mode:      mode,
-			Total:     total,
-			Exported:  added,
-			Skipped:   skipped,
-			Missing:   missing,
-			Failed:    failed,
+			Directory:   directory,
+			Mode:        mode,
+			Total:       total,
+			Exported:    added,
+			Skipped:     skipped,
+			Missing:     missing,
+			Unavailable: unavailable,
+			Failed:      failed,
 		}
 	}
 	entry := activitylog.Entry{
@@ -505,15 +510,16 @@ func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunRe
 		Summary: backupActivitySummary(summaryResult, status),
 		Detail:  detail,
 		Payload: map[string]any{
-			"mode":      mode,
-			"total":     total,
-			"completed": completed,
-			"added":     added,
-			"skipped":   skipped,
-			"missing":   missing,
-			"failed":    failed,
-			"directory": directory,
-			"scope":     scope,
+			"mode":        mode,
+			"total":       total,
+			"completed":   completed,
+			"added":       added,
+			"skipped":     skipped,
+			"missing":     missing,
+			"unavailable": unavailable,
+			"failed":      failed,
+			"directory":   directory,
+			"scope":       scope,
 		},
 	}
 	if err := a.appendActivityLog(entry); err != nil {
@@ -537,14 +543,15 @@ func backupDoneProgress(result *BackupRunResult) BackupProgress {
 		return BackupProgress{Phase: "done", Message: "备份完成"}
 	}
 	return BackupProgress{
-		Phase:    "done",
-		Current:  result.Total,
-		Total:    result.Total,
-		Exported: result.Exported,
-		Skipped:  result.Skipped,
-		Missing:  result.Missing,
-		Failed:   result.Failed,
-		Message:  "备份完成",
+		Phase:       "done",
+		Current:     result.Total,
+		Total:       result.Total,
+		Exported:    result.Exported,
+		Skipped:     result.Skipped,
+		Missing:     result.Missing,
+		Unavailable: result.Unavailable,
+		Failed:      result.Failed,
+		Message:     "备份完成",
 	}
 }
 
@@ -558,6 +565,7 @@ func backupProgressFromInternal(progress mailBackup.Progress) BackupProgress {
 		Exported:     progress.Exported,
 		Skipped:      progress.Skipped,
 		Missing:      progress.Missing,
+		Unavailable:  progress.Unavailable,
 		Failed:       progress.Failed,
 		Message:      progress.Message,
 	}
@@ -568,14 +576,15 @@ func backupRunResultFromInternal(result *mailBackup.RunResult) *BackupRunResult 
 		return nil
 	}
 	return &BackupRunResult{
-		Directory:  result.Directory,
-		Mode:       result.Mode,
-		Total:      result.Total,
-		Exported:   result.Exported,
-		Skipped:    result.Skipped,
-		Missing:    result.Missing,
-		Failed:     result.Failed,
-		ReportPath: result.ReportPath,
+		Directory:   result.Directory,
+		Mode:        result.Mode,
+		Total:       result.Total,
+		Exported:    result.Exported,
+		Skipped:     result.Skipped,
+		Missing:     result.Missing,
+		Unavailable: result.Unavailable,
+		Failed:      result.Failed,
+		ReportPath:  result.ReportPath,
 	}
 }
 

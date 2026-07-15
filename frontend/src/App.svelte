@@ -24,6 +24,7 @@
   import { loadImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
   import { initTheme, applyThemeFromMode, handleSystemThemeEvent, handleMediaQueryChange } from '$lib/stores/theme.svelte'
   import { DEFAULT_LIST_WIDTH, DEFAULT_SIDEBAR_WIDTH, loadUIState, saveUIState, getActivePane, setActivePane } from '$lib/stores/uiState.svelte'
+  import { shouldClearRestoredFolderSelection } from '$lib/stores/restoredFolderSelection'
   import {
     type FocusablePane,
     getFocusedPane,
@@ -235,8 +236,10 @@
   // an upgrade. Drop a persisted/stale selection as soon as that fact is known.
   $effect(() => {
     if (!selectedAccountId || !selectedFolderId || selectionSource !== 'account') return
+    const accountState = accountStore.accounts.find(a => a.account.id === selectedAccountId)
     const selected = findFolderById(selectedAccountId, selectedFolderId)
-    if (!selected?.noSelect) return
+    const foldersLoaded = !accountStore.loading && accountState?.loading !== true
+    if (!shouldClearRestoredFolderSelection(Boolean(accountState), foldersLoaded, selected)) return
 
     selectedAccountId = null
     selectedFolderId = null
@@ -291,24 +294,18 @@
     EventsOn('backup:progress', (data: BackupProgress) => {
       if (data.phase === 'done') {
         const missing = data.missing ?? 0
+        const unavailable = data.unavailable ?? 0
         addToast({
-          type: data.failed > 0 || missing > 0 ? 'warning' : 'success',
-          message: missing > 0
-            ? $_('settingsBackup.backupCompleteWithMissing', {
-              values: {
-                exported: data.exported,
-                skipped: data.skipped,
-                missing,
-                failed: data.failed,
-              },
-            })
-            : $_('settingsBackup.backupComplete', {
-              values: {
-                exported: data.exported,
-                skipped: data.skipped,
-                failed: data.failed,
-              },
-            }),
+          type: data.failed > 0 || missing > 0 || unavailable > 0 ? 'warning' : 'success',
+          message: $_('settingsBackup.backupComplete', {
+            values: {
+              exported: data.exported,
+              skipped: data.skipped,
+              missing,
+              unavailable,
+              failed: data.failed,
+            },
+          }),
         })
       } else if (data.phase === 'error') {
         addToast({
@@ -370,6 +367,11 @@
       showTermsDialog = true
     }
 
+    // Load accounts and folders before restoring a persisted selection. This
+    // prevents a hierarchy-only or removed folder from reaching MessageList or
+    // ConversationViewer during startup.
+    await accountStore.load()
+
     // Load persisted UI state
     const uiState = await loadUIState()
 
@@ -389,11 +391,14 @@
         a => a.account.id === uiState.selectedAccountId
       )
 
-      if (accountExists) {
+      const restoredFolder = findFolderById(uiState.selectedAccountId, uiState.selectedFolderId)
+
+      if (!shouldClearRestoredFolderSelection(accountExists, true, restoredFolder)) {
         selectedAccountId = uiState.selectedAccountId
         selectedFolderId = uiState.selectedFolderId
         selectedFolderName = uiState.selectedFolderName || 'Inbox'
         selectedFolderType = uiState.selectedFolderType
+        selectionSource = 'account'
 
         // Restore conversation selection
         if (uiState.selectedThreadId) {
@@ -401,8 +406,24 @@
           selectedConversationAccountId = uiState.selectedConversationAccountId
           selectedConversationFolderId = uiState.selectedConversationFolderId
         }
+      } else {
+        saveUIState({
+          selectedAccountId: null,
+          selectedFolderId: null,
+          selectedFolderName: 'Inbox',
+          selectedFolderType: null,
+          selectedThreadId: null,
+          selectedConversationAccountId: null,
+          selectedConversationFolderId: null,
+        })
       }
     }
+
+    // Keep launch synchronization asynchronous, matching the previous Sidebar
+    // behavior while ensuring account/folder state has initialized exactly once.
+    void accountStore.syncAllComplete().catch((err) => {
+      console.error('Failed to sync on launch:', err)
+    })
 
     // Listen for system theme changes from backend (XDG Settings Portal)
     EventsOn('theme:system-preference', (newTheme: string) => {
@@ -655,6 +676,7 @@
     exported: number
     skipped: number
     missing?: number
+    unavailable?: number
     failed: number
     message?: string
   }

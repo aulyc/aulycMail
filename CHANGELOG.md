@@ -4,6 +4,15 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+- Restored message bodies, original sources, and attachment downloads for
+  legacy local records left under IMAP hierarchy-only folders by resolving
+  their verified `.eml` counterparts from the backup index.
+- Separated server-unavailable messages from true backup failures so backup
+  totals and activity logs accurately report unavailable, missing, and failed
+  records.
+- Prevented startup from restoring missing or non-selectable folders and now
+  loads the current folder tree before applying the saved selection.
+
 ## [0.3.96] — 2026-07-15
 
 - Fixed IMAP `\\Noselect` containers so they behave as hierarchy-only folders:

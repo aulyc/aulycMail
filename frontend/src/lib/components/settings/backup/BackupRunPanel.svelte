@@ -7,7 +7,7 @@
   let { store, canStart, saveBeforeStart, onStart }: Props = $props()
   const percent = $derived(store.progress?.total ? Math.min(100, Math.round(store.progress.current / store.progress.total * 100)) : 0)
   const target = $derived([store.progress?.accountEmail, store.progress?.folderPath].filter(Boolean).join(' / '))
-  const hasIssues = $derived((store.progress?.missing ?? 0) > 0 || (store.progress?.failed ?? 0) > 0)
+  const hasIssues = $derived((store.progress?.missing ?? 0) > 0 || (store.progress?.unavailable ?? 0) > 0 || (store.progress?.failed ?? 0) > 0)
 </script>
 
 <section class="relative flex h-14 min-w-0 items-center gap-3 border-b border-border/75">
@@ -26,6 +26,7 @@
     <div class="flex items-baseline gap-1 whitespace-nowrap"><dt>{$_('settingsBackup.progressExported')}</dt><dd class="tabular-nums">{store.progress?.exported ?? 0}</dd></div>
     <div class="flex items-baseline gap-1 whitespace-nowrap"><dt>{$_('settingsBackup.progressSkipped')}</dt><dd class="tabular-nums">{store.progress?.skipped ?? 0}</dd></div>
     <div class="flex items-baseline gap-1 whitespace-nowrap"><dt>{$_('settingsBackup.progressMissing')}</dt><dd class="tabular-nums">{store.progress?.missing ?? 0}</dd></div>
+    <div class="flex items-baseline gap-1 whitespace-nowrap"><dt>{$_('settingsBackup.progressUnavailable')}</dt><dd class="tabular-nums">{store.progress?.unavailable ?? 0}</dd></div>
     <div class="flex items-baseline gap-1 whitespace-nowrap"><dt>{$_('settingsBackup.progressFailed')}</dt><dd class="tabular-nums">{store.progress?.failed ?? 0}</dd></div>
   </dl>
 

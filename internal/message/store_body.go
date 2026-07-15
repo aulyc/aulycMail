@@ -2,6 +2,7 @@ package message
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -10,12 +11,76 @@ import (
 func (s *Store) UpdateBody(messageID, bodyHTML, bodyText, snippet string, hasAttachments bool) error {
 	query := `
 		UPDATE messages
-		SET body_html = ?, body_text = ?, snippet = ?, body_fetched = 1, has_attachments = ?
+		SET body_html = ?, body_text = ?, snippet = ?, body_fetched = 1,
+		    body_failed = 0, has_attachments = ?
 		WHERE id = ?
 	`
 	_, err := s.db.Exec(query, nullString(bodyHTML), nullString(bodyText), nullString(snippet), hasAttachments, messageID)
 	if err != nil {
 		return fmt.Errorf("failed to update body: %w", err)
+	}
+	return nil
+}
+
+// RestoreBody replaces a message body and its parsed attachment metadata in a
+// single transaction. The raw source must be parsed and identity-checked by the
+// caller before this persistence boundary.
+func (s *Store) RestoreBody(messageID, bodyHTML, bodyText, snippet string, hasAttachments bool, attachments []*Attachment) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin body restore: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := tx.Exec(`
+		UPDATE messages
+		SET body_html = ?, body_text = ?, snippet = ?, body_fetched = 1,
+		    body_failed = 0, has_attachments = ?
+		WHERE id = ?
+	`, nullString(bodyHTML), nullString(bodyText), nullString(snippet), hasAttachments, messageID)
+	if err != nil {
+		return fmt.Errorf("failed to restore message body: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to verify restored message body: %w", err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("message not found during body restore: %s", messageID)
+	}
+
+	if _, err := tx.Exec(`DELETE FROM attachments WHERE message_id = ?`, messageID); err != nil {
+		return fmt.Errorf("failed to replace attachment metadata: %w", err)
+	}
+	if len(attachments) > 0 {
+		stmt, err := tx.Prepare(`
+			INSERT INTO attachments (id, message_id, filename, content_type, size, content_id, is_inline, local_path, content)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`)
+		if err != nil {
+			return fmt.Errorf("failed to prepare attachment restore: %w", err)
+		}
+		defer stmt.Close()
+		for _, attachment := range attachments {
+			if attachment == nil {
+				return errors.New("cannot restore nil attachment metadata")
+			}
+			var content []byte
+			if attachment.IsInline && len(attachment.Content) > 0 {
+				content = attachment.Content
+			}
+			if _, err := stmt.Exec(
+				attachment.ID, messageID, attachment.Filename, attachment.ContentType,
+				attachment.Size, nullString(attachment.ContentID), boolToInt(attachment.IsInline),
+				nullString(attachment.LocalPath), content,
+			); err != nil {
+				return fmt.Errorf("failed to restore attachment metadata: %w", err)
+			}
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit body restore: %w", err)
 	}
 	return nil
 }
@@ -184,7 +249,7 @@ func (s *Store) UpdateBodiesBatch(updates []BodyUpdate) error {
 	stmt, err := tx.Prepare(`
 		UPDATE messages
 		SET body_html = ?, body_text = ?, snippet = ?, body_fetched = 1,
-		    has_attachments = ?
+		    body_failed = 0, has_attachments = ?
 		WHERE id = ?
 	`)
 	if err != nil {

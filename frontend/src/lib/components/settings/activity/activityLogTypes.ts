@@ -12,6 +12,7 @@ export interface ActivityLogPayload {
   added?: number
   skipped?: number
   missing?: number
+  unavailable?: number
   failed?: number
   directory?: string
 }

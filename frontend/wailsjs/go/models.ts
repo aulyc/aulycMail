@@ -398,6 +398,7 @@ export namespace app {
 	    exported: number;
 	    skipped: number;
 	    missing: number;
+	    unavailable: number;
 	    failed: number;
 	    message?: string;
 
@@ -415,6 +416,7 @@ export namespace app {
 	        this.exported = source["exported"];
 	        this.skipped = source["skipped"];
 	        this.missing = source["missing"];
+	        this.unavailable = source["unavailable"];
 	        this.failed = source["failed"];
 	        this.message = source["message"];
 	    }
@@ -442,6 +444,7 @@ export namespace app {
 	    exported: number;
 	    skipped: number;
 	    missing: number;
+	    unavailable: number;
 	    failed: number;
 	    reportPath?: string;
 
@@ -457,6 +460,7 @@ export namespace app {
 	        this.exported = source["exported"];
 	        this.skipped = source["skipped"];
 	        this.missing = source["missing"];
+	        this.unavailable = source["unavailable"];
 	        this.failed = source["failed"];
 	        this.reportPath = source["reportPath"];
 	    }

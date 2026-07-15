@@ -37,14 +37,15 @@ type IndexMessage struct {
 }
 
 type IndexRun struct {
-	StartedAt  string `json:"startedAt"`
-	FinishedAt string `json:"finishedAt"`
-	Mode       string `json:"mode"`
-	Total      int    `json:"total"`
-	Exported   int    `json:"exported"`
-	Skipped    int    `json:"skipped"`
-	Missing    int    `json:"missing,omitempty"`
-	Failed     int    `json:"failed"`
+	StartedAt   string `json:"startedAt"`
+	FinishedAt  string `json:"finishedAt"`
+	Mode        string `json:"mode"`
+	Total       int    `json:"total"`
+	Exported    int    `json:"exported"`
+	Skipped     int    `json:"skipped"`
+	Missing     int    `json:"missing,omitempty"`
+	Unavailable int    `json:"unavailable,omitempty"`
+	Failed      int    `json:"failed"`
 }
 
 type Failure struct {
@@ -57,9 +58,10 @@ type Failure struct {
 
 type Report struct {
 	IndexRun
-	Directory       string    `json:"directory"`
-	MissingMessages []Failure `json:"missingMessages,omitempty"`
-	Failures        []Failure `json:"failures,omitempty"`
+	Directory           string    `json:"directory"`
+	MissingMessages     []Failure `json:"missingMessages,omitempty"`
+	UnavailableMessages []Failure `json:"unavailableMessages,omitempty"`
+	Failures            []Failure `json:"failures,omitempty"`
 }
 
 type MessageRow struct {
@@ -77,6 +79,7 @@ type MessageRow struct {
 	DateRaw        string
 	Size           int
 	HasAttachments bool
+	Selectable     bool
 }
 
 type MessageGroup struct {
@@ -134,6 +137,9 @@ func SaveReport(directory string, report Report) (string, error) {
 }
 
 func FormatRunResult(run IndexRun) string {
+	if run.Unavailable > 0 {
+		return fmt.Sprintf("%d exported, %d skipped, %d missing, %d unavailable, %d failed", run.Exported, run.Skipped, run.Missing, run.Unavailable, run.Failed)
+	}
 	if run.Missing > 0 {
 		return fmt.Sprintf("%d exported, %d skipped, %d missing, %d failed", run.Exported, run.Skipped, run.Missing, run.Failed)
 	}
