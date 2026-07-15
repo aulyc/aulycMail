@@ -4,6 +4,8 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+## [0.3.96] — 2026-07-15
+
 - Fixed IMAP `\\Noselect` containers so they behave as hierarchy-only folders:
   descendant unread badges remain accurate while misleading own cached message
   totals are suppressed.
