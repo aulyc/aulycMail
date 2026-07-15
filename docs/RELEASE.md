@@ -23,8 +23,8 @@ Both release channels perform the same identity steps:
 1. Refuse uncommitted functional changes.
 2. Select version/build and update only allowed release metadata.
 3. Create `chore: release <version>` and require a clean worktree.
-4. Run `make release-check`, including `make check` and a same-configuration
-   production candidate build.
+4. Run `make release-check`, including `make check`, a fresh `npm ci` from the
+   committed lockfile, and a same-configuration production candidate build.
 5. Create or verify the immutable annotated tag exactly matching the version.
 6. Create a temporary detached worktree at that exact tag.
 7. Verify tag, commit, `version.json`, release-only commit contents, and clean

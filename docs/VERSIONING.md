@@ -75,7 +75,9 @@ that release commit, and is never moved or overwritten.
 Before tag creation, `make release-check` runs shared checks and builds a
 production candidate with the same `arm64` target, Wails/Go production tags,
 linker metadata, Bundle ID, minimum macOS version, and bundle packaging used by
-the final artifact. Signing and notarization remain post-tag operations.
+the final artifact. The candidate first performs a clean `npm ci` from the
+committed lockfile so dependency drift is rejected before the immutable tag is
+created. Signing and notarization remain post-tag operations.
 
 ## Isolated tagged-source build
 

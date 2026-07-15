@@ -48,6 +48,7 @@ RELEASE_BUMP ?= auto
 RELEASE_CHANNEL ?=
 RELEASE_TAG ?= $(VERSION)
 RELEASE_OUTPUT_DIR ?= $(abspath dist)
+CLEAN_FRONTEND_INSTALL ?= 0
 RELEASE_METADATA_FILES := version.json wails.json frontend/package.json \
 	frontend/package-lock.json CHANGELOG.md
 
@@ -95,7 +96,7 @@ build-app:
 	@node tools/ensure-frontend-dist.mjs
 	$(DARWIN_LINK_WARN_ENV) wails generate module
 	@tools/normalize_wails_bindings.sh
-	@if [ ! -d frontend/node_modules ]; then \
+	@if [ "$(CLEAN_FRONTEND_INSTALL)" = "1" ] || [ ! -d frontend/node_modules ]; then \
 		echo "Installing frontend dependencies from package-lock.json..."; \
 		cd frontend && npm ci; \
 	else \
@@ -320,7 +321,7 @@ release-preflight:
 # Build the same production configuration used in the isolated final build,
 # before a tag is allowed to be created.
 release-candidate:
-	@$(MAKE) build-app APP_VERSION="$(VERSION)" BUNDLE_BUILD_NUMBER="$(BUILD_NUMBER)"
+	@$(MAKE) build-app APP_VERSION="$(VERSION)" BUNDLE_BUILD_NUMBER="$(BUILD_NUMBER)" CLEAN_FRONTEND_INSTALL=1
 	@bash tools/verify_release_candidate.sh --source-root "$(CURDIR)" --app "$(APP_BUNDLE)"
 
 # Run the shared gates once, then build and verify the pre-tag candidate.

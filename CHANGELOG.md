@@ -4,6 +4,9 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+- Fixed formal release validation so clean frontend dependency installs are
+  verified before an immutable tag is created.
+
 ## [0.3.93] — 2026-07-15
 
 - Stable release.
