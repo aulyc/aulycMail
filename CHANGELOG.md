@@ -4,6 +4,8 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+## [0.3.95] — 2026-07-15
+
 - Fixed release verification for mounted DMG paths whose volume names contain
   spaces.
 
