@@ -4,6 +4,8 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+## [0.3.92] — 2026-07-15
+
 ### Changed
 
 - Added a single SemVer source, independent build counter, immutable release-tag checks, and auditable DMG manifests.
