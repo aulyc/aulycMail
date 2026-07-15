@@ -326,7 +326,7 @@
     "fullExport": "完整导出",
     "incrementalExport": "增量导出",
     "startBackup": "开始备份",
-    "backupRunning": "后台备份中...",
+    "backupRunning": "备份中…",
     "progressExported": "新增",
     "progressSkipped": "跳过",
     "progressMissing": "未找到",
@@ -743,7 +743,7 @@
     "clearFailed": "清理日志失败",
     "backupFailed": "备份失败",
     "backupCancelled": "备份已取消",
-    "backupSummary": "{mode} · 完成 {completed} · 新增 {added} · 已存在 {skipped} · 缺失 {missing} · 原文不可获取 {unavailable} · 失败 {failed}",
+    "backupSummary": "{mode} · 总数 {total} · 完成 {completed} · 新增 {added} · 已存在 {skipped} · 缺失 {missing} · 原文不可获取 {unavailable} · 失败 {failed}",
     "syncSummary": "{target} · 新增 {added} 封",
     "filters": { "all": "全部", "sync": "同步", "backup": "备份", "failed": "失败" },
     "status": { "success": "成功", "partial": "部分完成", "failed": "失败", "cancelled": "已取消", "unknown": "未知" }

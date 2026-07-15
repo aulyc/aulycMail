@@ -4,6 +4,10 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+- Simplified backup status presentation by removing redundant button and task
+  icons, showing “备份中…” while running, adding the total to recent summaries,
+  and removing the duplicate current/total counter.
+
 ## [0.3.97] — 2026-07-15
 
 - Restored message bodies, original sources, and attachment downloads for

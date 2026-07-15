@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Icon from '@iconify/svelte'
   import { Button } from '$lib/components/ui/button'
   import { _ } from '$lib/i18n'
   import type { BackupRunStore } from './backupRun.svelte'
@@ -7,18 +6,12 @@
   let { store, canStart, saveBeforeStart, onStart }: Props = $props()
   const percent = $derived(store.progress?.total ? Math.min(100, Math.round(store.progress.current / store.progress.total * 100)) : 0)
   const target = $derived([store.progress?.accountEmail, store.progress?.folderPath].filter(Boolean).join(' / '))
-  const hasIssues = $derived((store.progress?.missing ?? 0) > 0 || (store.progress?.unavailable ?? 0) > 0 || (store.progress?.failed ?? 0) > 0)
 </script>
 
 <section class="relative flex h-14 min-w-0 items-center gap-3 border-b border-border/75">
   <h3 class="shrink-0 text-sm font-semibold text-foreground">{$_('settingsBackup.currentTask')}</h3>
 
-  {#if store.running || store.progress}
-    <div class="flex shrink-0 items-center gap-2 text-sm">
-      <Icon icon={store.running ? 'mdi:loading' : hasIssues ? 'mdi:alert-circle-outline' : 'mdi:check-circle-outline'} class="h-4 w-4 {store.running ? 'animate-spin text-primary' : hasIssues ? 'text-amber-500' : 'text-emerald-500'}" />
-      <span class="font-medium tabular-nums">{store.progress?.current ?? 0}/{store.progress?.total ?? 0}</span>
-    </div>
-  {:else}
+  {#if !(store.running || store.progress)}
     <p class="min-w-0 flex-1 truncate text-sm text-muted-foreground">{$_('settingsBackup.noCurrentTask')}</p>
   {/if}
 
@@ -37,8 +30,7 @@
   {/if}
 
   <Button size="sm" class="shrink-0" onclick={onStart} disabled={!canStart || store.running || store.loading}>
-    {#if store.running}<Icon icon="mdi:loading" class="mr-1.5 h-4 w-4 animate-spin" />{$_('settingsBackup.backupRunning')}
-    {:else}<Icon icon="mdi:archive-arrow-down-outline" class="mr-1.5 h-4 w-4" />{saveBeforeStart ? $_('settingsBackup.saveAndStart') : $_('settingsBackup.startBackup')}{/if}
+    {store.running ? $_('settingsBackup.backupRunning') : saveBeforeStart ? $_('settingsBackup.saveAndStart') : $_('settingsBackup.startBackup')}
   </Button>
 
   {#if store.running || store.progress}

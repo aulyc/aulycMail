@@ -326,7 +326,7 @@
     "fullExport": "Full export",
     "incrementalExport": "Incremental export",
     "startBackup": "Start backup",
-    "backupRunning": "Backing up in background...",
+    "backupRunning": "Backing up…",
     "progressExported": "Exported",
     "progressSkipped": "Skipped",
     "progressMissing": "Missing",
@@ -743,7 +743,7 @@
     "clearFailed": "Failed to clear logs",
     "backupFailed": "Backup failed",
     "backupCancelled": "Backup cancelled",
-    "backupSummary": "{mode} · completed {completed} · added {added} · existing {skipped} · missing {missing} · source unavailable {unavailable} · failed {failed}",
+    "backupSummary": "{mode} · total {total} · completed {completed} · added {added} · existing {skipped} · missing {missing} · source unavailable {unavailable} · failed {failed}",
     "syncSummary": "{target} · added {added}",
     "filters": { "all": "All", "sync": "Sync", "backup": "Backup", "failed": "Failed" },
     "status": { "success": "Success", "partial": "Partial", "failed": "Failed", "cancelled": "Cancelled", "unknown": "Unknown" }

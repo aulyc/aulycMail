@@ -37,15 +37,20 @@ export function activitySummary(log: ActivityLog): string {
       return log.status === 'cancelled' ? t('activityLog.backupCancelled') : t('activityLog.backupFailed')
     }
     const mode = payload.mode === 'incremental' ? t('settingsBackup.incrementalExport') : t('settingsBackup.fullExport')
+    const completed = payload.completed ?? payload.success ?? (payload.added ?? 0) + (payload.skipped ?? 0)
+    const missing = payload.missing ?? 0
+    const unavailable = payload.unavailable ?? 0
+    const failed = payload.failed ?? 0
     return t('activityLog.backupSummary', {
       values: {
         mode,
-        completed: payload.completed ?? payload.success ?? (payload.added ?? 0) + (payload.skipped ?? 0),
+        total: payload.total ?? completed + missing + unavailable + failed,
+        completed,
         added: payload.added ?? 0,
         skipped: payload.skipped ?? 0,
-        missing: payload.missing ?? 0,
-        unavailable: payload.unavailable ?? 0,
-        failed: payload.failed ?? 0,
+        missing,
+        unavailable,
+        failed,
       },
     })
   }
