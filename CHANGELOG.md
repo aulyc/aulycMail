@@ -4,6 +4,12 @@ All notable changes to aulycmail are documented here.
 
 ## [Unreleased]
 
+- Fixed IMAP `\\Noselect` containers so they behave as hierarchy-only folders:
+  descendant unread badges remain accurate while misleading own cached message
+  totals are suppressed.
+- Preserved cached messages under hierarchy-only containers without exposing
+  them as selectable mailboxes or repeatedly attempting unavailable body
+  downloads.
 - Updated vulnerable frontend build and editor dependencies within their
   existing compatible major versions.
 
