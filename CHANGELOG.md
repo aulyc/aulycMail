@@ -1,9 +1,12 @@
 # Changelog
 
-All notable changes to aulycmail are documented here.
+All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Renamed the product, app bundle, executable, and new release artifacts to
+  `aulycMail` while preserving the existing bundle ID, local data, Keychain
+  service, and historical release compatibility.
 - Simplified backup status presentation by removing redundant button and task
   icons, showing “备份中…” while running, adding the total to recent summaries,
   and removing the duplicate current/total counter.
@@ -62,5 +65,5 @@ All notable changes to aulycmail are documented here.
 
 ## [0.3.0] — 2026
 
-- Initial release of aulycmail, a lightweight email client for macOS.
+- Initial release of aulycMail, a lightweight email client for macOS.
 - Database migration v47 removes legacy CardDAV/remote-contact records and OAuth token metadata; export any legacy remote contacts before upgrading if needed.

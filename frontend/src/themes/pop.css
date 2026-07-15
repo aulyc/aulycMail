@@ -6,7 +6,7 @@
    Note on accent: COSMIC's default accent in Dark is cyan/teal #63D0DF
    (NOT the System76 brand orange older Pop!_OS GNOME shells used).
    Light mode uses a deep teal #00525A for proper contrast on light bg.
-   aulycmail-specific override: --ring matches --primary. */
+   aulycMail-specific override: --ring matches --primary. */
 @layer base {
   /* Pop! Light — primary.base bg, secondary.base elevated cards. */
   [data-theme="pop-light"] {
@@ -38,7 +38,7 @@
     color-scheme: dark;
     --background: 0 0% 15%;                /* primary.base #272727 */
     --foreground: 0 0% 100%;               /* neutral_10 #FFFFFF */
-    --card: 0 0% 15%;                      /* primary.base — flat, aulycmail convention */
+    --card: 0 0% 15%;                      /* primary.base — flat, aulycMail convention */
     --card-foreground: 0 0% 100%;
     --popover: 0 0% 15%;
     --popover-foreground: 0 0% 100%;

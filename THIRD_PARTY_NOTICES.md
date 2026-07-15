@@ -1,8 +1,8 @@
 # Third-Party Notices
 
 This file records license notices for third-party components and upstream
-portions included in or used by aulycmail. It is not a license for the
-proprietary aulycmail application as a whole.
+portions included in or used by aulycMail. It is not a license for the
+proprietary aulycMail application as a whole.
 
 ## Upstream Apache-2.0 Portions
 
@@ -200,7 +200,7 @@ When packaged, this notice is copied into the application bundle under:
 
 ## Runtime and Dependency Components
 
-aulycmail uses third-party runtime and build components, including Wails,
+aulycMail uses third-party runtime and build components, including Wails,
 Svelte, Vite, TipTap, Iconify, bits-ui, Tailwind CSS utilities, Go e-mail
 libraries, SQLite-related Go packages, and other transitive dependencies listed
 in go.mod, go.sum, frontend/package.json, and frontend/package-lock.json.

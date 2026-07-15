@@ -76,7 +76,7 @@ func BuildMDN(originalMsg *message.Message, fromName, fromEmail string, disposit
 	buf.WriteString(fmt.Sprintf("--%s\r\n", boundary))
 	buf.WriteString("Content-Type: message/disposition-notification\r\n")
 	buf.WriteString("\r\n")
-	buf.WriteString("Reporting-UA: aulycmail/1.0\r\n")
+	buf.WriteString("Reporting-UA: aulycMail/1.0\r\n")
 	if originalMsg.MessageID != "" {
 		buf.WriteString(fmt.Sprintf("Original-Message-ID: %s\r\n", originalMsg.MessageID))
 	}

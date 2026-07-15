@@ -56,7 +56,7 @@ type AppInfo struct {
 // GetAppInfo returns application metadata for the About settings page
 func (a *App) GetAppInfo() AppInfo {
 	return AppInfo{
-		Name:           "aulycmail",
+		Name:           "aulycMail",
 		Version:        Version,
 		BuildNumber:    BuildNumber,
 		CommitSHA:      CommitSHA,
@@ -68,7 +68,7 @@ func (a *App) GetAppInfo() AppInfo {
 }
 
 // GetPendingMailto returns and clears any pending mailto: URL data.
-// This is used when aulycmail is launched with a mailto: URL argument.
+// This is used when aulycMail is launched with a mailto: URL argument.
 func (a *App) GetPendingMailto() *MailtoData {
 	data := a.PendingMailto
 	a.PendingMailto = nil // Clear after reading

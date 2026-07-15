@@ -1,17 +1,17 @@
-aulycmail Proprietary License
+aulycMail Proprietary License
 
 Copyright (c) 2026 aulyc. All rights reserved.
 
-The aulycmail application, including aulycmail-specific source code,
+The aulycMail application, including aulycMail-specific source code,
 branding, artwork, documentation, build configuration, and distribution
 packages, is proprietary and is not released under a public source license.
 
 Except where a separate written agreement from aulyc says otherwise, you may
 not copy, publish, redistribute, sublicense, sell, rent, lease, modify, create
 derivative works from, reverse engineer, or make the source code of the
-proprietary portions of aulycmail available to third parties.
+proprietary portions of aulycMail available to third parties.
 
-Third-party components and upstream portions included in or used by aulycmail
+Third-party components and upstream portions included in or used by aulycMail
 remain governed by their own license terms. Required third-party and upstream
 license notices are collected in THIRD_PARTY_NOTICES.md. Nothing in this
 license limits rights granted directly by those third-party licenses.

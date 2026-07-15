@@ -28,7 +28,7 @@ export function ensureFrontendDist(root = DEFAULT_ROOT) {
   fs.mkdirSync(dist, { recursive: true })
   fs.writeFileSync(
     path.join(dist, 'index.html'),
-    '<!doctype html><meta charset="utf-8"><title>aulycmail build bootstrap</title>\n',
+    '<!doctype html><meta charset="utf-8"><title>aulycMail build bootstrap</title>\n',
   )
   return true
 }

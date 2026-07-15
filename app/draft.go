@@ -742,7 +742,7 @@ func (a *App) GetDraft(id string) (*smtp.ComposeMessage, error) {
 		return nil, nil
 	}
 
-	// No draft found - this might be a draft that was created outside aulycmail
+	// No draft found - this might be a draft that was created outside aulycMail.
 	// (e.g., from webmail). Build a ComposeMessage from the message itself.
 	log.Debug().Str("messageID", id).Msg("No local draft found, building from message")
 	return a.messageToComposeMessage(msg), nil

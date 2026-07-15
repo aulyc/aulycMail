@@ -100,7 +100,7 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 
 	// Create application with options
 	err = wails.Run(&options.App{
-		Title:  "aulycmail",
+		Title:  "aulycMail",
 		Width:  1300,
 		Height: 800,
 		// Floor for the narrowest pane layout (rail + sidebar-min + list-min +

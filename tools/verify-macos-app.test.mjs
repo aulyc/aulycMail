@@ -8,11 +8,11 @@ import test from 'node:test'
 const isSupportedHost = process.platform === 'darwin' && process.arch === 'arm64'
 
 test('verifies an app whose mounted-volume path contains spaces', { skip: !isSupportedHost }, (t) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aulycmail-app-verifier-test-'))
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aulycMail-app-verifier-test-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
 
-  const app = path.join(root, 'Mounted Volume', 'aulycmail.app')
-  const executable = path.join(app, 'Contents', 'MacOS', 'aulycmail')
+  const app = path.join(root, 'Mounted Volume', 'aulycMail.app')
+  const executable = path.join(app, 'Contents', 'MacOS', 'aulycMail')
   const info = path.join(app, 'Contents', 'Info.plist')
   const manifest = path.join(root, 'manifest.json')
   const source = path.join(root, 'main.go')
@@ -25,7 +25,9 @@ func main() { fmt.Println("1.2.3 (build 4)") }
   fs.writeFileSync(info, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleExecutable</key><string>aulycmail</string>
+<key>CFBundleName</key><string>aulycMail</string>
+<key>CFBundleDisplayName</key><string>aulycMail</string>
+<key>CFBundleExecutable</key><string>aulycMail</string>
 <key>CFBundleIdentifier</key><string>com.aulyc.aulycmail</string>
 <key>CFBundleShortVersionString</key><string>1.2.3</string>
 <key>CFBundleVersion</key><string>4</string>
@@ -35,6 +37,7 @@ func main() { fmt.Println("1.2.3 (build 4)") }
 </dict></plist>
 `)
   fs.writeFileSync(manifest, `${JSON.stringify({
+    application: 'aulycMail',
     version: '1.2.3',
     buildNumber: 4,
     releaseChannel: 'test',

@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_ROOT="$ROOT"
-APP="$ROOT/build/bin/aulycmail.app"
+APP="$ROOT/build/bin/aulycMail.app"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -37,6 +37,8 @@ EXPECTED_COMMIT="$(git -C "$SOURCE_ROOT" rev-parse HEAD)"
 INFO="$APP/Contents/Info.plist"
 EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$INFO")"
 EXECUTABLE="$APP/Contents/MacOS/$EXECUTABLE_NAME"
+ACTUAL_NAME="$(/usr/bin/plutil -extract CFBundleName raw -o - "$INFO")"
+ACTUAL_DISPLAY_NAME="$(/usr/bin/plutil -extract CFBundleDisplayName raw -o - "$INFO")"
 ACTUAL_VERSION="$(/usr/bin/plutil -extract AULYCSemanticVersion raw -o - "$INFO")"
 ACTUAL_BUILD="$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$INFO")"
 ACTUAL_COMMIT="$(/usr/bin/plutil -extract AULYCCommitSHA raw -o - "$INFO")"
@@ -49,6 +51,11 @@ FILE_DESCRIPTION="$(file "$EXECUTABLE")"
 if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" || "$ACTUAL_BUILD" != "$EXPECTED_BUILD" || \
       "$ACTUAL_COMMIT" != "$EXPECTED_COMMIT" ]]; then
   echo "Release candidate version/build/commit does not match the release source." >&2
+  exit 1
+fi
+if [[ "$(basename "$APP")" != "aulycMail.app" || "$ACTUAL_NAME" != "aulycMail" || \
+      "$ACTUAL_DISPLAY_NAME" != "aulycMail" || "$EXECUTABLE_NAME" != "aulycMail" ]]; then
+  echo "Release candidate product name, bundle name, or executable name is incorrect." >&2
   exit 1
 fi
 if [[ "$ACTUAL_BUNDLE_ID" != "com.aulyc.aulycmail" || "$ACTUAL_MIN_SYSTEM" != "11.0" ]]; then
@@ -65,4 +72,4 @@ if [[ "$RUNTIME_VERSION" != "$EXPECTED_VERSION (build $EXPECTED_BUILD)" ]]; then
 fi
 codesign --verify --deep --strict --verbose=2 "$APP"
 
-echo "Verified release candidate $EXPECTED_VERSION (build $EXPECTED_BUILD, arm64, com.aulyc.aulycmail)."
+echo "Verified aulycMail release candidate $EXPECTED_VERSION (build $EXPECTED_BUILD, arm64, com.aulyc.aulycmail)."

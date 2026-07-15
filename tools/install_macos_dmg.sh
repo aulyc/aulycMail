@@ -3,9 +3,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-DMG_PATH="$ROOT/dist/aulycmail.dmg"
+DMG_PATH="$ROOT/dist/aulycMail.dmg"
 SOURCE_REPO="$ROOT"
-DEST_APP="/Applications/aulycmail.app"
+DEST_APP=""
 LAUNCH=1
 ALLOW_ADHOC=0
 MOUNT_POINT=""
@@ -66,6 +66,13 @@ if [[ ! -f "$MANIFEST_PATH" ]]; then
 fi
 
 CHANNEL="$(/usr/bin/plutil -extract releaseChannel raw -o - "$MANIFEST_PATH")"
+APPLICATION="$(/usr/bin/plutil -extract application raw -o - "$MANIFEST_PATH")"
+DEST_APP="/Applications/$APPLICATION.app"
+if [[ "$APPLICATION" == "aulycMail" ]]; then
+  LEGACY_OR_CURRENT_APP="/Applications/aulycmail.app"
+else
+  LEGACY_OR_CURRENT_APP="/Applications/aulycMail.app"
+fi
 if [[ "$CHANNEL" == "test" ]]; then
   if [[ "$ALLOW_ADHOC" != "1" ]]; then
     echo "Refusing ad-hoc test release without explicit --allow-adhoc." >&2
@@ -93,20 +100,24 @@ if [[ -z "$MOUNT_POINT" || ! -d "$MOUNT_POINT" ]]; then
   echo "Failed to locate mounted DMG volume." >&2
   exit 1
 fi
-SOURCE_APP="$MOUNT_POINT/aulycmail.app"
+SOURCE_APP="$MOUNT_POINT/$APPLICATION.app"
 if [[ ! -d "$SOURCE_APP" ]]; then
-  echo "Missing aulycmail.app in release DMG." >&2
+  echo "Missing $APPLICATION.app in release DMG." >&2
   exit 1
 fi
 
-echo "Installing verified aulycmail.app to /Applications..."
+echo "Installing verified $APPLICATION.app to /Applications..."
+if [[ -d "$LEGACY_OR_CURRENT_APP" ]]; then
+  echo "Removing alternate-name installation at $LEGACY_OR_CURRENT_APP..."
+  rm -rf "$LEGACY_OR_CURRENT_APP"
+fi
 if [[ -d "$DEST_APP" ]]; then
   rm -rf "$DEST_APP"
 fi
 ditto "$SOURCE_APP" "$DEST_APP"
 
-if [[ "$DEST_APP" != "/Applications/aulycmail.app" || ! -d "$DEST_APP" ]]; then
-  echo "Installed app is not at the required /Applications/aulycmail.app path." >&2
+if [[ "$DEST_APP" != "/Applications/$APPLICATION.app" || ! -d "$DEST_APP" ]]; then
+  echo "Installed app is not at the required $DEST_APP path." >&2
   exit 1
 fi
 bash "$SOURCE_REPO/tools/verify_macos_app.sh" \

@@ -4,16 +4,16 @@
 
 ## Acceptance of Terms
 
-By downloading, installing, or using aulycmail, you agree to these Terms of Use.
+By downloading, installing, or using aulycMail, you agree to these Terms of Use.
 If you do not agree, do not use the application.
 
 ## Description
 
-aulycmail is a desktop e-mail client. It lets you connect to configured mail
+aulycMail is a desktop e-mail client. It lets you connect to configured mail
 accounts via IMAP/SMTP, send and receive e-mail, manage local mail state, and
 use local contacts for address autocomplete.
 
-aulycmail runs locally on your device. It does not provide e-mail hosting, cloud
+aulycMail runs locally on your device. It does not provide e-mail hosting, cloud
 storage, or server infrastructure.
 
 ## License Notices
@@ -28,14 +28,14 @@ notices, including the bundled legal notices where provided.
 You are responsible for:
 
 1. Securing your e-mail account credentials.
-2. Securing the device on which aulycmail is installed.
+2. Securing the device on which aulycMail is installed.
 3. Using the application in compliance with applicable laws.
 4. Complying with your e-mail provider's terms of service.
 5. Maintaining backups of important data.
 
 ## Acceptable Use
 
-You agree not to use aulycmail to send spam, malware, phishing messages, or
+You agree not to use aulycMail to send spam, malware, phishing messages, or
 other unlawful or harmful content.
 
 ## Disclaimer of Warranties
@@ -45,7 +45,7 @@ kind, either express or implied.
 
 ## Limitation of Liability
 
-To the maximum extent permitted by law, the developers of aulycmail are not
+To the maximum extent permitted by law, the developers of aulycMail are not
 liable for indirect, incidental, special, consequential, or punitive damages,
 including loss of data, loss of profits, or inability to use the application.
 

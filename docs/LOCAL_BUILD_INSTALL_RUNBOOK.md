@@ -4,8 +4,8 @@ This records the local macOS rebuild/install flow used for this checkout.
 
 ## Current Environment
 
-- Repository: `/Users/crp/Projects/aulycmail`
-- Installed app: `/Applications/aulycmail.app`
+- Repository: `/Users/crp/Projects/aulycMail`
+- Installed app: `/Applications/aulycMail.app`
 - Wails CLI: `/Users/crp/go/bin/wails`
 - Node/npm: `/Users/crp/.nvm/versions/node/v24.13.0/bin`
 - Build target: `make install-darwin`
@@ -13,8 +13,8 @@ This records the local macOS rebuild/install flow used for this checkout.
 ## Required Order
 
 1. Rebuild and install with the local Node and Wails paths. The `install-darwin`
-   target now quits a running installed `aulycmail` process before replacing the
-   bundle.
+   target quits a running installed `aulycMail` process or legacy `aulycmail`
+   process before replacing the bundle.
 
    ```sh
    /bin/zsh -lc "PATH=/Users/crp/.nvm/versions/node/v24.13.0/bin:/Users/crp/go/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin make install-darwin"
@@ -31,11 +31,11 @@ This records the local macOS rebuild/install flow used for this checkout.
 3. Verify the installed app bundle.
 
    ```sh
-   ls -ld /Applications/aulycmail.app /Applications/aulycmail.app/Contents/MacOS/aulycmail
-   codesign --verify --deep --strict --verbose=2 /Applications/aulycmail.app
+   ls -ld /Applications/aulycMail.app /Applications/aulycMail.app/Contents/MacOS/aulycMail
+   codesign --verify --deep --strict --verbose=2 /Applications/aulycMail.app
    ```
 
-## Last Confirmed Run
+## Last Confirmed Run Before Product Rename
 
 - Date/time: 2026-07-01 23:21 CST
 - Running app PID before quit: a running `aulycmail` process was detected by `make install-darwin`
@@ -44,6 +44,9 @@ This records the local macOS rebuild/install flow used for this checkout.
 - Installed binary: `/Applications/aulycmail.app/Contents/MacOS/aulycmail`
 - Installed timestamp observed: `Jul 1 23:21`
 - Codesign verification: valid on disk; satisfies Designated Requirement
+
+This historical record intentionally retains the lowercase App and executable
+paths that were verified before the `aulycMail` product rename.
 
 ## Notes
 

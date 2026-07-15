@@ -1,6 +1,6 @@
 ![Logo](frontend/src/assets/images/logo-universal.png)
 
-# aulycmail - A Lightweight E-Mail Client
+# aulycMail - A Lightweight E-Mail Client
 
 Maintained by: @aulyc
 
@@ -8,7 +8,7 @@ Maintained by: @aulyc
 
 ## Summary
 
-aulycmail is a standalone desktop e-mail client focused on:
+aulycMail is a standalone desktop e-mail client focused on:
 
 - Resource efficiency
 - Clean desktop UX

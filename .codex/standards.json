@@ -94,23 +94,23 @@
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "6c77a9b18a687c88f61880d00b52397287985cd8c209495515e8e71918de6f30"
+      "sha256": "971f67b49333c5c24da7913d5c1ef129f804d7a9116d439abe29d45c559d156d"
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "sha256": "5b182dda562602c8ed3744eaa5d9d12756ed09da629d1c895fff6e6657be2619"
+      "sha256": "dd8225720de0e7fc2b945b5517f43134a3131e3101ed544bf52166b3340012d8"
     },
     {
       "path": "docs/VERSIONING.md",
-      "sha256": "5c32f98deefe91ed5b09620c78f8abf4a459cf8a13652760d7d94107a0299943"
+      "sha256": "3086cc0dd822e3f22d4a8db51b28b36ae7e0a2ae428cd37828b6be8d4aefff0b"
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "d5337adb7cea29edbaf7857e4c1c696bae2b720ffa556df8622b0bb3b8cee4ee"
+      "sha256": "7f78210b48bab746bd211712bc26c6924fd7dd85828813a7f0e53b15ccc1702c"
     },
     {
       "path": "Makefile",
-      "sha256": "992222656b487cd8230effd2066e783f6d85e87d2625218e90b6243754f2a36d"
+      "sha256": "d5ec92bb0c0bd3e5eb35b5600a75e08fe5cbfc19b74f179fe329392baeac8e31"
     },
     {
       "path": ".golangci.yml",
@@ -126,19 +126,19 @@
     },
     {
       "path": "tools/release-identity.mjs",
-      "sha256": "a74507c4e15f45b1568e6b4fc36e4c1619ed7351ef24ad488d5542fb09576950"
+      "sha256": "1450cba12bef6df5c5a723db1929b7b8730cdd5aa439960bcfb8c82490cd06c5"
     },
     {
       "path": "tools/release-worktree.mjs",
-      "sha256": "640213e22d93729b133021c89d05bdc15e1ff0822cbeb0f3c0ce9953686add4f"
+      "sha256": "555f6168bb283c3f1cc3abd070bbfa024cecaedb0ba45e436d7dbd952633b43e"
     },
     {
       "path": "tools/package_macos_dmg.sh",
-      "sha256": "4ebc31cc69716a14f5480ff1bbdf172c646defe1bcd89917920b9d3dcb8300a2"
+      "sha256": "dbcfb863b97f28cda6a90a2839dfa8d2269e1a55a04736f1732b14a827edeb0d"
     },
     {
       "path": "tools/install_macos_dmg.sh",
-      "sha256": "faa8b35a8e09ec92546f4decc9cb0c2b97ef905cfd2883f82abec355d043c36e"
+      "sha256": "e956679ab381917a9286b3370820e880947039769d767c2569b2faba9aed7cb9"
     }
   ],
   "releaseSignals": {

@@ -286,9 +286,9 @@ func StartupDialogInfoFor(err error) StartupDialogInfo {
 	var schemaTooNew *database.ErrSchemaTooNew
 	if errors.As(err, &schemaTooNew) {
 		text := fmt.Sprintf(
-			"aulycmail cannot open your database because its schema (version %d) is newer "+
-				"than this build of aulycmail supports (max version %d).\n\n"+
-				"This usually means you downgraded aulycmail. To recover, either reinstall "+
+			"aulycMail cannot open your database because its schema (version %d) is newer "+
+				"than this build of aulycMail supports (max version %d).\n\n"+
+				"This usually means you downgraded aulycMail. To recover, either reinstall "+
 				"the newer version, or follow the rollback instructions to bring your "+
 				"database back to version %d:\n\n"+
 				"%s",
@@ -296,15 +296,15 @@ func StartupDialogInfoFor(err error) StartupDialogInfo {
 			databaseRecoveryURL,
 		)
 		return StartupDialogInfo{
-			Title:       "aulycmail could not start",
+			Title:       "aulycMail could not start",
 			Text:        text,
 			ActionLabel: "Open Help",
 			ActionURL:   databaseRecoveryURL,
 		}
 	}
 	return StartupDialogInfo{
-		Title: "aulycmail could not start",
-		Text:  fmt.Sprintf("aulycmail could not start.\n\nDetails: %v", err),
+		Title: "aulycMail could not start",
+		Text:  fmt.Sprintf("aulycMail could not start.\n\nDetails: %v", err),
 	}
 }
 
@@ -593,7 +593,7 @@ func (a *App) Startup(ctx context.Context) {
 	// Initialize autostart manager
 	a.autostartMgr = platform.NewAutostartManager()
 
-	log.Info().Msg("aulycmail started successfully")
+	log.Info().Msg("aulycMail started successfully")
 }
 
 // IsReady reports whether Startup has fully completed. The frontend calls
@@ -738,7 +738,7 @@ func (a *App) Shutdown(ctx context.Context) {
 		log.Info().Msg("Database closed")
 	}
 
-	log.Info().Msg("aulycmail shutdown complete")
+	log.Info().Msg("aulycMail shutdown complete")
 }
 
 // updateDBConnectionPool scales the database connection pool based on account count.
@@ -823,11 +823,11 @@ func (a *App) statusItemLabels() platform.StatusItemLabels {
 	}
 	if zh {
 		return platform.StatusItemLabels{
-			Open: "打开 aulycmail", Settings: "设置", Quit: "退出",
+			Open: "打开 aulycMail", Settings: "设置", Quit: "退出",
 		}
 	}
 	return platform.StatusItemLabels{
-		Open: "Open aulycmail", Settings: "Settings", Quit: "Quit",
+		Open: "Open aulycMail", Settings: "Settings", Quit: "Quit",
 	}
 }
 

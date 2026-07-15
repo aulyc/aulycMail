@@ -1,4 +1,4 @@
-// Package smtp provides SMTP client functionality for aulycmail
+// Package smtp provides SMTP client functionality for aulycMail.
 package smtp
 
 import (
@@ -121,7 +121,7 @@ func (m *ComposeMessage) ToRFC822() ([]byte, error) {
 	writeHeader(&buf, "Date", time.Now().Format(time.RFC1123Z))
 	writeHeader(&buf, "Message-ID", messageID)
 	writeHeader(&buf, "MIME-Version", "1.0")
-	writeHeader(&buf, "User-Agent", "aulycmail Email Client")
+	writeHeader(&buf, "User-Agent", "aulycMail Email Client")
 
 	// Threading headers
 	if m.InReplyTo != "" {

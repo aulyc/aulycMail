@@ -13,7 +13,7 @@ function writeJSON(file, value) {
 }
 
 function createTaggedReleaseRepo() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aulycmail-release-worktree-test-'))
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'aulycMail-release-worktree-test-'))
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   fs.mkdirSync(path.join(root, 'frontend'))
   fs.writeFileSync(path.join(root, '.gitignore'), 'build/\nfrontend/node_modules/\n')
@@ -105,9 +105,9 @@ test('isolated release refuses a dirty caller worktree', () => {
 
 test('release build refuses to overwrite an existing same-version artifact', () => {
   const { root } = createTaggedReleaseRepo()
-  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aulycmail-release-output-'))
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'aulycMail-release-output-'))
   try {
-    fs.writeFileSync(path.join(outputDir, 'aulycmail-1.2.3-beta.1-build.1.dmg'), 'existing\n')
+    fs.writeFileSync(path.join(outputDir, 'aulycMail-1.2.3-beta.1-build.1.dmg'), 'existing\n')
     assert.throws(
       () => buildReleaseFromTag({
         repoRoot: root,

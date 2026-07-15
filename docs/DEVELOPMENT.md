@@ -1,7 +1,7 @@
 # Development Guide
 
 This document describes the current local development and CI-neutral workflow
-for the Apple Silicon macOS build of aulycmail. Version and release behavior is
+for the Apple Silicon macOS build of aulycMail. Version and release behavior is
 documented separately in [VERSIONING.md](VERSIONING.md) and
 [RELEASE.md](RELEASE.md).
 
@@ -12,7 +12,7 @@ macOS command-line developer tools. On the maintained machine, use:
 
 ```bash
 export PATH=/Users/crp/.nvm/versions/node/v24.13.0/bin:/Users/crp/go/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
-export GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build
+export GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build
 ```
 
 The repository intentionally targets macOS `arm64` only. Production builds
@@ -67,7 +67,8 @@ make build           Local production build with development identity
 make install-darwin  Local build/install/launch; not a release
 ```
 
-`make install-darwin` replaces only `/Applications/aulycmail.app`. It must not
+`make install-darwin` replaces `/Applications/aulycMail.app` and removes a
+legacy `/Applications/aulycmail.app` bundle when present. It must not
 touch mail databases, settings, or credentials under the user's Application
 Support or Keychain storage.
 

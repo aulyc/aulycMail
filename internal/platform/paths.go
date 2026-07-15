@@ -22,8 +22,8 @@ func GetPaths() (*Paths, error) {
 		return nil, err
 	}
 
-	appSupport := filepath.Join(home, "Library", "Application Support", "aulycmail")
-	caches := filepath.Join(home, "Library", "Caches", "aulycmail")
+	appSupport := filepath.Join(home, "Library", "Application Support", appName)
+	caches := filepath.Join(home, "Library", "Caches", appName)
 
 	return &Paths{
 		Config: appSupport,

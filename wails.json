@@ -1,14 +1,14 @@
 {
   "$schema": "https://wails.io/schemas/config.v2.json",
-  "name": "aulycmail",
-  "outputfilename": "aulycmail",
+  "name": "aulycMail",
+  "outputfilename": "aulycMail",
   "frontend:install": "npm install",
   "frontend:build": "npm run build",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
   "info": {
-    "companyName": "aulycmail",
-    "productName": "aulycmail",
+    "companyName": "aulyc",
+    "productName": "aulycMail",
     "productVersion": "0.3.97",
     "copyright": "Copyright © 2026 aulyc",
     "comments": "A lightweight desktop e-mail client",

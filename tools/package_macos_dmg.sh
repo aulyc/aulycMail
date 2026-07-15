@@ -1,12 +1,12 @@
 #!/bin/bash
-# Package an existing aulycmail.app and derive release identity from Git and the real app.
+# Package an existing aulycMail.app and derive release identity from Git and the real app.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_ROOT="$ROOT"
-APP="$ROOT/build/bin/aulycmail.app"
-DMG_PATH="$ROOT/dist/aulycmail.dmg"
-VOLUME_NAME="aulycmail Installer"
+APP="$ROOT/build/bin/aulycMail.app"
+DMG_PATH="$ROOT/dist/aulycMail.dmg"
+VOLUME_NAME="aulycMail Installer"
 RELEASE_CHANNEL="local"
 TAG=""
 SIGN_IDENTITY="${SIGN_IDENTITY:-}"
@@ -19,8 +19,8 @@ Usage: tools/package_macos_dmg.sh [options]
 
 Options:
   --source-root PATH     Git source used to build the app
-  --app PATH             App bundle to package (default: build/bin/aulycmail.app)
-  --output PATH          DMG output path (default: dist/aulycmail.dmg)
+  --app PATH             App bundle to package (default: build/bin/aulycMail.app)
+  --output PATH          DMG output path (default: dist/aulycMail.dmg)
   --volume-name NAME     Mounted DMG volume name
   --release-channel NAME local, test, or formal
   --tag TAG              Exact annotated tag for test/formal releases
@@ -114,8 +114,11 @@ if [[ "$RELEASE_CHANNEL" != "local" ]]; then
 fi
 
 APP_INFO="$APP/Contents/Info.plist"
+APP_NAME="$(basename "$APP")"
 APP_EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP_INFO")"
 APP_EXECUTABLE="$APP/Contents/MacOS/$APP_EXECUTABLE_NAME"
+APP_BUNDLE_NAME="$(/usr/bin/plutil -extract CFBundleName raw -o - "$APP_INFO")"
+APP_DISPLAY_NAME="$(/usr/bin/plutil -extract CFBundleDisplayName raw -o - "$APP_INFO")"
 SEMANTIC_VERSION="$(/usr/bin/plutil -extract AULYCSemanticVersion raw -o - "$APP_INFO")"
 BUILD_NUMBER="$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$APP_INFO")"
 COMMIT_SHA="$(/usr/bin/plutil -extract AULYCCommitSHA raw -o - "$APP_INFO")"
@@ -133,6 +136,11 @@ if [[ ! "$BUILD_NUMBER" =~ ^[0-9]+$ || ! "$COMMIT_SHA" =~ ^[0-9a-f]{7,64}$ ]]; t
 fi
 if [[ "$ARCHITECTURE" != "arm64" || "$BUNDLE_IDENTIFIER" != "com.aulyc.aulycmail" ]]; then
   echo "Only the arm64 com.aulyc.aulycmail bundle can be packaged." >&2
+  exit 1
+fi
+if [[ "$APP_NAME" != "aulycMail.app" || "$APP_BUNDLE_NAME" != "aulycMail" || \
+      "$APP_DISPLAY_NAME" != "aulycMail" || "$APP_EXECUTABLE_NAME" != "aulycMail" ]]; then
+  echo "Only the aulycMail.app product identity can be packaged." >&2
   exit 1
 fi
 
@@ -158,8 +166,7 @@ if [[ -e "$DMG_PATH" || -e "$MANIFEST_PATH" ]]; then
   exit 1
 fi
 
-APP_NAME="$(basename "$APP")"
-WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/aulycmail-dmg.XXXXXX")"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/aulycMail-dmg.XXXXXX")"
 STAGING_DIR="$WORK_DIR/staging"
 RW_DMG="$WORK_DIR/$VOLUME_NAME-rw.dmg"
 MOUNT_POINT=""
@@ -328,7 +335,7 @@ const [
 ] = process.argv.slice(2)
 
 const manifest = {
-  application: 'aulycmail',
+  application: 'aulycMail',
   releaseProfile: 'macos-arm64-app',
   version,
   buildNumber: Number(buildNumber),

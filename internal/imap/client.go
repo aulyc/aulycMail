@@ -1,4 +1,4 @@
-// Package imap provides IMAP client functionality for aulycmail
+// Package imap provides IMAP client functionality for aulycMail.
 package imap
 
 import (
@@ -258,7 +258,7 @@ func (c *Client) Login() error {
 	// an otherwise-successful login (the later SELECT surfaces real problems).
 	if c.caps.Has(imap.CapID) {
 		if _, err := c.client.ID(&imap.IDData{
-			Name:    "aulycmail",
+			Name:    "aulycMail",
 			Version: ClientVersion,
 			Vendor:  "aulyc",
 		}).Wait(); err != nil {

@@ -2,7 +2,7 @@
 
 Read [VERSIONING.md](VERSIONING.md) first. The global
 `general-release-versioning` Skill supplies the shared baseline; this document
-describes the executable aulycmail `macos-arm64-app` flow.
+describes the executable aulycMail `macos-arm64-app` flow.
 
 ## Non-release quality entrypoints
 
@@ -36,7 +36,7 @@ Both release channels perform the same identity steps:
    never used as the final artifact source.
 9. Derive and validate release provenance against Git and the actual artifact.
 10. Verify the DMG and contained app, install to
-    `/Applications/aulycmail.app`, verify the installed app, then launch.
+    `/Applications/aulycMail.app`, verify the installed app, then launch.
 
 Existing same-version DMGs or provenance files are not overwritten. To reuse an
 existing artifact, verify and install that unchanged artifact. If content or
@@ -52,7 +52,7 @@ configuration, or lint finding stops the release before candidate creation.
 ## Test release
 
 ```bash
-GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
+GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build \
   make release-test
 ```
 
@@ -71,7 +71,7 @@ Prerequisites:
 - official `golangci-lint` v2.12.2 is available on `PATH`.
 
 ```bash
-GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \
+GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build \
   make release-formal \
   SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" \
   NOTARY_PROFILE=aulyc-notary
@@ -107,7 +107,7 @@ tools cross-check:
 - app and DMG code-signing type and Team ID;
 - Hardened Runtime flags;
 - formal stapler and Gatekeeper results;
-- the final `/Applications/aulycmail.app` path and installed identity.
+- the final `/Applications/aulycMail.app` path and installed identity.
 
 ## Failure and retry
 

@@ -90,7 +90,7 @@ static void aulycApplyStatusItemAppearance(void) {
     button.imagePosition = NSImageLeft;
     button.title = gStatusUnreadText ?: @"";
     button.font = [NSFont menuBarFontOfSize:0];
-    button.toolTip = @"aulycmail";
+    button.toolTip = @"aulycMail";
 }
 
 void aulycSetStatusItemVisible(int visible, AulycStatusItemLabels labels) {

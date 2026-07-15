@@ -103,7 +103,7 @@ func (m *darwinAutostartManager) launchAgentsDir() (string, error) {
 func (m *darwinAutostartManager) execCommand() string {
 	exe, err := os.Executable()
 	if err != nil {
-		return "aulycmail"
+		return "aulycMail"
 	}
 	return exe
 }

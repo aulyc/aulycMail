@@ -158,7 +158,7 @@ func (db *DB) Path() string {
 
 // ErrSchemaTooNew is returned by Migrate when the database's recorded migration
 // version is HIGHER than the highest migration this build knows about. This
-// happens when a user downgrades aulycmail after a newer version applied a
+// happens when a user downgrades aulycMail after a newer version applied a
 // forward-only migration. Callers surface a friendly recovery dialog.
 type ErrSchemaTooNew struct {
 	DBVersion    int
@@ -166,7 +166,7 @@ type ErrSchemaTooNew struct {
 }
 
 func (e *ErrSchemaTooNew) Error() string {
-	return fmt.Sprintf("database schema version %d is newer than this aulycmail build (max known: %d). See https://aulyc.com/aulycmail/support/database-recovery", e.DBVersion, e.BuildVersion)
+	return fmt.Sprintf("database schema version %d is newer than this aulycMail build (max known: %d). See https://aulyc.com/aulycmail/support/database-recovery", e.DBVersion, e.BuildVersion)
 }
 
 // Migrate runs all pending migrations
@@ -188,7 +188,7 @@ func (db *DB) Migrate() error {
 		return fmt.Errorf("failed to get current migration version: %w", err)
 	}
 
-	// Schema-version gate: refuse if the DB was written by a newer aulycmail. The
+	// Schema-version gate: refuse if the DB was written by a newer aulycMail. The
 	// DB has migrations this build doesn't know how to interpret — opening it
 	// would query columns/tables in an unexpected shape and likely corrupt
 	// autocomplete or crash. Surface a typed error the app can catch.

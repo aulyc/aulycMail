@@ -10,6 +10,9 @@ import { verifyRelease } from './version-bump.mjs'
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, '..')
+export const CURRENT_APPLICATION = 'aulycMail'
+export const LEGACY_APPLICATION = 'aulycmail'
+const SUPPORTED_APPLICATIONS = new Set([CURRENT_APPLICATION, LEGACY_APPLICATION])
 
 export const RELEASE_METADATA_FILES = new Set([
   'CHANGELOG.md',
@@ -194,7 +197,9 @@ export function validateManifest(manifest) {
   requireBoolean(manifest.hardenedRuntime, 'hardenedRuntime')
   requireBoolean(manifest.notarized, 'notarized')
 
-  if (manifest.application !== 'aulycmail') fail('Manifest application must be aulycmail.')
+  if (!SUPPORTED_APPLICATIONS.has(manifest.application)) {
+    fail(`Manifest application must be ${CURRENT_APPLICATION} or legacy ${LEGACY_APPLICATION}.`)
+  }
   if (manifest.releaseProfile !== 'macos-arm64-app') {
     fail('Manifest releaseProfile must be macos-arm64-app.')
   }
@@ -224,7 +229,7 @@ export function validateManifest(manifest) {
   }
   if (manifest.buildNumber < 1) fail('Test and formal releases require a positive buildNumber.')
   if (manifest.dirty) fail('Test and formal release manifests must record dirty=false.')
-  const expectedArtifact = `aulycmail-${manifest.version}-build.${manifest.buildNumber}.dmg`
+  const expectedArtifact = `${manifest.application}-${manifest.version}-build.${manifest.buildNumber}.dmg`
   if (manifest.artifact !== expectedArtifact) {
     fail(`Manifest artifact must be ${expectedArtifact}.`)
   }

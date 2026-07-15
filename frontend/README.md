@@ -1,4 +1,4 @@
-# aulycmail Frontend
+# aulycMail Frontend
 
 This directory contains the Svelte frontend used by the Wails desktop app.
 

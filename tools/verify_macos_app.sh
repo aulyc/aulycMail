@@ -37,6 +37,7 @@ if [[ "$CHANNEL" != "test" && "$CHANNEL" != "formal" ]]; then
 fi
 
 EXPECTED_VERSION="$(/usr/bin/plutil -extract version raw -o - "$MANIFEST")"
+EXPECTED_APPLICATION="$(/usr/bin/plutil -extract application raw -o - "$MANIFEST")"
 EXPECTED_BUILD="$(/usr/bin/plutil -extract buildNumber raw -o - "$MANIFEST")"
 EXPECTED_CHANNEL="$(/usr/bin/plutil -extract releaseChannel raw -o - "$MANIFEST")"
 EXPECTED_COMMIT="$(/usr/bin/plutil -extract commit raw -o - "$MANIFEST")"
@@ -56,6 +57,8 @@ fi
 INFO="$APP/Contents/Info.plist"
 EXECUTABLE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$INFO")"
 EXECUTABLE="$APP/Contents/MacOS/$EXECUTABLE_NAME"
+ACTUAL_NAME="$(/usr/bin/plutil -extract CFBundleName raw -o - "$INFO")"
+ACTUAL_DISPLAY_NAME="$(/usr/bin/plutil -extract CFBundleDisplayName raw -o - "$INFO" 2>/dev/null || true)"
 ACTUAL_VERSION="$(/usr/bin/plutil -extract AULYCSemanticVersion raw -o - "$INFO")"
 ACTUAL_SHORT="$(/usr/bin/plutil -extract CFBundleShortVersionString raw -o - "$INFO")"
 ACTUAL_BUILD="$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$INFO")"
@@ -71,6 +74,15 @@ if [[ "$ACTUAL_VERSION" != "$EXPECTED_VERSION" || "$ACTUAL_SHORT" != "$EXPECTED_
       "$ACTUAL_BUILD" != "$EXPECTED_BUILD" || "$ACTUAL_COMMIT" != "$EXPECTED_COMMIT" || \
       "$ACTUAL_BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" || "$ACTUAL_MIN_SYSTEM" != "$EXPECTED_MIN_SYSTEM" ]]; then
   echo "App Info.plist does not match the release manifest." >&2
+  exit 1
+fi
+if [[ "$(basename "$APP")" != "$EXPECTED_APPLICATION.app" || \
+      "$ACTUAL_NAME" != "$EXPECTED_APPLICATION" || "$EXECUTABLE_NAME" != "$EXPECTED_APPLICATION" ]]; then
+  echo "App bundle name, product name, or executable does not match the release manifest." >&2
+  exit 1
+fi
+if [[ "$EXPECTED_APPLICATION" == "aulycMail" && "$ACTUAL_DISPLAY_NAME" != "aulycMail" ]]; then
+  echo "Current aulycMail releases require CFBundleDisplayName=aulycMail." >&2
   exit 1
 fi
 if [[ "$RUNTIME_VERSION" != "$EXPECTED_VERSION (build $EXPECTED_BUILD)" ]]; then

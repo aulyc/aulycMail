@@ -7,7 +7,7 @@ package sync
 // and the server returns only UIDs whose flags changed after <prev> — typically
 // 0-10 messages per sync instead of every UID in the mailbox.
 //
-// For aulycmail users with 10k+ inboxes this turns flag sync from a multi-second
+// For aulycMail users with 10k+ inboxes this turns flag sync from a multi-second
 // pre-cycle stall into a single sub-100ms round-trip.
 //
 // Files split for review/test isolation:

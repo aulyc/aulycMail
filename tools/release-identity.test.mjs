@@ -6,6 +6,8 @@ import path from 'node:path'
 import test from 'node:test'
 
 import {
+  CURRENT_APPLICATION,
+  LEGACY_APPLICATION,
   REQUIRED_MANIFEST_FIELDS,
   validateManifest,
   verifyManifestGit,
@@ -13,7 +15,7 @@ import {
 
 function testManifest(overrides = {}) {
   return {
-    application: 'aulycmail',
+    application: CURRENT_APPLICATION,
     releaseProfile: 'macos-arm64-app',
     version: '1.2.3-beta.1',
     buildNumber: 7,
@@ -21,7 +23,7 @@ function testManifest(overrides = {}) {
     tag: '1.2.3-beta.1',
     commit: 'a'.repeat(40),
     dirty: false,
-    artifact: 'aulycmail-1.2.3-beta.1-build.7.dmg',
+    artifact: 'aulycMail-1.2.3-beta.1-build.7.dmg',
     sha256: 'b'.repeat(64),
     architecture: 'arm64',
     bundleIdentifier: 'com.aulyc.aulycmail',
@@ -77,7 +79,7 @@ test('formal release manifest requires Developer ID, runtime, Team ID, and notar
     version: '1.2.3',
     releaseChannel: 'formal',
     tag: '1.2.3',
-    artifact: 'aulycmail-1.2.3-build.7.dmg',
+    artifact: 'aulycMail-1.2.3-build.7.dmg',
     teamIdentifier: 'M9M7M2ARFD',
     signatureType: 'developer-id',
     hardenedRuntime: true,
@@ -99,6 +101,22 @@ test('manifest validation rejects missing fields, dirty releases, and channel im
   assert.throws(
     () => validateManifest(testManifest({ releaseProfile: 'obsidian-plugin' })),
     /releaseProfile must be macos-arm64-app/,
+  )
+  assert.throws(
+    () => validateManifest(testManifest({ application: 'otherMail' })),
+    /application must be aulycMail or legacy aulycmail/,
+  )
+})
+
+test('historical lowercase release manifests remain valid without weakening artifact binding', () => {
+  const legacy = testManifest({
+    application: LEGACY_APPLICATION,
+    artifact: 'aulycmail-1.2.3-beta.1-build.7.dmg',
+  })
+  assert.equal(validateManifest(legacy), legacy)
+  assert.throws(
+    () => validateManifest({ ...legacy, artifact: 'aulycMail-1.2.3-beta.1-build.7.dmg' }),
+    /artifact must be aulycmail-1\.2\.3-beta\.1-build\.7\.dmg/,
   )
 })
 

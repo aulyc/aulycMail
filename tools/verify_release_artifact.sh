@@ -45,6 +45,7 @@ node "$REPO/tools/release-identity.mjs" verify-manifest \
   --manifest "$MANIFEST" --repo "$REPO" --dmg "$DMG"
 
 EXPECTED_CHANNEL="$(/usr/bin/plutil -extract releaseChannel raw -o - "$MANIFEST")"
+EXPECTED_APPLICATION="$(/usr/bin/plutil -extract application raw -o - "$MANIFEST")"
 EXPECTED_SIGNATURE="$(/usr/bin/plutil -extract signatureType raw -o - "$MANIFEST")"
 EXPECTED_TEAM="$(/usr/bin/plutil -extract teamIdentifier raw -o - "$MANIFEST" 2>/dev/null || true)"
 if [[ "$EXPECTED_CHANNEL" != "$CHANNEL" ]]; then
@@ -91,9 +92,9 @@ if [[ -z "$MOUNT_POINT" || ! -d "$MOUNT_POINT" ]]; then
   echo "Failed to locate mounted DMG volume." >&2
   exit 1
 fi
-SOURCE_APP="$MOUNT_POINT/aulycmail.app"
+SOURCE_APP="$MOUNT_POINT/$EXPECTED_APPLICATION.app"
 if [[ ! -d "$SOURCE_APP" ]]; then
-  echo "Release DMG does not contain aulycmail.app." >&2
+  echo "Release DMG does not contain $EXPECTED_APPLICATION.app." >&2
   exit 1
 fi
 

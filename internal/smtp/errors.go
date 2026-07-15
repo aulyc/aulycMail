@@ -1,4 +1,4 @@
-// Package smtp provides SMTP client functionality for aulycmail
+// Package smtp provides SMTP client functionality for aulycMail.
 package smtp
 
 import "errors"

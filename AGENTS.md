@@ -2,7 +2,7 @@
 
 ## Repository purpose
 
-`aulycmail` is a local-first macOS desktop mail client. Preserve reliable
+`aulycMail` is a local-first macOS desktop mail client. Preserve reliable
 IMAP/SMTP behavior, local mail data, user settings, credentials, and release
 provenance over convenience or broad rewrites.
 
@@ -51,8 +51,8 @@ provenance over convenience or broad rewrites.
 - Shared development gate: `make check`.
 - Full non-release CI gate and production build: `make ci`.
 - Local development installation: `make install-darwin`; this is not a release.
-- Test release: `GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build make release-test`.
-- Formal release: `GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build make release-formal SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary`.
+- Test release: `GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build make release-test`.
+- Formal release: `GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build make release-formal SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary`.
 
 Do not install, release, tag, sign, notarize, or publish unless the user
 explicitly requests that operation.
@@ -129,6 +129,10 @@ successful aggregate target unless diagnosing a failure.
   formal release requires a new positive build number.
 - Product metadata: the built App's `Info.plist`, Mach-O executable, Wails
   metadata, embedded frontend assets, and code-signing identity.
+- Product name, App bundle, and executable: `aulycMail`, `aulycMail.app`, and
+  `aulycMail`. Preserve compatibility identities `com.aulyc.aulycmail`,
+  `~/Library/Application Support/aulycmail`, the `aulycmail` Keychain service,
+  and the `aulyc.local/aulycmail` Go module path.
 - Release provenance: historical `*.manifest.json` files generated beside each
   DMG. They are release provenance evidence, not product metadata; the filename
   remains for compatibility and every new file must declare
@@ -146,6 +150,6 @@ successful aggregate target unless diagnosing a failure.
   `Accepted`, stapling, stapler validation, and Gatekeeper verification.
 - Release provenance must be derived from and cross-checked against Git, the DMG,
   Info.plist, the executable, architecture tools, code signing, notarization,
-  and the actual `/Applications/aulycmail.app` installation.
+  and the actual `/Applications/aulycMail.app` installation.
 - Published tags and artifacts are immutable and must not be overwritten.
 - Read `docs/VERSIONING.md` and `docs/RELEASE.md` before release work.

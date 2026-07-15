@@ -1,7 +1,7 @@
-# aulycmail Email Client - Build System (macOS-only slim build)
+# aulycMail Email Client - Build System (macOS-only slim build)
 #
 # Usage:
-#   make build    - Build production binary (aulycmail.app)
+#   make build    - Build production binary (aulycMail.app)
 #   make dev      - Run in development mode
 #   make help     - Show all available targets
 
@@ -28,7 +28,7 @@ LOCAL_APP_VERSION := $(shell node tools/version-bump.mjs local-version $(COMMIT_
 APP_VERSION ?= $(LOCAL_APP_VERSION)
 BUNDLE_BUILD_NUMBER ?= 0
 
-# aulycmail is a password-auth mail client; only non-secret build metadata is injected.
+# aulycMail is a password-auth mail client; only non-secret build metadata is injected.
 LDFLAGS = -X $(MODULE)/app.Version=$(APP_VERSION) \
 	-X $(MODULE)/app.BuildNumber=$(BUNDLE_BUILD_NUMBER) \
 	-X $(MODULE)/app.CommitSHA=$(COMMIT_SHA) \
@@ -37,11 +37,11 @@ LDFLAGS = -X $(MODULE)/app.Version=$(APP_VERSION) \
 # Wails build tags
 BUILD_TAGS := webkit2_41
 GO_BUILD_TAGS := desktop,$(BUILD_TAGS),wv2runtime.download,production
-APP_BUNDLE := build/bin/aulycmail.app
-APP_BINARY := build/bin/aulycmail
-DMG_PATH ?= dist/aulycmail-$(VERSION)-build.$(BUNDLE_BUILD_NUMBER).dmg
-RELEASE_DMG_PATH := dist/aulycmail-$(VERSION)-build.$(BUILD_NUMBER).dmg
-DMG_VOLUME_NAME ?= aulycmail Installer
+APP_BUNDLE := build/bin/aulycMail.app
+APP_BINARY := build/bin/aulycMail
+DMG_PATH ?= dist/aulycMail-$(VERSION)-build.$(BUNDLE_BUILD_NUMBER).dmg
+RELEASE_DMG_PATH := dist/aulycMail-$(VERSION)-build.$(BUILD_NUMBER).dmg
+DMG_VOLUME_NAME ?= aulycMail Installer
 SIGN_IDENTITY ?=
 NOTARY_PROFILE ?=
 RELEASE_BUMP ?= auto
@@ -81,7 +81,7 @@ all: build
 
 ## Build Targets
 
-# Build production binary (aulycmail.app) and ad-hoc sign it
+# Build production binary (aulycMail.app) and ad-hoc sign it
 # (ad-hoc signature is required for macOS notifications to work).
 build: version-check build-app
 
@@ -89,10 +89,10 @@ build: version-check build-app
 # and the isolated tagged-source build. Callers provide the runtime identity.
 build-app:
 	@if [ "$$(uname -m)" != "arm64" ]; then \
-		echo 'aulycmail supports Apple Silicon arm64 builds only.'; \
+		echo 'aulycMail supports Apple Silicon arm64 builds only.'; \
 		exit 1; \
 	fi
-	@echo "Building aulycmail..."
+	@echo "Building aulycMail..."
 	@node tools/ensure-frontend-dist.mjs
 	$(DARWIN_LINK_WARN_ENV) wails generate module
 	@tools/normalize_wails_bindings.sh
@@ -113,7 +113,7 @@ build-app:
 		bash tools/package_macos_app.sh
 	@echo "Injecting macOS asset-catalog icon (fills the Liquid Glass plate on macOS 26)..."
 	bash tools/inject_macos_icon.sh $(APP_BUNDLE) build/appicon.png
-	@echo "Ad-hoc signing aulycmail.app (required for macOS notifications)..."
+	@echo "Ad-hoc signing aulycMail.app (required for macOS notifications)..."
 	@codesign_log=$$(mktemp); \
 	if codesign --force --deep --sign - $(APP_BUNDLE) >"$$codesign_log" 2>&1; then \
 		rm -f "$$codesign_log"; \
@@ -125,7 +125,7 @@ build-app:
 
 # Run in development mode with hot reload
 dev:
-	@echo "Starting aulycmail in development mode..."
+	@echo "Starting aulycMail in development mode..."
 	$(DARWIN_LINK_WARN_ENV) wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
 
 # Run in development mode with Go's race detector enabled. Builds significantly
@@ -134,7 +134,7 @@ dev:
 # shared-memory access. Use this when chasing a suspected data race —
 # reproduce the crash and the detector report points right at it.
 dev-race:
-	@echo "Starting aulycmail in development mode with -race..."
+	@echo "Starting aulycMail in development mode with -race..."
 	$(DARWIN_LINK_WARN_ENV) wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
 
 # Generate Wails TypeScript bindings
@@ -193,7 +193,7 @@ isolated-release-artifact:
 	@./tools/package_macos_dmg.sh \
 		--source-root "$(CURDIR)" \
 		--app "$(APP_BUNDLE)" \
-		--output "$(RELEASE_OUTPUT_DIR)/aulycmail-$(VERSION)-build.$(BUILD_NUMBER).dmg" \
+		--output "$(RELEASE_OUTPUT_DIR)/aulycMail-$(VERSION)-build.$(BUILD_NUMBER).dmg" \
 		--volume-name "$(DMG_VOLUME_NAME)" \
 		--release-channel "$(RELEASE_CHANNEL)" \
 		--tag "$(RELEASE_TAG)" \
@@ -373,7 +373,7 @@ release-tag: release-check
 		fi; \
 		echo 'Verified existing immutable release tag $(VERSION).'; \
 	else \
-		git tag -a "$(VERSION)" -m "aulycmail $(VERSION)"; \
+		git tag -a "$(VERSION)" -m "aulycMail $(VERSION)"; \
 		echo 'Created immutable release tag $(VERSION).'; \
 	fi
 
@@ -414,7 +414,7 @@ clean:
 	@echo "Cleaning build artifacts..."
 	rm -rf build/bin
 	rm -rf frontend/dist
-	rm -f aulycmail
+	rm -f aulycMail aulycmail
 
 # Install frontend dependencies
 frontend-deps:
@@ -428,15 +428,15 @@ frontend-update:
 
 ## Installation (macOS)
 
-# Install aulycmail to /Applications
+# Install aulycMail to /Applications
 install: install-darwin
 uninstall: uninstall-darwin
 
 # Quit a running installed app before replacing the bundle.
 quit-running-darwin:
-	@echo "Checking for running aulycmail..."
-	@if pgrep -x aulycmail >/dev/null; then \
-		echo "Quitting running aulycmail..."; \
+	@echo "Checking for running aulycMail or legacy aulycmail..."
+	@if pgrep -x aulycMail >/dev/null || pgrep -x aulycmail >/dev/null; then \
+		echo "Quitting running aulycMail..."; \
 		quit_log=$$(mktemp); \
 		if osascript -e 'tell application id "com.aulyc.aulycmail" to quit' >"$$quit_log" 2>&1; then \
 			rm -f "$$quit_log"; \
@@ -446,26 +446,28 @@ quit-running-darwin:
 		fi; \
 	fi
 	@for i in $$(seq 1 20); do \
-		if ! pgrep -x aulycmail >/dev/null; then \
-			echo "No running aulycmail process found."; \
+		if ! pgrep -x aulycMail >/dev/null && ! pgrep -x aulycmail >/dev/null; then \
+			echo "No running aulycMail process found."; \
 			exit 0; \
 		fi; \
 		sleep 0.5; \
 	done; \
-	echo "aulycmail is still running; quit it and retry installation."; \
+	echo "aulycMail is still running; quit it and retry installation."; \
 	exit 1
 
-# Install aulycmail on macOS
+# Install aulycMail on macOS
 install-darwin: quit-running-darwin build
-	@echo "Installing aulycmail.app to /Applications..."
-	@if [ -d "/Applications/aulycmail.app" ]; then \
-		echo "Removing existing installation..."; \
-		rm -rf "/Applications/aulycmail.app"; \
-	fi
-	cp -R "build/bin/aulycmail.app" "/Applications/"
+	@echo "Installing aulycMail.app to /Applications..."
+	@for app in "/Applications/aulycMail.app" "/Applications/aulycmail.app"; do \
+		if [ -d "$$app" ]; then \
+			echo "Removing existing installation at $$app..."; \
+			rm -rf "$$app"; \
+		fi; \
+	done
+	cp -R "$(APP_BUNDLE)" "/Applications/aulycMail.app"
 	@echo "Re-signing installed copy..."
 	@codesign_log=$$(mktemp); \
-	if codesign --force --deep --sign - "/Applications/aulycmail.app" >"$$codesign_log" 2>&1; then \
+	if codesign --force --deep --sign - "/Applications/aulycMail.app" >"$$codesign_log" 2>&1; then \
 		rm -f "$$codesign_log"; \
 	else \
 		cat "$$codesign_log"; \
@@ -474,28 +476,28 @@ install-darwin: quit-running-darwin build
 	fi
 	@echo ""
 	@echo "Installation complete!"
-	@echo "aulycmail is now available in /Applications."
+	@echo "aulycMail is now available in /Applications."
 	$(MAKE) launch-darwin
 
 # Launch the installed macOS app.
 launch-darwin:
-	@echo "Launching aulycmail..."
-	open "/Applications/aulycmail.app"
+	@echo "Launching aulycMail..."
+	open "/Applications/aulycMail.app"
 
-# Uninstall aulycmail from macOS
+# Uninstall aulycMail from macOS
 uninstall-darwin:
-	@echo "Uninstalling aulycmail from /Applications..."
-	rm -rf "/Applications/aulycmail.app"
+	@echo "Uninstalling aulycMail from /Applications..."
+	rm -rf "/Applications/aulycMail.app" "/Applications/aulycmail.app"
 	@echo "Uninstallation complete!"
 
 ## Help
 
 # Show available targets
 help:
-	@echo "aulycmail Email Client - Build System (macOS-only)"
+	@echo "aulycMail Email Client - Build System (macOS-only)"
 	@echo ""
 	@echo "Build Targets:"
-	@echo "  make build        - Build production binary (aulycmail.app)"
+	@echo "  make build        - Build production binary (aulycMail.app)"
 	@echo "  make dev          - Run in development mode with hot reload"
 	@echo "  make dev-race     - Run in development mode with race detector"
 	@echo "  make generate     - Generate Wails TypeScript bindings"
@@ -508,11 +510,11 @@ help:
 	@echo "  make release-dmg  - Build a formal notarized DMG from an isolated exact tag"
 	@echo ""
 	@echo "Installation:"
-	@echo "  make install      - Build, install, and launch aulycmail from /Applications"
+	@echo "  make install      - Build, install, and launch aulycMail from /Applications"
 	@echo "  make install-dmg  - Verify and install DMG_PATH into /Applications"
 	@echo "  make install-test-release-dmg - Build and install the exact tagged test DMG"
-	@echo "  make install-release-dmg - Build signed DMG, install it, and launch aulycmail"
-	@echo "  make uninstall    - Uninstall aulycmail from /Applications"
+	@echo "  make install-release-dmg - Build signed DMG, install it, and launch aulycMail"
+	@echo "  make uninstall    - Uninstall aulycMail from /Applications"
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make fmt-check     - Verify Go formatting without modifying files"

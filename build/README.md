@@ -1,7 +1,7 @@
 # Build Directory
 
 The build directory contains packaging assets and generated build output for
-aulycmail.
+aulycMail.
 
 ## Structure
 

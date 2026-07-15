@@ -1,6 +1,6 @@
-# aulycmail Keyboard Shortcuts
+# aulycMail Keyboard Shortcuts
 
-Complete reference of all keyboard shortcuts in aulycmail.
+Complete reference of all keyboard shortcuts in aulycMail.
 
 ## Global Shortcuts
 

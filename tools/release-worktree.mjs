@@ -56,7 +56,7 @@ export function withDetachedTagWorktree({ repoRoot, tag, linkNodeModules = false
   if (!isGitWorktreeClean(root)) fail('Caller worktree must be clean before an isolated release build.')
   const identity = verifyReleaseTag(root, tag, { requireHead: true })
 
-  const container = fs.mkdtempSync(path.join(os.tmpdir(), 'aulycmail-release-worktree-'))
+  const container = fs.mkdtempSync(path.join(os.tmpdir(), 'aulycMail-release-worktree-'))
   const worktree = path.join(container, 'source')
   let primaryError = null
   let result
@@ -111,7 +111,7 @@ export function buildReleaseFromTag({
   const root = path.resolve(repoRoot)
   const destination = path.resolve(outputDir)
   const identity = verifyReleaseTag(root, tag, { requireHead: true })
-  const artifact = `aulycmail-${identity.version}-build.${identity.build}.dmg`
+  const artifact = `aulycMail-${identity.version}-build.${identity.build}.dmg`
   const dmgPath = path.join(destination, artifact)
   const manifestPath = path.join(destination, artifact.replace(/\.dmg$/, '.manifest.json'))
   if (fs.existsSync(dmgPath) || fs.existsSync(manifestPath)) {

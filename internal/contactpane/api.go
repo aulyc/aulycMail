@@ -10,7 +10,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// Source IDs for aulycmail's single local contact store. There are no remote
+// Source IDs for aulycMail's single local contact store. There are no remote
 // sources — every contact lives in the local contact-record schema.
 //
 // The local store distinguishes entries by `contact_records.kind`:

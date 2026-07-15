@@ -1,6 +1,6 @@
 # Versioning Policy
 
-This policy is the aulycmail project profile for the shared
+This policy is the aulycMail project profile for the shared
 `general-release-versioning` Skill. It defines how the common baseline maps to
 the Apple Silicon macOS Wails application.
 
@@ -112,6 +112,8 @@ and SHA-256 from the real DMG. Formal notarization values come from the accepted
 | `CFBundleVersion` | `0` local; allocated release build |
 | `AULYCSemanticVersion` | exact runtime SemVer |
 | `AULYCCommitSHA` | exact source commit |
+| App bundle | `aulycMail.app` |
+| Main executable | `aulycMail` |
 | Bundle identifier | `com.aulyc.aulycmail` |
 | Minimum macOS version | `11.0` |
 | Architecture | `arm64` |
@@ -119,8 +121,8 @@ and SHA-256 from the real DMG. Formal notarization values come from the accepted
 Release files are immutable:
 
 ```text
-aulycmail-<version>-build.<build>.dmg
-aulycmail-<version>-build.<build>.manifest.json
+aulycMail-<version>-build.<build>.dmg
+aulycMail-<version>-build.<build>.manifest.json
 ```
 
 The historical `.manifest.json` filename is retained for compatibility. It is
@@ -132,6 +134,16 @@ tag, commit, dirty state, artifact, SHA-256, architecture, Bundle ID, Team ID,
 minimum system version, signature type, Hardened Runtime, notarization state,
 submission ID, and UTC build time. Test and formal manifests require
 `dirty: false`.
+
+New release provenance records `application: aulycMail`. Validation continues
+to accept historical `application: aulycmail` provenance only when its artifact
+name uses the matching historical `aulycmail-...` prefix. Published historical
+tags and artifacts are never renamed or overwritten.
+
+The product rename does not change compatibility identities. The Bundle ID
+remains `com.aulyc.aulycmail`; user data remains under
+`~/Library/Application Support/aulycmail`; the Keychain service remains
+`aulycmail`; and Go/npm/internal storage identifiers remain lowercase.
 
 Mail databases, attachments, settings, passwords, tokens, Keychain data, and
 other user data are never release metadata or app-replacement payloads.

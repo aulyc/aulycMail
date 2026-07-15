@@ -388,7 +388,7 @@ func (a *App) sendSystemNotification(info sync.NewMailInfo, subject, fromName, f
 func (a *App) initNotifications(ctx context.Context) {
 	log := logging.WithComponent("app.notify")
 
-	a.notifier = notification.New("aulycmail")
+	a.notifier = notification.New("aulycMail")
 
 	// Set click handler for mail notifications.
 	a.notifier.SetClickHandler(func(data notification.NotificationData) {

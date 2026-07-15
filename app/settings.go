@@ -132,12 +132,12 @@ func (a *App) SetTermsAccepted(accepted bool) error {
 	return a.settingsStore.SetTermsAccepted(accepted)
 }
 
-// GetRunBackground returns whether aulycmail keeps running when the window is closed
+// GetRunBackground returns whether aulycMail keeps running when the window is closed.
 func (a *App) GetRunBackground() (bool, error) {
 	return a.settingsStore.GetRunBackground()
 }
 
-// SetRunBackground sets whether aulycmail keeps running when the window is closed.
+// SetRunBackground sets whether aulycMail keeps running when the window is closed.
 // Disabling also force-disables start_hidden and the menu bar status item.
 func (a *App) SetRunBackground(enabled bool) error {
 	if err := a.settingsStore.SetRunBackground(enabled); err != nil {
@@ -155,12 +155,12 @@ func (a *App) SetRunBackground(enabled bool) error {
 	return nil
 }
 
-// GetStartHidden returns whether aulycmail starts with the window hidden
+// GetStartHidden returns whether aulycMail starts with the window hidden.
 func (a *App) GetStartHidden() (bool, error) {
 	return a.settingsStore.GetStartHidden()
 }
 
-// SetStartHidden sets whether aulycmail starts with the window hidden.
+// SetStartHidden sets whether aulycMail starts with the window hidden.
 // Enabling also force-enables run_background (start hidden requires background mode).
 func (a *App) SetStartHidden(enabled bool) error {
 	if enabled {
@@ -171,12 +171,12 @@ func (a *App) SetStartHidden(enabled bool) error {
 	return a.settingsStore.SetStartHidden(enabled)
 }
 
-// GetAutostart returns whether aulycmail starts on login
+// GetAutostart returns whether aulycMail starts on login.
 func (a *App) GetAutostart() (bool, error) {
 	return a.settingsStore.GetAutostart()
 }
 
-// SetAutostart sets whether aulycmail starts on login.
+// SetAutostart sets whether aulycMail starts on login.
 func (a *App) SetAutostart(enabled bool) error {
 	// Check current value to avoid unnecessary OS-level changes
 	current, _ := a.settingsStore.GetAutostart()
@@ -236,7 +236,7 @@ func (a *App) SetAlwaysLoadImages(enabled bool) error {
 }
 
 // GetDarkMailContent returns whether email content should be visually darkened
-// while aulycmail is in dark mode.
+// while aulycMail is in dark mode.
 func (a *App) GetDarkMailContent() (bool, error) {
 	return a.settingsStore.GetDarkMailContent()
 }

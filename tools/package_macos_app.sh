@@ -1,5 +1,5 @@
 #!/bin/bash
-# Package the already-built aulycmail binary into a macOS .app bundle.
+# Package the already-built aulycMail binary into a macOS .app bundle.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -7,8 +7,8 @@ SEMANTIC_VERSION="${SEMANTIC_VERSION:?SEMANTIC_VERSION is required}"
 SHORT_VERSION="${SHORT_VERSION:?SHORT_VERSION is required}"
 BUILD_NUMBER="${BUILD_NUMBER:-0}"
 COMMIT_SHA="${COMMIT_SHA:-unknown}"
-APP="$ROOT/build/bin/aulycmail.app"
-BIN="$ROOT/build/bin/aulycmail"
+APP="$ROOT/build/bin/aulycMail.app"
+BIN="$ROOT/build/bin/aulycMail"
 CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
@@ -38,8 +38,8 @@ fi
 
 rm -rf "$APP"
 mkdir -p "$MACOS" "$RESOURCES" "$LEGAL"
-cp "$BIN" "$MACOS/aulycmail"
-chmod 0755 "$MACOS/aulycmail"
+cp "$BIN" "$MACOS/aulycMail"
+chmod 0755 "$MACOS/aulycMail"
 if [ -f "$ROOT/build/menubar-icon.png" ]; then
   cp "$ROOT/build/menubar-icon.png" "$RESOURCES/MenuBarIcon.png"
 fi
@@ -60,15 +60,17 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleName</key>
-  <string>aulycmail</string>
+  <string>aulycMail</string>
+  <key>CFBundleDisplayName</key>
+  <string>aulycMail</string>
   <key>CFBundleExecutable</key>
-  <string>aulycmail</string>
+  <string>aulycMail</string>
   <key>CFBundleIdentifier</key>
   <string>com.aulyc.aulycmail</string>
   <key>CFBundleVersion</key>
   <string>${BUILD_NUMBER}</string>
   <key>CFBundleGetInfoString</key>
-  <string>aulycmail ${SEMANTIC_VERSION} (build ${BUILD_NUMBER})</string>
+  <string>aulycMail ${SEMANTIC_VERSION} (build ${BUILD_NUMBER})</string>
   <key>CFBundleShortVersionString</key>
   <string>${SHORT_VERSION}</string>
   <key>AULYCSemanticVersion</key>

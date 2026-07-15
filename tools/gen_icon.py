@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Dark, minimalist line icon for aulycmail — full rectangle + V flap.
+"""Dark, minimalist line icon for aulycMail — full rectangle + V flap.
 
 Matches a hand-drawn reference: a complete rounded rectangle (with top edge)
 plus an envelope flap drawn as a V from the two top corners down to a center

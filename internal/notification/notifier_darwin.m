@@ -4,10 +4,10 @@
 extern void goNotificationCallback(char *accountId, char *folderId, char *threadId);
 
 // Delegate that handles notification interactions and foreground presentation
-@interface aulycmailNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
+@interface AulycMailNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
 @end
 
-@implementation aulycmailNotificationDelegate
+@implementation AulycMailNotificationDelegate
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
 didReceiveNotificationResponse:(UNNotificationResponse *)response
@@ -40,7 +40,7 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 
 @end
 
-static aulycmailNotificationDelegate *notifDelegate = nil;
+static AulycMailNotificationDelegate *notifDelegate = nil;
 
 // setupNotifications initializes UNUserNotificationCenter and requests authorization.
 // Dispatches to the main queue since UNUserNotificationCenter delegate must be
@@ -48,7 +48,7 @@ static aulycmailNotificationDelegate *notifDelegate = nil;
 void setupNotifications(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
-        notifDelegate = [[aulycmailNotificationDelegate alloc] init];
+        notifDelegate = [[AulycMailNotificationDelegate alloc] init];
         center.delegate = notifDelegate;
 
         // Badge is required for the Dock unread-count badge to render — without
@@ -57,10 +57,10 @@ void setupNotifications(void) {
         [center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound | UNAuthorizationOptionBadge)
                               completionHandler:^(BOOL granted, NSError *error) {
             if (error != nil) {
-                NSLog(@"[aulycmail] Notification authorization error: %@", error);
+                NSLog(@"[aulycMail] Notification authorization error: %@", error);
                 return;
             }
-            NSLog(@"[aulycmail] Notification authorization granted: %d", granted);
+            NSLog(@"[aulycMail] Notification authorization granted: %d", granted);
         }];
     });
 }
@@ -98,7 +98,7 @@ void showNotification(const char *title, const char *body,
             addNotificationRequest:request
              withCompletionHandler:^(NSError *error) {
                 if (error != nil) {
-                    NSLog(@"[aulycmail] Failed to deliver notification: %@", error);
+                    NSLog(@"[aulycMail] Failed to deliver notification: %@", error);
                 }
             }];
     });

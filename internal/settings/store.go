@@ -369,20 +369,20 @@ func (s *Store) SetTermsAccepted(accepted bool) error {
 	return s.Set(KeyTermsAccepted, value)
 }
 
-// GetLastSeenVersion returns the aulycmail version that was running the last time
+// GetLastSeenVersion returns the aulycMail version that was running the last time
 // the "What's new in this version" dialog was acknowledged with OK. Empty
 // string means it's never been acknowledged (e.g. fresh install).
 func (s *Store) GetLastSeenVersion() (string, error) {
 	return s.Get(KeyLastSeenVersion)
 }
 
-// SetLastSeenVersion records the current aulycmail version as acknowledged so the
+// SetLastSeenVersion records the current aulycMail version as acknowledged so the
 // What's New dialog doesn't fire again until the next version upgrade.
 func (s *Store) SetLastSeenVersion(version string) error {
 	return s.Set(KeyLastSeenVersion, version)
 }
 
-// GetRunBackground returns whether aulycmail should keep running when the window is closed
+// GetRunBackground returns whether aulycMail should keep running when the window is closed
 func (s *Store) GetRunBackground() (bool, error) {
 	value, err := s.Get(KeyRunBackground)
 	if err != nil {
@@ -391,7 +391,7 @@ func (s *Store) GetRunBackground() (bool, error) {
 	return value == "true", nil
 }
 
-// SetRunBackground sets whether aulycmail should keep running when the window is closed
+// SetRunBackground sets whether aulycMail should keep running when the window is closed
 func (s *Store) SetRunBackground(enabled bool) error {
 	value := "false"
 	if enabled {
@@ -400,7 +400,7 @@ func (s *Store) SetRunBackground(enabled bool) error {
 	return s.Set(KeyRunBackground, value)
 }
 
-// GetStartHidden returns whether aulycmail should start with the window hidden
+// GetStartHidden returns whether aulycMail should start with the window hidden
 func (s *Store) GetStartHidden() (bool, error) {
 	value, err := s.Get(KeyStartHidden)
 	if err != nil {
@@ -409,7 +409,7 @@ func (s *Store) GetStartHidden() (bool, error) {
 	return value == "true", nil
 }
 
-// SetStartHidden sets whether aulycmail should start with the window hidden
+// SetStartHidden sets whether aulycMail should start with the window hidden
 func (s *Store) SetStartHidden(enabled bool) error {
 	value := "false"
 	if enabled {
@@ -418,7 +418,7 @@ func (s *Store) SetStartHidden(enabled bool) error {
 	return s.Set(KeyStartHidden, value)
 }
 
-// GetAutostart returns whether aulycmail should start on login
+// GetAutostart returns whether aulycMail should start on login
 func (s *Store) GetAutostart() (bool, error) {
 	value, err := s.Get(KeyAutostart)
 	if err != nil {
@@ -427,7 +427,7 @@ func (s *Store) GetAutostart() (bool, error) {
 	return value == "true", nil
 }
 
-// SetAutostart sets whether aulycmail should start on login
+// SetAutostart sets whether aulycMail should start on login
 func (s *Store) SetAutostart(enabled bool) error {
 	value := "false"
 	if enabled {
@@ -504,7 +504,7 @@ func (s *Store) SetAlwaysLoadImages(enabled bool) error {
 }
 
 // GetDarkMailContent returns whether email content should be visually darkened
-// while aulycmail is in dark mode. Off by default.
+// while aulycMail is in dark mode. Off by default.
 func (s *Store) GetDarkMailContent() (bool, error) {
 	value, err := s.Get(KeyDarkMailContent)
 	if err != nil {
