@@ -23,8 +23,11 @@ Both release channels perform the same identity steps:
 1. Refuse uncommitted functional changes.
 2. Select version/build and update only allowed release metadata.
 3. Create `chore: release <version>` and require a clean worktree.
-4. Run `make release-check`, including `make check`, a fresh `npm ci` from the
-   committed lockfile, and a same-configuration production candidate build.
+4. Run `make release-check`. It first requires `golangci-lint` exactly at
+   v2.12.2 from machine-readable `version --json`, verifies `.golangci.yml`, and
+   runs `golangci-lint run` without fallback. It then runs `make check`, a fresh
+   `npm ci` from the committed lockfile, and a same-configuration production
+   candidate build.
 5. Create or verify the immutable annotated tag exactly matching the version.
 6. Create a temporary detached worktree at that exact tag.
 7. Verify tag, commit, `version.json`, release-only commit contents, and clean
@@ -38,6 +41,13 @@ Both release channels perform the same identity steps:
 Existing same-version DMGs or provenance files are not overwritten. To reuse an
 existing artifact, verify and install that unchanged artifact. If content or
 identity differs, prepare a new prerelease or patch version/build.
+
+The pinned release linter version is encoded directly in the Make target and
+cannot be weakened with an ordinary Make command-line variable. Install it with
+the official fixed-version binary method documented in
+[DEVELOPMENT.md](DEVELOPMENT.md). Unlike the development-only `go vet`
+fallback, a missing tool, malformed version JSON, version mismatch, invalid v2
+configuration, or lint finding stops the release before candidate creation.
 
 ## Test release
 
@@ -58,6 +68,7 @@ Prerequisites:
 
 - the Developer ID Application certificate is available in Keychain;
 - `notarytool` credentials exist under the `aulyc-notary` Keychain profile.
+- official `golangci-lint` v2.12.2 is available on `PATH`.
 
 ```bash
 GOCACHE=/Users/crp/Projects/aulycmail/.cache/go-build \

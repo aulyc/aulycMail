@@ -94,7 +94,11 @@
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "20e6aa8db3db3fb254067ea1bc77fb4c2d0e395f48194ccc1e7d1cdcefba8c67"
+      "sha256": "6c77a9b18a687c88f61880d00b52397287985cd8c209495515e8e71918de6f30"
+    },
+    {
+      "path": "docs/DEVELOPMENT.md",
+      "sha256": "5b182dda562602c8ed3744eaa5d9d12756ed09da629d1c895fff6e6657be2619"
     },
     {
       "path": "docs/VERSIONING.md",
@@ -102,11 +106,15 @@
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "2feabf4daa4ca445a0594e0a1dc9bfb44142d31a6ce9a58ac6743290b79b6390"
+      "sha256": "d5337adb7cea29edbaf7857e4c1c696bae2b720ffa556df8622b0bb3b8cee4ee"
     },
     {
       "path": "Makefile",
-      "sha256": "f18b803607d0293364ee11646de1782e2b0e1b65de9a97cc0d6e228f5d5c4942"
+      "sha256": "992222656b487cd8230effd2066e783f6d85e87d2625218e90b6243754f2a36d"
+    },
+    {
+      "path": ".golangci.yml",
+      "sha256": "e9dae3427b82cf5cece9ad302c9830621a5ca4d1f24f8f7387129402eaeea155"
     },
     {
       "path": "tools/version-bump.mjs",
@@ -140,6 +148,8 @@
     "releaseFiles": [
       "AGENTS.md",
       "CHANGELOG.md",
+      ".golangci.yml",
+      "docs/DEVELOPMENT.md",
       "docs/VERSIONING.md",
       "docs/RELEASE.md",
       "Makefile",
@@ -151,7 +161,8 @@
       "tools/install_macos_dmg.sh"
     ],
     "ciPaths": [
-      "Makefile"
+      "Makefile",
+      ".golangci.yml"
     ]
   }
 }

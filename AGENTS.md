@@ -46,6 +46,7 @@ provenance over convenience or broad rewrites.
 - Generate Wails bindings: `make generate`.
 - Local production build: `make build`.
 - Go-only gate: `make check-go`.
+- Release Go lint gate: `make release-golangci-lint`.
 - Frontend-only gate: `make check-frontend`.
 - Shared development gate: `make check`.
 - Full non-release CI gate and production build: `make ci`.
@@ -59,6 +60,8 @@ explicitly requests that operation.
 ## Quality gates by change scope
 
 - Go-only: `make check-go`.
+- `make check-go` runs `golangci-lint` when available and otherwise reports an
+  explicit development-only fallback to `go vet`.
 - Frontend-only: `make check-frontend`.
 - Version/release tools, generated bindings, cross-stack behavior, dependencies,
   build configuration, or shared contracts: `make check`.
@@ -66,6 +69,10 @@ explicitly requests that operation.
 - Documentation-only: run relevant link/text checks plus `git diff --check`; run
   broader gates when commands, contracts, or generated-file rules changed.
 - Release identity: `make release-check` before creating or accepting a tag.
+  It must find `golangci-lint` exactly at v2.12.2 via `version --json`, verify
+  `.golangci.yml`, and run `golangci-lint run`; missing or mismatched tools fail
+  without fallback. The required version must not be Make-command-line
+  overridable.
 
 Report any gate not run and why. Avoid rerunning a subset already covered by a
 successful aggregate target unless diagnosing a failure.
@@ -131,6 +138,9 @@ successful aggregate target unless diagnosing a failure.
 - Test and formal releases require a clean release-only metadata commit, a
   matching immutable annotated tag without `v`, a pre-tag production candidate,
   and final artifacts built from an isolated detached worktree at that exact tag.
+- `make release-check` applies the fail-closed `golangci-lint` v2.12.2 gate to
+  every subsequent test and formal release before the shared checks and
+  production candidate build.
 - Test releases are ad-hoc signed, never notarized, and never claim Gatekeeper
   trust. Formal releases require Developer ID, Hardened Runtime, notarization
   `Accepted`, stapling, stapler validation, and Gatekeeper verification.

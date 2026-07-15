@@ -118,7 +118,10 @@ func (l *darwinSingleInstanceLock) handleConnection(conn net.Conn) {
 	defer conn.Close()
 	log := logging.WithComponent("singleinstance")
 
-	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		log.Debug().Err(err).Msg("Failed to set single-instance connection read deadline")
+		return
+	}
 	scanner := bufio.NewScanner(conn)
 	// Limit scanner buffer to 2KB — no legitimate command exceeds this
 	scanner.Buffer(make([]byte, 2048), 2048)

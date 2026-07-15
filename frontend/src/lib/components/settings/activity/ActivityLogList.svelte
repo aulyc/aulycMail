@@ -18,7 +18,7 @@
   {:else}
     {#each store.entries as log (log.id)}<ActivityLogItem {log} />{/each}
     {#if store.hasMore}
-      <div class="flex justify-center border-t border-border p-3"><Button variant="ghost" size="sm" onclick={() => store.loadMore()} disabled={store.loading}>{$_('activityLog.loadMore')}</Button></div>
+      <div class="flex justify-center p-3"><Button variant="ghost" size="sm" onclick={() => store.loadMore()} disabled={store.loading}>{$_('activityLog.loadMore')}</Button></div>
     {/if}
   {/if}
 </div>

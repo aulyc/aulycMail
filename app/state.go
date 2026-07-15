@@ -62,7 +62,7 @@ func (a *App) GetAppInfo() AppInfo {
 		CommitSHA:      CommitSHA,
 		DisplayVersion: VersionLabel(),
 		Description:    "A lightweight desktop e-mail client",
-		Website:        "https://aulyc.com/aulycmail",
+		Website:        "https://www.aulyc.com",
 		License:        "Proprietary",
 	}
 }

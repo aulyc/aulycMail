@@ -24,6 +24,23 @@ Install frontend dependencies when needed:
 make frontend-deps
 ```
 
+For reproducible release linting, install the official precompiled
+`golangci-lint` v2.12.2 binary into the Go bin directory already present on
+`PATH`:
+
+```bash
+curl -sSfL https://golangci-lint.run/install.sh | \
+  sh -s -- -b "$(go env GOPATH)/bin" v2.12.2
+golangci-lint version --json
+```
+
+Do not rely on an unpinned Homebrew upgrade for the release tool. Local
+development remains usable without it: `make check-go` reports the missing
+tool and falls back to `go vet`. Releases are fail-closed: `make release-check`
+requires the machine-readable version to equal `2.12.2`, validates
+`.golangci.yml` as a v2 configuration, and runs `golangci-lint run` without a
+fallback.
+
 ## Architecture
 
 - `main.go` and `preflight.go` assemble the process, application lifecycle, and
@@ -62,6 +79,7 @@ make check-go        fmt-check + Go tests + golangci-lint (or explicit go vet fa
 make check-frontend  unit tests + svelte-check + i18n + ESLint + knip
 make check           version checks/tests + check-go + check-frontend
 make ci              make check + complete production build
+make release-golangci-lint  exact v2.12.2 + config verification + release lint
 ```
 
 Use the smallest relevant gate while iterating, then `make ci` before handing

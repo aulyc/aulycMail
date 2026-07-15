@@ -99,11 +99,6 @@
       </div>
     </div>
 
-    <!-- Description -->
-    <p class="text-center text-sm text-muted-foreground max-w-xs">
-      {appInfo.description}
-    </p>
-
     <!-- Links -->
     <div class="flex flex-col items-center gap-2">
       <button

@@ -7,6 +7,12 @@ All notable changes to aulycmail are documented here.
 - Simplified backup status presentation by removing redundant button and task
   icons, showing “备份中…” while running, adding the total to recent summaries,
   and removing the duplicate current/total counter.
+- Required the pinned `golangci-lint` v2.12.2 gate before test and formal
+  release candidate builds, while retaining the explicit `go vet` fallback for
+  local development.
+- Updated the About page website to `www.aulyc.com`, removed its redundant
+  product tagline, and eliminated the doubled separator above “Load more” in
+  the activity log.
 
 ## [0.3.97] — 2026-07-15
 

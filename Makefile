@@ -10,7 +10,7 @@
         frontend-deps frontend-update normalize-wails-bindings install uninstall \
         dmg release-dmg test-release-dmg install-dmg install-release-dmg install-test-release-dmg install-darwin \
         quit-running-darwin launch-darwin uninstall-darwin version-check version-test \
-        prepare-test-release prepare-formal-release release-preflight release-check \
+        prepare-test-release prepare-formal-release release-preflight release-golangci-lint release-check \
         release-tag release-tag-check release-test release-formal help
 
 # Go module path
@@ -324,8 +324,34 @@ release-candidate:
 	@$(MAKE) build-app APP_VERSION="$(VERSION)" BUNDLE_BUILD_NUMBER="$(BUILD_NUMBER)" CLEAN_FRONTEND_INSTALL=1
 	@bash tools/verify_release_candidate.sh --source-root "$(CURDIR)" --app "$(APP_BUNDLE)"
 
-# Run the shared gates once, then build and verify the pre-tag candidate.
-release-check: release-preflight check
+# Release lint is fail-closed and intentionally pins the version inline so an
+# ordinary Make command-line variable cannot weaken the release requirement.
+release-golangci-lint:
+	@if ! command -v golangci-lint >/dev/null 2>&1; then \
+		echo 'golangci-lint v2.12.2 is required for release-check; no fallback is allowed.'; \
+		exit 1; \
+	fi
+	@version_json=$$(golangci-lint version --json) || { \
+		echo 'Unable to read golangci-lint version as JSON.'; \
+		exit 1; \
+	}; \
+	actual_version=$$(printf '%s' "$$version_json" | node -e 'const fs = require("fs"); try { const value = JSON.parse(fs.readFileSync(0, "utf8")); if (typeof value.version !== "string") process.exit(2); process.stdout.write(value.version); } catch { process.exit(2); }') || { \
+		echo 'golangci-lint version --json did not contain a valid version field.'; \
+		exit 1; \
+	}; \
+	if [ "$$actual_version" != "2.12.2" ]; then \
+		echo "golangci-lint v2.12.2 is required for release-check; found $$actual_version."; \
+		exit 1; \
+	fi; \
+	echo "Verified release golangci-lint v$$actual_version at $$(command -v golangci-lint)."
+	@golangci-lint config verify --config .golangci.yml
+	@golangci-lint run
+
+# Run the fail-closed release lint before the shared gates, then build and
+# verify the pre-tag candidate. Recursive calls preserve this ordering under -j.
+release-check: release-preflight
+	@$(MAKE) release-golangci-lint
+	@$(MAKE) check
 	@$(MAKE) release-candidate
 	@if [ -n "$$(git status --porcelain --untracked-files=all)" ]; then \
 		echo 'Quality checks changed tracked files; review and commit them before tagging:'; \
@@ -364,9 +390,10 @@ lint: lint-go lint-frontend
 lint-go:
 	@echo "Running Go linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
+		echo "Using golangci-lint at $$(command -v golangci-lint)"; \
 		golangci-lint run; \
 	else \
-		echo "golangci-lint not found; running go vet instead"; \
+		echo "golangci-lint not found; running go vet instead (development fallback only)"; \
 		go vet $(GO_PACKAGES); \
 	fi
 
@@ -475,7 +502,7 @@ help:
 	@echo "  make dmg          - Package the current app bundle as a non-release local DMG"
 	@echo "  make release-test - Auto-version, commit, tag, ad-hoc sign, and install a test release"
 	@echo "  make release-formal - Auto-version, commit, tag, notarize, and install a stable release"
-	@echo "  make release-check - Run shared gates and the pre-tag production candidate build"
+	@echo "  make release-check - Require golangci-lint v2.12.2, run gates, and build the candidate"
 	@echo "  make release-tag  - Create the annotated no-v tag after release checks pass"
 	@echo "  make test-release-dmg - Build an ad-hoc test DMG from an isolated exact tag"
 	@echo "  make release-dmg  - Build a formal notarized DMG from an isolated exact tag"
@@ -496,6 +523,7 @@ help:
 	@echo "  make test          - Run Go tests"
 	@echo "  make lint          - Run all linters (Go + frontend)"
 	@echo "  make lint-go       - Run golangci-lint, or explicitly fall back to go vet"
+	@echo "  make release-golangci-lint - Verify v2.12.2/config and run fail-closed release lint"
 	@echo "  make lint-frontend - Run frontend linter only (ESLint)"
 	@echo "  make version-check - Verify files derived from version.json"
 	@echo "  make version-test  - Test version parsing and synchronization"
