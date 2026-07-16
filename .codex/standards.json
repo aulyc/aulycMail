@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "projectId": "aulycmail",
   "applicability": "applicable",
-  "coreVersion": "1.0.0",
+  "coreVersion": "2.0.0",
   "artifacts": [
     {
       "id": "aulycmail-macos-app",
@@ -66,6 +66,13 @@
       "evidence": [".codex/standards.json"]
     },
     {
+      "ruleId": "REL-014",
+      "evidence": [
+        "docs/RELEASE.md#formal-github-source-publication",
+        "Makefile"
+      ]
+    },
+    {
       "ruleId": "MAC-001",
       "evidence": ["AGENTS.md#versioning-and-release-profile"]
     },
@@ -94,7 +101,7 @@
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "6f811a493ad4349b5ef8708a6b1790b586aba2ac3b615e11a4b4c7a8b5b24b07"
+      "sha256": "b1d8b0b95c33add04706285b3040d8ab61ddb4c321765d25312edc5bdf97abd3"
     },
     {
       "path": "docs/DEVELOPMENT.md",
@@ -102,15 +109,15 @@
     },
     {
       "path": "docs/VERSIONING.md",
-      "sha256": "00723e4d103a038d092cc0cc77011d99537b4b680f0aa1d32d647639ec620232"
+      "sha256": "c6e2115ded6a9637ef05fd02043ed9399ac21e40048e15d71c666186ddfc18ef"
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "71a52c81d39638afac73ab6ae0ca36c29bb8aeafd2688dd4153e623d4bec7645"
+      "sha256": "be76db295a3b5e6750f0f6970097cc788cfb81f215b2d71d50572623212bfef4"
     },
     {
       "path": "Makefile",
-      "sha256": "a836e65a5dc1239872593731d51c5520e2c28991d3b6dcf7973f54e3da762048"
+      "sha256": "5a7495302bfa52a746d15af1e5ee344addfd3ff63379c0d52a97fe59b81a6cc6"
     },
     {
       "path": ".golangci.yml",

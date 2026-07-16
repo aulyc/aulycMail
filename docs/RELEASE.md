@@ -90,9 +90,21 @@ Stapling, `stapler validate`, DMG Gatekeeper assessment, contained-app
 assessment, installed-app assessment, and manifest verification must all pass.
 Credentials remain in Keychain and are not written to logs or release provenance.
 Only after those checks and the installed-app verification succeed does the
-formal flow push `main` and the annotated tag to the private backup repository.
-The push is atomic and never forced; a conflicting remote ref stops the release
-instead of overwriting remote history.
+formal flow use the central GitHub gate to push `main` and the annotated tag to
+the private backup repository. The push is atomic and never forced; a
+conflicting remote ref stops the release instead of overwriting remote history.
+
+## Formal GitHub source publication
+
+The central registry binds this project to `aulyc/aulycMail`, Git remote
+`backup`, and formal branch `main`. `make release-formal` runs the central
+preflight before release metadata changes. After the installed formal App is
+verified, the same flow passes the real `.manifest.json` provenance file to the
+central `push` phase, atomically publishes the branch and annotated tag, reads
+both refs back, and writes `sourceRepository`, `sourceBranch`,
+`sourceRemoteCommit`, `sourceRemoteTagCommit`, and
+`sourceRemoteVerifiedAt` from that remote evidence. A missing or invalid `gh`
+login, URL mismatch, non-atomic push, or ref mismatch stops the release.
 
 ## Release provenance and artifact verification
 
@@ -105,6 +117,8 @@ releaseProfile, application, version, buildNumber, releaseChannel, tag, commit, 
 artifact, sha256, architecture, bundleIdentifier, teamIdentifier,
 minimumSystemVersion, signatureType, hardenedRuntime, notarized,
 notarizationSubmissionId, builtAt
+sourceRepository, sourceBranch, sourceRemoteCommit, sourceRemoteTagCommit,
+sourceRemoteVerifiedAt (formal release after GitHub publication)
 ```
 
 Validation does not trust those values alone. The release and installation

@@ -51,6 +51,7 @@ RELEASE_TAG ?= $(VERSION)
 RELEASE_OUTPUT_DIR ?= $(abspath dist)
 BACKUP_REMOTE ?= backup
 BACKUP_BRANCH ?= main
+CENTRAL_FORMAL_GIT := /Users/crp/Projects/Codex 开发规范/scripts/formal_release_git.py
 CLEAN_FRONTEND_INSTALL ?= 0
 RELEASE_METADATA_FILES := version.json wails.json frontend/package.json \
 	frontend/package-lock.json CHANGELOG.md
@@ -371,19 +372,15 @@ release-tag-check:
 # Fail before release metadata changes if the private backup remote cannot be
 # reached or the formal release is not running from the configured branch.
 release-backup-preflight:
-	@node tools/release-backup.mjs preflight \
-		--root "$(CURDIR)" \
-		--remote "$(BACKUP_REMOTE)" \
-		--branch "$(BACKUP_BRANCH)"
+	@python3 "$(CENTRAL_FORMAL_GIT)" preflight --path "$(CURDIR)"
 
 # Publish the verified formal release commit and annotated tag together, then
 # independently confirm that both remote refs resolve to the local release.
 release-backup-push: release-tag-check
-	@node tools/release-backup.mjs push \
-		--root "$(CURDIR)" \
-		--remote "$(BACKUP_REMOTE)" \
-		--branch "$(BACKUP_BRANCH)" \
-		--tag "$(VERSION)"
+	@python3 "$(CENTRAL_FORMAL_GIT)" push \
+		--path "$(CURDIR)" \
+		--tag "$(VERSION)" \
+		--provenance "$(RELEASE_OUTPUT_DIR)/aulycMail-$(VERSION)-build.$(BUILD_NUMBER).manifest.json"
 
 # Create the annotated release tag once; existing tags are never overwritten.
 release-tag: release-check

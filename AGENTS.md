@@ -54,9 +54,10 @@ provenance over convenience or broad rewrites.
 - Test release: `GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build make release-test`.
 - Formal release: `GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build make release-formal SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary`.
 - Formal release backup: remote `backup`, branch `main`; `make release-formal`
-  must verify remote access before changing release metadata, then atomically
-  push and verify the formal release commit and annotated tag after installation
-  succeeds.
+  must run the central GitHub preflight before changing release metadata, then
+  atomically push and verify the formal release commit and annotated tag after
+  installation succeeds. The central gate also finalizes and verifies the
+  GitHub source fields in the release provenance.
 
 Do not install, release, tag, sign, notarize, or publish unless the user
 explicitly requests that operation.
@@ -157,6 +158,7 @@ successful aggregate target unless diagnosing a failure.
   and the actual `/Applications/aulycMail.app` installation.
 - Published tags and artifacts are immutable and must not be overwritten.
 - Formal releases are incomplete until `backup/main` and the matching annotated
-  tag are verified at the exact release commit. Test releases are not pushed by
-  this project-owned backup step.
+  tag are verified at the exact release commit and the provenance records
+  `aulyc/aulycMail`, `main`, both remote commits, and the verification time.
+  Test releases are not pushed by this project-owned backup step.
 - Read `docs/VERSIONING.md` and `docs/RELEASE.md` before release work.
