@@ -77,6 +77,14 @@ Functional changes must be committed first. Release preparation creates
 The tag is annotated, exactly equals the version, has no `v` prefix, points to
 that release commit, and is never moved or overwritten.
 
+Formal releases use the private Git remote `backup` and branch `main`. Before
+release metadata changes, the remote must exist, be reachable, and the caller
+must be on `main`. After the formal DMG passes signing, notarization, artifact
+verification, installation, and installed-app verification, the release flow
+atomically pushes `HEAD` to `backup/main` together with the matching annotated
+tag. It then reads both remote refs back and requires them to resolve to the
+exact release commit. Test releases are not pushed by this backup step.
+
 Before tag creation, `make release-check` runs shared checks and builds a
 production candidate with the same `arm64` target, Wails/Go production tags,
 linker metadata, Bundle ID, minimum macOS version, and bundle packaging used by

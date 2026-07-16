@@ -81,15 +81,17 @@ make check-frontend  unit tests + svelte-check + i18n + ESLint + knip
 make check           version checks/tests + check-go + check-frontend
 make ci              make check + complete production build
 make release-golangci-lint  exact v2.12.2 + config verification + release lint
+make release-backup-preflight  verify private backup remote and formal branch
 ```
 
 Use the smallest relevant gate while iterating, then `make ci` before handing
 off build-affecting changes. `make ci` is platform-neutral as a command entry,
 but its production build requires the supported macOS Apple Silicon host.
 
-No CI provider is configured in this repository. After a Git remote and CI
-platform are selected, that provider should invoke `make ci`. Developer ID
-signing, notarization, installation, and publication must remain outside normal
+No CI provider is configured in this repository. The `backup` Git remote is a
+private offsite source/tag backup, not a CI provider. After a CI platform is
+selected, that provider should invoke `make ci`. Developer ID signing,
+notarization, installation, and publication must remain outside normal
 pull-request CI.
 
 ## Generated files

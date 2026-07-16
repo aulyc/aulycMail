@@ -53,7 +53,9 @@ Both commands require functional changes to be committed, then automatically
 select the SemVer version, increment the build, create the release commit, run
 a same-configuration production candidate, create the immutable tag, build the
 final DMG from a temporary detached worktree at that exact tag, install it, and
-verify its identity. See the complete
+verify its identity. Formal releases additionally require the private `backup`
+remote and atomically push the verified `main` release commit and annotated tag
+after installation succeeds. See the complete
 [Release Process](docs/RELEASE.md).
 
 See [Development Guide](docs/DEVELOPMENT.md) for architecture, generated files,

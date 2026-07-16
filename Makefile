@@ -11,7 +11,8 @@
         dmg release-dmg test-release-dmg install-dmg install-release-dmg install-test-release-dmg install-darwin \
         quit-running-darwin launch-darwin uninstall-darwin version-check version-test \
         prepare-test-release prepare-formal-release release-preflight release-golangci-lint release-check \
-        release-tag release-tag-check release-test release-formal help
+        release-tag release-tag-check release-backup-preflight release-backup-push \
+        release-test release-formal help
 
 # Go module path
 MODULE := aulyc.local/aulycmail
@@ -48,6 +49,8 @@ RELEASE_BUMP ?= auto
 RELEASE_CHANNEL ?=
 RELEASE_TAG ?= $(VERSION)
 RELEASE_OUTPUT_DIR ?= $(abspath dist)
+BACKUP_REMOTE ?= backup
+BACKUP_BRANCH ?= main
 CLEAN_FRONTEND_INSTALL ?= 0
 RELEASE_METADATA_FILES := version.json wails.json frontend/package.json \
 	frontend/package-lock.json CHANGELOG.md
@@ -230,9 +233,11 @@ release-formal:
 		echo 'NOTARY_PROFILE is required for a formal release.'; \
 		exit 1; \
 	fi
+	@$(MAKE) release-backup-preflight
 	@$(MAKE) prepare-formal-release RELEASE_BUMP="$(RELEASE_BUMP)"
 	@$(MAKE) release-tag
 	@$(MAKE) install-release-dmg
+	@$(MAKE) release-backup-push
 
 ## Code Quality
 
@@ -362,6 +367,23 @@ release-check: release-preflight
 # Public artifacts require an exact annotated tag at the release commit.
 release-tag-check:
 	@node tools/release-identity.mjs verify-tag --root "$(CURDIR)" --tag "$(VERSION)"
+
+# Fail before release metadata changes if the private backup remote cannot be
+# reached or the formal release is not running from the configured branch.
+release-backup-preflight:
+	@node tools/release-backup.mjs preflight \
+		--root "$(CURDIR)" \
+		--remote "$(BACKUP_REMOTE)" \
+		--branch "$(BACKUP_BRANCH)"
+
+# Publish the verified formal release commit and annotated tag together, then
+# independently confirm that both remote refs resolve to the local release.
+release-backup-push: release-tag-check
+	@node tools/release-backup.mjs push \
+		--root "$(CURDIR)" \
+		--remote "$(BACKUP_REMOTE)" \
+		--branch "$(BACKUP_BRANCH)" \
+		--tag "$(VERSION)"
 
 # Create the annotated release tag once; existing tags are never overwritten.
 release-tag: release-check
@@ -506,6 +528,8 @@ help:
 	@echo "  make release-formal - Auto-version, commit, tag, notarize, and install a stable release"
 	@echo "  make release-check - Require golangci-lint v2.12.2, run gates, and build the candidate"
 	@echo "  make release-tag  - Create the annotated no-v tag after release checks pass"
+	@echo "  make release-backup-preflight - Verify the private backup remote before formal release"
+	@echo "  make release-backup-push - Atomically push and verify the formal release commit/tag"
 	@echo "  make test-release-dmg - Build an ad-hoc test DMG from an isolated exact tag"
 	@echo "  make release-dmg  - Build a formal notarized DMG from an isolated exact tag"
 	@echo ""

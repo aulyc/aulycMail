@@ -94,23 +94,23 @@
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "971f67b49333c5c24da7913d5c1ef129f804d7a9116d439abe29d45c559d156d"
+      "sha256": "6f811a493ad4349b5ef8708a6b1790b586aba2ac3b615e11a4b4c7a8b5b24b07"
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "sha256": "dd8225720de0e7fc2b945b5517f43134a3131e3101ed544bf52166b3340012d8"
+      "sha256": "548f9ba34f79d7e07e27add7ca9aaa0cc308f1ab2a1af28c877f47415d099fc3"
     },
     {
       "path": "docs/VERSIONING.md",
-      "sha256": "3086cc0dd822e3f22d4a8db51b28b36ae7e0a2ae428cd37828b6be8d4aefff0b"
+      "sha256": "00723e4d103a038d092cc0cc77011d99537b4b680f0aa1d32d647639ec620232"
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "7f78210b48bab746bd211712bc26c6924fd7dd85828813a7f0e53b15ccc1702c"
+      "sha256": "71a52c81d39638afac73ab6ae0ca36c29bb8aeafd2688dd4153e623d4bec7645"
     },
     {
       "path": "Makefile",
-      "sha256": "d5ec92bb0c0bd3e5eb35b5600a75e08fe5cbfc19b74f179fe329392baeac8e31"
+      "sha256": "a836e65a5dc1239872593731d51c5520e2c28991d3b6dcf7973f54e3da762048"
     },
     {
       "path": ".golangci.yml",
@@ -131,6 +131,10 @@
     {
       "path": "tools/release-worktree.mjs",
       "sha256": "555f6168bb283c3f1cc3abd070bbfa024cecaedb0ba45e436d7dbd952633b43e"
+    },
+    {
+      "path": "tools/release-backup.mjs",
+      "sha256": "d5c9b6abd191d47b430c4495c4b0665ff57891972791045d60b3dbd887d8ae29"
     },
     {
       "path": "tools/package_macos_dmg.sh",
@@ -157,6 +161,7 @@
       "tools/release-prepare.mjs",
       "tools/release-identity.mjs",
       "tools/release-worktree.mjs",
+      "tools/release-backup.mjs",
       "tools/package_macos_dmg.sh",
       "tools/install_macos_dmg.sh"
     ],

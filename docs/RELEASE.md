@@ -20,7 +20,9 @@ must not run in ordinary pull-request CI.
 
 Both release channels perform the same identity steps:
 
-1. Refuse uncommitted functional changes.
+1. Refuse uncommitted functional changes. Formal releases additionally verify
+   that private remote `backup` is reachable and the caller is on `main` before
+   changing release metadata.
 2. Select version/build and update only allowed release metadata.
 3. Create `chore: release <version>` and require a clean worktree.
 4. Run `make release-check`. It first requires `golangci-lint` exactly at
@@ -37,6 +39,9 @@ Both release channels perform the same identity steps:
 9. Derive and validate release provenance against Git and the actual artifact.
 10. Verify the DMG and contained app, install to
     `/Applications/aulycMail.app`, verify the installed app, then launch.
+11. For a formal release, atomically push the release commit to `backup/main`
+    together with the annotated release tag, then read both remote refs back
+    and require them to resolve to the exact release commit.
 
 Existing same-version DMGs or provenance files are not overwritten. To reuse an
 existing artifact, verify and install that unchanged artifact. If content or
@@ -69,6 +74,8 @@ Prerequisites:
 - the Developer ID Application certificate is available in Keychain;
 - `notarytool` credentials exist under the `aulyc-notary` Keychain profile.
 - official `golangci-lint` v2.12.2 is available on `PATH`.
+- Git remote `backup` points to the private `aulyc/aulycMail` repository and is
+  reachable from the release machine; the formal release runs from `main`.
 
 ```bash
 GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build \
@@ -82,6 +89,10 @@ is signed, submitted with `notarytool --wait`, and must return `Accepted`.
 Stapling, `stapler validate`, DMG Gatekeeper assessment, contained-app
 assessment, installed-app assessment, and manifest verification must all pass.
 Credentials remain in Keychain and are not written to logs or release provenance.
+Only after those checks and the installed-app verification succeed does the
+formal flow push `main` and the annotated tag to the private backup repository.
+The push is atomic and never forced; a conflicting remote ref stops the release
+instead of overwriting remote history.
 
 ## Release provenance and artifact verification
 

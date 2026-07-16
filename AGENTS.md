@@ -53,6 +53,10 @@ provenance over convenience or broad rewrites.
 - Local development installation: `make install-darwin`; this is not a release.
 - Test release: `GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build make release-test`.
 - Formal release: `GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build make release-formal SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary`.
+- Formal release backup: remote `backup`, branch `main`; `make release-formal`
+  must verify remote access before changing release metadata, then atomically
+  push and verify the formal release commit and annotated tag after installation
+  succeeds.
 
 Do not install, release, tag, sign, notarize, or publish unless the user
 explicitly requests that operation.
@@ -152,4 +156,7 @@ successful aggregate target unless diagnosing a failure.
   Info.plist, the executable, architecture tools, code signing, notarization,
   and the actual `/Applications/aulycMail.app` installation.
 - Published tags and artifacts are immutable and must not be overwritten.
+- Formal releases are incomplete until `backup/main` and the matching annotated
+  tag are verified at the exact release commit. Test releases are not pushed by
+  this project-owned backup step.
 - Read `docs/VERSIONING.md` and `docs/RELEASE.md` before release work.
