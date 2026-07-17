@@ -4,6 +4,11 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Moved local and Wails-generated app bundles into hidden `.cache` paths so
+  macOS does not list project builds as duplicates of the installed app.
+- Removed transient macOS `.fseventsd` metadata from generated DMG installers
+  and made packaging fail if it reappears in the final image.
+
 ## [0.3.98] — 2026-07-17
 
 - Renamed the product, app bundle, executable, and new release artifacts to

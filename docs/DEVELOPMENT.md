@@ -110,8 +110,13 @@ make check
 ```
 
 The normalizer removes tool-only whitespace drift. Review semantic binding
-changes and commit them with the Go API change. Generated build outputs under
-`frontend/dist/`, `build/bin/`, `dist/`, and local caches remain untracked.
+changes and commit them with the Go API change. Local production bundles are
+generated under `.cache/build/`; Wails development bundles use `.cache/wails/`.
+Those paths, `frontend/dist/`, and `dist/` remain untracked. Keeping every
+project-built `.app` below hidden `.cache/` prevents macOS from presenting it
+as a duplicate of the installed `/Applications/aulycMail.app`. Production
+builds, Wails development, and `make clean` also remove the obsolete visible
+`build/bin/` output left by older checkouts.
 
 ## Database and user-data safety
 

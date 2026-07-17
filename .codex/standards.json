@@ -101,11 +101,11 @@
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "b1d8b0b95c33add04706285b3040d8ab61ddb4c321765d25312edc5bdf97abd3"
+      "sha256": "cd0e61ae34f57d3623c108db3a6c9d232c4b4a419a781178c7db8e5d424a5d2b"
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "sha256": "548f9ba34f79d7e07e27add7ca9aaa0cc308f1ab2a1af28c877f47415d099fc3"
+      "sha256": "140f678b518bac2f89ced40360b397a14fed92f572c2144ec4dd8a8a5ae1b70b"
     },
     {
       "path": "docs/VERSIONING.md",
@@ -113,11 +113,15 @@
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "be76db295a3b5e6750f0f6970097cc788cfb81f215b2d71d50572623212bfef4"
+      "sha256": "db9fd6a499d0533f5334061e8b79d12b81a8332a6b760ed1018e5a6547063fd2"
     },
     {
       "path": "Makefile",
-      "sha256": "5a7495302bfa52a746d15af1e5ee344addfd3ff63379c0d52a97fe59b81a6cc6"
+      "sha256": "3b01071981a21f5f76cb6a3adb1998bc0d1820d60faf720e1d2625ae4b0a9417"
+    },
+    {
+      "path": "wails.json",
+      "sha256": "e3d492a541704f1df335af273531b8b156f9e58d0d470c16487d27ebab389ee0"
     },
     {
       "path": ".golangci.yml",
@@ -144,8 +148,20 @@
       "sha256": "d5c9b6abd191d47b430c4495c4b0665ff57891972791045d60b3dbd887d8ae29"
     },
     {
+      "path": "tools/package_macos_app.sh",
+      "sha256": "ae6d074e7ce09b8da2dd5bba2868d2d7c8d1235f2903aba0bd237d8db9566d6d"
+    },
+    {
       "path": "tools/package_macos_dmg.sh",
-      "sha256": "dbcfb863b97f28cda6a90a2839dfa8d2269e1a55a04736f1732b14a827edeb0d"
+      "sha256": "249dbf13c1d731a8ee5db3972c3aca47f542ab5332d12b1585faef7c8b41b09e"
+    },
+    {
+      "path": "tools/verify_release_candidate.sh",
+      "sha256": "0f5265777c256b15f14208e9846e79a3fe035a99e359c3d5bac94dc669b9abaf"
+    },
+    {
+      "path": "tools/build-output-layout.test.mjs",
+      "sha256": "f119f40cffcb3b50d9bda9f2535b0c31e3b2b046e7841f41719c946cae6db0a4"
     },
     {
       "path": "tools/install_macos_dmg.sh",
@@ -164,17 +180,26 @@
       "docs/VERSIONING.md",
       "docs/RELEASE.md",
       "Makefile",
+      "tools/build-output-layout.test.mjs",
+      "wails.json",
       "tools/version-bump.mjs",
       "tools/release-prepare.mjs",
       "tools/release-identity.mjs",
       "tools/release-worktree.mjs",
       "tools/release-backup.mjs",
+      "tools/package_macos_app.sh",
       "tools/package_macos_dmg.sh",
+      "tools/verify_release_candidate.sh",
       "tools/install_macos_dmg.sh"
     ],
     "ciPaths": [
       "Makefile",
-      ".golangci.yml"
+      ".golangci.yml",
+      "tools/build-output-layout.test.mjs",
+      "wails.json",
+      "tools/package_macos_app.sh",
+      "tools/package_macos_dmg.sh",
+      "tools/verify_release_candidate.sh"
     ]
   }
 }

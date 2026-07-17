@@ -23,7 +23,8 @@ provenance over convenience or broad rewrites.
 - `frontend/src/`: Svelte UI, frontend state, presentation, and user interaction.
 - `frontend/wailsjs/`: generated Wails JavaScript/TypeScript bindings.
 - `tools/`: versioning, release, macOS packaging, verification, and generated-file helpers.
-- `build/`: checked-in packaging inputs; generated bundles live under `build/bin/`.
+- `build/`: checked-in packaging inputs only; generated bundles live under
+  hidden `.cache/build/` and `.cache/wails/` paths.
 - `docs/`: current development, versioning, release, privacy, and operational documentation.
 
 ## Architecture boundaries
@@ -90,8 +91,10 @@ successful aggregate target unless diagnosing a failure.
   version tools and verify with `make version-check`.
 - Treat `frontend/wailsjs/` as generated-but-reviewed source. Regenerate it only
   through Wails plus `tools/normalize_wails_bindings.sh`.
-- Do not commit `frontend/node_modules/`, `frontend/dist/`, `build/bin/`, local
-  caches, databases, logs, DMGs, or `dist/` artifacts.
+- Do not commit `frontend/node_modules/`, `frontend/dist/`, `.cache/`, local
+  databases, logs, DMGs, or `dist/` artifacts.
+- Production builds, Wails development, and `make clean` remove the obsolete
+  visible `build/bin/` output before continuing.
 
 ## Data, settings, and credentials
 

@@ -5,7 +5,6 @@ aulycmail.exe
 aulycmail-creds
 
 # Wails build artifacts
-build/bin/
 .tools/
 .crush
 

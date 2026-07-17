@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_ROOT="$ROOT"
-APP="$ROOT/build/bin/aulycMail.app"
+APP="$ROOT/.cache/build/aulycMail.app"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

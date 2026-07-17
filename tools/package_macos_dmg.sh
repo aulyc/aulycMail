@@ -4,7 +4,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SOURCE_ROOT="$ROOT"
-APP="$ROOT/build/bin/aulycMail.app"
+APP="$ROOT/.cache/build/aulycMail.app"
 DMG_PATH="$ROOT/dist/aulycMail.dmg"
 VOLUME_NAME="aulycMail Installer"
 RELEASE_CHANNEL="local"
@@ -19,7 +19,7 @@ Usage: tools/package_macos_dmg.sh [options]
 
 Options:
   --source-root PATH     Git source used to build the app
-  --app PATH             App bundle to package (default: build/bin/aulycMail.app)
+  --app PATH             App bundle to package (default: .cache/build/aulycMail.app)
   --output PATH          DMG output path (default: dist/aulycMail.dmg)
   --volume-name NAME     Mounted DMG volume name
   --release-channel NAME local, test, or formal
@@ -277,12 +277,32 @@ end run
 OSA
 
 sync
+echo "Removing transient macOS filesystem metadata..."
+rm -rf -- "$MOUNT_POINT/.fseventsd"
+if [[ -e "$MOUNT_POINT/.fseventsd" ]]; then
+  echo "Failed to remove .fseventsd from the writable DMG." >&2
+  exit 1
+fi
 hdiutil detach "$MOUNT_POINT" -quiet
 MOUNT_POINT=""
 
 echo "Compressing DMG..."
 hdiutil convert "$RW_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG_PATH" >/dev/null
 OUTPUT_CREATED=1
+
+echo "Verifying final DMG filesystem contents..."
+ATTACH_OUTPUT="$(hdiutil attach "$DMG_PATH" -readonly -noverify -noautoopen)"
+MOUNT_POINT="$(printf '%s\n' "$ATTACH_OUTPUT" | sed -n 's|^.*\(/Volumes/.*\)$|\1|p' | head -n 1)"
+if [[ -z "$MOUNT_POINT" || ! -d "$MOUNT_POINT" ]]; then
+  echo "Failed to locate the final mounted DMG volume." >&2
+  exit 1
+fi
+if [[ -e "$MOUNT_POINT/.fseventsd" ]]; then
+  echo "Final DMG unexpectedly contains .fseventsd." >&2
+  exit 1
+fi
+hdiutil detach "$MOUNT_POINT" -quiet
+MOUNT_POINT=""
 
 if [[ "$RELEASE_CHANNEL" == "formal" ]]; then
   echo "Signing DMG with $SIGN_IDENTITY..."

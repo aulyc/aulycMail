@@ -126,6 +126,7 @@ tools cross-check:
 
 - annotated Git tag, target commit, tagged `version.json`, and release commit;
 - DMG filename and SHA-256;
+- absence of transient macOS volume metadata such as `.fseventsd`;
 - app Info.plist version/build/commit, Bundle ID, and minimum macOS version;
 - app executable `--version`;
 - `lipo` and `file` arm64 results;

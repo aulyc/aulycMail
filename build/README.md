@@ -1,11 +1,15 @@
 # Build Directory
 
-The build directory contains packaging assets and generated build output for
-aulycMail.
+The build directory contains tracked packaging assets for aulycMail. Generated
+application bundles are kept under hidden `.cache/` paths so macOS does not
+present them as duplicates of the installed application. Build and clean
+commands remove the obsolete generated `build/bin/` directory from older
+checkouts.
 
 ## Structure
 
-- `bin/` - generated desktop application output
+- `.cache/build/` - local production binary and application bundle
+- `.cache/wails/` - Wails development build assets and output
 - `darwin/` - macOS packaging metadata used by Wails
 
 ## macOS

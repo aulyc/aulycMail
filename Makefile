@@ -7,7 +7,7 @@
 
 .PHONY: all build build-app dev dev-race generate clean test lint lint-go lint-frontend \
         fmt fmt-check check-go check-frontend check ci release-candidate isolated-release-artifact \
-        frontend-deps frontend-update normalize-wails-bindings install uninstall \
+        frontend-deps frontend-update normalize-wails-bindings remove-obsolete-build-output prepare-wails-build-assets install uninstall \
         dmg release-dmg test-release-dmg install-dmg install-release-dmg install-test-release-dmg install-darwin \
         quit-running-darwin launch-darwin uninstall-darwin version-check version-test \
         prepare-test-release prepare-formal-release release-preflight release-golangci-lint release-check \
@@ -38,8 +38,11 @@ LDFLAGS = -X $(MODULE)/app.Version=$(APP_VERSION) \
 # Wails build tags
 BUILD_TAGS := webkit2_41
 GO_BUILD_TAGS := desktop,$(BUILD_TAGS),wv2runtime.download,production
-APP_BUNDLE := build/bin/aulycMail.app
-APP_BINARY := build/bin/aulycMail
+WAILS_BUILD_DIR := .cache/wails
+BUILD_OUTPUT_DIR := .cache/build
+OBSOLETE_BUILD_OUTPUT_DIR := build/bin
+APP_BUNDLE := $(BUILD_OUTPUT_DIR)/aulycMail.app
+APP_BINARY := $(BUILD_OUTPUT_DIR)/aulycMail
 DMG_PATH ?= dist/aulycMail-$(VERSION)-build.$(BUNDLE_BUILD_NUMBER).dmg
 RELEASE_DMG_PATH := dist/aulycMail-$(VERSION)-build.$(BUILD_NUMBER).dmg
 DMG_VOLUME_NAME ?= aulycMail Installer
@@ -76,6 +79,7 @@ endif
 # vendor their own Go modules under frontend/node_modules, and those should not
 # become part of this repository's Go test surface.
 GO_PACKAGES := $(shell find . \
+	-path './.cache' -prune -o \
 	-path './frontend/node_modules' -prune -o \
 	-path './frontend/dist' -prune -o \
 	-name '*.go' -print | xargs -n1 dirname | sort -u | sed 's,^\./,./,')
@@ -91,7 +95,7 @@ build: version-check build-app
 
 # Internal production build shared by local CI, the pre-tag release candidate,
 # and the isolated tagged-source build. Callers provide the runtime identity.
-build-app:
+build-app: remove-obsolete-build-output
 	@if [ "$$(uname -m)" != "arm64" ]; then \
 		echo 'aulycMail supports Apple Silicon arm64 builds only.'; \
 		exit 1; \
@@ -109,10 +113,11 @@ build-app:
 	@echo "Compiling frontend..."
 	cd frontend && npm run build
 	@echo "Compiling application..."
-	mkdir -p build/bin
+	mkdir -p "$(BUILD_OUTPUT_DIR)"
 	GOARCH=arm64 $(DARWIN_LINK_WARN_ENV) go build -trimpath -buildvcs=false -tags $(GO_BUILD_TAGS) -ldflags "$(LDFLAGS) -s -w" -o $(APP_BINARY)
 	@echo "Packaging macOS app bundle..."
-	SEMANTIC_VERSION="$(APP_VERSION)" SHORT_VERSION="$(BASE_VERSION)" \
+	AULYCMAIL_APP_BUNDLE="$(abspath $(APP_BUNDLE))" AULYCMAIL_APP_BINARY="$(abspath $(APP_BINARY))" \
+		SEMANTIC_VERSION="$(APP_VERSION)" SHORT_VERSION="$(BASE_VERSION)" \
 		BUILD_NUMBER="$(BUNDLE_BUILD_NUMBER)" COMMIT_SHA="$(COMMIT_SHA)" \
 		bash tools/package_macos_app.sh
 	@echo "Injecting macOS asset-catalog icon (fills the Liquid Glass plate on macOS 26)..."
@@ -127,19 +132,34 @@ build-app:
 		exit 1; \
 	fi
 
+# Remove the pre-migration visible output so macOS cannot continue discovering
+# it as a second copy of the installed application.
+remove-obsolete-build-output:
+	@if [ -e "$(OBSOLETE_BUILD_OUTPUT_DIR)" ] || [ -L "$(OBSOLETE_BUILD_OUTPUT_DIR)" ]; then \
+		echo "Removing obsolete visible build output $(OBSOLETE_BUILD_OUTPUT_DIR) ..."; \
+		rm -rf -- "$(OBSOLETE_BUILD_OUTPUT_DIR)"; \
+	fi
+
+# Copy the tracked Wails packaging inputs into its ignored hidden build root.
+prepare-wails-build-assets: remove-obsolete-build-output
+	@mkdir -p "$(WAILS_BUILD_DIR)/darwin"
+	@cp build/appicon.png "$(WAILS_BUILD_DIR)/appicon.png"
+	@cp build/darwin/Info.plist "$(WAILS_BUILD_DIR)/darwin/Info.plist"
+	@cp build/darwin/Info.dev.plist "$(WAILS_BUILD_DIR)/darwin/Info.dev.plist"
+
 # Run in development mode with hot reload
-dev:
+dev: prepare-wails-build-assets generate
 	@echo "Starting aulycMail in development mode..."
-	$(DARWIN_LINK_WARN_ENV) wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
+	$(DARWIN_LINK_WARN_ENV) wails dev -skipbindings -nosyncgomod -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS)
 
 # Run in development mode with Go's race detector enabled. Builds significantly
 # slower and adds ~5-10x runtime overhead, but instruments every memory access
 # and prints exactly which line + goroutines collide on any unsynchronized
 # shared-memory access. Use this when chasing a suspected data race —
 # reproduce the crash and the detector report points right at it.
-dev-race:
+dev-race: prepare-wails-build-assets generate
 	@echo "Starting aulycMail in development mode with -race..."
-	$(DARWIN_LINK_WARN_ENV) wails dev -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
+	$(DARWIN_LINK_WARN_ENV) wails dev -skipbindings -nosyncgomod -ldflags "$(LDFLAGS)" -tags $(BUILD_TAGS) -race
 
 # Generate Wails TypeScript bindings
 generate:
@@ -254,9 +274,9 @@ version-test:
 fmt-check:
 	@files="$$(find . \
 		-path './.git' -prune -o \
+		-path './.cache' -prune -o \
 		-path './frontend/node_modules' -prune -o \
 		-path './frontend/dist' -prune -o \
-		-path './build/bin' -prune -o \
 		-name '*.go' -print)"; \
 	unformatted="$$(test -z "$$files" || gofmt -l $$files)"; \
 	if [ -n "$$unformatted" ]; then \
@@ -429,9 +449,9 @@ fmt:
 ## Maintenance
 
 # Clean build artifacts
-clean:
+clean: remove-obsolete-build-output
 	@echo "Cleaning build artifacts..."
-	rm -rf build/bin
+	rm -rf "$(BUILD_OUTPUT_DIR)" "$(WAILS_BUILD_DIR)"
 	rm -rf frontend/dist
 	rm -f aulycMail aulycmail
 
