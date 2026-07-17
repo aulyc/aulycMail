@@ -120,10 +120,6 @@
       "sha256": "3b01071981a21f5f76cb6a3adb1998bc0d1820d60faf720e1d2625ae4b0a9417"
     },
     {
-      "path": "wails.json",
-      "sha256": "e3d492a541704f1df335af273531b8b156f9e58d0d470c16487d27ebab389ee0"
-    },
-    {
       "path": ".golangci.yml",
       "sha256": "e9dae3427b82cf5cece9ad302c9830621a5ca4d1f24f8f7387129402eaeea155"
     },

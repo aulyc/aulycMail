@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Prevented the formal GitHub gate from treating the version-derived
+  `wails.json` update as release-standards drift after release preparation.
+
 ## [0.3.99] — 2026-07-18
 
 - Moved local and Wails-generated app bundles into hidden `.cache` paths so
