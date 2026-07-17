@@ -16,6 +16,9 @@ All notable changes to aulycMail are documented here.
 - Updated the About page website to `www.aulyc.com`, removed its redundant
   product tagline, and eliminated the doubled separator above “Load more” in
   the activity log.
+- Fixed folders excluded from background synchronization, such as Junk, so
+  opening them catches up from the server and reconciles unread badges with
+  the local message list without starting duplicate syncs.
 
 ## [0.3.97] — 2026-07-15
 

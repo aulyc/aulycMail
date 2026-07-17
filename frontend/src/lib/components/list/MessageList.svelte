@@ -46,6 +46,10 @@
     type FolderEvent,
     type ReadChangedEvent,
   } from './messageListEvents'
+  import {
+    findFolderSyncDescriptor,
+    shouldAutoSyncFolderOnOpen,
+  } from './folderOpenSync'
 
   interface Props {
     accountId?: string | null
@@ -127,6 +131,11 @@
   // On notification click, loadConversations (folder change) and MarkAsRead race —
   // the flagsChanged event may fire before the new conversations array is ready.
   let pendingFlagChanges: Array<{messageIds: string[], isRead: boolean}> = []
+
+  // Opening a folder that is excluded from the account's background policy
+  // performs one foreground catch-up sync. Throttle recent attempts so quick
+  // back-and-forth navigation never creates a request loop.
+  const folderOpenSyncAttempts = new Map<string, number>()
 
   // Search state
   let showSearch = $state(false)
@@ -234,6 +243,61 @@
     // Buffer this change so we can apply it after the load completes.
     if (loading) {
       pendingFlagChanges.push({ messageIds: data.messageIds, isRead: data.isRead })
+    }
+  }
+
+  async function autoSyncOpenedFolder(
+    targetAccountId: string,
+    targetFolderId: string,
+    navigationGeneration: number,
+  ) {
+    const accountState = accountStore.getAccount(targetAccountId)
+    const descriptor = accountState
+      ? findFolderSyncDescriptor(accountState.folders || [], targetFolderId)
+      : null
+    const syncKey = `${targetAccountId}:${targetFolderId}`
+    const now = Date.now()
+
+    if (!shouldAutoSyncFolderOnOpen({
+      accountId: targetAccountId,
+      folderId: targetFolderId,
+      folderType: descriptor?.type,
+      folderSubscribed: descriptor?.subscribed ?? false,
+      syncAllFolders: accountState?.account.syncAllFolders ?? false,
+      syncFoldersEnabled: accountState?.account.syncFoldersEnabled ?? false,
+      isUnifiedView: false,
+      isOnline: accountStore.isOnline,
+      isSyncing: accountStore.syncProgress[targetAccountId]?.[targetFolderId] !== undefined,
+      lastAttemptAt: folderOpenSyncAttempts.get(syncKey),
+      now,
+    })) {
+      return
+    }
+
+    folderOpenSyncAttempts.set(syncKey, now)
+
+    try {
+      // Keep the cached list visible while headers catch up. SyncFolder returns
+      // after header reconciliation, which is enough to reload the list; body
+      // download continues in the existing background path.
+      await SyncFolder(targetAccountId, targetFolderId)
+
+      // A slow sync for the previous folder must never reload or replace the
+      // newly selected folder's list.
+      if (
+        navigationGeneration !== loadGeneration ||
+        accountId !== targetAccountId ||
+        folderId !== targetFolderId
+      ) {
+        return
+      }
+
+      offset = 0
+      await loadConversations()
+    } catch (err) {
+      // Automatic catch-up is best-effort: preserve the usable cached list.
+      // The shared account store already surfaces the backend sync error.
+      console.warn('Automatic folder sync failed:', err)
     }
   }
 
@@ -360,7 +424,11 @@
     serverSearchTotalCount = 0
     lastServerQuery = ''
     folderNavLoad = true // this load is a real folder switch → may auto-select first
+    const navigationGeneration = loadGeneration
     loadConversations()
+    if (!isUnifiedView) {
+      void autoSyncOpenedFolder(accountId!, folderId!, navigationGeneration)
+    }
     checkFTSIndexStatus()
   })
 
