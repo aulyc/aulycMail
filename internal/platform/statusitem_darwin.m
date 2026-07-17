@@ -26,8 +26,8 @@ static NSString* aulycStatusStr(const char* s) {
     return s ? [NSString stringWithUTF8String:s] : @"";
 }
 
-static NSMenuItem* aulycStatusItem(NSString* title, SEL action, id target) {
-    NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:@""] autorelease];
+static NSMenuItem* aulycStatusItem(NSString* title, SEL action, id target, NSString* keyEquivalent) {
+    NSMenuItem* item = [[[NSMenuItem alloc] initWithTitle:title action:action keyEquivalent:keyEquivalent] autorelease];
     item.target = target;
     [item setImage:nil];
     [item setOnStateImage:nil];
@@ -116,10 +116,10 @@ void aulycSetStatusItemVisible(int visible, AulycStatusItemLabels labels) {
         }
 
         NSMenu *menu = [[[NSMenu alloc] init] autorelease];
-        [menu addItem:aulycStatusItem(open, @selector(onOpen:), gStatusItemTarget)];
-        [menu addItem:aulycStatusItem(settings, @selector(onSettings:), gStatusItemTarget)];
+        [menu addItem:aulycStatusItem(open, @selector(onOpen:), gStatusItemTarget, @"")];
+        [menu addItem:aulycStatusItem(settings, @selector(onSettings:), gStatusItemTarget, @"")];
         [menu addItem:[NSMenuItem separatorItem]];
-        [menu addItem:aulycStatusItem(quit, @selector(onQuit:), gStatusItemTarget)];
+        [menu addItem:aulycStatusItem(quit, @selector(onQuit:), gStatusItemTarget, @"q")];
         gStatusItem.menu = menu;
 
         aulycApplyStatusItemAppearance();

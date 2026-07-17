@@ -11,6 +11,7 @@ All notable changes to aulycMail are documented here.
 - Clarified backup results as checked, backed up, and not backed up, with
   explicit reasons for server-missing messages, unreadable sources, and
   processing failures while preserving older activity-log compatibility.
+- Added the standard Command-Q shortcut to the macOS status-bar Quit action.
 
 ## [0.3.98] — 2026-07-17
 
