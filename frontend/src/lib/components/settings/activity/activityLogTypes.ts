@@ -8,6 +8,8 @@ export interface ActivityLogPayload {
   mode?: 'full' | 'incremental'
   total?: number
   completed?: number
+  backedUp?: number
+  notBackedUp?: number
   success?: number
   added?: number
   skipped?: number

@@ -1,6 +1,7 @@
 import { get } from 'svelte/store'
 import { _ } from '$lib/i18n'
 import { formatLocalDateTime } from '$lib/utils/date'
+import { backupStatistics } from '$lib/backup/backupStatistics'
 import type { ActivityLog, ActivityLogPayload } from './activityLogTypes'
 
 function payloadOf(log: ActivityLog): ActivityLogPayload {
@@ -37,20 +38,26 @@ export function activitySummary(log: ActivityLog): string {
       return log.status === 'cancelled' ? t('activityLog.backupCancelled') : t('activityLog.backupFailed')
     }
     const mode = payload.mode === 'incremental' ? t('settingsBackup.incrementalExport') : t('settingsBackup.fullExport')
-    const completed = payload.completed ?? payload.success ?? (payload.added ?? 0) + (payload.skipped ?? 0)
-    const missing = payload.missing ?? 0
-    const unavailable = payload.unavailable ?? 0
-    const failed = payload.failed ?? 0
+    const statistics = backupStatistics({
+      total: payload.total,
+      completed: payload.backedUp ?? payload.completed ?? payload.success,
+      exported: payload.added,
+      skipped: payload.skipped,
+      missing: payload.missing,
+      unavailable: payload.unavailable,
+      failed: payload.failed,
+    })
     return t('activityLog.backupSummary', {
       values: {
         mode,
-        total: payload.total ?? completed + missing + unavailable + failed,
-        completed,
-        added: payload.added ?? 0,
-        skipped: payload.skipped ?? 0,
-        missing,
-        unavailable,
-        failed,
+        checked: statistics.checked,
+        backedUp: statistics.backedUp,
+        notBackedUp: payload.notBackedUp ?? statistics.notBackedUp,
+        newlyBackedUp: statistics.newlyBackedUp,
+        previouslyBackedUp: statistics.previouslyBackedUp,
+        serverNotReturned: statistics.serverNotReturned,
+        noReadableSource: statistics.noReadableSource,
+        processingFailed: statistics.processingFailed,
       },
     })
   }

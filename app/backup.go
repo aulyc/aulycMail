@@ -458,8 +458,10 @@ func backupActivitySummary(result *BackupRunResult, status string) string {
 	if result.Mode == "incremental" {
 		mode = "增量导出"
 	}
-	return fmt.Sprintf("%s · 完成 %d · 新增 %d · 已存在 %d · 缺失 %d · 原文不可获取 %d · 失败 %d",
-		mode, result.Exported+result.Skipped, result.Exported, result.Skipped, result.Missing, result.Unavailable, result.Failed)
+	backedUp := result.Exported + result.Skipped
+	notBackedUp := result.Missing + result.Unavailable + result.Failed
+	return fmt.Sprintf("%s · 本次核对 %d · 已备份 %d · 未备份 %d · 本次新备份 %d · 此前已备份 %d · 服务器未返回 %d · 无可读取来源 %d · 处理失败 %d",
+		mode, result.Total, backedUp, notBackedUp, result.Exported, result.Skipped, result.Missing, result.Unavailable, result.Failed)
 }
 
 func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunResult, runErr error, activityMode string) {
@@ -513,6 +515,8 @@ func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunRe
 			"mode":        mode,
 			"total":       total,
 			"completed":   completed,
+			"backedUp":    completed,
+			"notBackedUp": missing + unavailable + failed,
 			"added":       added,
 			"skipped":     skipped,
 			"missing":     missing,

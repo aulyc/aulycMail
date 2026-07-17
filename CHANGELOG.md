@@ -8,6 +8,9 @@ All notable changes to aulycMail are documented here.
   macOS does not list project builds as duplicates of the installed app.
 - Removed transient macOS `.fseventsd` metadata from generated DMG installers
   and made packaging fail if it reappears in the final image.
+- Clarified backup results as checked, backed up, and not backed up, with
+  explicit reasons for server-missing messages, unreadable sources, and
+  processing failures while preserving older activity-log compatibility.
 
 ## [0.3.98] — 2026-07-17
 

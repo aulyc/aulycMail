@@ -270,7 +270,7 @@
     "appearance": "调整主题和邮件列表的显示方式",
     "mail": "设置邮件撰写、回执和远程图片加载",
     "accounts": "添加、编辑、排序或测试邮箱账户",
-    "backup": "将邮件导出到本地目录并查看最近结果"
+    "backup": "以本地已同步的邮件记录为核对范围，将服务器原文导出到指定目录"
   },
   "settingsGeneral": {
     "language": "语言",
@@ -320,6 +320,7 @@
     "noRecentLog": "暂无备份日志",
     "indexWithoutLog": "已检测到备份索引，暂无最近备份日志",
     "currentTask": "当前任务",
+    "latestResult": "本次结果",
     "noCurrentTask": "当前没有正在运行的备份任务。",
     "loadRunStateFailed": "加载当前备份任务失败",
     "saveAndStart": "保存并开始备份",
@@ -327,15 +328,18 @@
     "incrementalExport": "增量导出",
     "startBackup": "开始备份",
     "backupRunning": "备份中…",
-    "progressExported": "新增",
-    "progressSkipped": "跳过",
-    "progressMissing": "未找到",
-    "progressUnavailable": "原文不可获取",
-    "progressFailed": "失败",
+    "checked": "本次核对",
+    "backedUp": "已备份",
+    "notBackedUp": "未备份",
+    "newlyBackedUp": "本次新备份",
+    "previouslyBackedUp": "此前已备份",
+    "serverNotReturned": "服务器未返回",
+    "noReadableSource": "无可读取来源",
+    "processingFailed": "处理失败",
     "chooseDirectoryFailed": "选择备份目录失败",
     "openDirectoryFailed": "打开备份目录失败",
     "backupStartedInBackground": "备份已在后台开始",
-    "backupComplete": "备份完成：新增 {exported}，跳过 {skipped}，未找到 {missing}，原文不可获取 {unavailable}，失败 {failed}",
+    "backupComplete": "备份完成：本次核对 {checked}，已备份 {backedUp}，未备份 {notBackedUp}",
     "backupFailed": "备份失败"
   },
   "backupViewer": {
@@ -743,7 +747,7 @@
     "clearFailed": "清理日志失败",
     "backupFailed": "备份失败",
     "backupCancelled": "备份已取消",
-    "backupSummary": "{mode} · 总数 {total} · 完成 {completed} · 新增 {added} · 已存在 {skipped} · 缺失 {missing} · 原文不可获取 {unavailable} · 失败 {failed}",
+    "backupSummary": "{mode} · 本次核对 {checked} · 已备份 {backedUp} · 未备份 {notBackedUp} · 本次新备份 {newlyBackedUp} · 此前已备份 {previouslyBackedUp} · 服务器未返回 {serverNotReturned} · 无可读取来源 {noReadableSource} · 处理失败 {processingFailed}",
     "syncSummary": "{target} · 新增 {added} 封",
     "filters": { "all": "全部", "sync": "同步", "backup": "备份", "failed": "失败" },
     "status": { "success": "成功", "partial": "部分完成", "failed": "失败", "cancelled": "已取消", "unknown": "未知" }

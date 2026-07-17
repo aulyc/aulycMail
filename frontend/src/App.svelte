@@ -25,6 +25,7 @@
   import { initTheme, applyThemeFromMode, handleSystemThemeEvent, handleMediaQueryChange } from '$lib/stores/theme.svelte'
   import { DEFAULT_LIST_WIDTH, DEFAULT_SIDEBAR_WIDTH, loadUIState, saveUIState, getActivePane, setActivePane } from '$lib/stores/uiState.svelte'
   import { shouldClearRestoredFolderSelection } from '$lib/stores/restoredFolderSelection'
+  import { backupStatistics } from '$lib/backup/backupStatistics'
   import {
     type FocusablePane,
     getFocusedPane,
@@ -293,17 +294,14 @@
     })
     EventsOn('backup:progress', (data: BackupProgress) => {
       if (data.phase === 'done') {
-        const missing = data.missing ?? 0
-        const unavailable = data.unavailable ?? 0
+        const statistics = backupStatistics(data)
         addToast({
-          type: data.failed > 0 || missing > 0 || unavailable > 0 ? 'warning' : 'success',
+          type: statistics.notBackedUp > 0 ? 'warning' : 'success',
           message: $_('settingsBackup.backupComplete', {
             values: {
-              exported: data.exported,
-              skipped: data.skipped,
-              missing,
-              unavailable,
-              failed: data.failed,
+              checked: statistics.checked,
+              backedUp: statistics.backedUp,
+              notBackedUp: statistics.notBackedUp,
             },
           }),
         })
@@ -673,6 +671,8 @@
 
   interface BackupProgress {
     phase: string
+    current: number
+    total: number
     exported: number
     skipped: number
     missing?: number

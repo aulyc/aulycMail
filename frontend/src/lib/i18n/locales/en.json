@@ -270,7 +270,7 @@
     "appearance": "Adjust the theme and message list display",
     "mail": "Set message composition, read receipts, and remote image loading",
     "accounts": "Add, edit, reorder, or test email accounts",
-    "backup": "Export mail to a local directory and see the latest result"
+    "backup": "Use locally synced message records as the check scope and export the server originals to a local directory"
   },
   "settingsGeneral": {
     "language": "Language",
@@ -320,6 +320,7 @@
     "noRecentLog": "No backup log yet",
     "indexWithoutLog": "A backup index was found, but there is no recent backup log",
     "currentTask": "Current task",
+    "latestResult": "Latest result",
     "noCurrentTask": "No backup task is currently running.",
     "loadRunStateFailed": "Failed to load the current backup task",
     "saveAndStart": "Save and start backup",
@@ -327,15 +328,18 @@
     "incrementalExport": "Incremental export",
     "startBackup": "Start backup",
     "backupRunning": "Backing up…",
-    "progressExported": "Exported",
-    "progressSkipped": "Skipped",
-    "progressMissing": "Missing",
-    "progressUnavailable": "Source unavailable",
-    "progressFailed": "Failed",
+    "checked": "Checked this run",
+    "backedUp": "Backed up",
+    "notBackedUp": "Not backed up",
+    "newlyBackedUp": "Newly backed up",
+    "previouslyBackedUp": "Previously backed up",
+    "serverNotReturned": "Not returned by server",
+    "noReadableSource": "No readable source",
+    "processingFailed": "Processing failed",
     "chooseDirectoryFailed": "Failed to choose backup directory",
     "openDirectoryFailed": "Failed to open backup directory",
     "backupStartedInBackground": "Backup started in the background",
-    "backupComplete": "Backup complete: exported {exported}, skipped {skipped}, missing {missing}, source unavailable {unavailable}, failed {failed}",
+    "backupComplete": "Backup complete: checked {checked}, backed up {backedUp}, not backed up {notBackedUp}",
     "backupFailed": "Backup failed"
   },
   "backupViewer": {
@@ -743,7 +747,7 @@
     "clearFailed": "Failed to clear logs",
     "backupFailed": "Backup failed",
     "backupCancelled": "Backup cancelled",
-    "backupSummary": "{mode} · total {total} · completed {completed} · added {added} · existing {skipped} · missing {missing} · source unavailable {unavailable} · failed {failed}",
+    "backupSummary": "{mode} · checked this run {checked} · backed up {backedUp} · not backed up {notBackedUp} · newly backed up {newlyBackedUp} · previously backed up {previouslyBackedUp} · not returned by server {serverNotReturned} · no readable source {noReadableSource} · processing failed {processingFailed}",
     "syncSummary": "{target} · added {added}",
     "filters": { "all": "All", "sync": "Sync", "backup": "Backup", "failed": "Failed" },
     "status": { "success": "Success", "partial": "Partial", "failed": "Failed", "cancelled": "Cancelled", "unknown": "Unknown" }

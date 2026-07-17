@@ -427,6 +427,25 @@ func TestBackupActivityStatus(t *testing.T) {
 	}
 }
 
+func TestBackupActivitySummaryUsesCoverageSemantics(t *testing.T) {
+	t.Parallel()
+
+	result := &BackupRunResult{
+		Mode:        "incremental",
+		Total:       21438,
+		Exported:    27,
+		Skipped:     21407,
+		Missing:     4,
+		Unavailable: 0,
+		Failed:      0,
+	}
+
+	want := "增量导出 · 本次核对 21438 · 已备份 21434 · 未备份 4 · 本次新备份 27 · 此前已备份 21407 · 服务器未返回 4 · 无可读取来源 0 · 处理失败 0"
+	if got := backupActivitySummary(result, activitylog.StatusPartial); got != want {
+		t.Fatalf("backupActivitySummary() = %q, want %q", got, want)
+	}
+}
+
 func (r errorReader) Read([]byte) (int, error) {
 	return 0, r.err
 }
