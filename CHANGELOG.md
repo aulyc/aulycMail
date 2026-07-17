@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.3.98] — 2026-07-17
+
 - Renamed the product, app bundle, executable, and new release artifacts to
   `aulycMail` while preserving the existing bundle ID, local data, Keychain
   service, and historical release compatibility.
