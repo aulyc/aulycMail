@@ -25,17 +25,6 @@
     infoOpen = true
   }
 
-  function openInfoOnPointerDown(event: PointerEvent, kind: InfoKind) {
-    if (event.button !== 0) return
-    event.preventDefault()
-    event.stopPropagation()
-    openInfo(kind)
-  }
-
-  function openInfoOnKeyboardClick(event: MouseEvent, kind: InfoKind) {
-    if (event.detail === 0) openInfo(kind)
-  }
-
   const infoContent = $derived.by((): { title: string; intro: string; sections: InfoSection[] } => {
     if (infoKind === 'product') return {
       title: $_('settingsAbout.product.title'),
@@ -103,8 +92,7 @@
     <div class="flex flex-col items-center gap-2">
       <button
         type="button"
-        onpointerdown={(event) => openInfoOnPointerDown(event, 'product')}
-        onclick={(event) => openInfoOnKeyboardClick(event, 'product')}
+        onclick={() => openInfo('product')}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
         <Icon icon="lucide:book-open-text" class="w-5 h-5" />
@@ -120,8 +108,7 @@
       </button>
       <button
         type="button"
-        onpointerdown={(event) => openInfoOnPointerDown(event, 'privacy')}
-        onclick={(event) => openInfoOnKeyboardClick(event, 'privacy')}
+        onclick={() => openInfo('privacy')}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
         <Icon icon="mdi:shield-account" class="w-5 h-5" />
@@ -129,8 +116,7 @@
       </button>
       <button
         type="button"
-        onpointerdown={(event) => openInfoOnPointerDown(event, 'terms')}
-        onclick={(event) => openInfoOnKeyboardClick(event, 'terms')}
+        onclick={() => openInfo('terms')}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
         <Icon icon="mdi:file-document" class="w-5 h-5" />
@@ -138,8 +124,7 @@
       </button>
       <button
         type="button"
-        onpointerdown={(event) => openInfoOnPointerDown(event, 'acknowledgements')}
-        onclick={(event) => openInfoOnKeyboardClick(event, 'acknowledgements')}
+        onclick={() => openInfo('acknowledgements')}
         class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
         <Icon icon="lucide:heart-handshake" class="w-5 h-5" />
