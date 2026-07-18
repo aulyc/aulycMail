@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.3.100] — 2026-07-18
+
 - Prevented the formal GitHub gate from treating the version-derived
   `wails.json` update as release-standards drift after release preparation.
 
