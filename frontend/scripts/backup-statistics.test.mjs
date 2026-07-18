@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { backupStatistics } from '../src/lib/backup/backupStatistics.ts'
+import { backupProgressPercent, backupStatistics } from '../src/lib/backup/backupStatistics.ts'
 
 test('presents backup counters as coverage and mutually exclusive outcomes', () => {
   assert.deepEqual(backupStatistics({
@@ -47,4 +47,11 @@ test('honours the legacy completed counter when detailed success counters are ab
   assert.equal(result.backedUp, 8)
   assert.equal(result.notBackedUp, 2)
   assert.equal(result.checked, 10)
+})
+
+test('calculates a bounded determinate backup percentage', () => {
+  assert.equal(backupProgressPercent(25, 100), 25)
+  assert.equal(backupProgressPercent(200, 100), 100)
+  assert.equal(backupProgressPercent(-1, 100), 0)
+  assert.equal(backupProgressPercent(0, 0), null)
 })

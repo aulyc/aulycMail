@@ -6,6 +6,7 @@
   import type { SettingsDraft } from '../settingsDraft.svelte'
   import SettingsPageHeader from '../shared/SettingsPageHeader.svelte'
   import BackupConfigSection from './BackupConfigSection.svelte'
+  import BackupProgressDialog from './BackupProgressDialog.svelte'
   import RecentBackupLog from './RecentBackupLog.svelte'
   import BackupRunPanel from './BackupRunPanel.svelte'
   import { BackupRunStore } from './backupRun.svelte'
@@ -15,6 +16,9 @@
   const accountIds = $derived(accountStore.accounts.filter(item => !item.account.sharedMailboxParentId).map(item => item.account.id))
   const selectedIds = $derived(draft.backupScope === 'all' ? accountIds : draft.backupSelectedAccountIds.filter(id => accountIds.includes(id)))
   const canStart = $derived(Boolean(draft.backupDirectory.trim()) && selectedIds.length > 0)
+  let progressDialogOpen = $state(false)
+  let preparing = $state(false)
+  let startFailed = $state(false)
 
   $effect(() => {
     if (accountStore.loading) return
@@ -26,14 +30,27 @@
   })
 
   async function start() {
+    progressDialogOpen = true
+    startFailed = false
+    if (store.running) return
+    preparing = true
     try {
       if (draft.backupDirty) await draft.saveBackup()
       await store.start(draft.backupDirectory.trim(), draft.backupScope, selectedIds)
-      addToast({ type: 'success', message: $_('settingsBackup.backupStartedInBackground') })
     } catch (error) {
       console.error('Failed to start backup:', error)
-      addToast({ type: 'error', message: $_('settingsBackup.backupFailed') })
+      if (!store.running) {
+        startFailed = true
+        addToast({ type: 'error', message: $_('settingsBackup.backupFailed') })
+      }
+    } finally {
+      preparing = false
     }
+  }
+
+  function runInBackground() {
+    progressDialogOpen = false
+    addToast({ type: 'success', message: $_('settingsBackup.backupContinuesInBackground') })
   }
   onMount(() => {
     void store.startListening().catch((error) => {
@@ -51,4 +68,11 @@
     <RecentBackupLog directory={draft.backupDirectory} />
     <BackupRunPanel {store} {canStart} saveBeforeStart={draft.backupDirty} onStart={start} />
   </div>
+  <BackupProgressDialog
+    bind:open={progressDialogOpen}
+    {store}
+    {preparing}
+    {startFailed}
+    onRunInBackground={runInBackground}
+  />
 </div>
