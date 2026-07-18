@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-07-18
+
 - Added Finder **Open With** integration that creates a new message and
   attaches the selected regular files without replacing an existing draft.
 - Moved the selected-account checkmark to the left edge of each Backup Viewer
