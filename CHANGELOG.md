@@ -4,6 +4,12 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Refined the backup settings layout with a header action, compact latest-backup
+  summary, horizontal progress feedback, and expandable activity details that
+  keep only one row open at a time.
+- Added a reproducible npm dependency security-audit command and CI gate so a
+  clean frontend install is audited before project checks and production builds.
+
 ## [0.3.101] — 2026-07-18
 
 - Replaced the duplicate inline backup result panel and horizontal progress bar
