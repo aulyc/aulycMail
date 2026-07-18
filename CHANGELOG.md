@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-07-18
+
 - Stabilized the Backup Progress dialog height by reserving its current-target
   row across active and idle states.
 
