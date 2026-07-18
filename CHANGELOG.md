@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-07-18
+
 - Adopted release-core 2.0.1 host-credential verification rules for
   fail-closed formal releases.
 
