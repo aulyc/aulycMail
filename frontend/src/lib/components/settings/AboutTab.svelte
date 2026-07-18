@@ -89,45 +89,45 @@
     </div>
 
     <!-- Links -->
-    <div class="flex flex-col items-center gap-2">
+    <div class="flex w-max flex-col items-stretch gap-2">
       <button
         type="button"
         onclick={() => openInfo('product')}
-        class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
-        <Icon icon="lucide:book-open-text" class="w-5 h-5" />
+        <Icon icon="lucide:book-open-text" class="h-5 w-5 shrink-0" />
         <span>{$_('settingsAbout.productDescription')}</span>
       </button>
       <button
         type="button"
         onclick={openWebsite}
-        class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors"
+        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline"
       >
-        <Icon icon="mdi:web" class="w-5 h-5" />
+        <Icon icon="mdi:web" class="h-5 w-5 shrink-0" />
         <span>{$_('settingsAbout.website')}</span>
       </button>
       <button
         type="button"
         onclick={() => openInfo('privacy')}
-        class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
-        <Icon icon="mdi:shield-account" class="w-5 h-5" />
+        <Icon icon="mdi:shield-account" class="h-5 w-5 shrink-0" />
         <span>{$_('settingsAbout.privacyPolicy')}</span>
       </button>
       <button
         type="button"
         onclick={() => openInfo('terms')}
-        class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
-        <Icon icon="mdi:file-document" class="w-5 h-5" />
+        <Icon icon="mdi:file-document" class="h-5 w-5 shrink-0" />
         <span>{$_('settingsAbout.termsOfUse')}</span>
       </button>
       <button
         type="button"
         onclick={() => openInfo('acknowledgements')}
-        class="flex items-center gap-2 text-sm text-primary hover:underline transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
       >
-        <Icon icon="lucide:heart-handshake" class="w-5 h-5" />
+        <Icon icon="lucide:heart-handshake" class="h-5 w-5 shrink-0" />
         <span>{$_('settingsAbout.acknowledgementsLabel')}</span>
       </button>
     </div>

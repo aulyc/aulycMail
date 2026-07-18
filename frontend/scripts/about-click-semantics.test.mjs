@@ -16,3 +16,11 @@ test('about actions use standard click activation instead of pointer-down activa
   assert.match(aboutTab, /onclick=\{\(\) => openInfo\('product'\)\}/)
   assert.match(aboutInfoDialog, /onclick=\{close\}/)
 })
+
+test('about links share aligned icon and text columns', async () => {
+  const aboutTab = await readFile(aboutTabPath, 'utf8')
+
+  assert.match(aboutTab, /class="flex w-max flex-col items-stretch gap-2"/)
+  assert.match(aboutTab, /class="flex w-full items-center justify-start gap-2 text-left[^"]*"/)
+  assert.match(aboutTab, /icon="lucide:heart-handshake" class="h-5 w-5 shrink-0"/)
+})

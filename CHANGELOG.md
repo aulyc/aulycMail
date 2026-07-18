@@ -6,7 +6,8 @@ All notable changes to aulycMail are documented here.
 
 - Refined backup and activity-log settings with compact aligned selectors,
   inline backup composition notes, consistent status typography, and a single
-  close action on pages without editable settings.
+  close action on pages without editable settings, plus aligned About-page
+  link icons and labels.
 - Prevented a high-volume synchronization day from evicting earlier activity
   history by applying the 1,000-entry limit per activity type and UTC day while
   retaining the existing 30-day age limit.
