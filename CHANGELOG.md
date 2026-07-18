@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Stabilized the Backup Progress dialog height by reserving its current-target
+  row across active and idle states.
+
 ## [0.5.1] — 2026-07-18
 
 - Adopted release-core 2.0.1 host-credential verification rules for

@@ -117,9 +117,13 @@
           {/if}
         </div>
 
-        {#if active && target}
-          <p class="max-w-full truncate text-xs text-muted-foreground" title={target}>{target}</p>
-        {/if}
+        <p
+          class="max-w-full truncate text-xs text-muted-foreground {active && target ? '' : 'invisible'}"
+          title={active && target ? target : undefined}
+          aria-hidden={!(active && target)}
+        >
+          {active && target ? target : '\u00a0'}
+        </p>
       </div>
 
       {#if !failed}
