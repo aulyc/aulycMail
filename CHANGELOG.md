@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Adopted release-core 2.0.1 host-credential verification rules for
+  fail-closed formal releases.
+
 ## [0.5.0] — 2026-07-18
 
 - Added Finder **Open With** integration that creates a new message and

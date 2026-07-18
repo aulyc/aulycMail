@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "projectId": "aulycmail",
   "applicability": "applicable",
-  "coreVersion": "2.0.0",
+  "coreVersion": "2.0.1",
   "artifacts": [
     {
       "id": "aulycmail-macos-app",
