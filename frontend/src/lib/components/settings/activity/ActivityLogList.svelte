@@ -6,6 +6,11 @@
   import ActivityLogItem from './ActivityLogItem.svelte'
   interface Props { store: ActivityLogsStore }
   let { store }: Props = $props()
+  let expandedId = $state<string | null>(null)
+
+  function toggleExpanded(id: string) {
+    expandedId = expandedId === id ? null : id
+  }
 </script>
 
 <div class="min-h-0 flex-1 overflow-y-auto border-y border-border/70 scrollbar-thin">
@@ -16,7 +21,9 @@
   {:else if store.entries.length === 0}
     <div class="py-12 text-center text-sm text-muted-foreground">{$_('activityLog.empty')}</div>
   {:else}
-    {#each store.entries as log (log.id)}<ActivityLogItem {log} />{/each}
+    {#each store.entries as log (log.id)}
+      <ActivityLogItem {log} expanded={expandedId === log.id} onToggle={() => toggleExpanded(log.id)} />
+    {/each}
     {#if store.hasMore}
       <div class="flex justify-center p-3"><Button variant="ghost" size="sm" onclick={() => store.loadMore()} disabled={store.loading}>{$_('activityLog.loadMore')}</Button></div>
     {/if}

@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Icon from '@iconify/svelte'
   import { backupProgressPercent, backupStatistics } from '$lib/backup/backupStatistics'
   import { Button } from '$lib/components/ui/button'
   import * as Dialog from '$lib/components/ui/dialog'
@@ -22,8 +21,6 @@
     onRunInBackground,
   }: Props = $props()
 
-  const radius = 54
-  const circumference = 2 * Math.PI * radius
   const progress = $derived(preparing ? null : store.progress)
   const active = $derived(preparing || store.running)
   const failed = $derived(startFailed || (!active && progress?.phase === 'error'))
@@ -38,11 +35,12 @@
     unavailable: progress?.unavailable,
     failed: progress?.failed,
   }))
-  const ringClass = $derived(failed
-    ? 'text-destructive'
+  const displayedPercent = $derived(finished ? 100 : (percent ?? 0))
+  const progressClass = $derived(failed
+    ? 'bg-destructive'
     : finished && statistics.notBackedUp > 0
-      ? 'text-amber-500'
-      : 'text-primary')
+      ? 'bg-amber-500'
+      : 'bg-primary')
 
   function close() {
     if (active) {
@@ -81,73 +79,46 @@
     </Dialog.Header>
 
     <div class="min-h-0 space-y-5 overflow-y-auto px-6 py-5 scrollbar-thin" aria-live="polite">
-      <div class="flex flex-col items-center text-center">
+      <div class="space-y-3 py-1">
+        <div class="flex items-center justify-between gap-4 text-sm">
+          <p class="min-w-0 font-medium tabular-nums text-foreground">
+            {#if active && (progress?.total ?? 0) > 0}
+              {$_('settingsBackup.checkedProgress', {
+                values: { current: progress?.current ?? 0, total: progress?.total ?? 0 },
+              })}
+            {:else if active}
+              {$_('settingsBackup.calculatingScope')}
+            {:else if finished}
+              {$_('settingsBackup.checkedTotal', { values: { count: statistics.checked } })}
+            {:else}
+              {$_('settingsBackup.backupFailed')}
+            {/if}
+          </p>
+          {#if percent !== null || finished}
+            <span class="shrink-0 font-semibold tabular-nums text-foreground">{displayedPercent}%</span>
+          {/if}
+        </div>
+
         <div
-          class="relative h-36 w-36"
+          class="relative h-2.5 overflow-hidden rounded-full bg-muted"
           role="progressbar"
           aria-label={$_('settingsBackup.progressTitle')}
           aria-valuemin="0"
           aria-valuemax="100"
-          aria-valuenow={percent ?? undefined}
+          aria-valuenow={percent ?? (finished ? 100 : undefined)}
         >
-          <svg viewBox="0 0 128 128" class={`h-full w-full ${ringClass}`} aria-hidden="true">
-            <circle cx="64" cy="64" r={radius} fill="none" stroke="currentColor" stroke-width="8" class="opacity-15" />
-            {#if active && percent === null}
-              <circle
-                cx="64"
-                cy="64"
-                r={radius}
-                fill="none"
-                stroke="currentColor"
-                stroke-width="8"
-                stroke-linecap="round"
-                stroke-dasharray={`${circumference * 0.24} ${circumference * 0.76}`}
-                class="origin-center animate-spin"
-              />
-            {:else}
-              <circle
-                cx="64"
-                cy="64"
-                r={radius}
-                fill="none"
-                stroke="currentColor"
-                stroke-width="8"
-                stroke-linecap="round"
-                stroke-dasharray={circumference}
-                stroke-dashoffset={circumference * (1 - (failed ? 1 : (percent ?? (finished ? 100 : 0))) / 100)}
-                transform="rotate(-90 64 64)"
-                class="transition-[stroke-dashoffset] duration-300"
-              />
-            {/if}
-          </svg>
-          <div class="absolute inset-0 flex flex-col items-center justify-center">
-            {#if failed}
-              <Icon icon="mdi:alert-outline" class="h-9 w-9 text-destructive" />
-            {:else if finished}
-              <Icon icon={statistics.notBackedUp > 0 ? 'mdi:alert-circle-check-outline' : 'mdi:check'} class={`h-10 w-10 ${ringClass}`} />
-            {:else if percent !== null}
-              <span class="text-2xl font-semibold tabular-nums text-foreground">{percent}%</span>
-            {:else}
-              <span class="text-sm font-medium text-muted-foreground">{$_('settingsBackup.preparing')}</span>
-            {/if}
-          </div>
+          {#if active && percent === null}
+            <div class="backup-progress-indeterminate absolute inset-y-0 w-2/5 rounded-full bg-primary"></div>
+          {:else}
+            <div
+              class={`h-full rounded-full transition-[width] duration-300 ${progressClass}`}
+              style={`width: ${displayedPercent}%`}
+            ></div>
+          {/if}
         </div>
 
-        {#if active && (progress?.total ?? 0) > 0}
-          <p class="mt-3 text-sm font-medium tabular-nums text-foreground">
-            {$_('settingsBackup.checkedProgress', {
-              values: { current: progress?.current ?? 0, total: progress?.total ?? 0 },
-            })}
-          </p>
-        {:else if active}
-          <p class="mt-3 text-sm text-muted-foreground">{$_('settingsBackup.calculatingScope')}</p>
-        {:else if finished}
-          <p class="mt-3 text-sm font-medium tabular-nums text-foreground">
-            {$_('settingsBackup.checkedTotal', { values: { count: statistics.checked } })}
-          </p>
-        {/if}
         {#if active && target}
-          <p class="mt-1 max-w-full truncate text-xs text-muted-foreground" title={target}>{target}</p>
+          <p class="max-w-full truncate text-xs text-muted-foreground" title={target}>{target}</p>
         {/if}
       </div>
 
@@ -205,3 +176,20 @@
     </footer>
   </Dialog.Content>
 </Dialog.Root>
+
+<style>
+  @keyframes backup-progress-slide {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(250%); }
+  }
+
+  .backup-progress-indeterminate {
+    animation: backup-progress-slide 1.2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .backup-progress-indeterminate {
+      animation: none;
+    }
+  }
+</style>

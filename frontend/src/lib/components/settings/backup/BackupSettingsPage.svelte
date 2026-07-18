@@ -10,8 +10,8 @@
   import RecentBackupLog from './RecentBackupLog.svelte'
   import BackupRunPanel from './BackupRunPanel.svelte'
   import { BackupRunStore } from './backupRun.svelte'
-  interface Props { draft: SettingsDraft }
-  let { draft }: Props = $props()
+  interface Props { draft: SettingsDraft; onOpenActivityLog?: () => void }
+  let { draft, onOpenActivityLog }: Props = $props()
   const store = new BackupRunStore()
   const accountIds = $derived(accountStore.accounts.filter(item => !item.account.sharedMailboxParentId).map(item => item.account.id))
   const selectedIds = $derived(draft.backupScope === 'all' ? accountIds : draft.backupSelectedAccountIds.filter(id => accountIds.includes(id)))
@@ -62,11 +62,14 @@
 </script>
 
 <div class="space-y-6">
-  <SettingsPageHeader description={$_('settingsDescriptions.backup')} />
+  <SettingsPageHeader description={$_('settingsDescriptions.backup')}>
+    {#snippet action()}
+      <BackupRunPanel {store} {canStart} saveBeforeStart={draft.backupDirty} onStart={start} />
+    {/snippet}
+  </SettingsPageHeader>
   <div>
     <BackupConfigSection {draft} running={store.running} />
-    <RecentBackupLog directory={draft.backupDirectory} />
-    <BackupRunPanel {store} {canStart} saveBeforeStart={draft.backupDirty} onStart={start} />
+    <RecentBackupLog directory={draft.backupDirectory} onOpenLogs={onOpenActivityLog} />
   </div>
   <BackupProgressDialog
     bind:open={progressDialogOpen}

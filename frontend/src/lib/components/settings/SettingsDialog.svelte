@@ -26,6 +26,7 @@
   let appInfo = $state<app.AppInfo | null>(null)
   let appInfoLoading = $state(false)
   let showRestartDialog = $state(false)
+  let activityInitialType = $state('')
   let loadSequence = 0
 
   const navigation: NavigationItem[] = $derived([
@@ -78,6 +79,11 @@
 
   function close() { open = false; onClose?.() }
   function handleOpenChange(value: boolean) { open = value; if (!value) onClose?.() }
+  function openBackupActivityLog() { activityInitialType = 'backup'; activePage = 'activity' }
+  function selectNavigationPage(page: SettingsPage) {
+    if (page === 'activity') activityInitialType = ''
+    activePage = page
+  }
 
   function keepDialogFromTakingPointerFocus(event: PointerEvent) {
     if (event.button !== 0 || !(event.target instanceof Element)) return
@@ -95,7 +101,7 @@
 
     event.preventDefault()
     event.stopPropagation()
-    activePage = navigation[nextIndex].id
+    selectNavigationPage(navigation[nextIndex].id)
     const nav = (event.currentTarget as HTMLButtonElement).closest('nav')
     nav?.querySelectorAll<HTMLButtonElement>('[data-settings-page]')[nextIndex]?.focus()
   }
@@ -119,7 +125,7 @@
                 aria-selected={activePage === item.id}
                 aria-controls={`settings-panel-${item.id}`}
                 class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition-colors focus:outline-none {activePage === item.id ? 'bg-primary/12 text-primary ring-1 ring-primary/20' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}"
-                onclick={() => activePage = item.id}
+                onclick={() => selectNavigationPage(item.id)}
                 onkeydown={(event) => handleNavigationKeydown(event, index)}
               >
                 <Icon icon={item.icon} class="h-[18px] w-[18px] shrink-0" /><span class="truncate">{item.label}</span>
@@ -146,8 +152,8 @@
           {:else if activePage === 'appearance'}<AppearanceSettingsPage {draft} />
           {:else if activePage === 'mail'}<MailSettingsPage {draft} />
           {:else if activePage === 'accounts'}<AccountsSettingsPage />
-          {:else if activePage === 'backup'}<BackupSettingsPage {draft} />
-          {:else}<ActivityLogPage />{/if}
+          {:else if activePage === 'backup'}<BackupSettingsPage {draft} onOpenActivityLog={openBackupActivityLog} />
+          {:else}<ActivityLogPage initialType={activityInitialType} />{/if}
         </div>
         <footer class="flex h-16 shrink-0 items-center justify-between border-t border-border bg-background/95 px-7">
           <span class="text-xs text-muted-foreground">{draft.dirty ? $_('settings.unsavedChanges') : ''}</span>

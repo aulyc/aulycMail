@@ -5,8 +5,10 @@
   import ActivityLogFilters from './ActivityLogFilters.svelte'
   import ActivityLogList from './ActivityLogList.svelte'
   import { ActivityLogsStore } from './activityLogs.svelte'
+  interface Props { initialType?: string }
+  let { initialType = '' }: Props = $props()
   const store = new ActivityLogsStore()
-  onMount(() => { store.start(); void store.refresh() })
+  onMount(() => { store.type = initialType; store.start(); void store.refresh() })
   onDestroy(() => store.stop())
 </script>
 
