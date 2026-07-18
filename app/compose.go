@@ -285,7 +285,6 @@ func readFileAsAttachment(filePath string) (*ComposerAttachment, error) {
 	encoded := base64.StdEncoding.EncodeToString(content)
 
 	log.Debug().
-		Str("filename", filename).
 		Str("contentType", contentType).
 		Int("size", len(content)).
 		Msg("File read as attachment")

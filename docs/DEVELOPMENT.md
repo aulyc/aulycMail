@@ -121,6 +121,21 @@ as a duplicate of the installed `/Applications/aulycMail.app`. Production
 builds, Wails development, and `make clean` also remove the obsolete visible
 `build/bin/` output left by older checkouts.
 
+## macOS file-open integration
+
+The packaged App declares `public.data` with `Viewer` role and `Alternate`
+handler rank. This makes aulycMail available from Finder's **Open With** menu
+for regular files without claiming to be their default editor. Wails routes the
+native `OnFileOpen` callback into a short backend batch so a multi-file Finder
+selection opens one new message with all selected files attached.
+
+File-open requests received during startup remain queued until the frontend has
+loaded accounts and calls `NotifyStartupComplete`. If a composer is already
+open, the frontend keeps the new request queued until that composer closes;
+this prevents an external file-open action from replacing unsaved mail. File
+contents are still read only through the existing Go attachment bridge—the
+webview never reads arbitrary filesystem paths directly.
+
 ## Database and user-data safety
 
 Migrations live in `internal/database/migrations.go` and run transactionally.

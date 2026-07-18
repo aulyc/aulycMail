@@ -25,9 +25,21 @@
         <string>true</string>
         <key>NSHumanReadableCopyright</key>
         <string>{{.Info.Copyright}}</string>
-        {{if .Info.FileAssociations}}
         <key>CFBundleDocumentTypes</key>
         <array>
+          <dict>
+            <key>CFBundleTypeName</key>
+            <string>Mail Attachment</string>
+            <key>CFBundleTypeRole</key>
+            <string>Viewer</string>
+            <key>LSHandlerRank</key>
+            <string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array>
+              <string>public.data</string>
+            </array>
+          </dict>
+          {{if .Info.FileAssociations}}
           {{range .Info.FileAssociations}}
           <dict>
             <key>CFBundleTypeExtensions</key>
@@ -42,8 +54,8 @@
             <string>{{.IconName}}</string>
           </dict>
           {{end}}
+          {{end}}
         </array>
-        {{end}}
         {{if .Info.Protocols}}
         <key>CFBundleURLTypes</key>
         <array>

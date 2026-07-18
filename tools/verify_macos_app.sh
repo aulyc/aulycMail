@@ -65,6 +65,9 @@ ACTUAL_BUILD="$(/usr/bin/plutil -extract CFBundleVersion raw -o - "$INFO")"
 ACTUAL_COMMIT="$(/usr/bin/plutil -extract AULYCCommitSHA raw -o - "$INFO")"
 ACTUAL_BUNDLE_ID="$(/usr/bin/plutil -extract CFBundleIdentifier raw -o - "$INFO")"
 ACTUAL_MIN_SYSTEM="$(/usr/bin/plutil -extract LSMinimumSystemVersion raw -o - "$INFO")"
+ACTUAL_OPEN_TYPE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:LSItemContentTypes:0' "$INFO")"
+ACTUAL_OPEN_ROLE="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:CFBundleTypeRole' "$INFO")"
+ACTUAL_HANDLER_RANK="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDocumentTypes:0:LSHandlerRank' "$INFO")"
 ACTUAL_ARCH="$(lipo -archs "$EXECUTABLE")"
 FILE_DESCRIPTION="$(file "$EXECUTABLE")"
 RUNTIME_VERSION="$("$EXECUTABLE" --version)"
@@ -91,6 +94,11 @@ if [[ "$RUNTIME_VERSION" != "$EXPECTED_VERSION (build $EXPECTED_BUILD)" ]]; then
 fi
 if [[ "$ACTUAL_ARCH" != "$EXPECTED_ARCH" || "$ACTUAL_ARCH" != "arm64" || "$FILE_DESCRIPTION" != *"arm64"* ]]; then
   echo "App architecture does not match the arm64 release manifest." >&2
+  exit 1
+fi
+if [[ "$ACTUAL_OPEN_TYPE" != "public.data" || "$ACTUAL_OPEN_ROLE" != "Viewer" || \
+      "$ACTUAL_HANDLER_RANK" != "Alternate" ]]; then
+  echo "App does not declare the expected alternate file-open association." >&2
   exit 1
 fi
 

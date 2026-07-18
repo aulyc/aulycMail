@@ -216,6 +216,10 @@ type App struct {
 	// Pending mailto: URL data (from command line)
 	PendingMailto *MailtoData
 
+	// Native macOS file-open requests. Finder may deliver these before the
+	// frontend has mounted, so the batcher owns readiness and short batching.
+	externalFileOpen *externalFileOpenBatcher
+
 	// Full-text search indexer
 	ftsIndexer *message.FTSIndexer
 
@@ -257,9 +261,14 @@ type App struct {
 
 // NewApp creates a new App application struct
 func NewApp(debugModeFn func() bool) *App {
-	return &App{
+	application := &App{
 		debugMode: debugModeFn,
 	}
+	application.externalFileOpen = newExternalFileOpenBatcher(
+		externalFileOpenDebounce,
+		application.emitExternalOpenFiles,
+	)
+	return application
 }
 
 // StartupDialogInfo holds the user-facing dialog content for a startup
@@ -649,6 +658,9 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 // → real window handoff cleanly (avoiding the taskbar-icon flash from #154).
 func (a *App) NotifyStartupComplete() {
 	platform.NotifyStartupComplete()
+	if a.externalFileOpen != nil {
+		a.externalFileOpen.SetReady()
+	}
 }
 
 // ShowWindow brings the window to the foreground from hidden/minimized state.
@@ -690,6 +702,9 @@ func (a *App) GetStartHiddenActive() bool {
 // Shutdown is called when the app is closing
 func (a *App) Shutdown(ctx context.Context) {
 	log := logging.WithComponent("app")
+	if a.externalFileOpen != nil {
+		a.externalFileOpen.Stop()
+	}
 
 	// Stop email sync scheduler
 	if a.syncScheduler != nil {

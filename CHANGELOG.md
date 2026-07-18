@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Added Finder **Open With** integration that creates a new message and
+  attaches the selected regular files without replacing an existing draft.
 - Moved the selected-account checkmark to the left edge of each Backup Viewer
   mailbox option while preserving aligned labels and message counts.
 - Stabilized Backup Viewer message rows with a single-line timestamp and one

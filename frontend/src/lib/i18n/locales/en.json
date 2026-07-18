@@ -240,6 +240,8 @@
     "undoFailed": "Undo failed.",
     "failedToPrepare": "Failed to prepare {mode}. Opening blank composer.",
     "noAccountConfigured": "No email account configured. Please add an account first.",
+    "externalFilesQueued": "Queued {count} file(s). A new message will open after you close the current composer.",
+    "externalFilesFailed": "Could not attach {count} opened file(s).",
     "movedTo": "Moved to {folder}",
     "copyingTo": "Copying to {folder}...",
     "attachmentSaved": "Saved \"{filename}\"",

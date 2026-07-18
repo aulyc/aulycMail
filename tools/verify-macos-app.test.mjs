@@ -34,6 +34,12 @@ func main() { fmt.Println("1.2.3 (build 4)") }
 <key>AULYCSemanticVersion</key><string>1.2.3</string>
 <key>AULYCCommitSHA</key><string>0123456789abcdef</string>
 <key>LSMinimumSystemVersion</key><string>11.0</string>
+<key>CFBundleDocumentTypes</key><array><dict>
+<key>CFBundleTypeName</key><string>Mail Attachment</string>
+<key>CFBundleTypeRole</key><string>Viewer</string>
+<key>LSHandlerRank</key><string>Alternate</string>
+<key>LSItemContentTypes</key><array><string>public.data</string></array>
+</dict></array>
 </dict></plist>
 `)
   fs.writeFileSync(manifest, `${JSON.stringify({

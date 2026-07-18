@@ -26,6 +26,7 @@
   import { DEFAULT_LIST_WIDTH, DEFAULT_SIDEBAR_WIDTH, loadUIState, saveUIState, getActivePane, setActivePane } from '$lib/stores/uiState.svelte'
   import { shouldClearRestoredFolderSelection } from '$lib/stores/restoredFolderSelection'
   import { backupStatistics } from '$lib/backup/backupStatistics'
+  import { normalizeExternalOpenFiles, toExternalSmtpAttachment } from '$lib/externalFileCompose'
   import {
     type FocusablePane,
     getFocusedPane,
@@ -36,7 +37,7 @@
   import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive } from '$lib/stores/layout.svelte'
   import { archiveMessages, setReadStateMessages, toggleSpamMessages, toggleStarMessages, undoLastMailAction } from '$lib/mailActions'
   // @ts-ignore - wailsjs path
-  import { PrepareReply, GetPendingMailto, GetDraft, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, QuitApp, GetSystemTheme, NotifyStartupComplete } from '../wailsjs/go/app/App.js'
+  import { PrepareReply, GetPendingMailto, GetDraft, GetTermsAccepted, SetTermsAccepted, RefreshWindowConstraints, AcceptCertificate, GetStartHiddenActive, QuitApp, GetSystemTheme, NotifyStartupComplete, ReadFileAsAttachment } from '../wailsjs/go/app/App.js'
   // @ts-ignore - wailsjs path
   import { smtp, folder, certificate } from '../wailsjs/go/models'
   // @ts-ignore - wailsjs runtime
@@ -78,6 +79,8 @@
   let composerInitialMessage = $state<smtp.ComposeMessage | null>(null)
   let composerDraftId = $state<string | null>(null)
   let composerImagesLoaded = $state(false)
+  let externalFileComposeBusy = false
+  let pendingExternalFileBatches: string[][] = []
 
   // Mirror composer visibility into the keyboard store so the viewer can
   // suppress its Delete/Backspace shortcut during the composer's mount→focus race.
@@ -337,6 +340,12 @@
     // Listen for external mailto from second instance (routed through backend)
     EventsOn('mailto:external', (data: MailtoData) => {
       handleMailtoData(data)
+    })
+
+    // Finder's Open With action routes regular files here. The backend waits
+    // for NotifyStartupComplete before emitting, so accounts are loaded first.
+    EventsOn('files:openAsAttachments', (payload: unknown) => {
+      enqueueExternalFiles(payload)
     })
 
     // Listen for escape-iframe-focus event (from EmailBody when navigating away from iframe)
@@ -614,6 +623,99 @@
     showComposer = true
   }
 
+  function enqueueExternalFiles(payload: unknown) {
+    const paths = normalizeExternalOpenFiles(payload)
+    if (paths.length === 0) return
+
+    if (showComposer || externalFileComposeBusy) {
+      pendingExternalFileBatches.push(paths)
+      addToast({
+        type: 'info',
+        message: $_('toast.externalFilesQueued', { values: { count: paths.length } }),
+      })
+      return
+    }
+
+    void openExternalFilesAsNewMessage(paths)
+  }
+
+  function processNextExternalFileBatch() {
+    if (showComposer || externalFileComposeBusy || pendingExternalFileBatches.length === 0) return
+    const paths = pendingExternalFileBatches.shift()
+    if (paths) void openExternalFilesAsNewMessage(paths)
+  }
+
+  async function openExternalFilesAsNewMessage(paths: string[]) {
+    const accountId = resolveAccountId(selectedAccountId)
+    if (!accountId) {
+      addToast({
+        type: 'error',
+        message: $_('toast.noAccountConfigured'),
+      })
+      processNextExternalFileBatch()
+      return
+    }
+
+    externalFileComposeBusy = true
+    const attachments: smtp.Attachment[] = []
+    let failedCount = 0
+
+    for (const filePath of paths) {
+      try {
+        const attachment = await ReadFileAsAttachment(filePath)
+        if (!attachment) {
+          failedCount += 1
+          continue
+        }
+        attachments.push(new smtp.Attachment(toExternalSmtpAttachment(attachment)))
+      } catch {
+        // Do not put user file paths into webview logs. The toast below reports
+        // only the failure count while successful files still open normally.
+        failedCount += 1
+      }
+    }
+
+    // The user can still open a composer while attachment reads are in
+    // flight. Preserve that message and retry the native request after it
+    // closes instead of replacing unsaved content.
+    if (showComposer) {
+      pendingExternalFileBatches.unshift(paths)
+      externalFileComposeBusy = false
+      addToast({
+        type: 'info',
+        message: $_('toast.externalFilesQueued', { values: { count: paths.length } }),
+      })
+      return
+    }
+
+    if (failedCount > 0) {
+      addToast({
+        type: 'error',
+        message: $_('toast.externalFilesFailed', { values: { count: failedCount } }),
+      })
+    }
+
+    if (attachments.length > 0) {
+      composerAccountId = accountId
+      composerDraftId = null
+      composerInitialMessage = new smtp.ComposeMessage({
+        from: new smtp.Address({ name: '', address: '' }),
+        to: [],
+        cc: [],
+        bcc: [],
+        subject: '',
+        text_body: '',
+        html_body: '',
+        attachments,
+        request_read_receipt: false,
+      })
+      showComposer = true
+    }
+
+    externalFileComposeBusy = false
+    if (!showComposer) processNextExternalFileBatch()
+  }
+
   // Handle edit draft (opens composer with existing draft)
   async function handleEditDraft(draftId: string) {
     // Use conversation's account ID, fall back to selected account or first account
@@ -739,9 +841,13 @@
 
   // Close composer
   function closeComposer() {
+    const wasOpen = showComposer
     showComposer = false
     composerAccountId = null
     composerInitialMessage = null
+    if (wasOpen) {
+      void tick().then(processNextExternalFileBatch)
+    }
   }
 
   // Pane sizing — fixed widths (no dragging). Restored from saved state on

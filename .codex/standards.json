@@ -105,7 +105,7 @@
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "sha256": "d543dfa10f621887df134ae9c99be3daa145aa6764701116bd829f2bf1547c01"
+      "sha256": "ca50cc17a47cc72ba3b969e1305149babb86e68a3fd66e5320a6fcc1aa5e8a36"
     },
     {
       "path": "docs/VERSIONING.md",
@@ -145,7 +145,7 @@
     },
     {
       "path": "tools/package_macos_app.sh",
-      "sha256": "ae6d074e7ce09b8da2dd5bba2868d2d7c8d1235f2903aba0bd237d8db9566d6d"
+      "sha256": "7af16c303c1f6df26e3cd98dd58e7e98fdbafae14ae6ae2b9432f41206c25a6e"
     },
     {
       "path": "tools/package_macos_dmg.sh",
@@ -153,11 +153,11 @@
     },
     {
       "path": "tools/verify_release_candidate.sh",
-      "sha256": "0f5265777c256b15f14208e9846e79a3fe035a99e359c3d5bac94dc669b9abaf"
+      "sha256": "63aec5d9c87601eabd82c9456f45f9360d9e1056ed20eef31e9e37d21fc864ca"
     },
     {
       "path": "tools/build-output-layout.test.mjs",
-      "sha256": "f119f40cffcb3b50d9bda9f2535b0c31e3b2b046e7841f41719c946cae6db0a4"
+      "sha256": "8d836f65c40a5ee01088bd76fe1811dd7a2be591daeafc00ee42fca4ba8bbf48"
     },
     {
       "path": "tools/install_macos_dmg.sh",

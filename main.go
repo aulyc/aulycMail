@@ -124,7 +124,11 @@ func runMainMode(mailtoData *app.MailtoData, rawMailtoArg string) {
 		// Provide a Mac options block so the green traffic-light zoom/maximize
 		// button stays enabled — Wails leaves it disabled when Mac is nil
 		// (DisableZoom defaults to false here, so zoom is on).
-		Mac: &mac.Options{},
+		Mac: &mac.Options{
+			OnFileOpen: func(filePath string) {
+				app.HandleFileOpen(application, filePath)
+			},
+		},
 	})
 
 	if err != nil {

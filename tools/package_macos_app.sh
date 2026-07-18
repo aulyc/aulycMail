@@ -85,6 +85,21 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <string>true</string>
   <key>NSHumanReadableCopyright</key>
   <string>Copyright &#xA9; 2026 aulyc</string>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key>
+      <string>Mail Attachment</string>
+      <key>CFBundleTypeRole</key>
+      <string>Viewer</string>
+      <key>LSHandlerRank</key>
+      <string>Alternate</string>
+      <key>LSItemContentTypes</key>
+      <array>
+        <string>public.data</string>
+      </array>
+    </dict>
+  </array>
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
