@@ -165,41 +165,50 @@ func TestStoreClearUsesCurrentFilters(t *testing.T) {
 	}
 }
 
-func TestStorePruneAppliesAgeAndCountLimits(t *testing.T) {
+func TestStorePruneAppliesAgeAndPerTypeDayCountLimits(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db)
 	now := time.Date(2026, 7, 11, 12, 0, 0, 0, time.UTC)
 	store.now = func() time.Time { return now }
 
-	insert := func(id string, createdAt time.Time) {
+	insert := func(id, logType string, createdAt time.Time) {
 		t.Helper()
 		_, err := db.Exec(`
 			INSERT INTO activity_logs
 				(id, created_at, type, status, title, summary, payload_json)
 			VALUES (?, ?, ?, ?, 'Title', 'Summary', '{}')
-		`, id, createdAt.UTC().Format(time.RFC3339Nano), TypeSync, StatusSuccess)
+		`, id, createdAt.UTC().Format(time.RFC3339Nano), logType, StatusSuccess)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	insert("expired", now.Add(-RetentionPeriod-time.Second))
-	for i := 0; i < MaxEntries+5; i++ {
-		insert(fmt.Sprintf("recent-%04d", i), now.Add(-time.Duration(i)*time.Second))
+	insert("expired", TypeSync, now.Add(-RetentionPeriod-time.Second))
+	for i := 0; i < MaxEntriesPerTypePerDay+5; i++ {
+		insert(fmt.Sprintf("recent-%04d", i), TypeSync, now.Add(-time.Duration(i)*time.Second))
 	}
+	insert("previous-day-sync", TypeSync, now.Add(-24*time.Hour))
+	insert("same-day-backup", TypeBackup, now.Add(-time.Minute))
 	if err := store.Prune(); err != nil {
 		t.Fatal(err)
 	}
 
-	var total, expired int
+	var total, expired, previousDay, backup int
 	if err := db.QueryRow("SELECT COUNT(*) FROM activity_logs").Scan(&total); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.QueryRow("SELECT COUNT(*) FROM activity_logs WHERE id = 'expired'").Scan(&expired); err != nil {
 		t.Fatal(err)
 	}
-	if total != MaxEntries || expired != 0 {
-		t.Fatalf("after prune: total=%d expired=%d, want total=%d expired=0", total, expired, MaxEntries)
+	if err := db.QueryRow("SELECT COUNT(*) FROM activity_logs WHERE id = 'previous-day-sync'").Scan(&previousDay); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow("SELECT COUNT(*) FROM activity_logs WHERE id = 'same-day-backup'").Scan(&backup); err != nil {
+		t.Fatal(err)
+	}
+	wantTotal := MaxEntriesPerTypePerDay + 2
+	if total != wantTotal || expired != 0 || previousDay != 1 || backup != 1 {
+		t.Fatalf("after prune: total=%d expired=%d previousDay=%d backup=%d, want total=%d expired=0 previousDay=1 backup=1", total, expired, previousDay, backup, wantTotal)
 	}
 }
 

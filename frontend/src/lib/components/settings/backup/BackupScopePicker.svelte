@@ -29,7 +29,7 @@
   }
 </script>
 
-<div class="relative w-[32rem] max-w-full" bind:this={element}>
+<div class="relative w-96 max-w-full" bind:this={element}>
   <button type="button" class="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm hover:bg-muted/40 disabled:opacity-50" disabled={disabled || accounts.length === 0} onclick={() => open = !open}>
     <span class="truncate">{accounts.length === 0 ? $_('settingsBackup.noAccounts') : label}</span><Icon icon="mdi:chevron-down" class="h-4 w-4 text-muted-foreground" />
   </button>

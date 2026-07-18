@@ -22,7 +22,7 @@
 
 <SettingsSection framed={false}>
   <SettingsRow label={$_('settingsBackup.directory')}>
-    <div class="w-[32rem] max-w-full"><BackupDirectoryPicker directory={draft.backupDirectory} placeholder={$_('settingsBackup.directoryPlaceholder')} disabled={running} openDisabled={draft.backupDirty} onChoose={setDirectory} onSelectHistory={setDirectory} onOpenDirectory={openDirectory} onChooseError={() => addToast({ type: 'error', message: $_('settingsBackup.chooseDirectoryFailed') })} /></div>
+    <div class="w-96 max-w-full"><BackupDirectoryPicker directory={draft.backupDirectory} placeholder={$_('settingsBackup.directoryPlaceholder')} disabled={running} openDisabled={draft.backupDirty} onChoose={setDirectory} onSelectHistory={setDirectory} onOpenDirectory={openDirectory} onChooseError={() => addToast({ type: 'error', message: $_('settingsBackup.chooseDirectoryFailed') })} /></div>
   </SettingsRow>
   <SettingsRow label={$_('settingsBackup.scope')}>
     <BackupScopePicker bind:scope={draft.backupScope} bind:selectedAccountIds={draft.backupSelectedAccountIds} disabled={running} />

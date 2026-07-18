@@ -165,8 +165,9 @@ func (s *Store) Clear(query Query) (int64, error) {
 	return count, nil
 }
 
-// Prune removes entries older than 30 days and then caps the remaining set at
-// the newest 1000 records.
+// Prune removes entries older than 30 days and caps each activity type on each
+// UTC calendar day. A busy day of folder synchronization must not evict the
+// previous days that the date filter still offers to users.
 func (s *Store) Prune() error {
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -194,11 +195,18 @@ func pruneWithExecutor(exec sqlExecutor, now time.Time) error {
 	if _, err := exec.Exec(`
 		DELETE FROM activity_logs
 		WHERE id IN (
-			SELECT id FROM activity_logs
-			ORDER BY created_at DESC, id DESC
-			LIMIT -1 OFFSET ?
+			SELECT id FROM (
+				SELECT
+					id,
+					ROW_NUMBER() OVER (
+						PARTITION BY substr(created_at, 1, 10), type
+						ORDER BY created_at DESC, id DESC
+					) AS position
+				FROM activity_logs
+			)
+			WHERE position > ?
 		)
-	`, MaxEntries); err != nil {
+	`, MaxEntriesPerTypePerDay); err != nil {
 		return fmt.Errorf("cap activity logs: %w", err)
 	}
 	return nil

@@ -57,14 +57,14 @@
 <section class="border-b border-border/75">
   <div class="flex min-h-14 items-center gap-4 py-1.5 text-sm">
     <h3 class="shrink-0 font-semibold text-foreground">{$_('settingsBackup.recentLog')}</h3>
-    <div class="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3">
+    <div class="ml-auto flex min-w-0 flex-1 items-center justify-end gap-3 text-xs">
       {#if loading}<Icon icon="mdi:loading" class="h-5 w-5 animate-spin text-muted-foreground" />
       {:else if log}
         <Icon icon={statusIcon} class={`h-4 w-4 shrink-0 ${statusClass}`} />
         <span class="min-w-0 truncate text-foreground" title={summary}>{summary}</span>
-        <time class="shrink-0 text-xs tabular-nums text-muted-foreground">{activityTime(log.createdAt)}</time>
+        <time class="shrink-0 tabular-nums text-muted-foreground">{activityTime(log.createdAt)}</time>
         {#if onOpenLogs}
-          <button type="button" class="flex shrink-0 items-center gap-0.5 text-xs font-medium text-primary hover:underline" onclick={onOpenLogs}>
+          <button type="button" class="flex shrink-0 items-center gap-0.5 font-medium text-primary hover:underline" onclick={onOpenLogs}>
             {$_('settingsBackup.viewLogs')}<Icon icon="mdi:chevron-right" class="h-4 w-4" />
           </button>
         {/if}

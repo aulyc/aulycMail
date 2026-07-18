@@ -45,8 +45,8 @@ type Page struct {
 }
 
 const (
-	DefaultPageSize = 50
-	MaxPageSize     = 200
-	MaxEntries      = 1000
-	RetentionPeriod = 30 * 24 * time.Hour
+	DefaultPageSize         = 50
+	MaxPageSize             = 200
+	MaxEntriesPerTypePerDay = 1000
+	RetentionPeriod         = 30 * 24 * time.Hour
 )

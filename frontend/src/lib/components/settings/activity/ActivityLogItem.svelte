@@ -53,16 +53,20 @@
 
         <div class="mt-2 grid grid-cols-2 gap-2">
           <section class="rounded-md bg-background px-3 py-2.5">
-            <h4 class="text-xs font-medium text-foreground">{$_('settingsBackup.backedUp')}</h4>
-            <p class="mt-0.5 text-[11px] text-muted-foreground">{$_('settingsBackup.backedUpComposition')}</p>
+            <div class="flex items-baseline gap-2">
+              <h4 class="shrink-0 text-xs font-medium text-foreground">{$_('settingsBackup.backedUp')}</h4>
+              <p class="min-w-0 truncate text-[11px] text-muted-foreground">{$_('settingsBackup.backedUpComposition')}</p>
+            </div>
             <dl class="mt-2 grid grid-cols-2 gap-2 text-xs">
               <div><dt class="text-muted-foreground">{$_('settingsBackup.newlyBackedUp')}</dt><dd class="mt-1 font-semibold tabular-nums text-foreground">{backup.statistics.newlyBackedUp}</dd></div>
               <div><dt class="text-muted-foreground">{$_('settingsBackup.previouslyBackedUp')}</dt><dd class="mt-1 font-semibold tabular-nums text-foreground">{backup.statistics.previouslyBackedUp}</dd></div>
             </dl>
           </section>
           <section class="rounded-md bg-background px-3 py-2.5">
-            <h4 class="text-xs font-medium text-foreground">{$_('settingsBackup.notBackedUp')}</h4>
-            <p class="mt-0.5 text-[11px] text-muted-foreground">{$_('settingsBackup.notBackedUpComposition')}</p>
+            <div class="flex items-baseline gap-2">
+              <h4 class="shrink-0 text-xs font-medium text-foreground">{$_('settingsBackup.notBackedUp')}</h4>
+              <p class="min-w-0 truncate text-[11px] text-muted-foreground">{$_('settingsBackup.notBackedUpComposition')}</p>
+            </div>
             <dl class="mt-2 grid grid-cols-3 gap-2 text-xs">
               <div><dt class="leading-4 text-muted-foreground">{$_('settingsBackup.serverNotReturned')}</dt><dd class="mt-1 font-semibold tabular-nums text-foreground">{backup.statistics.serverNotReturned}</dd></div>
               <div><dt class="leading-4 text-muted-foreground">{$_('settingsBackup.noReadableSource')}</dt><dd class="mt-1 font-semibold tabular-nums text-foreground">{backup.statistics.noReadableSource}</dd></div>

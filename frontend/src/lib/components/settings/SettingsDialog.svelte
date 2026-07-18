@@ -38,6 +38,10 @@
     { id: 'activity', icon: 'lucide:history', label: $_('activityLog.title') },
     { id: 'about', icon: 'lucide:info', label: $_('settings.about') },
   ])
+  const usesSettingsDraft = $derived(
+    activePage === 'general' || activePage === 'appearance' || activePage === 'mail' || activePage === 'backup',
+  )
+  const showDraftActions = $derived(usesSettingsDraft || draft.dirty)
 
   $effect(() => {
     if (!open) return
@@ -156,11 +160,16 @@
           {:else}<ActivityLogPage initialType={activityInitialType} />{/if}
         </div>
         <footer class="flex h-16 shrink-0 items-center justify-between border-t border-border bg-background/95 px-7">
-          <span class="text-xs text-muted-foreground">{draft.dirty ? $_('settings.unsavedChanges') : ''}</span>
-          <div class="flex items-center gap-2">
-            <Button variant="ghost" onclick={close} disabled={draft.saving}>{$_('common.cancel')}</Button>
-            <Button onclick={save} disabled={draft.saving || draft.loading || !draft.dirty}>{#if draft.saving}<Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />{/if}{$_('common.save')}</Button>
-          </div>
+          {#if showDraftActions}
+            <span class="text-xs text-muted-foreground">{draft.dirty ? $_('settings.unsavedChanges') : ''}</span>
+            <div class="flex items-center gap-2">
+              <Button variant="ghost" onclick={close} disabled={draft.saving}>{$_('common.cancel')}</Button>
+              <Button onclick={save} disabled={draft.saving || draft.loading || !draft.dirty}>{#if draft.saving}<Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />{/if}{$_('common.save')}</Button>
+            </div>
+          {:else}
+            <span></span>
+            <Button onclick={close}>{$_('common.close')}</Button>
+          {/if}
         </footer>
       </div>
     </div>
