@@ -78,15 +78,18 @@ Support or Keychain storage.
 make fmt-check       Non-mutating gofmt verification
 make check-go        fmt-check + Go tests + golangci-lint (or explicit go vet fallback)
 make check-frontend  unit tests + svelte-check + i18n + ESLint + knip
+make security-audit  npm audit for all production and development dependencies
 make check           version checks/tests + check-go + check-frontend
-make ci              make check + complete production build
+make ci              clean npm ci + security audit + make check + production build
 make release-golangci-lint  exact v2.12.2 + config verification + release lint
 make release-backup-preflight  verify private backup remote and formal branch
 ```
 
 Use the smallest relevant gate while iterating, then `make ci` before handing
 off build-affecting changes. `make ci` is platform-neutral as a command entry,
-but its production build requires the supported macOS Apple Silicon host.
+but its production build requires the supported macOS Apple Silicon host. It
+recreates `frontend/node_modules` from `package-lock.json` and runs
+`npm run security:audit` immediately after that clean install.
 
 No CI provider is configured in this repository. The `backup` Git remote is a
 private offsite source/tag backup, not a CI provider. After a CI platform is

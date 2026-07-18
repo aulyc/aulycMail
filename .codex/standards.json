@@ -105,7 +105,7 @@
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "sha256": "140f678b518bac2f89ced40360b397a14fed92f572c2144ec4dd8a8a5ae1b70b"
+      "sha256": "d543dfa10f621887df134ae9c99be3daa145aa6764701116bd829f2bf1547c01"
     },
     {
       "path": "docs/VERSIONING.md",
@@ -117,7 +117,7 @@
     },
     {
       "path": "Makefile",
-      "sha256": "3b01071981a21f5f76cb6a3adb1998bc0d1820d60faf720e1d2625ae4b0a9417"
+      "sha256": "645863175b9948423831ccd77c4882846690319fc038a127244ae1ed6c75e8e0"
     },
     {
       "path": ".golangci.yml",

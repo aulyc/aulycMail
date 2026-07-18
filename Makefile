@@ -6,7 +6,7 @@
 #   make help     - Show all available targets
 
 .PHONY: all build build-app dev dev-race generate clean test lint lint-go lint-frontend \
-        fmt fmt-check check-go check-frontend check ci release-candidate isolated-release-artifact \
+        fmt fmt-check check-go check-frontend security-audit check ci release-candidate isolated-release-artifact \
         frontend-deps frontend-update normalize-wails-bindings remove-obsolete-build-output prepare-wails-build-assets install uninstall \
         dmg release-dmg test-release-dmg install-dmg install-release-dmg install-test-release-dmg install-darwin \
         quit-running-darwin launch-darwin uninstall-darwin version-check version-test \
@@ -297,11 +297,20 @@ check-frontend:
 	@cd frontend && npm run lint
 	@cd frontend && npm run knip
 
+# Audit the complete npm dependency graph, including development dependencies.
+security-audit:
+	@cd frontend && npm run security:audit
+
 # Platform-neutral development gate used before review and by CI.
 check: version-check version-test check-go check-frontend
 
-# Complete non-release CI entrypoint: all checks followed by a production build.
-ci: check
+# Complete non-release CI entrypoint: reproducible frontend install and audit,
+# followed by all checks and a production build.
+ci:
+	@cd frontend && npm ci
+	@$(MAKE) security-audit
+	@node tools/ensure-frontend-dist.mjs
+	@$(MAKE) check
 	@$(MAKE) build-app
 
 # Automatic release preparation requires all functional changes to be committed.
@@ -561,8 +570,9 @@ help:
 	@echo "  make fmt-check     - Verify Go formatting without modifying files"
 	@echo "  make check-go      - Run Go formatting, tests, and lint/vet"
 	@echo "  make check-frontend - Run frontend unit/type/i18n/lint/knip checks"
+	@echo "  make security-audit - Audit all npm dependencies at low severity and above"
 	@echo "  make check         - Run version, Go, frontend, and release-tool tests"
-	@echo "  make ci            - Run make check, then a full production build"
+	@echo "  make ci            - Clean-install/audit npm dependencies, run checks, then build"
 	@echo "  make test          - Run Go tests"
 	@echo "  make lint          - Run all linters (Go + frontend)"
 	@echo "  make lint-go       - Run golangci-lint, or explicitly fall back to go vet"

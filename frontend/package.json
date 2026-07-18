@@ -9,6 +9,7 @@
     "build": "node scripts/gen-icons.cjs && vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "security:audit": "npm audit --audit-level=low",
     "test:unit": "node --test scripts/*.test.mjs",
     "i18n:check": "node scripts/check-i18n-keys.cjs",
     "lint": "eslint .",
