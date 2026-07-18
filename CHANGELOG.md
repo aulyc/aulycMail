@@ -4,6 +4,12 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Replaced the duplicate inline backup result panel and horizontal progress bar
+  with a circular progress dialog that can continue in the background and be
+  reopened while the backup runs.
+- Standardized About-page information and close actions so they activate on a
+  completed click instead of immediately on pointer down.
+
 ## [0.3.100] — 2026-07-18
 
 - Prevented the formal GitHub gate from treating the version-derived
