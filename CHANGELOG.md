@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-07-18
+
 - Refined the backup settings layout with a header action, compact latest-backup
   summary, horizontal progress feedback, and expandable activity details that
   keep only one row open at a time.
