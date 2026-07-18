@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-07-18
+
 - Refined backup and activity-log settings with compact aligned selectors,
   inline backup composition notes, consistent status typography, and a single
   close action on pages without editable settings, plus aligned About-page
