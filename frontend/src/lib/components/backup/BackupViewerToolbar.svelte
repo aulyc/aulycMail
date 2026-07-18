@@ -102,7 +102,7 @@
       </Select.Trigger>
       <Select.Content class="z-[130] w-[300px]">
         {#each accountScopes as scope (scope.id || 'all')}
-          <Select.Item value={scope.id} label={scope.label} class="pr-3">
+          <Select.Item value={scope.id} label={scope.label} indicatorPosition="start" class="pr-3">
             <span class="grid min-w-0 flex-1 grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
               <span class="truncate">{scope.label}</span>
               {#if typeof scope.count === 'number'}

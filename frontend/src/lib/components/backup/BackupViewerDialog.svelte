@@ -632,20 +632,12 @@
                   <button
                     type="button"
                     data-backup-message-key={message.key}
-                    class="relative flex w-full items-start gap-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
+                    class="relative grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
                     onclick={() => selectMessage(message.key)}
                   >
                     <Icon icon="mdi:email-outline" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
                     <span class="min-w-0 flex-1">
-                      <span class="flex items-center gap-2">
-                        <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{message.subject || $_('backupViewer.unknownSubject')}</span>
-                        {#if hasAttachments}
-                          <span class="shrink-0 text-primary" title={$_('backupViewer.attachments')}>
-                            <Icon icon="mdi:paperclip" class="h-4 w-4" />
-                          </span>
-                        {/if}
-                        <span class="w-[96px] shrink-0 text-right text-xs tabular-nums text-muted-foreground">{formatShortDate(message.date)}</span>
-                      </span>
+                      <span class="block truncate text-sm font-semibold text-foreground">{message.subject || $_('backupViewer.unknownSubject')}</span>
                       <span class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                         <span class="truncate">{message.accountEmail}</span>
                         {#if message.folderPath}
@@ -654,6 +646,7 @@
                         {/if}
                       </span>
                     </span>
+                    <time datetime={message.date} class="shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">{formatShortDate(message.date)}</time>
                     <span class="pointer-events-none absolute bottom-0 right-0 top-0 w-[5px] {hasAttachments ? 'bg-amber-500' : 'bg-transparent'}" aria-hidden="true"></span>
                   </button>
                 {/each}

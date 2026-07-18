@@ -8,6 +8,7 @@
     value: string;
     label?: string;
     disabled?: boolean;
+    indicatorPosition?: 'start' | 'end';
     class?: string;
     children?: Snippet;
   }
@@ -16,6 +17,7 @@
     value,
     label,
     disabled = false,
+    indicatorPosition = 'end',
     class: className,
     children: itemContent,
   }: Props = $props()
@@ -35,6 +37,13 @@
   )}
 >
   {#snippet children({ selected })}
+    {#if indicatorPosition === 'start'}
+      <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+        {#if selected}
+          <Icon icon="mdi:check" class="h-4 w-4" />
+        {/if}
+      </span>
+    {/if}
     <span class="min-w-0 flex-1">
       {#if itemContent}
         {@render itemContent()}
@@ -42,10 +51,12 @@
         <span class="block truncate">{label || value}</span>
       {/if}
     </span>
-    <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
-      {#if selected}
-        <Icon icon="mdi:check" class="h-4 w-4" />
-      {/if}
-    </span>
+    {#if indicatorPosition === 'end'}
+      <span class="flex h-3.5 w-3.5 shrink-0 items-center justify-center">
+        {#if selected}
+          <Icon icon="mdi:check" class="h-4 w-4" />
+        {/if}
+      </span>
+    {/if}
   {/snippet}
 </SelectPrimitive.Item>

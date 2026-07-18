@@ -4,6 +4,11 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Moved the selected-account checkmark to the left edge of each Backup Viewer
+  mailbox option while preserving aligned labels and message counts.
+- Stabilized Backup Viewer message rows with a single-line timestamp and one
+  right-edge attachment marker instead of a redundant paperclip icon.
+
 ## [0.4.1] — 2026-07-18
 
 - Refined backup and activity-log settings with compact aligned selectors,
