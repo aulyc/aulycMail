@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.5.3] — 2026-07-19
+
 - Moved the Backup Viewer attachment marker to the left edge of message rows.
 - Aligned the Backup Viewer account controls with the left edge of the message
   detail cards.
