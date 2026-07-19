@@ -4,6 +4,10 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Moved the Backup Viewer attachment marker to the left edge of message rows.
+- Aligned the Backup Viewer account controls with the left edge of the message
+  detail cards.
+
 ## [0.5.2] — 2026-07-18
 
 - Stabilized the Backup Progress dialog height by reserving its current-target

@@ -647,7 +647,7 @@
                       </span>
                     </span>
                     <time datetime={message.date} class="shrink-0 whitespace-nowrap text-right text-xs tabular-nums text-muted-foreground">{formatShortDate(message.date)}</time>
-                    <span class="pointer-events-none absolute bottom-0 right-0 top-0 w-[5px] {hasAttachments ? 'bg-amber-500' : 'bg-transparent'}" aria-hidden="true"></span>
+                    <span class="pointer-events-none absolute bottom-0 left-0 top-0 w-[5px] {hasAttachments ? 'bg-amber-500' : 'bg-transparent'}" aria-hidden="true"></span>
                   </button>
                 {/each}
               </div>

@@ -67,10 +67,10 @@
   }: Props = $props()
 </script>
 
-<header class="relative z-20 flex shrink-0 items-center gap-3 overflow-visible border-b border-border px-4 py-2">
-  <h2 class="shrink-0 text-lg font-semibold">{$_('backupViewer.title')}</h2>
+<header class="relative z-20 grid shrink-0 grid-cols-[42%_minmax(0,1fr)] items-center overflow-visible border-b border-border py-2">
+  <div class="flex min-w-0 items-center gap-3 px-4">
+    <h2 class="shrink-0 text-lg font-semibold">{$_('backupViewer.title')}</h2>
 
-  <div class="flex min-w-0 flex-1 items-center gap-2 overflow-visible">
     <div class="w-[340px] min-w-[240px] shrink">
       <BackupDirectoryPicker
         bind:menuOpen={directoryMenuOpen}
@@ -83,7 +83,9 @@
         onOpenDirectory={onOpenDirectory}
       />
     </div>
+  </div>
 
+  <div data-backup-viewer-detail-toolbar class="flex min-w-0 items-center gap-2 overflow-visible pl-6 pr-12">
     <Select.Root
       value={selectedAccountEmail}
       onValueChange={(value) => void onSelectScope(value)}
@@ -196,7 +198,7 @@
 
   <button
     type="button"
-    class="shrink-0 rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+    class="absolute right-4 top-1/2 shrink-0 -translate-y-1/2 rounded p-1 text-muted-foreground transition hover:bg-muted hover:text-foreground"
     aria-label={$_('common.close')}
     onclick={onClose}
   >
