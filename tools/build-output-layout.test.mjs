@@ -30,3 +30,9 @@ test('macOS bundles advertise regular files as an alternate attachment handler',
   assert.match(mainSource, /OnFileOpen:\s*func\(filePath string\)/)
   assert.match(mainSource, /app\.HandleFileOpen\(application, filePath\)/)
 })
+
+test('macOS packaging does not copy local extended attributes into app bundles', () => {
+  assert.doesNotMatch(packageScript, /^\s*cp\s/m)
+  assert.equal(packageScript.match(/\/bin\/cp -X /g)?.length, 5)
+  assert.match(packageScript, /\/usr\/bin\/xattr -cr "\$APP"/)
+})
