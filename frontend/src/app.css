@@ -91,12 +91,6 @@ mark {
   border-top-color: #f97316;
 }
 
-/* Selection is independent from the active keyboard region and therefore
-   remains visible when Tab moves elsewhere. Inset rendering preserves size. */
-.keyboard-selected-item {
-  box-shadow: inset 0 0 0 2px #cbd5e1;
-}
-
 /* Smooth slide-down for conversation viewer content */
 @keyframes conversation-slide-down {
   from {

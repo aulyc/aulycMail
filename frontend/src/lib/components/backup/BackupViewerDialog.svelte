@@ -700,7 +700,7 @@
                     role="option"
                     aria-selected={selectedMessageKey === message.key}
                     tabindex={selectedMessageKey === message.key ? 0 : -1}
-                    class="relative grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'keyboard-selected-item bg-primary/15' : 'hover:bg-muted/40'}"
+                    class="relative grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors focus:outline-none {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
                     onclick={() => selectMessage(message.key)}
                   >
                     <Icon icon="mdi:email-outline" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />

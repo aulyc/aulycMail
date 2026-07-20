@@ -4,6 +4,10 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Simplified keyboard navigation visuals by keeping the top region accent and
+  selection backgrounds while removing persistent inset frames, and kept mail
+  sidebar DOM focus on the region container to prevent stale native outlines.
+
 ## [0.6.0-beta.1] — 2026-07-20
 
 - Aligned the Backup Viewer directory picker with the right edge of the message

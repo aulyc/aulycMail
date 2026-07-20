@@ -183,7 +183,11 @@
                 tabindex="-1"
                 aria-selected={activePage === item.id}
                 aria-controls={`settings-panel-${item.id}`}
-                class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition-colors focus:outline-none {selectedNavigationPage === item.id ? 'keyboard-selected-item' : ''} {activePage === item.id ? 'bg-primary/12 text-primary' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}"
+                class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition-colors focus:outline-none {activePage === item.id
+                  ? 'bg-primary/12 text-primary'
+                  : selectedNavigationPage === item.id
+                    ? 'bg-background/70 text-foreground'
+                    : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}"
                 onclick={() => selectNavigationPage(item.id)}
               >
                 <Icon icon={item.icon} class="h-[18px] w-[18px] shrink-0" /><span class="truncate">{item.label}</span>

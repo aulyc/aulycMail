@@ -951,6 +951,19 @@
     setFocusedPane(pane)
   }
 
+  function handlePaneMouseDown(pane: FocusablePane, event: MouseEvent) {
+    handlePaneClick(pane)
+    if (pane !== 'sidebar' || event.button !== 0) return
+    if (!(event.target instanceof Element) || !event.target.closest('[data-sidebar-item]')) return
+
+    // Folder/account rows are logical selections inside one keyboard region.
+    // Keep DOM focus on that region so an old clicked row cannot retain a
+    // native WebKit focus outline after arrow-key selection moves elsewhere.
+    event.preventDefault()
+    const region = event.currentTarget as HTMLElement | null
+    region?.focus({ preventScroll: true })
+  }
+
   // Bulk action handlers
   function handleBulkActionComplete(autoSelectNext?: boolean) {
     messageListRef?.clearChecked()
@@ -1028,7 +1041,7 @@
       class="keyboard-region outline-none {getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'flex-shrink-0 border-r border-border bg-muted/30'}"
       style="{getLayoutMode() === 'full' ? `width: ${sidebarWidth}px` : ''}"
       role="presentation"
-      onmousedown={() => handlePaneClick('sidebar')}
+      onmousedown={(event) => handlePaneMouseDown('sidebar', event)}
     >
       <Sidebar
         bind:this={sidebarRef}

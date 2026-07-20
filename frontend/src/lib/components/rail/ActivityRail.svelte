@@ -117,7 +117,7 @@
   <button
     bind:this={settingsButtonEl}
     tabindex="-1"
-    class="mt-auto mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 {selectedFeature === 'settings' ? 'keyboard-selected-item' : ''}"
+    class="mt-auto mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 {selectedFeature === 'settings' ? 'bg-accent/40 text-primary' : ''}"
     type="button"
     title={$_('sidebar.settings')}
     aria-label={$_('sidebar.settings')}

@@ -18,6 +18,8 @@ const appStylesPath = new URL('../src/app.css', import.meta.url)
 const activityRailPath = new URL('../src/lib/components/rail/ActivityRail.svelte', import.meta.url)
 const listRowPath = new URL('../src/lib/components/kit/ListRow.svelte', import.meta.url)
 const sourceSidebarPath = new URL('../src/lib/components/kit/SourceSidebar.svelte', import.meta.url)
+const folderTreeItemPath = new URL('../src/lib/components/sidebar/FolderTreeItem.svelte', import.meta.url)
+const accountSectionPath = new URL('../src/lib/components/sidebar/AccountSection.svelte', import.meta.url)
 const contactListPath = new URL('../src/lib/contacts/components/ContactList.svelte', import.meta.url)
 const contactStorePath = new URL('../src/lib/contacts/stores/contactsView.svelte.ts', import.meta.url)
 const viewerPath = new URL('../src/lib/components/viewer/ConversationViewer.svelte', import.meta.url)
@@ -78,7 +80,7 @@ test('main Tab routing uses one focused region and preserves input Tab', async (
   assert.match(activityRail, /data-keyboard-region="featureNav"/)
 })
 
-test('region and selection indicators are persistent inset chrome', async () => {
+test('region indicator stays top-only while selections use component backgrounds', async () => {
   const [styles, app, activityRail, listRow] = await Promise.all([
     readFile(appStylesPath, 'utf8'),
     readFile(appPath, 'utf8'),
@@ -88,10 +90,11 @@ test('region and selection indicators are persistent inset chrome', async () => 
 
   assert.match(styles, /\.keyboard-region \{[\s\S]*border-top: 3px solid transparent/)
   assert.match(styles, /\.keyboard-region\[data-region-active='true'\][\s\S]*#f97316/)
-  assert.match(styles, /\.keyboard-selected-item \{[\s\S]*box-shadow: inset 0 0 0 2px #cbd5e1/)
+  assert.doesNotMatch(styles, /keyboard-selected-item|inset 0 0 0 2px #cbd5e1/)
   assert.match(app, /isMainKeyboardScope\(\) && getActivePane\(\) === 'mail' && getFocusedPane\(\) === 'messageList'/)
-  assert.match(activityRail, /selectedFeature === 'settings' \? 'keyboard-selected-item'/)
-  assert.match(listRow, /selected \? 'keyboard-selected-item'/)
+  assert.match(activityRail, /selectedFeature === 'settings' \? 'bg-accent\/40 text-primary'/)
+  assert.match(listRow, /selected[\s\S]*bg-primary\/20/)
+  assert.doesNotMatch(activityRail + listRow, /keyboard-selected-item/)
 })
 
 test('mouse interaction claims each main region', async () => {
@@ -102,7 +105,7 @@ test('mouse interaction claims each main region', async () => {
     readFile(contactListPath, 'utf8'),
   ])
 
-  assert.match(app, /onmousedown=\{\(\) => handlePaneClick\('sidebar'\)\}/)
+  assert.match(app, /onmousedown=\{\(event\) => handlePaneMouseDown\('sidebar', event\)\}/)
   assert.match(app, /onmousedown=\{\(\) => handlePaneClick\('messageList'\)\}/)
   assert.match(app, /onmousedown=\{\(\) => handlePaneClick\('viewer'\)\}/)
   assert.match(activityRail, /onmousedown=\{claimRegion\}/)
@@ -110,6 +113,24 @@ test('mouse interaction claims each main region', async () => {
   assert.match(contactList, /function claimListRegion[\s\S]*setFocusedPane\('messageList'\)/)
   assert.match(contactList, /onmousedown=\{claimListRegion\}/)
   assert.match(contactList, /data-keyboard-region-visible=\{!isResponsive\(\) \|\| getResponsiveView\(\) === 'default'\}/)
+})
+
+test('mail sidebar rows leave DOM focus on the keyboard region', async () => {
+  const [app, folderTreeItem, accountSection] = await Promise.all([
+    readFile(appPath, 'utf8'),
+    readFile(folderTreeItemPath, 'utf8'),
+    readFile(accountSectionPath, 'utf8'),
+  ])
+
+  assert.match(
+    app,
+    /function handlePaneMouseDown[\s\S]*pane !== 'sidebar'[\s\S]*closest\('\[data-sidebar-item\]'\)[\s\S]*event\.preventDefault\(\)[\s\S]*region\?\.focus\(\{ preventScroll: true \}\)/,
+  )
+  assert.match(folderTreeItem, /tabindex="-1"[\s\S]*data-sidebar-item="folder"/)
+  assert.match(folderTreeItem, /transition-colors focus:outline-none/)
+  assert.match(accountSection, /tabindex="-1"[\s\S]*data-sidebar-item="account-header"/)
+  assert.match(accountSection, /transition-colors focus:outline-none/)
+  assert.doesNotMatch(folderTreeItem + accountSection, /keyboard-selected-item/)
 })
 
 test('input Escape returns to its region while search scope Tab remains unchanged', async () => {

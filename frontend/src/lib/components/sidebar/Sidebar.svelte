@@ -437,7 +437,6 @@
           selectedFolderId={accountStore.selectedFolder?.folderId ?? selectedFolderId ?? ''}
           {selectionSource}
           isHeaderFocused={focusedAccountId === accWithFolders.account.id}
-          showFolderKeyboardSelection={focusedAccountId === null}
           isExpanded={expandedAccounts[accWithFolders.account.id] ?? true}
           {collapsedFolders}
           {onMessagesMoved}

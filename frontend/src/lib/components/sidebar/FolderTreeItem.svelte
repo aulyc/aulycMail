@@ -14,7 +14,6 @@
     accountId: string
     selectedAccountId: string
     selectedFolderId: string
-    showFolderKeyboardSelection?: boolean
     selectionSource: 'unified' | 'account' | null
     collapsedFolders: Record<string, boolean>
     onFolderSelect?: (f: folder.Folder) => void
@@ -27,7 +26,6 @@
     accountId,
     selectedAccountId,
     selectedFolderId,
-    showFolderKeyboardSelection = true,
     selectionSource,
     collapsedFolders,
     onFolderSelect,
@@ -163,11 +161,12 @@
 {#if tree.folder}
   <FolderContextMenu folderId={tree.folder.id} disabled={isDirectoryOnly}>
     <button
-      class="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors {isFolderSelected(tree.folder.id)
-        ? `${showFolderKeyboardSelection ? 'keyboard-selected-item ' : ''}bg-primary/10 text-primary font-medium`
+      class="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors focus:outline-none {isFolderSelected(tree.folder.id)
+        ? 'bg-primary/10 text-primary font-medium'
         : isDirectoryOnly
           ? 'text-muted-foreground hover:bg-muted/50'
           : 'text-foreground hover:bg-muted/50'} {isDragOver ? 'ring-2 ring-primary ring-inset' : ''}"
+      tabindex="-1"
       data-sidebar-item="folder"
       data-account-id={accountId}
       data-folder-id={tree.folder.id}
@@ -227,7 +226,6 @@
           {accountId}
           {selectedAccountId}
           {selectedFolderId}
-          {showFolderKeyboardSelection}
           {selectionSource}
           {collapsedFolders}
           {onFolderSelect}

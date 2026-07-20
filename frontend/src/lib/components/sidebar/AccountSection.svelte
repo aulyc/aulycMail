@@ -16,7 +16,6 @@
     selectedFolderId: string
     selectionSource: 'unified' | 'account' | null
     isHeaderFocused?: boolean
-    showFolderKeyboardSelection?: boolean
     isExpanded?: boolean
     onFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
     onToggleExpanded?: () => void
@@ -35,7 +34,6 @@
     selectedFolderId,
     selectionSource,
     isHeaderFocused = false,
-    showFolderKeyboardSelection = true,
     isExpanded = true,
     onFolderSelect,
     onToggleExpanded,
@@ -80,7 +78,8 @@
        sidebar header is just an expand/collapse toggle. -->
   <div>
     <button
-      class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors {isHeaderFocused ? 'keyboard-selected-item bg-muted' : ''}"
+      class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors focus:outline-none {isHeaderFocused ? 'bg-muted' : ''}"
+      tabindex="-1"
       data-sidebar-item="account-header"
       data-account-id={acc.id}
       type="button"
@@ -133,7 +132,6 @@
             accountId={acc.id}
             {selectedAccountId}
             {selectedFolderId}
-            {showFolderKeyboardSelection}
             {selectionSource}
             {collapsedFolders}
             {onMessagesMoved}

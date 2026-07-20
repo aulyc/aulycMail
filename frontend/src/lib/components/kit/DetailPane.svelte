@@ -128,7 +128,7 @@
       {/if}
     </div>
   {:else}
-    <div bind:this={scrollRegionEl} class="keyboard-selected-item flex-1 min-h-0 overflow-y-auto p-6">
+    <div bind:this={scrollRegionEl} class="flex-1 min-h-0 overflow-y-auto p-6">
       {#if body}
         {@render body()}
       {/if}

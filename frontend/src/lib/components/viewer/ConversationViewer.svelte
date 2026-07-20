@@ -1092,7 +1092,7 @@
       </button>
     </div>
   {:else if conversation}
-    <div class="conversation-viewer-content keyboard-selected-item flex flex-col h-full">
+    <div class="conversation-viewer-content flex flex-col h-full">
     <!-- Header with Actions — all icons in one continuous row, no grouping -->
     <div class="flex items-center gap-1 px-4 py-3 border-b border-border">
       {#if showBackButton}
