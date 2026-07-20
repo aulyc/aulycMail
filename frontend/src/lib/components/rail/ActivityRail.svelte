@@ -43,13 +43,13 @@
   function moveSelection(delta: number) {
     const ids = ['mail', ...BUILT_IN_RAIL_PANES.map((pane) => pane.id), 'settings']
     const currentIndex = Math.max(0, ids.indexOf(selectedFeature))
-    selectedFeature = ids[(currentIndex + delta + ids.length) % ids.length]
-    activateSelection()
+    const nextFeature = ids[(currentIndex + delta + ids.length) % ids.length]
+    activateSelection(nextFeature)
   }
 
-  function activateSelection() {
-    if (selectedFeature === 'settings') selectSettings()
-    else select(selectedFeature)
+  function activateSelection(feature: string) {
+    if (feature === 'settings') selectSettings()
+    else select(feature)
   }
 
   function handleKeydown(event: KeyboardEvent) {
@@ -63,7 +63,7 @@
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       event.stopPropagation()
-      activateSelection()
+      activateSelection(selectedFeature)
     }
   }
 
@@ -100,16 +100,14 @@
   <RailButton
     icon="mdi:email"
     label="Mail"
-    active={active === 'mail'}
-    selected={selectedFeature === 'mail'}
+    active={selectedFeature === 'mail'}
     onclick={() => select('mail')}
   />
   {#each BUILT_IN_RAIL_PANES as pane (pane.id)}
     <RailButton
       icon={pane.icon}
       label={$_(pane.labelKey)}
-      active={active === pane.id}
-      selected={selectedFeature === pane.id}
+      active={selectedFeature === pane.id}
       onclick={() => select(pane.id)}
     />
   {/each}
@@ -118,7 +116,7 @@
   <button
     bind:this={settingsButtonEl}
     tabindex="-1"
-    class="mt-auto mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30 transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 {selectedFeature === 'settings' ? 'bg-accent/40 text-primary' : ''}"
+    class="mt-auto mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 {selectedFeature === 'settings' ? 'border-l-primary bg-accent/40 text-primary' : 'border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30'}"
     type="button"
     title={$_('sidebar.settings')}
     aria-label={$_('sidebar.settings')}

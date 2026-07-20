@@ -17,6 +17,7 @@ const appPath = new URL('../src/App.svelte', import.meta.url)
 const appStylesPath = new URL('../src/app.css', import.meta.url)
 const activityRailPath = new URL('../src/lib/components/rail/ActivityRail.svelte', import.meta.url)
 const listRowPath = new URL('../src/lib/components/kit/ListRow.svelte', import.meta.url)
+const railButtonPath = new URL('../src/lib/components/rail/RailButton.svelte', import.meta.url)
 const sourceSidebarPath = new URL('../src/lib/components/kit/SourceSidebar.svelte', import.meta.url)
 const folderTreeItemPath = new URL('../src/lib/components/sidebar/FolderTreeItem.svelte', import.meta.url)
 const accountSectionPath = new URL('../src/lib/components/sidebar/AccountSection.svelte', import.meta.url)
@@ -80,15 +81,26 @@ test('main Tab routing uses one focused region and preserves input Tab', async (
   assert.match(activityRail, /data-keyboard-region="featureNav"/)
 })
 
-test('feature navigation arrows immediately activate the selected destination', async () => {
-  const activityRail = await readFile(activityRailPath, 'utf8')
+test('feature navigation arrows directly activate the next destination', async () => {
+  const [activityRail, railButton] = await Promise.all([
+    readFile(activityRailPath, 'utf8'),
+    readFile(railButtonPath, 'utf8'),
+  ])
   const moveSelection = activityRail.match(
     /function moveSelection\(delta: number\) \{([\s\S]*?)\n {2}\}/,
   )?.[1] ?? ''
 
-  assert.match(moveSelection, /activateSelection\(\)/)
+  assert.match(moveSelection, /const nextFeature =/)
+  assert.match(moveSelection, /activateSelection\(nextFeature\)/)
+  assert.doesNotMatch(moveSelection, /selectedFeature\s*=/)
+  assert.match(activityRail, /function activateSelection\(feature: string\)/)
   assert.match(activityRail, /function select\(name: string\)[\s\S]*setActivePane\(name\)/)
   assert.match(activityRail, /function selectSettings\(\)[\s\S]*onOpenSettings\?\.\(\)/)
+  assert.match(activityRail, /active=\{selectedFeature === 'mail'\}/)
+  assert.match(activityRail, /active=\{selectedFeature === pane\.id\}/)
+  assert.match(activityRail, /selectedFeature === 'settings' \? 'border-l-primary/)
+  assert.doesNotMatch(activityRail, /selected=\{selectedFeature/)
+  assert.doesNotMatch(railButton, /selected/)
 })
 
 test('region indicator stays top-only while selections use component backgrounds', async () => {
@@ -106,7 +118,7 @@ test('region indicator stays top-only while selections use component backgrounds
   assert.match(styles, /\.keyboard-region\[data-region-active='true'\][\s\S]*#f97316/)
   assert.doesNotMatch(styles, /keyboard-selected-item|inset 0 0 0 2px #cbd5e1/)
   assert.match(app, /isMainKeyboardScope\(\) && getActivePane\(\) === 'mail' && getFocusedPane\(\) === 'messageList'/)
-  assert.match(activityRail, /selectedFeature === 'settings' \? 'bg-accent\/40 text-primary'/)
+  assert.match(activityRail, /selectedFeature === 'settings' \? 'border-l-primary bg-accent\/40 text-primary'/)
   assert.match(listRow, /selected[\s\S]*bg-primary\/20/)
   assert.doesNotMatch(activityRail + listRow, /keyboard-selected-item/)
 })
