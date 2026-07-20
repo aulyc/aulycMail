@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.1] — 2026-07-20
+
 - Aligned the Backup Viewer directory picker with the right edge of the message
   list.
 - Restored consistent modal keyboard behavior, including Escape-to-close, Tab
