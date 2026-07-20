@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.3] — 2026-07-20
+
 - Removed the obsolete pane-focus flash so changing keyboard regions no longer
   draws a transient blue inset frame.
 - Made the Dock unread badge follow the current macOS notification badge
