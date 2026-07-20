@@ -38,19 +38,19 @@ fi
 
 rm -rf "$APP"
 mkdir -p "$MACOS" "$RESOURCES" "$LEGAL"
-/bin/cp -X "$BIN" "$MACOS/aulycMail"
+cp "$BIN" "$MACOS/aulycMail"
 chmod 0755 "$MACOS/aulycMail"
 if [ -f "$ROOT/build/menubar-icon.png" ]; then
-  /bin/cp -X "$ROOT/build/menubar-icon.png" "$RESOURCES/MenuBarIcon.png"
+  cp "$ROOT/build/menubar-icon.png" "$RESOURCES/MenuBarIcon.png"
 fi
 if [ -f "$ROOT/LICENSE" ]; then
-  /bin/cp -X "$ROOT/LICENSE" "$LEGAL/LICENSE.txt"
+  cp "$ROOT/LICENSE" "$LEGAL/LICENSE.txt"
 fi
 if [ -f "$ROOT/THIRD_PARTY_NOTICES.md" ]; then
-  /bin/cp -X "$ROOT/THIRD_PARTY_NOTICES.md" "$LEGAL/THIRD_PARTY_NOTICES.md"
+  cp "$ROOT/THIRD_PARTY_NOTICES.md" "$LEGAL/THIRD_PARTY_NOTICES.md"
 fi
 if [ -f "$ROOT/frontend/src/assets/fonts/OFL.txt" ]; then
-  /bin/cp -X "$ROOT/frontend/src/assets/fonts/OFL.txt" "$LEGAL/Nunito-OFL.txt"
+  cp "$ROOT/frontend/src/assets/fonts/OFL.txt" "$LEGAL/Nunito-OFL.txt"
 fi
 
 cat > "$CONTENTS/Info.plist" <<PLIST
@@ -116,7 +116,5 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
-
-/usr/bin/xattr -cr "$APP"
 
 echo "Packaged macOS app bundle at $APP"

@@ -4,9 +4,6 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
-- Prevented macOS packaging from copying local extended attributes into app
-  bundles, avoiding execution-policy denial for ad-hoc test candidates.
-
 ## [0.6.0-beta.4] — 2026-07-20
 
 - Made Up/Down in the feature navigation rail immediately switch Mail or
