@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Removed the obsolete pane-focus flash so changing keyboard regions no longer
+  draws a transient blue inset frame.
+
 ## [0.6.0-beta.2] — 2026-07-20
 
 - Simplified keyboard navigation visuals by keeping the top region accent and

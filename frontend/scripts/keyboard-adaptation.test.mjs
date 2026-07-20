@@ -81,13 +81,16 @@ test('main Tab routing uses one focused region and preserves input Tab', async (
 })
 
 test('region indicator stays top-only while selections use component backgrounds', async () => {
-  const [styles, app, activityRail, listRow] = await Promise.all([
+  const [styles, keyboardStore, app, activityRail, listRow] = await Promise.all([
     readFile(appStylesPath, 'utf8'),
+    readFile(keyboardStorePath, 'utf8'),
     readFile(appPath, 'utf8'),
     readFile(activityRailPath, 'utf8'),
     readFile(listRowPath, 'utf8'),
   ])
 
+  assert.doesNotMatch(styles, /pane-focus-flash/)
+  assert.doesNotMatch(keyboardStore, /flashingPane|flashTimeoutId|triggerFlash|isPaneFlashing/)
   assert.match(styles, /\.keyboard-region \{[\s\S]*border-top: 3px solid transparent/)
   assert.match(styles, /\.keyboard-region\[data-region-active='true'\][\s\S]*#f97316/)
   assert.doesNotMatch(styles, /keyboard-selected-item|inset 0 0 0 2px #cbd5e1/)

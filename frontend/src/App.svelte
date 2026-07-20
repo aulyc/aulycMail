@@ -32,7 +32,6 @@
     getFocusedPane,
     isMainKeyboardScope,
     setFocusedPane,
-    isPaneFlashing,
     setComposerOpen,
   } from '$lib/stores/keyboard.svelte'
   import { initLayout, getLayoutMode, getResponsiveView, showViewer, hideViewer, showSidebar, hideSidebar, isResponsive } from '$lib/stores/layout.svelte'
@@ -1052,7 +1051,6 @@
         selectedFolderId={selectedFolderId}
         selectionSource={selectionSource}
         isFocused={getFocusedPane() === 'sidebar'}
-        isFlashing={isPaneFlashing('sidebar')}
         showBackButton={getLayoutMode() === 'narrow'}
         onBack={hideSidebar}
       />
@@ -1098,7 +1096,6 @@
         onSearch={() => { showSearchOverlay = true }}
         onRowActionComplete={() => viewerRef?.refreshFlags()}
         isFocused={getFocusedPane() === 'messageList'}
-        isFlashing={isPaneFlashing('messageList')}
         showFolderToggle={getLayoutMode() === 'narrow'}
         onToggleSidebar={showSidebar}
       />
@@ -1127,7 +1124,6 @@
         onEditDraft={handleEditDraft}
         onActionComplete={(autoSelectNext) => messageListRef?.handleActionComplete(autoSelectNext)}
         isFocused={getFocusedPane() === 'viewer'}
-        isFlashing={isPaneFlashing('viewer')}
         showBackButton={isResponsive()}
         onBack={() => { focusMode = 'off'; focusedMessageIdInFocus = null; hideViewer() }}
         inFocusMode={focusMode !== 'off'}

@@ -12,7 +12,7 @@
   import { type Snippet, onMount } from 'svelte'
   import SidebarFrame from './SidebarFrame.svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
-  import { setFocusedPane, getFocusedPane, isMainKeyboardScope, isPaneFlashing, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
+  import { setFocusedPane, getFocusedPane, isMainKeyboardScope, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
 
   type SourceSection<U extends { id: string }> = {
     heading?: string
@@ -121,8 +121,6 @@
     navigatePrev: () => move(-1),
     activate: () => { if (selectedId !== null) onSelect(selectedId) },
   }))
-
-  const flashing = $derived(isPaneFlashing(focusSlot))
 </script>
 
 <SidebarFrame
@@ -132,7 +130,6 @@
   {label}
   bind:containerRef
   focusable
-  class={flashing ? 'pane-focus-flash' : ''}
   keyboardRegion={focusSlot}
   regionActive={isMainKeyboardScope() && getFocusedPane() === focusSlot}
   onkeydown={handleKeyDown}

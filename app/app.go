@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 	goSync "sync"
+	"sync/atomic"
 	"time"
 
 	"aulyc.local/aulycmail/internal/account"
@@ -244,7 +245,9 @@ type App struct {
 	themeMonitor platform.ThemeMonitor
 
 	// Desktop notifications with click handling
-	notifier notification.Notifier
+	notifierMu       goSync.RWMutex
+	notifier         notification.Notifier
+	dockBadgeEnabled atomic.Bool
 
 	// DebugMode function reference (injected from main)
 	debugMode func() bool
@@ -402,6 +405,9 @@ func (a *App) Startup(ctx context.Context) {
 	platform.SetActivationHandler(func() {
 		if a.windowHidden {
 			a.ShowWindow()
+		}
+		if notifier := a.currentNotifier(); notifier != nil {
+			notifier.RefreshSettings()
 		}
 	})
 	platform.StartActivationObserver()
@@ -737,8 +743,8 @@ func (a *App) Shutdown(ctx context.Context) {
 	}
 
 	// Stop notification listener
-	if a.notifier != nil {
-		a.notifier.Stop()
+	if notifier := a.currentNotifier(); notifier != nil {
+		notifier.Stop()
 		log.Info().Msg("Notification listener stopped")
 	}
 

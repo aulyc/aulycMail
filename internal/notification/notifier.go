@@ -7,6 +7,17 @@ import "context"
 // ClickHandler is called when a notification is clicked
 type ClickHandler func(data NotificationData)
 
+// SettingsHandler is called after macOS resolves the app's notification
+// settings. BadgeEnabled is deliberately separate from Authorized because
+// requestAuthorization may succeed while icon badges are disabled.
+type SettingsHandler func(settings Settings)
+
+// Settings contains the notification capabilities that affect app behavior.
+type Settings struct {
+	Authorized   bool
+	BadgeEnabled bool
+}
+
 // NotificationData contains the context for a notification click.
 type NotificationData struct {
 	AccountID string
@@ -35,6 +46,12 @@ type Notifier interface {
 
 	// SetClickHandler sets the callback for notification clicks
 	SetClickHandler(handler ClickHandler)
+
+	// SetSettingsHandler sets the callback for resolved notification settings.
+	SetSettingsHandler(handler SettingsHandler)
+
+	// RefreshSettings re-reads the current system notification settings.
+	RefreshSettings()
 }
 
 // New creates a platform-specific Notifier

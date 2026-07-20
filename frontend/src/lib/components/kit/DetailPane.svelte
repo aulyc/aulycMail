@@ -7,7 +7,7 @@
   import { type Snippet } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from 'svelte-i18n'
-  import { getFocusedPane, isMainKeyboardScope, isPaneFlashing, setFocusedPane, type FocusablePane } from '$lib/stores/keyboard.svelte'
+  import { getFocusedPane, isMainKeyboardScope, setFocusedPane, type FocusablePane } from '$lib/stores/keyboard.svelte'
   // Self-managed responsive (mobile + tablet) behavior — read the layout
   // store directly so pane consumers never forward responsive
   // props. At medium (≤1024px) and narrow (≤767px) the detail pane renders
@@ -43,7 +43,6 @@
     emptyText = 'Nothing selected.',
   }: Props = $props()
 
-  const flashing = $derived(isPaneFlashing(focusSlot))
   const overlay = $derived(isResponsive())
   const visible = $derived(getResponsiveView() === 'viewer')
   let containerEl = $state<HTMLElement | null>(null)
@@ -82,7 +81,7 @@
   data-keyboard-region-focus-target
   data-region-active={isMainKeyboardScope() && getFocusedPane() === focusSlot}
   tabindex="-1"
-  class="keyboard-region flex-1 min-w-0 flex flex-col bg-background outline-none {flashing ? 'pane-focus-flash' : ''} {overlay ? 'responsive-viewer-overlay' : ''} {overlay && visible ? 'responsive-viewer-visible' : ''}"
+  class="keyboard-region flex-1 min-w-0 flex flex-col bg-background outline-none {overlay ? 'responsive-viewer-overlay' : ''} {overlay && visible ? 'responsive-viewer-visible' : ''}"
   onfocusin={claimRegion}
   onmousedown={handleMouseDown}
   onkeydown={handleKeydown}

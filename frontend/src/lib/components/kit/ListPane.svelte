@@ -15,7 +15,7 @@
 
   import { onMount, type Snippet } from 'svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
-  import { setFocusedPane, getFocusedPane, isPaneFlashing, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
+  import { setFocusedPane, getFocusedPane, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
 
   type Density = 'micro' | 'compact' | 'standard' | 'large'
   type ScrollBlock = 'start' | 'center' | 'end' | 'nearest'
@@ -288,8 +288,6 @@
     },
     focusSearch: onFocusSearch,
   }))
-
-  const flashing = $derived(isPaneFlashing(focusSlot))
 </script>
 
 <div
@@ -298,7 +296,7 @@
   role="listbox"
   aria-label={label ?? 'List'}
   tabindex="0"
-  class="flex-1 min-w-0 min-h-0 flex flex-col outline-none {flashing ? 'pane-focus-flash' : ''}"
+  class="flex-1 min-w-0 min-h-0 flex flex-col outline-none"
   onkeydown={handleKeyDown}
   onfocus={handleFocus}
   onmousedown={handleMouseDown}

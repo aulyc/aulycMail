@@ -69,7 +69,6 @@
     onOpenDraft?: (messageId: string) => void
     onSearch?: () => void
     isFocused?: boolean
-    isFlashing?: boolean
     showFolderToggle?: boolean
     onToggleSidebar?: () => void
   }
@@ -87,7 +86,6 @@
     onOpenDraft,
     onSearch,
     isFocused: _isFocused = false,
-    isFlashing = false,
     showFolderToggle = false,
     onToggleSidebar,
   }: Props = $props()
@@ -1450,7 +1448,7 @@
   }
 </script>
 
-<div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
+<div class="flex flex-col h-full">
   <!-- Header -->
   <div class="flex items-center gap-2 px-4 py-3 border-b border-border">
     {#if showFolderToggle}

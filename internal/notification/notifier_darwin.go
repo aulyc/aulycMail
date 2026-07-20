@@ -10,6 +10,7 @@ package notification
 
 // Implemented in notifier_darwin.m
 void setupNotifications(void);
+void refreshNotificationSettings(void);
 void showNotification(const char *title, const char *body,
                       const char *accountId, const char *folderId, const char *threadId);
 void cancelNotifications(void);
@@ -61,13 +62,38 @@ func goNotificationCallback(accountId *C.char, folderId *C.char, threadId *C.cha
 	go handler(data)
 }
 
+//export goNotificationSettingsCallback
+func goNotificationSettingsCallback(authorized C.int, badgeEnabled C.int) {
+	dispatchNotificationSettings(authorized != 0, badgeEnabled != 0)
+}
+
+func dispatchNotificationSettings(authorized, badgeEnabled bool) {
+	n := darwinNotif
+	if n == nil {
+		return
+	}
+
+	n.mu.RLock()
+	handler := n.settingsHandler
+	n.mu.RUnlock()
+	if handler == nil {
+		return
+	}
+
+	go handler(Settings{
+		Authorized:   authorized,
+		BadgeEnabled: badgeEnabled,
+	})
+}
+
 // darwinNotifier uses UNUserNotificationCenter for notifications on macOS
 // with click handling via inline CGo Objective-C.
 type darwinNotifier struct {
-	appName      string
-	clickHandler ClickHandler
-	mu           sync.RWMutex
-	log          zerolog.Logger
+	appName         string
+	clickHandler    ClickHandler
+	settingsHandler SettingsHandler
+	mu              sync.RWMutex
+	log             zerolog.Logger
 }
 
 func newPlatformNotifier(appName string) Notifier {
@@ -112,4 +138,14 @@ func (n *darwinNotifier) SetClickHandler(handler ClickHandler) {
 	n.mu.Lock()
 	n.clickHandler = handler
 	n.mu.Unlock()
+}
+
+func (n *darwinNotifier) SetSettingsHandler(handler SettingsHandler) {
+	n.mu.Lock()
+	n.settingsHandler = handler
+	n.mu.Unlock()
+}
+
+func (n *darwinNotifier) RefreshSettings() {
+	C.refreshNotificationSettings()
 }

@@ -363,8 +363,8 @@ func (a *App) sendSystemNotification(info sync.NewMailInfo, subject, fromName, f
 	}
 
 	// Use the notifier if available
-	if a.notifier != nil {
-		_, err := a.notifier.Show(notification.Notification{
+	if notifier := a.currentNotifier(); notifier != nil {
+		_, err := notifier.Show(notification.Notification{
 			Title: title,
 			Body:  body,
 			Icon:  "mail-unread",
@@ -388,10 +388,13 @@ func (a *App) sendSystemNotification(info sync.NewMailInfo, subject, fromName, f
 func (a *App) initNotifications(ctx context.Context) {
 	log := logging.WithComponent("app.notify")
 
-	a.notifier = notification.New("aulycMail")
+	notifier := notification.New("aulycMail")
+	a.notifierMu.Lock()
+	a.notifier = notifier
+	a.notifierMu.Unlock()
 
 	// Set click handler for mail notifications.
-	a.notifier.SetClickHandler(func(data notification.NotificationData) {
+	notifier.SetClickHandler(func(data notification.NotificationData) {
 		a.ShowWindow()
 
 		log.Info().
@@ -405,11 +408,25 @@ func (a *App) initNotifications(ctx context.Context) {
 			"threadId":  data.ThreadID,
 		})
 	})
+	notifier.SetSettingsHandler(func(settings notification.Settings) {
+		log.Info().
+			Bool("authorized", settings.Authorized).
+			Bool("badgeEnabled", settings.BadgeEnabled).
+			Msg("Notification settings refreshed")
+		a.dockBadgeEnabled.Store(settings.BadgeEnabled)
+		a.refreshUnreadBadges()
+	})
 
 	// Start the notification listener
-	if err := a.notifier.Start(ctx); err != nil {
+	if err := notifier.Start(ctx); err != nil {
 		log.Warn().Err(err).Msg("Failed to start notification listener (click handling may not work)")
 	}
+}
+
+func (a *App) currentNotifier() notification.Notifier {
+	a.notifierMu.RLock()
+	defer a.notifierMu.RUnlock()
+	return a.notifier
 }
 
 // ============================================================================

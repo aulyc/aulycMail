@@ -1,6 +1,34 @@
 package notification
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
+
+func TestDispatchNotificationSettings(t *testing.T) {
+	n := &darwinNotifier{}
+	darwinNotif = n
+	t.Cleanup(func() { darwinNotif = nil })
+
+	got := make(chan Settings, 1)
+	n.SetSettingsHandler(func(settings Settings) {
+		got <- settings
+	})
+
+	dispatchNotificationSettings(true, false)
+	var settings Settings
+	select {
+	case settings = <-got:
+	case <-time.After(time.Second):
+		t.Fatal("settings callback was not dispatched")
+	}
+	if !settings.Authorized {
+		t.Fatal("Authorized = false, want true")
+	}
+	if settings.BadgeEnabled {
+		t.Fatal("BadgeEnabled = true, want false")
+	}
+}
 
 func TestNotificationStruct(t *testing.T) {
 	tests := []struct {

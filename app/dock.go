@@ -14,7 +14,12 @@ func (a *App) refreshUnreadBadges() {
 	if err != nil {
 		return
 	}
-	platform.SetDockBadge(count)
+	if a.dockBadgeEnabled.Load() {
+		platform.SetDockBadge(count)
+	} else {
+		// Clear rather than retaining a label that macOS cannot currently show.
+		platform.SetDockBadge(0)
+	}
 
 	if a.settingsStore == nil {
 		return

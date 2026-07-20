@@ -39,9 +39,6 @@
     /** When true, the <aside> gets tabindex="0" so it can take DOM focus.
      *  Default false. */
     focusable?: boolean
-    /** Extra class string appended to the outer <aside>. Used by SourceSidebar
-     *  for its pane-focus-flash indicator. */
-    class?: string
     /** Optional DOM event handlers forwarded to the outer <aside>. */
     onkeydown?: (e: KeyboardEvent) => void
     onfocus?: () => void
@@ -59,7 +56,6 @@
     footer,
     containerRef = $bindable(null),
     focusable = false,
-    class: extraClass = '',
     onkeydown,
     onfocus,
     onmousedown,
@@ -85,7 +81,7 @@
   role="navigation"
   aria-label={label ?? title ?? 'Sidebar'}
   tabindex={focusable ? 0 : undefined}
-  class="{keyboardRegion ? 'keyboard-region' : ''} flex-shrink-0 flex flex-col {title ? '' : 'pt-3'} border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {extraClass}"
+  class="{keyboardRegion ? 'keyboard-region' : ''} flex-shrink-0 flex flex-col {title ? '' : 'pt-3'} border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''}"
   style="width: {paneWidth}px"
   {onkeydown}
   {onfocus}

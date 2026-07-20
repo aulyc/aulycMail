@@ -41,7 +41,6 @@
     onEditDraft?: (draftId: string) => void
     onActionComplete?: (autoSelectNext?: boolean) => void
     isFocused?: boolean
-    isFlashing?: boolean
     showBackButton?: boolean
     onBack?: () => void
     // Focus mode (whole thread or single message takes full window)
@@ -61,7 +60,6 @@
     onEditDraft,
     onActionComplete,
     isFocused = false,
-    isFlashing = false,
     showBackButton = false,
     onBack,
     inFocusMode = false,
@@ -1065,7 +1063,7 @@
 
 </script>
 
-<div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
+<div class="flex flex-col h-full">
   {#if !threadId}
     <!-- No conversation selected -->
     <div class="flex flex-col items-center justify-center h-full text-muted-foreground">

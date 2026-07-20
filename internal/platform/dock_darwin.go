@@ -4,12 +4,12 @@ package platform
 
 /*
 #cgo CFLAGS: -x objective-c -mmacosx-version-min=10.14
-#cgo LDFLAGS: -framework Cocoa
+#cgo LDFLAGS: -framework Cocoa -framework UserNotifications
 
 #include <stdlib.h>
 
 // Implemented in dock_darwin.m
-void aulycSetDockBadge(const char *label);
+void aulycSetDockBadge(int count, const char *label);
 */
 import "C"
 
@@ -32,5 +32,5 @@ func SetDockBadge(count int) {
 	}
 	c := C.CString(label)
 	defer C.free(unsafe.Pointer(c))
-	C.aulycSetDockBadge(c)
+	C.aulycSetDockBadge(C.int(count), c)
 }

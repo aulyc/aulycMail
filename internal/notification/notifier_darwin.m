@@ -2,6 +2,7 @@
 
 // Forward declaration of the Go callback (defined via //export in notifier_darwin.go)
 extern void goNotificationCallback(char *accountId, char *folderId, char *threadId);
+extern void goNotificationSettingsCallback(int authorized, int badgeEnabled);
 
 // Delegate that handles notification interactions and foreground presentation
 @interface AulycMailNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
@@ -42,6 +43,17 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
 
 static AulycMailNotificationDelegate *notifDelegate = nil;
 
+static void publishNotificationSettings(UNUserNotificationCenter *center) {
+    [center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
+        BOOL authorized = settings.authorizationStatus == UNAuthorizationStatusAuthorized
+            || settings.authorizationStatus == UNAuthorizationStatusProvisional;
+        BOOL badgeEnabled = settings.badgeSetting == UNNotificationSettingEnabled;
+        NSLog(@"[aulycMail] Notification settings: authorized=%d badgeEnabled=%d",
+              authorized, badgeEnabled);
+        goNotificationSettingsCallback(authorized ? 1 : 0, badgeEnabled ? 1 : 0);
+    }];
+}
+
 // setupNotifications initializes UNUserNotificationCenter and requests authorization.
 // Dispatches to the main queue since UNUserNotificationCenter delegate must be
 // configured on the main thread for reliable callback delivery.
@@ -58,10 +70,22 @@ void setupNotifications(void) {
                               completionHandler:^(BOOL granted, NSError *error) {
             if (error != nil) {
                 NSLog(@"[aulycMail] Notification authorization error: %@", error);
-                return;
+            } else {
+                NSLog(@"[aulycMail] Notification authorization granted: %d", granted);
             }
-            NSLog(@"[aulycMail] Notification authorization granted: %d", granted);
+            // The granted flag only means at least one requested capability was
+            // accepted. Read badgeSetting explicitly, then notify Go so the
+            // current unread count is replayed after authorization settles.
+            publishNotificationSettings(center);
         }];
+    });
+}
+
+// refreshNotificationSettings re-reads permissions after the app is activated,
+// covering changes made in System Settings while the app remains running.
+void refreshNotificationSettings(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        publishNotificationSettings([UNUserNotificationCenter currentNotificationCenter]);
     });
 }
 

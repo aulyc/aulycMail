@@ -17,9 +17,7 @@ const PANE_ORDER = MAIN_KEYBOARD_REGION_ORDER
 
 // Reactive state using Svelte 5 runes
 let focusedPane = $state<FocusablePane>('messageList')
-let flashingPane = $state<FocusablePane | null>(null)
 let keyboardScope = $state<'main' | 'settings'>('main')
-let flashTimeoutId: ReturnType<typeof setTimeout> | null = null
 
 /**
  * Get the currently focused pane
@@ -29,38 +27,10 @@ export function getFocusedPane(): FocusablePane {
 }
 
 /**
- * Check if a specific pane is currently flashing
- */
-export function isPaneFlashing(pane: FocusablePane): boolean {
-  return flashingPane === pane
-}
-
-/**
- * Trigger flash animation on a pane
- */
-function triggerFlash(pane: FocusablePane) {
-  // Clear any existing flash timeout
-  if (flashTimeoutId) {
-    clearTimeout(flashTimeoutId)
-  }
-
-  flashingPane = pane
-
-  // Clear flash after animation duration
-  flashTimeoutId = setTimeout(() => {
-    flashingPane = null
-    flashTimeoutId = null
-  }, 300) // Match CSS animation duration
-}
-
-/**
- * Set the focused pane and trigger flash animation
+ * Set the focused pane.
  */
 export function setFocusedPane(pane: FocusablePane) {
-  if (focusedPane !== pane) {
-    focusedPane = pane
-    triggerFlash(pane)
-  }
+  focusedPane = pane
 }
 
 export function setKeyboardScope(scope: 'main' | 'settings'): void {

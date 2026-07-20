@@ -103,7 +103,6 @@
     selectedFolderId?: string | null
     selectionSource?: 'account' | null
     isFocused?: boolean
-    isFlashing?: boolean
     showBackButton?: boolean
     onBack?: () => void
   }
@@ -116,7 +115,6 @@
     selectedFolderId = null,
     selectionSource = null,
     isFocused: _isFocused = false,
-    isFlashing = false,
     showBackButton = false,
     onBack,
   }: Props = $props()
@@ -369,7 +367,7 @@
   }
 </script>
 
-<div class="flex flex-col h-full {isFlashing ? 'pane-focus-flash' : ''}">
+<div class="flex flex-col h-full">
   <!-- Header with Compose Button -->
   <div class="px-4 py-3 border-b border-border">
     <div class="flex items-center gap-2">
