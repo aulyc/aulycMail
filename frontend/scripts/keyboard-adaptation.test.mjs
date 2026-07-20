@@ -80,6 +80,17 @@ test('main Tab routing uses one focused region and preserves input Tab', async (
   assert.match(activityRail, /data-keyboard-region="featureNav"/)
 })
 
+test('feature navigation arrows immediately activate the selected destination', async () => {
+  const activityRail = await readFile(activityRailPath, 'utf8')
+  const moveSelection = activityRail.match(
+    /function moveSelection\(delta: number\) \{([\s\S]*?)\n {2}\}/,
+  )?.[1] ?? ''
+
+  assert.match(moveSelection, /activateSelection\(\)/)
+  assert.match(activityRail, /function select\(name: string\)[\s\S]*setActivePane\(name\)/)
+  assert.match(activityRail, /function selectSettings\(\)[\s\S]*onOpenSettings\?\.\(\)/)
+})
+
 test('region indicator stays top-only while selections use component backgrounds', async () => {
   const [styles, keyboardStore, app, activityRail, listRow] = await Promise.all([
     readFile(appStylesPath, 'utf8'),

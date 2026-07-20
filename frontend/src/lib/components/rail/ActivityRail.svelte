@@ -44,6 +44,7 @@
     const ids = ['mail', ...BUILT_IN_RAIL_PANES.map((pane) => pane.id), 'settings']
     const currentIndex = Math.max(0, ids.indexOf(selectedFeature))
     selectedFeature = ids[(currentIndex + delta + ids.length) % ids.length]
+    activateSelection()
   }
 
   function activateSelection() {

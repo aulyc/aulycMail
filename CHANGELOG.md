@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Made Up/Down in the feature navigation rail immediately switch Mail or
+  Contacts, or open Settings, while that region is active.
+
 ## [0.6.0-beta.3] — 2026-07-20
 
 - Removed the obsolete pane-focus flash so changing keyboard regions no longer
