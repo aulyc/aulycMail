@@ -12,7 +12,7 @@ macOS command-line developer tools. On the maintained machine, use:
 
 ```bash
 export PATH=/Users/crp/.nvm/versions/node/v24.13.0/bin:/Users/crp/go/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
-export GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build
+export GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build
 ```
 
 The repository intentionally targets macOS `arm64` only. Production builds

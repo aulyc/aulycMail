@@ -101,11 +101,11 @@
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "cd0e61ae34f57d3623c108db3a6c9d232c4b4a419a781178c7db8e5d424a5d2b"
+      "sha256": "dd7eacee37c22a5d8d85c855c0776ee9598f6e97ef944d3c71d6b0b9655ba1fa"
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "sha256": "ca50cc17a47cc72ba3b969e1305149babb86e68a3fd66e5320a6fcc1aa5e8a36"
+      "sha256": "855786085937c19343eff1aa31dcca606500420cfa65276988641d8920c5fc80"
     },
     {
       "path": "docs/VERSIONING.md",
@@ -113,7 +113,7 @@
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "db9fd6a499d0533f5334061e8b79d12b81a8332a6b760ed1018e5a6547063fd2"
+      "sha256": "50a4e4553fbdcc8c0d43ad3d3514de0dee7cb741da52b5cf70416ea32b3c49f5"
     },
     {
       "path": "Makefile",

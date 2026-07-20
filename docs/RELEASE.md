@@ -57,7 +57,7 @@ configuration, or lint finding stops the release before candidate creation.
 ## Test release
 
 ```bash
-GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build \
+GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build \
   make release-test
 ```
 
@@ -78,7 +78,7 @@ Prerequisites:
   reachable from the release machine; the formal release runs from `main`.
 
 ```bash
-GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build \
+GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build \
   make release-formal \
   SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" \
   NOTARY_PROFILE=aulyc-notary

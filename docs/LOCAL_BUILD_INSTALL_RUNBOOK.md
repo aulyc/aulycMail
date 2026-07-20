@@ -4,7 +4,7 @@ This records the local macOS rebuild/install flow used for this checkout.
 
 ## Current Environment
 
-- Repository: `/Users/crp/Projects/aulycMail`
+- Repository: `/Users/crp/Projects/aulyc/aulycMail`
 - Installed app: `/Applications/aulycMail.app`
 - Wails CLI: `/Users/crp/go/bin/wails`
 - Node/npm: `/Users/crp/.nvm/versions/node/v24.13.0/bin`

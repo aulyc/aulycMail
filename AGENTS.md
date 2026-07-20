@@ -52,8 +52,8 @@ provenance over convenience or broad rewrites.
 - Shared development gate: `make check`.
 - Full non-release CI gate and production build: `make ci`.
 - Local development installation: `make install-darwin`; this is not a release.
-- Test release: `GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build make release-test`.
-- Formal release: `GOCACHE=/Users/crp/Projects/aulycMail/.cache/go-build make release-formal SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary`.
+- Test release: `GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build make release-test`.
+- Formal release: `GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build make release-formal SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary`.
 - Formal release backup: remote `backup`, branch `main`; `make release-formal`
   must run the central GitHub preflight before changing release metadata, then
   atomically push and verify the formal release commit and annotated tag after
