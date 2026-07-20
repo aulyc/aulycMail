@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.5] — 2026-07-20
+
 - Merged feature-rail keyboard selection and activation so Up/Down immediately
   switches to the next destination, with one blue selection marker instead of
   a separate shadow-only state.
