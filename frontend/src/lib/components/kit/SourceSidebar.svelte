@@ -12,7 +12,7 @@
   import { type Snippet, onMount } from 'svelte'
   import SidebarFrame from './SidebarFrame.svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
-  import { setFocusedPane, getFocusedPane, isPaneFlashing, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
+  import { setFocusedPane, getFocusedPane, isMainKeyboardScope, isPaneFlashing, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
 
   type SourceSection<U extends { id: string }> = {
     heading?: string
@@ -80,6 +80,7 @@
   }
 
   function handleKeyDown(e: KeyboardEvent) {
+    if (e.isComposing || e.keyCode === 229) return
     if (KEY.LIST_NEXT(e)) {
       e.preventDefault()
       e.stopPropagation()
@@ -92,8 +93,9 @@
       move(-1)
       return
     }
-    if (KEY.LIST_OPEN(e)) {
-      if (!selectedId) return
+    if (KEY.LIST_OPEN(e) || (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey)) {
+      if (e.target !== containerRef) return
+      if (selectedId === null) return
       e.preventDefault()
       e.stopPropagation()
       onSelect(selectedId)
@@ -117,7 +119,7 @@
   onMount(() => registerPaneNav(focusSlot, {
     navigateNext: () => move(1),
     navigatePrev: () => move(-1),
-    activate: () => { if (selectedId) onSelect(selectedId) },
+    activate: () => { if (selectedId !== null) onSelect(selectedId) },
   }))
 
   const flashing = $derived(isPaneFlashing(focusSlot))
@@ -131,6 +133,8 @@
   bind:containerRef
   focusable
   class={flashing ? 'pane-focus-flash' : ''}
+  keyboardRegion={focusSlot}
+  regionActive={isMainKeyboardScope() && getFocusedPane() === focusSlot}
   onkeydown={handleKeyDown}
   onfocus={handleFocus}
   onmousedown={handleMouseDown}

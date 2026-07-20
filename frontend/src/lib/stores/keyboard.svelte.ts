@@ -4,14 +4,21 @@
  * Tracks which pane is focused and manages focus state for keyboard navigation.
  */
 
-export type FocusablePane = 'sidebar' | 'messageList' | 'viewer'
+import {
+  MAIN_KEYBOARD_REGION_ORDER,
+  nextVisibleRegion,
+  type MainKeyboardRegion,
+} from '$lib/keyboard/regionNavigation'
+
+export type FocusablePane = MainKeyboardRegion
 
 // Pane cycle order for navigation
-const PANE_ORDER: FocusablePane[] = ['sidebar', 'messageList', 'viewer']
+const PANE_ORDER = MAIN_KEYBOARD_REGION_ORDER
 
 // Reactive state using Svelte 5 runes
 let focusedPane = $state<FocusablePane>('messageList')
 let flashingPane = $state<FocusablePane | null>(null)
+let keyboardScope = $state<'main' | 'settings'>('main')
 let flashTimeoutId: ReturnType<typeof setTimeout> | null = null
 
 /**
@@ -56,22 +63,60 @@ export function setFocusedPane(pane: FocusablePane) {
   }
 }
 
+export function setKeyboardScope(scope: 'main' | 'settings'): void {
+  keyboardScope = scope
+}
+
+export function isMainKeyboardScope(): boolean {
+  return keyboardScope === 'main'
+}
+
+function isVisibleRegionElement(element: HTMLElement): boolean {
+  if (element.hidden || element.getAttribute('aria-hidden') === 'true') return false
+  if (element.dataset.keyboardRegionVisible === 'false') return false
+  const style = window.getComputedStyle(element)
+  return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0
+}
+
+function getRegionElement(pane: FocusablePane): HTMLElement | null {
+  const matches = document.querySelectorAll<HTMLElement>(`[data-keyboard-region="${pane}"]`)
+  return [...matches].find(isVisibleRegionElement) ?? null
+}
+
+function getVisiblePanes(): FocusablePane[] {
+  return PANE_ORDER.filter((pane) => getRegionElement(pane) !== null)
+}
+
+/** Focus the pane-level keyboard target without traversing its child controls. */
+export function focusPane(pane: FocusablePane): boolean {
+  const region = getRegionElement(pane)
+  if (!region) return false
+  setFocusedPane(pane)
+  const target = region.matches('[data-keyboard-region-focus-target]')
+    ? region
+    : region.querySelector<HTMLElement>('[data-keyboard-region-focus-target]') ?? region
+  target.focus({ preventScroll: true })
+  return true
+}
+
+export function focusCurrentPane(): boolean {
+  return focusPane(focusedPane)
+}
+
 /**
  * Focus the previous pane in the cycle: viewer -> messageList -> sidebar -> viewer
  */
 export function focusPreviousPane() {
-  const currentIndex = PANE_ORDER.indexOf(focusedPane)
-  const previousIndex = currentIndex === 0 ? PANE_ORDER.length - 1 : currentIndex - 1
-  setFocusedPane(PANE_ORDER[previousIndex])
+  const previous = nextVisibleRegion(focusedPane, -1, getVisiblePanes())
+  focusPane(previous)
 }
 
 /**
  * Focus the next pane in the cycle: sidebar -> messageList -> viewer -> sidebar
  */
 export function focusNextPane() {
-  const currentIndex = PANE_ORDER.indexOf(focusedPane)
-  const nextIndex = (currentIndex + 1) % PANE_ORDER.length
-  setFocusedPane(PANE_ORDER[nextIndex])
+  const next = nextVisibleRegion(focusedPane, 1, getVisiblePanes())
+  focusPane(next)
 }
 
 /**
@@ -83,24 +128,16 @@ export function isInputElement(target: EventTarget | null): boolean {
     return false
   }
 
-  const tagName = target.tagName.toUpperCase()
-
-  // Check for standard input elements
-  if (tagName === 'INPUT' || tagName === 'TEXTAREA') {
-    return true
-  }
-
-  // Check for contenteditable elements (like TipTap editor)
-  if (target.isContentEditable) {
-    return true
-  }
-
-  // Check for elements with role="textbox"
-  if (target.getAttribute('role') === 'textbox') {
-    return true
-  }
-
-  return false
+  return Boolean(target.closest([
+    'input',
+    'textarea',
+    'select',
+    '[contenteditable="true"]',
+    '[role="textbox"]',
+    '[role="searchbox"]',
+    '[role="combobox"]',
+    '[data-keyboard-input="true"]',
+  ].join(',')))
 }
 
 /**

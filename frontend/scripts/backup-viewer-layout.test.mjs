@@ -40,3 +40,17 @@ test('backup viewer toolbar controls align with the message detail cards', async
   assert.match(toolbar, /data-backup-viewer-detail-toolbar[^>]*class="[^"]*pl-6/)
   assert.match(detail, /class="min-h-0 flex-1 overflow-y-auto px-6 py-5 scrollbar-thin"/)
 })
+
+test('backup viewer directory picker ends at the message list edge', async () => {
+  const [toolbar, dialog] = await Promise.all([
+    readFile(toolbarPath, 'utf8'),
+    readFile(dialogPath, 'utf8'),
+  ])
+
+  assert.match(dialog, /grid-cols-\[42%_1fr\]/)
+  assert.match(toolbar, /grid-cols-\[42%_minmax\(0,1fr\)\]/)
+  assert.match(toolbar, /data-backup-viewer-list-toolbar[^>]*class="[^"]*pl-4/)
+  assert.doesNotMatch(toolbar, /data-backup-viewer-list-toolbar[^>]*class="[^"]*pr-/)
+  assert.match(toolbar, /<div class="min-w-\[240px\] flex-1">\s*<BackupDirectoryPicker/)
+  assert.doesNotMatch(toolbar, /w-\[340px\]/)
+})

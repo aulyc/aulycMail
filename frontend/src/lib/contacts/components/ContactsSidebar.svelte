@@ -136,7 +136,7 @@
 >
   {#snippet titleContent()}
     <button
-      class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
+      class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors whitespace-nowrap {contactsView.selectedSourceId === '' ? 'keyboard-selected-item' : ''}"
       aria-pressed={contactsView.selectedSourceId === ''}
       onclick={() => pick('')}
       type="button"
@@ -166,10 +166,10 @@
       aria-selected={active}
       class={it.accountID
         ? `mb-1 w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-left transition-colors cursor-pointer select-none ${active
-          ? 'bg-primary/10 text-primary'
+          ? 'keyboard-selected-item bg-primary/10 text-primary'
           : 'text-foreground hover:bg-muted/50'}`
         : `mb-1 flex items-center gap-2 mx-2 py-1.5 pr-2 text-sm rounded-md text-left transition-colors cursor-pointer select-none ${active
-          ? 'bg-primary/10 text-primary font-medium'
+          ? 'keyboard-selected-item bg-primary/10 text-primary font-medium'
           : 'text-foreground hover:bg-muted/50'}`}
       style={it.accountID ? undefined : 'padding-left: 0.75rem'}
       onclick={() => pick(it.id)}

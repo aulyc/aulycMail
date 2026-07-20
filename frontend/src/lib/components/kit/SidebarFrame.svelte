@@ -46,6 +46,8 @@
     onkeydown?: (e: KeyboardEvent) => void
     onfocus?: () => void
     onmousedown?: (e: MouseEvent) => void
+    keyboardRegion?: string
+    regionActive?: boolean
   }
 
   let {
@@ -61,6 +63,8 @@
     onkeydown,
     onfocus,
     onmousedown,
+    keyboardRegion,
+    regionActive = false,
   }: Props = $props()
 
   const narrow = $derived(getLayoutMode() === 'narrow')
@@ -74,10 +78,14 @@
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <aside
   bind:this={containerRef}
+  data-keyboard-region={keyboardRegion}
+  data-keyboard-region-visible={!narrow || overlayVisible}
+  data-keyboard-region-focus-target={keyboardRegion ? '' : undefined}
+  data-region-active={keyboardRegion ? regionActive : undefined}
   role="navigation"
   aria-label={label ?? title ?? 'Sidebar'}
   tabindex={focusable ? 0 : undefined}
-  class="flex-shrink-0 flex flex-col {title ? '' : 'pt-3'} border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {extraClass}"
+  class="{keyboardRegion ? 'keyboard-region' : ''} flex-shrink-0 flex flex-col {title ? '' : 'pt-3'} border-r border-border outline-none {narrow ? 'bg-background' : 'bg-muted/30'} {narrow ? 'responsive-sidebar-overlay' : ''} {overlayVisible ? 'responsive-sidebar-visible' : ''} {extraClass}"
   style="width: {paneWidth}px"
   {onkeydown}
   {onfocus}

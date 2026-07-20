@@ -4,6 +4,18 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Aligned the Backup Viewer directory picker with the right edge of the message
+  list.
+- Restored consistent modal keyboard behavior, including Escape-to-close, Tab
+  focus containment and restoration, mail-search Escape handling, and scoped
+  folder-picker navigation keys.
+- Unified Mail and Contacts around four persistent keyboard regions with
+  cyclic Tab navigation, independent region/selection indicators, input and
+  IME safeguards, and two-region Settings navigation.
+- Kept non-empty mail lists synchronized with a visible detail after Escape,
+  folder changes, refreshes, and deletion; removed Conversation Viewer Tab
+  message switching and converted Backup Viewer messages to roving tabindex.
+
 ## [0.5.3] — 2026-07-19
 
 - Moved the Backup Viewer attachment marker to the left edge of message rows.

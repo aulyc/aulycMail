@@ -14,6 +14,7 @@
   // groups in a later phase.
 
   import Icon from '@iconify/svelte'
+  import { tick } from 'svelte'
   import { _ } from 'svelte-i18n'
   import ListPane from '$lib/components/kit/ListPane.svelte'
   import ListRow from '$lib/components/kit/ListRow.svelte'
@@ -27,6 +28,8 @@
   // markup and trailing action buttons.
   import ListHeader from '$lib/components/kit/ListHeader.svelte'
   import { getUIState, getUIStateVersion } from '$lib/stores/uiState.svelte'
+  import { focusPane, getFocusedPane, isMainKeyboardScope, setFocusedPane } from '$lib/stores/keyboard.svelte'
+  import { getResponsiveView, isResponsive } from '$lib/stores/layout.svelte'
   // @ts-ignore - wailsjs bindings
   import type { contactdto } from '$wailsjs/go/models'
 
@@ -50,6 +53,7 @@
   // making it $state adds overhead without benefit.
   let searchInputEl: HTMLInputElement | null = null
   let sortOrder = $state<SortOrder>('name-asc')
+  let regionEl = $state<HTMLElement | null>(null)
 
   // Delete-confirmation state for keyboard-triggered deletes. ContactDetail
   // has its own button-triggered confirm dialog; this one fires when the user
@@ -95,11 +99,13 @@
       // navigation works immediately on filtered results.
       e.preventDefault()
       searchInputEl?.blur()
+      void tick().then(() => focusPane('messageList'))
       return
     }
     if (e.key === 'Escape') {
       e.preventDefault()
       clearSearch()
+      void tick().then(() => focusPane('messageList'))
     }
   }
 
@@ -206,9 +212,27 @@
   })
 
   const headerCount = $derived(contactsView.total)
+
+  function claimListRegion(event: MouseEvent) {
+    setFocusedPane('messageList')
+    if (!(event.target instanceof Element)) return
+    if (event.target.closest('button, a, input, textarea, select, [contenteditable="true"]')) return
+    regionEl?.querySelector<HTMLElement>('[data-keyboard-region-focus-target]')?.focus({ preventScroll: true })
+  }
 </script>
 
-<div class="flex-shrink-0 min-h-0 flex flex-col border-r border-border bg-background" style="width: {listWidth}px">
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+<div
+  bind:this={regionEl}
+  role="region"
+  aria-label={headerLabel}
+  data-keyboard-region="messageList"
+  data-keyboard-region-visible={!isResponsive() || getResponsiveView() === 'default'}
+  data-region-active={isMainKeyboardScope() && getFocusedPane() === 'messageList'}
+  class="keyboard-region flex-shrink-0 min-h-0 flex flex-col border-r border-border bg-background"
+  style="width: {listWidth}px"
+  onmousedown={claimListRegion}
+>
   <ListHeader
     label={headerLabel}
     count={headerCount}

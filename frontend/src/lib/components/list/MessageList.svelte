@@ -50,6 +50,8 @@
     findFolderSyncDescriptor,
     shouldAutoSyncFolderOnOpen,
   } from './folderOpenSync'
+  import { resolveRequiredSelectionIndex } from './requiredSelection'
+  import { focusPane } from '$lib/stores/keyboard.svelte'
 
   interface Props {
     accountId?: string | null
@@ -57,6 +59,8 @@
     folderName?: string
     folderType?: string
     onConversationSelect?: (threadId: string, folderId: string, accountId: string) => void
+    /** Keeps the detail synchronized with arrow navigation without revealing a responsive overlay. */
+    onConversationFocus?: (threadId: string, folderId: string, accountId: string) => void
     /** Called when the loaded folder has no conversations (so the parent can clear the viewer). */
     onEmptyFolder?: () => void
     onReply?: (mode: 'reply' | 'reply-all' | 'forward', messageId: string) => void
@@ -76,6 +80,7 @@
     folderName = 'Inbox',
     folderType = 'inbox',
     onConversationSelect,
+    onConversationFocus,
     onEmptyFolder,
     onReply,
     onRowActionComplete,
@@ -125,6 +130,7 @@
   // Deferred reload: when a dialog (e.g. folder picker) is open, defer the reload
   // so the component tree isn't destroyed mid-interaction
   let pendingReload = false
+  let pendingPreferredSelectionIndex: number | null = null
   let eventUnsubscribers: Array<() => void> = []
 
   // Buffer for flag changes that arrive while loadConversations() is in-flight.
@@ -451,15 +457,19 @@
   // Check if viewing unified inbox
   const isUnifiedView = $derived(accountId === 'unified' && folderId === 'inbox')
 
-  async function loadConversations(customLimit?: number) {
+  async function loadConversations(customLimit?: number, preferredSelectionIndex = 0) {
     // For unified view, we don't need accountId/folderId
     if (!isUnifiedView && (!accountId || !folderId)) return
 
     // Prevent concurrent loads — defer instead of dropping
     if (loading) {
       pendingReload = true
+      pendingPreferredSelectionIndex = preferredSelectionIndex
       return
     }
+
+    const effectivePreferredSelectionIndex = pendingPreferredSelectionIndex ?? preferredSelectionIndex
+    pendingPreferredSelectionIndex = null
 
     loading = true
     error = null
@@ -516,29 +526,27 @@
       folderNavLoad = false
       lastLoadedFolderId = folderId // still used by the pagination-exhausted check
 
-      // Auto-select first message on folder navigation or initial load
+      // A successful empty result is authoritative for the visible folder.
       if (conversations.length === 0) {
         totalCount = count
-        // Only clear the selection / viewer when navigating to an empty folder.
-        // A transient empty result from a background reload leaves the current
-        // selection untouched.
-        if (folderChanged) {
+        if (!isSearchMode) {
           selectedThreadId = null
-          if (getLayoutMode() !== 'narrow') onEmptyFolder?.()
+          onEmptyFolder?.()
         }
         return
       }
 
-      if (folderChanged || !selectedThreadId) {
-        selectedThreadId = conversations[0].threadId
-        // Also open it in the viewer so the right pane reflects the highlighted
-        // first row. In narrow layout the viewer is an overlay, so don't
-        // force it open on a folder switch.
-        if (getLayoutMode() !== 'narrow') {
-          const first = conversations[0] as any
-          const realFolderId = isUnifiedView && first.folderId ? first.folderId : folderId!
-          const realAccountId = isUnifiedView && first.accountId ? first.accountId : accountId!
-          onConversationSelect?.(first.threadId, realFolderId, realAccountId)
+      if (!isSearchMode) {
+        const selectedIndex = resolveRequiredSelectionIndex(
+          conversations.map((conversation) => conversation.threadId),
+          selectedThreadId,
+          effectivePreferredSelectionIndex,
+        )
+        const selected = conversations[selectedIndex]
+        const selectionChanged = selectedThreadId !== selected.threadId
+        selectedThreadId = selected.threadId
+        if (folderChanged || selectionChanged) {
+          emitConversationSelection(selected as any, false, isUnifiedView)
         }
       }
       totalCount = count
@@ -635,7 +643,7 @@
   }
 
   // Perform the actual search
-  async function performSearch() {
+  async function performSearch(preferredSelectionIndex = 0) {
     const query = searchQuery.trim()
     if (!query) {
       searchResults = []
@@ -663,9 +671,15 @@
       })
       searchResults = results || []
       searchTotalCount = count
-      // Auto-select first search result for keyboard navigation
       if (searchResults.length > 0) {
-        selectedThreadId = searchResults[0].threadId
+        const selectedIndex = resolveRequiredSelectionIndex(
+          searchResults.map((conversation) => conversation.threadId),
+          selectedThreadId,
+          preferredSelectionIndex,
+        )
+        const selected = searchResults[selectedIndex]
+        selectedThreadId = selected.threadId
+        emitConversationSelection(selected, false, true)
       }
     } catch (err) {
       console.error('Search failed:', err)
@@ -722,11 +736,29 @@
     lastServerQuery = ''
     isServerSearching = false
     searchDebouncer.cancel()
+    const selectedIndex = resolveRequiredSelectionIndex(
+      conversations.map((conversation) => conversation.threadId),
+      selectedThreadId,
+    )
+    if (selectedIndex >= 0) {
+      const selected = conversations[selectedIndex]
+      selectedThreadId = selected.threadId
+      emitConversationSelection(selected as any, false, isUnifiedView)
+    } else if (conversations.length === 0) {
+      selectedThreadId = null
+      onEmptyFolder?.()
+    }
   }
 
   // Handle keyboard events in search input
   function handleSearchKeydown(event: KeyboardEvent) {
     switch (true) {
+      case event.key === 'Escape':
+        event.preventDefault()
+        event.stopPropagation()
+        clearSearch()
+        void tick().then(() => listContainerRef?.focus())
+        break
       case event.key === 'Enter' && event.shiftKey:
         event.preventDefault()
         if (isUnifiedView) return
@@ -779,7 +811,13 @@
       serverSearchCount = items.length
       serverSearchTotalCount = response.totalCount
       if (items.length > 0) {
-        selectedThreadId = items[0].threadId
+        const selectedIndex = resolveRequiredSelectionIndex(
+          items.map((conversation) => conversation.threadId),
+          selectedThreadId,
+        )
+        const selected = items[selectedIndex]
+        selectedThreadId = selected.threadId
+        emitConversationSelection(selected, false, true)
       }
     } catch (err) {
       console.error('Server search failed:', err)
@@ -803,6 +841,23 @@
       ? (serverSearchMode ? serverSearchTotalCount : searchTotalCount)
       : totalCount
   )
+
+  function conversationLocation(conversation: any, useItemLocation: boolean) {
+    return {
+      realFolderId: useItemLocation && conversation.folderId ? conversation.folderId : folderId!,
+      realAccountId: useItemLocation && conversation.accountId ? conversation.accountId : accountId!,
+    }
+  }
+
+  function emitConversationSelection(conversation: any, activate: boolean, useItemLocation: boolean) {
+    const { realFolderId, realAccountId } = conversationLocation(conversation, useItemLocation)
+    if (serverSearchMode && conversation._isLocal === false && conversation._uid) {
+      void fetchAndSelectServerResult(conversation, realFolderId, realAccountId, activate)
+      return
+    }
+    const callback = activate ? onConversationSelect : onConversationFocus
+    callback?.(conversation.threadId, realFolderId, realAccountId)
+  }
 
   // A row is shown selected (highlighted) if it's in the multi-selection set;
   // when nothing is multi-selected, the single open conversation is highlighted.
@@ -846,21 +901,17 @@
       scrollToIndex(index, 'start')
     }
 
-    // For unified view or search, use real folderId and accountId from conversation data
     const conversation = activeList[index] as any
-    const realFolderId = (isUnifiedView || isSearchMode) && conversation.folderId ? conversation.folderId : folderId!
-    const realAccountId = (isUnifiedView || isSearchMode) && conversation.accountId ? conversation.accountId : accountId!
-
-    // If this is a non-local server result, fetch it first
-    if (serverSearchMode && conversation._isLocal === false && conversation._uid) {
-      fetchAndSelectServerResult(conversation, realFolderId, realAccountId)
-      return
-    }
-    onConversationSelect?.(threadId, realFolderId, realAccountId)
+    emitConversationSelection(conversation, true, isUnifiedView || isSearchMode)
   }
 
   // Fetch a non-local server result, save locally, update the result, then select
-  async function fetchAndSelectServerResult(conversation: any, realFolderId: string, realAccountId: string) {
+  async function fetchAndSelectServerResult(
+    conversation: any,
+    realFolderId: string,
+    realAccountId: string,
+    activate: boolean,
+  ) {
     try {
       const msg = await FetchServerMessage(realAccountId, realFolderId, conversation._uid)
       if (msg) {
@@ -878,7 +929,8 @@
           serverSearchResults = serverSearchResults
           selectedThreadId = serverSearchResults[idx].threadId
         }
-        onConversationSelect?.(msg.threadId || msg.id, realFolderId, realAccountId)
+        const callback = activate ? onConversationSelect : onConversationFocus
+        callback?.(msg.threadId || msg.id, realFolderId, realAccountId)
       }
     } catch (err) {
       console.error('Failed to fetch server message:', err)
@@ -895,7 +947,7 @@
 
     // If in search mode, refresh search results instead of conversations
     if (isSearchMode) {
-      performSearch().then(() => {
+      performSearch(autoSelectNext ? currentIndex : 0).then(() => {
         // Restore scroll position
         if (listContainerRef) {
           requestAnimationFrame(() => {
@@ -903,25 +955,7 @@
           })
         }
 
-        // Auto-select next message if requested
-        if (autoSelectNext) {
-          const isNarrow = getLayoutMode() === 'narrow'
-          if (isNarrow) {
-            hideViewer()
-          }
-          if (currentIndex >= 0 && searchResults.length > 0) {
-            const newIndex = Math.min(currentIndex, searchResults.length - 1)
-            const conv = searchResults[newIndex]
-            if (conv) {
-              if (isNarrow) {
-                selectedThreadId = conv.threadId
-              }
-              if (!isNarrow) {
-                selectConversation(conv.threadId, newIndex)
-              }
-            }
-          }
-        }
+        if (autoSelectNext && getLayoutMode() === 'narrow') hideViewer()
       })
       return
     }
@@ -931,7 +965,7 @@
     const totalLoaded = Math.max(conversations.length, PAGE_SIZE)
     offset = 0
 
-    loadConversations(totalLoaded).then(() => {
+    loadConversations(totalLoaded, autoSelectNext ? currentIndex : 0).then(() => {
       // Restore scroll position
       if (listContainerRef) {
         requestAnimationFrame(() => {
@@ -939,26 +973,7 @@
         })
       }
 
-      // Auto-select next message if requested (for delete/archive/spam actions)
-      // After reload, the same index now points to what was the "next" message
-      if (autoSelectNext) {
-        const isNarrow = getLayoutMode() === 'narrow'
-        if (isNarrow) {
-          hideViewer()
-        }
-        if (currentIndex >= 0 && conversations.length > 0) {
-          const newIndex = Math.min(currentIndex, conversations.length - 1)
-          const conv = conversations[newIndex]
-          if (conv) {
-            if (isNarrow) {
-              selectedThreadId = conv.threadId
-            }
-            if (!isNarrow) {
-              selectConversation(conv.threadId, newIndex)
-            }
-          }
-        }
-      }
+      if (autoSelectNext && getLayoutMode() === 'narrow') hideViewer()
 
     })
   }
@@ -1065,6 +1080,17 @@
     return activeList.findIndex(c => c.threadId === selectedThreadId)
   }
 
+  function focusConversationAtIndex(index: number) {
+    const conv = activeList[index] as any
+    if (!conv) return
+    if (checkedThreadIds.size > 0) checkedThreadIds = new Set()
+    selectedThreadId = conv.threadId
+    lastClickedIndex = index
+    scrollToIndex(index)
+    emitConversationSelection(conv, false, isUnifiedView || isSearchMode)
+    focusPane('messageList')
+  }
+
   // Select previous message (exposed for keyboard navigation)
   // Moves the single selection; collapses any multi-selection back to single.
   export function selectPrevious() {
@@ -1073,41 +1099,32 @@
     const currentIndex = getSelectedIndex()
     const newIndex = currentIndex <= 0 ? 0 : currentIndex - 1
 
-    const conv = activeList[newIndex]
-    if (conv) {
-      if (checkedThreadIds.size > 0) checkedThreadIds = new Set()
-      selectedThreadId = conv.threadId
-      lastClickedIndex = newIndex
-      scrollToIndex(newIndex)
-      // Blur any focused element so Enter key triggers openSelected() instead of the button
-      ;(document.activeElement as HTMLElement)?.blur?.()
-    }
+    focusConversationAtIndex(newIndex)
   }
 
   // Select next message (exposed for keyboard navigation)
   // Moves the single selection; collapses any multi-selection back to single.
-  export function selectNext() {
+  export async function selectNext() {
     if (activeList.length === 0) return
 
-    const currentIndex = getSelectedIndex()
+    let currentIndex = getSelectedIndex()
 
-    // If at last message and more are available, focus the "Load more" button
+    // Page forward without moving DOM focus to the load-more button. The list
+    // remains a single keyboard region and the first newly loaded row becomes
+    // the next selection.
     if (currentIndex >= activeList.length - 1 && activeList.length < activeCount) {
-      loadMoreButtonRef?.focus()
-      return
+      const previousLength = activeList.length
+      if (isSearchMode && !serverSearchMode) {
+        await loadMoreSearchResults()
+      } else if (!isSearchMode) {
+        offset = conversations.length
+        await loadConversations()
+      }
+      if (activeList.length > previousLength) currentIndex = previousLength - 1
     }
 
     const newIndex = currentIndex >= activeList.length - 1 ? activeList.length - 1 : currentIndex + 1
-
-    const conv = activeList[newIndex]
-    if (conv) {
-      if (checkedThreadIds.size > 0) checkedThreadIds = new Set()
-      selectedThreadId = conv.threadId
-      lastClickedIndex = newIndex
-      scrollToIndex(newIndex)
-      // Blur any focused element so Enter key triggers openSelected() instead of the button
-      ;(document.activeElement as HTMLElement)?.blur?.()
-    }
+    focusConversationAtIndex(newIndex)
   }
 
   // Open the currently selected conversation (exposed for keyboard navigation)
@@ -1117,9 +1134,7 @@
     const index = getSelectedIndex()
     if (index >= 0) {
       const conv = activeList[index] as any
-      const realFolderId = (isUnifiedView || isSearchMode) && conv.folderId ? conv.folderId : folderId!
-      const realAccountId = (isUnifiedView || isSearchMode) && conv.accountId ? conv.accountId : accountId!
-      onConversationSelect?.(selectedThreadId, realFolderId, realAccountId)
+      emitConversationSelection(conv, true, isUnifiedView || isSearchMode)
     }
   }
 
@@ -1660,6 +1675,7 @@
             {conversation}
             density={getMessageListDensity()}
             selected={isRowSelected(conversation.threadId)}
+            current={selectedThreadId === conversation.threadId}
             checked={checkedThreadIds.has(conversation.threadId)}
             accountId={resolvedAccountId}
             folderId={resolvedFolderId}
@@ -1691,6 +1707,7 @@
   <div
     bind:this={listContainerRef}
     bind:clientHeight={listViewportHeight}
+    tabindex="-1"
     class="flex-1 overflow-y-auto scrollbar-thin"
     onscroll={handleListScroll}
   >

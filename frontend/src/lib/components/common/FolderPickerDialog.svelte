@@ -168,8 +168,14 @@
     return folderIcons[type] || folderIcons.folder
   }
 
+  function eventTargetsFolderNavigation(event: KeyboardEvent): boolean {
+    const target = event.target
+    if (!(target instanceof Node)) return false
+    return target === searchInput || Boolean(listEl?.contains(target))
+  }
+
   function handleKeydown(e: KeyboardEvent) {
-    if (!active) return
+    if (!active || !eventTargetsFolderNavigation(e)) return
     const folders = displayFolders()
     if (folders.length === 0) return
 

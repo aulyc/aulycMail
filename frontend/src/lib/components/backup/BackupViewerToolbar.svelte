@@ -68,10 +68,10 @@
 </script>
 
 <header class="relative z-20 grid shrink-0 grid-cols-[42%_minmax(0,1fr)] items-center overflow-visible border-b border-border py-2">
-  <div class="flex min-w-0 items-center gap-3 px-4">
+  <div data-backup-viewer-list-toolbar class="flex min-w-0 items-center gap-3 pl-4">
     <h2 class="shrink-0 text-lg font-semibold">{$_('backupViewer.title')}</h2>
 
-    <div class="w-[340px] min-w-[240px] shrink">
+    <div class="min-w-[240px] flex-1">
       <BackupDirectoryPicker
         bind:menuOpen={directoryMenuOpen}
         {directory}

@@ -127,6 +127,7 @@
 
   // Handle folder selection
   function handleFolderSelect(accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) {
+    focusedAccountId = null
     accountStore.selectFolder(accountId, folderId, folderPath, folderName)
     onFolderSelect?.(accountId, folderId, folderPath, folderName, folderType)
   }
@@ -436,11 +437,15 @@
           selectedFolderId={accountStore.selectedFolder?.folderId ?? selectedFolderId ?? ''}
           {selectionSource}
           isHeaderFocused={focusedAccountId === accWithFolders.account.id}
+          showFolderKeyboardSelection={focusedAccountId === null}
           isExpanded={expandedAccounts[accWithFolders.account.id] ?? true}
           {collapsedFolders}
           {onMessagesMoved}
           onFolderSelect={handleFolderSelect}
-          onToggleExpanded={() => toggleAccountExpanded(accWithFolders.account.id)}
+          onToggleExpanded={() => {
+            focusedAccountId = accWithFolders.account.id
+            toggleAccountExpanded(accWithFolders.account.id)
+          }}
           onToggleFolderCollapse={toggleFolderCollapsed}
         />
       {/each}

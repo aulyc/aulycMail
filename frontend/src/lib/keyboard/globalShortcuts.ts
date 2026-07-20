@@ -2,6 +2,7 @@ import { KEY } from './shortcuts'
 import {
   focusNextPane,
   focusPreviousPane,
+  focusCurrentPane,
   getFocusedPane,
   getPaneNav,
   isInputElement,
@@ -36,7 +37,6 @@ export interface GlobalShortcutContext {
   setSearchOverlay(open: boolean): void
   setFocusMode(mode: FocusMode): void
   setFocusedMessageIdInFocus(messageId: string | null): void
-  clearConversation(): void
   focusContextMenu(): void
   handleQuit(): void
   handleCompose(): void
@@ -52,6 +52,7 @@ export interface GlobalShortcutContext {
 
 export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContext): void {
   if (e.defaultPrevented) return
+  if (e.isComposing || e.keyCode === 229) return
 
   const inInput = isInputElement(e.target)
   const focusedPane = getFocusedPane()
@@ -72,6 +73,14 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
       e.preventDefault()
       return
     }
+    return
+  }
+
+  if (e.key === 'Tab' && !inInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (e.shiftKey) focusPreviousPane()
+    else focusNextPane()
     return
   }
 
@@ -299,7 +308,15 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
     return
   }
 
-  if (inInput) return
+  if (inInput) {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      ;(e.target as HTMLElement | null)?.blur?.()
+      requestAnimationFrame(() => focusCurrentPane())
+    }
+    return
+  }
 
   if (e.key === 'Escape') {
     if (ctx.focusMode !== 'off') {
@@ -317,14 +334,15 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
     }
     if (ctx.messageListRef?.hasCheckedMessages()) {
       ctx.messageListRef.clearChecked()
-    } else if (ctx.selectedThreadId) {
-      ctx.clearConversation()
     }
     return
   }
 
+  // Pane-local handlers own non-mail navigation and actions. Nothing below
+  // this point may operate the always-mounted, currently hidden mail tree.
+  if (!isMailActive()) return
+
   if (KEY.LIST_PREV(e) || KEY.LIST_PREV_CHECK(e)) {
-    if (!isMailActive()) return
     e.preventDefault()
     if (focusedPane === 'sidebar') {
       ctx.sidebarRef?.selectPreviousFolder()
@@ -337,7 +355,6 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
     return
   }
   if (KEY.LIST_NEXT(e) || KEY.LIST_NEXT_CHECK(e)) {
-    if (!isMailActive()) return
     e.preventDefault()
     if (focusedPane === 'sidebar') {
       ctx.sidebarRef?.selectNextFolder()

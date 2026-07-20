@@ -43,12 +43,12 @@
     selectedScrollBlock?: ScrollBlock
 
     /** Fired on j/k/Arrow navigation when the highlighted row changes.
-     *  Semantics: this is "focus change," NOT "open." Consumers should use
-     *  it to update their selectedId state and refresh visual highlight — and
-     *  nothing else. In particular: do NOT load detail / open viewer here. */
+     *  This is selection, not activation: consumers should update both their
+     *  selected-row state and any already-visible detail, but must not reveal
+     *  a responsive overlay until onActivate fires. */
     onSelect: (id: string) => void
     /** Fired on Enter when an item is activated. Consumers wire actual "open"
-     *  behavior here (load detail, slide in the viewer overlay, etc.). When
+     *  behavior here (for example, slide in the viewer overlay). When
      *  absent, Enter is a no-op — there is intentionally no fallback to
      *  onSelect so consumers can't accidentally couple "highlight changed" with
      *  "viewer opens." Mouse clicks on rows fire onActivate via the canonical
@@ -166,6 +166,7 @@
   }
 
   function handleKeyDown(e: KeyboardEvent) {
+    if (e.isComposing || e.keyCode === 229) return
     // Range-extend (Shift+J / Shift+ArrowDown / Shift+K / Shift+ArrowUp) —
     // checked before LIST_NEXT/PREV because those predicates require !shiftKey.
     // Match mail's selectNextWithCheck / selectPreviousWithCheck pattern: cursor
@@ -293,6 +294,7 @@
 
 <div
   bind:this={containerRef}
+  data-keyboard-region-focus-target
   role="listbox"
   aria-label={label ?? 'List'}
   tabindex="0"

@@ -13,6 +13,7 @@
     conversation: message.Conversation
     density?: 'micro' | 'compact' | 'standard' | 'large'
     selected: boolean
+    current?: boolean
     checked: boolean
     accountId: string
     folderId: string
@@ -37,6 +38,7 @@
     conversation,
     density = 'standard',
     selected,
+    current = false,
     checked,
     accountId,
     folderId: _folderId,
@@ -198,7 +200,7 @@
 	  data-row-index={rowIndex}
 	  draggable="true"
 	  style="height: {densityRowHeight[density]}px; min-height: {densityRowHeight[density]}px;"
-	  class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
+	  class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {current ? 'keyboard-selected-item' : ''} {selected
 	    ? 'bg-primary/20'
 	    : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
   onclick={(e) => onSelect(e)}

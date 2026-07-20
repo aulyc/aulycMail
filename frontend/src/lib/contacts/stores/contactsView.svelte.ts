@@ -39,6 +39,7 @@ let loadingMore = $state<boolean>(false)
 let listResetSignal = $state(0)
 let selectedContactScrollTopSignal = $state(0)
 let contactsLoadSeq = 0
+let contactDetailSeq = 0
 
 export const contactsView = {
   get selectedSourceId(): string {
@@ -83,6 +84,7 @@ export function selectSource(sourceId: string): void {
   selectedSourceId = sourceId
   selectedContactId = null
   detail = null
+  contactDetailSeq += 1
   // Switching category resets the search filter so the new category shows all
   // its contacts (not the intersection with a lingering query). The ContactList
   // mirrors this by clearing its own search input + closing the search bar.
@@ -98,7 +100,7 @@ export function setSearchQuery(q: string): void {
   searchQuery = q
 }
 
-export async function reloadContacts(limit = CONTACTS_PAGE_SIZE, offset = 0): Promise<void> {
+export async function reloadContacts(limit = CONTACTS_PAGE_SIZE, offset = 0, preferredIndex = 0): Promise<void> {
   const seq = ++contactsLoadSeq
   loading = true
   loadingMore = false
@@ -107,6 +109,14 @@ export async function reloadContacts(limit = CONTACTS_PAGE_SIZE, offset = 0): Pr
     if (seq === contactsLoadSeq) {
       contacts = result?.items || []
       total = result?.total ?? contacts.length
+      if (contacts.length === 0) {
+        selectedContactId = null
+        detail = null
+        contactDetailSeq += 1
+      } else if (!selectedContactId || !contacts.some((contact) => contact.id === selectedContactId)) {
+        const index = Math.max(0, Math.min(preferredIndex, contacts.length - 1))
+        await focusContact(contacts[index].id)
+      }
     }
   } catch (err) {
     console.error('Failed to list contacts for browse:', err)
@@ -144,43 +154,36 @@ export async function loadMoreContacts(limit = CONTACTS_PAGE_SIZE): Promise<void
   }
 }
 
-// Focus-vs-activate split mirrors mail's MessageList behavior (and is
-// enforced by the kit's ListPane semantics — see ListPane.svelte's onSelect
-// and onActivate docstrings):
+// Focus-vs-activate keeps keyboard selection and responsive presentation
+// separate while ensuring the detail follows the selected contact:
 //
-//   focusContact(id)    — j/k navigation. Updates the highlighted row only.
-//                         Does NOT load detail, does NOT slide in the viewer.
-//   activateContact(id) — Enter key or row click. Loads detail and (on
-//                         responsive viewports) reveals the viewer overlay.
-//
-// Programmatic callers that want the "old" combined behavior (e.g.,
-// post-create navigation in ContactsPane.handleCreated) call
-// activateContact(id) explicitly.
+//   focusContact(id)    — arrows update the highlighted row and detail without
+//                         opening a responsive overlay.
+//   activateContact(id) — Enter or a row click also reveals the overlay.
 
-export function focusContact(id: string | null): void {
+async function selectContact(id: string | null, reveal: boolean): Promise<void> {
   selectedContactId = id
-  if (!id) {
-    detail = null
-  }
-  // Intentionally NO detail load and NO showViewer here — focus changes
-  // should not move data on/off the network or trigger overlay animations.
-}
-
-export async function activateContact(id: string | null): Promise<void> {
-  selectedContactId = id
+  const seq = ++contactDetailSeq
   if (!id) {
     detail = null
     return
   }
-  // On responsive viewports, reveal the detail pane overlay. Self-gating
-  // store call — no-op on full layout.
-  if (isResponsive()) showViewer()
+  if (reveal && isResponsive()) showViewer()
   try {
-    detail = await GetContactDetail(id)
+    const loaded = await GetContactDetail(id)
+    if (seq === contactDetailSeq && selectedContactId === id) detail = loaded
   } catch (err) {
     console.error('Failed to load contact detail:', err)
-    detail = null
+    if (seq === contactDetailSeq && selectedContactId === id) detail = null
   }
+}
+
+export async function focusContact(id: string | null): Promise<void> {
+  await selectContact(id, false)
+}
+
+export async function activateContact(id: string | null): Promise<void> {
+  await selectContact(id, true)
 }
 
 export async function activateContactFromGlobalSearch(id: string): Promise<void> {
@@ -208,12 +211,13 @@ export async function updateContact(id: string, patch: contactdto.ContactPatch):
 // Delete a local (sent-recipient) contact entirely. After deletion the list
 // reloads and detail view clears.
 export async function deleteLocalContact(email: string): Promise<void> {
+  const deletedIndex = contacts.findIndex((contact) => contact.id === email)
   await DeleteLocalContact(email)
   if (selectedContactId === email) {
     selectedContactId = null
     detail = null
   }
-  await reloadContacts()
+  await reloadContacts(CONTACTS_PAGE_SIZE, 0, Math.max(0, deletedIndex))
 }
 
 // Create a local manual contact. The backend rejects collected/remote source

@@ -260,42 +260,12 @@
       })
     )
 
-    // Keyboard handler for message navigation and deletion
+    // Focused-message deletion stays local to the viewer. Region-level Tab
+    // navigation is owned by the app's single global shortcut dispatcher.
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.isComposing || e.keyCode === 229) return
       // Only handle if viewer pane is focused
       if (!isFocused) return
-
-      // Handle Tab for message navigation. preventDefault is called only when
-      // we actually navigate, so at the first/last boundary native Tab passes
-      // through and the user can leave the viewer normally.
-      if (e.key === 'Tab' && conversation?.messages) {
-        const messageIds = conversation.messages.map(m => m.id)
-        const currentIndex = focusedMessageId ? messageIds.indexOf(focusedMessageId) : -1
-
-        if (e.shiftKey) {
-          if (currentIndex > 0) {
-            e.preventDefault()
-            focusedMessageId = messageIds[currentIndex - 1]
-            ;(document.querySelector(`[data-message-id="${focusedMessageId}"]`) as HTMLElement)?.focus()
-          }
-          // currentIndex <= 0: let native Shift+Tab navigate out of the viewer
-          return
-        }
-
-        if (currentIndex >= 0 && currentIndex < messageIds.length - 1) {
-          e.preventDefault()
-          focusedMessageId = messageIds[currentIndex + 1]
-          ;(document.querySelector(`[data-message-id="${focusedMessageId}"]`) as HTMLElement)?.focus()
-          return
-        }
-        if (currentIndex === -1 && messageIds.length > 0) {
-          e.preventDefault()
-          focusedMessageId = messageIds[0]
-          ;(document.querySelector(`[data-message-id="${focusedMessageId}"]`) as HTMLElement)?.focus()
-        }
-        // At last message (currentIndex === messageIds.length - 1): let native Tab navigate out
-        return
-      }
 
       // Handle delete for focused message. Guard against the composer-mount
       // focus race (a keystroke fired between Reply click and TipTap focus)
@@ -1122,7 +1092,7 @@
       </button>
     </div>
   {:else if conversation}
-    <div class="conversation-viewer-content flex flex-col h-full">
+    <div class="conversation-viewer-content keyboard-selected-item flex flex-col h-full">
     <!-- Header with Actions — all icons in one continuous row, no grouping -->
     <div class="flex items-center gap-1 px-4 py-3 border-b border-border">
       {#if showBackButton}

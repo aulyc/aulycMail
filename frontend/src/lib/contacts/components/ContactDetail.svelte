@@ -307,7 +307,7 @@
       </div>
 
       <!-- Scrolling related-mail list (pr-3 keeps the scrollbar off the date) -->
-      <div class="flex-1 min-h-0 overflow-y-auto scrollbar-thin border-t border-border pr-3">
+      <div data-keyboard-detail-scroll class="flex-1 min-h-0 overflow-y-auto scrollbar-thin border-t border-border pr-3">
         {#if loadingMessages}
           <div class="flex items-center gap-2 text-sm text-muted-foreground py-2">
             <Icon icon="mdi:loading" class="w-4 h-4 animate-spin" />

@@ -29,6 +29,7 @@
     removeBackupDirectory,
   } from '$lib/utils/backup-directory-history'
   import { dialogGuardClose, dialogGuardOpen } from '$lib/stores/dialogGuard'
+  import { nextRovingIndex, type RovingNavigationKey } from '$lib/keyboard/regionNavigation'
 
   interface Props {
     open?: boolean
@@ -73,6 +74,7 @@
   let searchInputEl = $state<HTMLInputElement | null>(null)
   const searchDebouncer = createDebouncer(200)
   let searchSeq = 0
+  let messageDetailSeq = 0
   let composing = false
   let guardActive = false
   const messagePageSize = 200
@@ -95,6 +97,9 @@
     return `background-color: ${styles.surfaceBackground}; --backup-viewer-content-filter: ${styles.contentFilter}; --backup-viewer-media-filter: ${styles.mediaFilter};`
   })
   const visibleMessages = $derived(messages)
+  const hasValidMessageSelection = $derived(
+    visibleMessages.some((message) => message.key === selectedMessageKey),
+  )
 
   $effect(() => {
     if (open) {
@@ -195,6 +200,7 @@
     messagesTotal = 0
     selectedAccountEmail = ''
     selectedMessageKey = ''
+    messageDetailSeq += 1
     detail = null
     loadingCatalog = false
     loadingMessages = false
@@ -217,6 +223,7 @@
     messagesTotal = 0
     detail = null
     selectedMessageKey = ''
+    messageDetailSeq += 1
     selectedAccountEmail = ''
     directory = dir.trim()
     try {
@@ -312,6 +319,7 @@
       messages = []
       messagesTotal = 0
       selectedMessageKey = ''
+      messageDetailSeq += 1
       detail = null
     } else {
       loadingMoreMessages = true
@@ -342,6 +350,7 @@
     const first = visibleMessages[0]
     if (!first) {
       selectedMessageKey = ''
+      messageDetailSeq += 1
       detail = null
       return
     }
@@ -351,21 +360,24 @@
   async function selectMessage(key: string) {
     if (!directory.trim() || !key) return
     selectedMessageKey = key
+    const seq = ++messageDetailSeq
     loadingDetail = true
     errorMessage = ''
     try {
       const loadedDetail = await GetBackupViewerMessage(directory, key)
+      if (seq !== messageDetailSeq || selectedMessageKey !== key) return
       detail = loadedDetail
       errorMessage = ''
       attachmentsExpanded = true
       updateMessageAttachmentCount(key, loadedDetail?.attachments?.length ?? 0)
     } catch (err) {
+      if (seq !== messageDetailSeq || selectedMessageKey !== key) return
       console.error('Failed to load backup message:', err)
       detail = null
       const reason = describeError(err)
       errorMessage = reason ? `${$_('backupViewer.messageLoadFailed')}: ${reason}` : $_('backupViewer.messageLoadFailed')
     } finally {
-      loadingDetail = false
+      if (seq === messageDetailSeq) loadingDetail = false
     }
   }
 
@@ -383,11 +395,56 @@
     messageListEl?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  function scrollMessageIntoView(key: string) {
+  function scrollMessageIntoView(
+    key: string,
+    block: 'start' | 'center' | 'end' | 'nearest' = 'nearest',
+  ) {
     if (!messageListEl || !key) return
     const row = [...messageListEl.querySelectorAll<HTMLElement>('[data-backup-message-key]')]
       .find((element) => element.dataset.backupMessageKey === key)
-    row?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    row?.scrollIntoView({ block, behavior: 'smooth' })
+  }
+
+  function focusMessageRow(key: string) {
+    if (!messageListEl || !key) return
+    const row = [...messageListEl.querySelectorAll<HTMLElement>('[data-backup-message-key]')]
+      .find((element) => element.dataset.backupMessageKey === key)
+    row?.focus({ preventScroll: true })
+  }
+
+  async function moveMessageSelection(key: RovingNavigationKey) {
+    if (visibleMessages.length === 0) return
+    const currentIndex = visibleMessages.findIndex((message) => message.key === selectedMessageKey)
+    const nextIndex = nextRovingIndex(key, currentIndex, visibleMessages.length)
+    const next = visibleMessages[nextIndex]
+    if (!next) return
+    void selectMessage(next.key)
+    await tick()
+    scrollMessageIntoView(next.key)
+    focusMessageRow(next.key)
+  }
+
+  function handleMessageListFocus() {
+    if (hasValidMessageSelection || visibleMessages.length === 0) return
+    const first = visibleMessages[0]
+    if (!first) return
+    void selectMessage(first.key)
+    void tick().then(() => focusMessageRow(first.key))
+  }
+
+  function handleMessageListKeydown(event: KeyboardEvent) {
+    if (event.isComposing || event.keyCode === 229) return
+    if (['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault()
+      event.stopPropagation()
+      void moveMessageSelection(event.key as RovingNavigationKey)
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      event.stopPropagation()
+      if (selectedMessageKey) void selectMessage(selectedMessageKey)
+    }
   }
 
   function toggleMessageSortOrder() {
@@ -520,7 +577,7 @@
 	    await tick()
 	    await selectMessage(message.key)
 	    await tick()
-	    scrollMessageIntoView(message.key)
+	    scrollMessageIntoView(message.key, 'start')
 	  }
 
   function onSearchKeydown(event: KeyboardEvent) {
@@ -626,13 +683,24 @@
             <div class="flex min-h-0 flex-1 items-center justify-center px-6 text-center text-sm text-muted-foreground">{$_('backupViewer.noMessages')}</div>
           {:else}
             <div class="flex min-h-0 flex-1 flex-col">
-              <div bind:this={messageListEl} class="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+              <div
+                bind:this={messageListEl}
+                role="listbox"
+                aria-label={$_('backupViewer.title')}
+                tabindex={hasValidMessageSelection ? -1 : 0}
+                class="min-h-0 flex-1 overflow-y-auto scrollbar-thin outline-none"
+                onfocus={handleMessageListFocus}
+                onkeydown={handleMessageListKeydown}
+              >
                 {#each visibleMessages as message (message.key)}
                   {@const hasAttachments = messageAttachmentCount(message) > 0}
                   <button
                     type="button"
                     data-backup-message-key={message.key}
-                    class="relative grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'bg-primary/15' : 'hover:bg-muted/40'}"
+                    role="option"
+                    aria-selected={selectedMessageKey === message.key}
+                    tabindex={selectedMessageKey === message.key ? 0 : -1}
+                    class="relative grid w-full grid-cols-[1rem_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-border py-3 pl-4 pr-6 text-left transition-colors {selectedMessageKey === message.key ? 'keyboard-selected-item bg-primary/15' : 'hover:bg-muted/40'}"
                     onclick={() => selectMessage(message.key)}
                   >
                     <Icon icon="mdi:email-outline" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />

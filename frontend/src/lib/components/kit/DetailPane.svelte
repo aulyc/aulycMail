@@ -7,7 +7,7 @@
   import { type Snippet } from 'svelte'
   import Icon from '@iconify/svelte'
   import { _ } from 'svelte-i18n'
-  import { isPaneFlashing, type FocusablePane } from '$lib/stores/keyboard.svelte'
+  import { getFocusedPane, isMainKeyboardScope, isPaneFlashing, setFocusedPane, type FocusablePane } from '$lib/stores/keyboard.svelte'
   // Self-managed responsive (mobile + tablet) behavior — read the layout
   // store directly so pane consumers never forward responsive
   // props. At medium (≤1024px) and narrow (≤767px) the detail pane renders
@@ -46,9 +46,47 @@
   const flashing = $derived(isPaneFlashing(focusSlot))
   const overlay = $derived(isResponsive())
   const visible = $derived(getResponsiveView() === 'viewer')
+  let containerEl = $state<HTMLElement | null>(null)
+  let scrollRegionEl = $state<HTMLElement | null>(null)
+
+  function claimRegion() {
+    setFocusedPane(focusSlot)
+  }
+
+  function handleMouseDown(event: MouseEvent) {
+    claimRegion()
+    if (!(event.target instanceof Element)) return
+    if (event.target.closest('button, a, input, textarea, select, [contenteditable="true"], [role="button"]')) return
+    containerEl?.focus({ preventScroll: true })
+  }
+
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.isComposing || event.keyCode === 229 || event.target !== containerEl) return
+    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
+    event.preventDefault()
+    event.stopPropagation()
+    const scroller = containerEl?.querySelector<HTMLElement>('[data-keyboard-detail-scroll]') ?? scrollRegionEl
+    const amount = Math.max(80, (scroller?.clientHeight ?? 0) * 0.18)
+    scroller?.scrollBy({
+      top: event.key === 'ArrowDown' ? amount : -amount,
+      behavior: 'smooth',
+    })
+  }
 </script>
 
-<section class="flex-1 min-w-0 flex flex-col bg-background {flashing ? 'pane-focus-flash' : ''} {overlay ? 'responsive-viewer-overlay' : ''} {overlay && visible ? 'responsive-viewer-visible' : ''}">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<section
+  bind:this={containerEl}
+  data-keyboard-region={focusSlot}
+  data-keyboard-region-visible={!overlay || visible}
+  data-keyboard-region-focus-target
+  data-region-active={isMainKeyboardScope() && getFocusedPane() === focusSlot}
+  tabindex="-1"
+  class="keyboard-region flex-1 min-w-0 flex flex-col bg-background outline-none {flashing ? 'pane-focus-flash' : ''} {overlay ? 'responsive-viewer-overlay' : ''} {overlay && visible ? 'responsive-viewer-visible' : ''}"
+  onfocusin={claimRegion}
+  onmousedown={handleMouseDown}
+  onkeydown={handleKeydown}
+>
   <!--
     Header rendering rules — matched 1-for-1 with mail's ConversationViewer
     pattern at App.svelte:1488 (showBackButton={isResponsive()}):
@@ -90,7 +128,7 @@
       {/if}
     </div>
   {:else}
-    <div class="flex-1 min-h-0 overflow-y-auto p-6">
+    <div bind:this={scrollRegionEl} class="keyboard-selected-item flex-1 min-h-0 overflow-y-auto p-6">
       {#if body}
         {@render body()}
       {/if}

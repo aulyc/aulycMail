@@ -30,6 +30,7 @@
   import {
     type FocusablePane,
     getFocusedPane,
+    isMainKeyboardScope,
     setFocusedPane,
     isPaneFlashing,
     setComposerOpen,
@@ -52,6 +53,7 @@
   let sidebarRef: Sidebar | null = null
   let messageListRef: MessageList | null = null
   let viewerRef: ConversationViewer | null = null
+  let activityRailRef: ActivityRail | null = null
   let messageListContainerRef: HTMLElement | null = null
 
   // React to theme mode changes from settings store
@@ -146,7 +148,13 @@
   function openSettings(page: SettingsPage = 'general') {
     settingsPage = page
     showBackupViewer = false
+    activityRailRef?.selectSettingsEntry()
     showSettings = true
+  }
+
+  function handleSettingsClosed() {
+    showSettings = false
+    requestAnimationFrame(() => activityRailRef?.focusSettings())
   }
 
   // Certificate TOFU state (for background sync cert errors)
@@ -548,24 +556,30 @@
     return { folderName, folderType }
   }
 
-  // Handle conversation selection from list
-  function handleConversationSelect(threadId: string, folderId: string, accountId: string) {
-    if (accountId && folderId && (accountId !== selectedAccountId || folderId !== selectedFolderId)) {
-      openMailConversation({ accountId, folderId, threadId })
-      return
-    }
-
+  // Keep the detail model synchronized with the list cursor without forcing a
+  // responsive detail overlay open. Arrow navigation uses this path; Enter or
+  // a row click follows with handleConversationSelect to reveal the item.
+  function handleConversationFocus(threadId: string, folderId: string, accountId: string) {
     selectedThreadId = threadId
     selectedConversationFolderId = folderId
     selectedConversationAccountId = accountId
-    showViewer()
 
-    // Persist state
     saveUIState({
       selectedThreadId: threadId,
       selectedConversationAccountId: accountId,
       selectedConversationFolderId: folderId,
     })
+  }
+
+  // Handle activation from the list. The detail is already synchronized by
+  // focus navigation; activation additionally reveals responsive layouts.
+  function handleConversationSelect(threadId: string, folderId: string, accountId: string) {
+    if (accountId && folderId && (accountId !== selectedAccountId || folderId !== selectedFolderId)) {
+      openMailConversation({ accountId, folderId, threadId })
+      return
+    }
+    handleConversationFocus(threadId, folderId, accountId)
+    showViewer()
   }
 
   // Open a specific conversation in the mail view: switch the rail to mail,
@@ -913,11 +927,6 @@
       setSearchOverlay: (open) => { showSearchOverlay = open },
       setFocusMode: (mode) => { focusMode = mode },
       setFocusedMessageIdInFocus: (messageId) => { focusedMessageIdInFocus = messageId },
-      clearConversation: () => {
-        selectedThreadId = null
-        selectedConversationFolderId = null
-        selectedConversationAccountId = null
-      },
       focusContextMenu,
       handleQuit,
       handleCompose,
@@ -997,7 +1006,7 @@
 <div class="flex flex-col h-full w-full overflow-hidden bg-background">
   <!-- Main Content -->
   <div class="flex flex-1 min-h-0 overflow-hidden relative">
-    <ActivityRail onOpenSettings={() => openSettings()} />
+    <ActivityRail bind:this={activityRailRef} onOpenSettings={() => openSettings()} />
 
     {#if getActivePane() === 'contacts'}
       <ContactsPane />
@@ -1011,10 +1020,15 @@
     <div style:display={getActivePane() === 'mail' ? 'contents' : 'none'}>
     <!-- Sidebar (Folder List) -->
     <aside
-      class="{getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'flex-shrink-0 border-r border-border bg-muted/30'}"
+      data-keyboard-region="sidebar"
+      data-keyboard-region-visible={getLayoutMode() !== 'narrow' || getResponsiveView() === 'sidebar'}
+      data-keyboard-region-focus-target
+      data-region-active={isMainKeyboardScope() && getActivePane() === 'mail' && getFocusedPane() === 'sidebar'}
+      tabindex="-1"
+      class="keyboard-region outline-none {getLayoutMode() === 'narrow' ? `responsive-sidebar-overlay w-72 border-r border-border bg-background ${getResponsiveView() === 'sidebar' ? 'responsive-sidebar-visible' : ''}` : 'flex-shrink-0 border-r border-border bg-muted/30'}"
       style="{getLayoutMode() === 'full' ? `width: ${sidebarWidth}px` : ''}"
       role="presentation"
-      onclick={() => handlePaneClick('sidebar')}
+      onmousedown={() => handlePaneClick('sidebar')}
     >
       <Sidebar
         bind:this={sidebarRef}
@@ -1046,12 +1060,16 @@
     <!-- Message List -->
     <section
       bind:this={messageListContainerRef}
-      class="{isResponsive() ? 'flex-1 min-w-0 border-r border-border bg-background' : 'flex-shrink-0 border-r border-border bg-background'}"
+      data-keyboard-region="messageList"
+      data-keyboard-region-visible={getLayoutMode() === 'full' || getResponsiveView() === 'default'}
+      data-keyboard-region-focus-target
+      data-region-active={isMainKeyboardScope() && getActivePane() === 'mail' && getFocusedPane() === 'messageList'}
+      class="keyboard-region outline-none {isResponsive() ? 'flex-1 min-w-0 border-r border-border bg-background' : 'flex-shrink-0 border-r border-border bg-background'}"
       style="{getLayoutMode() === 'full' ? `width: ${listWidth}px` : ''}"
       role="presentation"
       data-pane="messageList"
       tabindex="-1"
-      onclick={() => handlePaneClick('messageList')}
+      onmousedown={() => handlePaneClick('messageList')}
     >
       <MessageList
         bind:this={messageListRef}
@@ -1060,6 +1078,7 @@
         folderName={selectedFolderName}
         folderType={selectedFolderType || 'inbox'}
         onConversationSelect={handleConversationSelect}
+        onConversationFocus={handleConversationFocus}
         onEmptyFolder={handleEmptyFolder}
         onReply={handleReply}
         onOpenDraft={handleEditDraft}
@@ -1074,10 +1093,15 @@
 
     <!-- Conversation Viewer -->
     <main
-      class="{viewerIsOverlay ? `responsive-viewer-overlay bg-background ${viewerIsVisible ? 'responsive-viewer-visible' : ''}` : 'flex-1 min-w-0 bg-background'}"
+      data-keyboard-region="viewer"
+      data-keyboard-region-visible={!viewerIsOverlay || viewerIsVisible}
+      data-keyboard-region-focus-target
+      data-region-active={isMainKeyboardScope() && getActivePane() === 'mail' && getFocusedPane() === 'viewer'}
+      tabindex="-1"
+      class="keyboard-region outline-none {viewerIsOverlay ? `responsive-viewer-overlay bg-background ${viewerIsVisible ? 'responsive-viewer-visible' : ''}` : 'flex-1 min-w-0 bg-background'}"
       role="presentation"
       data-pane="viewer"
-      onclick={() => handlePaneClick('viewer')}
+      onmousedown={() => handlePaneClick('viewer')}
     >
       <ConversationViewer
         bind:this={viewerRef}
@@ -1131,7 +1155,7 @@
 <TermsDialog bind:open={showTermsDialog} onAccept={handleTermsAccepted} />
 
 <!-- App Settings dialog — opened from the rail's gear (works in every view) -->
-<SettingsDialog bind:open={showSettings} bind:activePage={settingsPage} onClose={() => { showSettings = false }} />
+<SettingsDialog bind:open={showSettings} bind:activePage={settingsPage} onClose={handleSettingsClosed} />
 <BackupViewerDialog bind:open={showBackupViewer} onClose={() => { showBackupViewer = false }} />
 
 <SearchOverlay
