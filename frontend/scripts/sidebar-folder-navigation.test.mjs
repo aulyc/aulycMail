@@ -136,3 +136,13 @@ test('sidebar action buttons switch horizontally and activate with Enter or Spac
   assert.match(globalShortcuts, /case 'Enter':[\s\S]*hasFocusedSidebarAction\(\)[\s\S]*activateFocusedSidebarAction\(\)/)
   assert.match(globalShortcuts, /case ' ':[\s\S]*hasFocusedSidebarAction\(\)[\s\S]*activateFocusedSidebarAction\(\)/)
 })
+
+test('spam folder unread badges use a neutral tone while ordinary unread stays primary', async () => {
+  const folderTreeItem = await readFile(folderTreeItemPath, 'utf8')
+
+  assert.match(folderTreeItem, /let isSpamFolder = \$derived\(tree\.folder\?\.type === 'spam'\)/)
+  assert.match(
+    folderTreeItem,
+    /isSpamFolder\s*\? 'bg-muted text-muted-foreground'\s*: 'bg-primary text-primary-foreground'/,
+  )
+})

@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Distinguished Junk and Spam unread counts with neutral gray sidebar badges
+  while preserving the Dock badge's existing exclusion of junk mail.
+
 ## [0.6.0-beta.7] — 2026-07-22
 
 - Fixed scheduled no-change folder probes leaving account sync spinners and the

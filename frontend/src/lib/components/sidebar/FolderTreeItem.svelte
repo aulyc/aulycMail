@@ -65,6 +65,7 @@
 
   let hasChildren = $derived(tree.children && tree.children.length > 0)
   let isDirectoryOnly = $derived(tree.folder?.noSelect === true)
+  let isSpamFolder = $derived(tree.folder?.type === 'spam')
 
   // Recursively sum unread across a subtree (folder + all descendants).
   function sumTreeUnread(trees: folder.FolderTree[]): number {
@@ -222,7 +223,9 @@
         </span>
       {:else if aggregateUnread > 0}
         <span
-          class="px-1.5 py-0.5 text-xs font-medium rounded-full bg-primary text-primary-foreground"
+          class="px-1.5 py-0.5 text-xs font-medium rounded-full {isSpamFolder
+            ? 'bg-muted text-muted-foreground'
+            : 'bg-primary text-primary-foreground'}"
         >
           {aggregateUnread}
         </span>
