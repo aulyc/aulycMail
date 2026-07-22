@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.7] — 2026-07-22
+
 - Fixed scheduled no-change folder probes leaving account sync spinners and the
   status bar active after backend work had already completed.
 
