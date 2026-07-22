@@ -77,6 +77,11 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 		}
 		a.refreshUnreadBadges()
 	})
+	a.syncScheduler.SetAccountSyncFinishedCallback(func(accountID string) {
+		wailsRuntime.EventsEmit(a.ctx, "sync:accountFinished", map[string]interface{}{
+			"accountId": accountID,
+		})
+	})
 
 	// Wire up network connectivity check so scheduler skips ticks when offline
 	if a.networkMonitor != nil {

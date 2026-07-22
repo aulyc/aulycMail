@@ -157,6 +157,22 @@ class AccountStore {
       }
     })
 
+    // A scheduled remote probe can finish without syncing any message folder.
+    // Clear the account-level progress entry even when no folder:synced event
+    // was needed, and also cover folder-list failures and cancellation.
+    EventsOn('sync:accountFinished', (data: { accountId: string }) => {
+      if (this.syncProgress[data.accountId]) {
+        delete this.syncProgress[data.accountId]
+        this.syncProgress = { ...this.syncProgress }
+      }
+
+      const acc = this.accounts.find((a) => a.account.id === data.accountId)
+      if (acc) {
+        acc.syncing = false
+        this.accounts = [...this.accounts]
+      }
+    })
+
     // Listen for sync errors
     EventsOn('folder:syncError', (data: { accountId: string; folderId: string; error: string }) => {
       console.error('[AccountStore] Sync error:', data)

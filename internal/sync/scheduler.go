@@ -34,6 +34,10 @@ type SyncCompletedCallback func(accountID, folderID string, err error)
 // compatible while activity logging can use durable Added/Removed statistics.
 type SyncCompletedResultCallback func(accountID, folderID string, result MessageSyncResult, err error)
 
+// AccountSyncFinishedCallback is called once after an account-level scheduler
+// run returns, including no-change probes, failures, and cancellations.
+type AccountSyncFinishedCallback func(accountID string)
+
 // Scheduler handles periodic background sync of email accounts
 type Scheduler struct {
 	engine       *Engine
@@ -45,6 +49,7 @@ type Scheduler struct {
 	newMailCallback       NewMailCallback
 	syncCompletedCallback SyncCompletedCallback
 	syncResultCallback    SyncCompletedResultCallback
+	accountFinished       AccountSyncFinishedCallback
 	isConnected           func() bool // optional: skip sync when offline
 
 	// Control
@@ -104,6 +109,20 @@ func (s *Scheduler) SetSyncCompletedCallback(callback SyncCompletedCallback) {
 // SetSyncCompletedResultCallback sets the result-bearing completion callback.
 func (s *Scheduler) SetSyncCompletedResultCallback(callback SyncCompletedResultCallback) {
 	s.syncResultCallback = callback
+}
+
+// SetAccountSyncFinishedCallback sets the account-level lifecycle callback.
+func (s *Scheduler) SetAccountSyncFinishedCallback(callback AccountSyncFinishedCallback) {
+	s.accountFinished = callback
+}
+
+func (s *Scheduler) runAccountSyncLifecycle(accountID string, work func()) {
+	defer func() {
+		if s.accountFinished != nil {
+			s.accountFinished(accountID)
+		}
+	}()
+	work()
 }
 
 func (s *Scheduler) notifySyncCompleted(accountID, folderID string, result MessageSyncResult, err error) {
@@ -274,7 +293,9 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account, trigger Trigger) {
 			s.lastAttempts[acc.ID] = time.Now()
 			s.probeMu.Unlock()
 		}
-		s.syncAccountInboxWork(ctx, acc, trigger)
+		s.runAccountSyncLifecycle(acc.ID, func() {
+			s.syncAccountInboxWork(ctx, acc, trigger)
+		})
 		return nil
 	})
 	if err != nil && !errors.Is(err, ErrCoalesced) && !errors.Is(err, context.Canceled) {
