@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.6] — 2026-07-22
+
 - Added right-side Settings control navigation so Up/Down selects visible rows
   and Enter or Space enters the selected control without overriding native input behavior.
 - Restored focus to the feature rail after closing Settings so its left-edge
