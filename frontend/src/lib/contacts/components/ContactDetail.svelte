@@ -4,7 +4,7 @@
   import { Button } from '$lib/components/ui/button'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
   import Icon from '@iconify/svelte'
-  import { contactsView, deleteLocalContact } from '$contacts/stores/contactsView.svelte'
+  import { contactsView, deleteLocalContact, focusContact } from '$contacts/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { formatLocalDateTime, formatRelativeDate } from '$lib/utils/date'
   // @ts-ignore - wailsjs bindings
@@ -121,6 +121,26 @@
   emptyIcon="mdi:account-multiple-outline"
   emptyText={$_('contacts.detail.emptyState')}
 >
+  {#snippet emptyState()}
+    {#if contactsView.detailLoading}
+      <Icon icon="mdi:loading" width="48" height="48" class="animate-spin" />
+      <p class="text-lg">{$_('contacts.detail.loading')}</p>
+    {:else if contactsView.detailLoadError}
+      <Icon icon="mdi:alert-circle-outline" width="48" height="48" />
+      <p class="text-lg">{$_('contacts.detail.loadFailed')}</p>
+      <button
+        type="button"
+        class="rounded text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+        onclick={() => focusContact(contactsView.selectedContactId)}
+      >
+        {$_('contacts.detail.retry')}
+      </button>
+    {:else}
+      <Icon icon="mdi:account-multiple-outline" width="48" height="48" />
+      <p class="text-lg">{$_('contacts.detail.emptyState')}</p>
+    {/if}
+  {/snippet}
+
   {#snippet header()}
     {#if contact}
       <h1 class="m-0 text-xl font-semibold text-foreground flex-1 min-w-0 truncate">

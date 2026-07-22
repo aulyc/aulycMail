@@ -182,11 +182,15 @@ func (a *API) ListContacts(filter contactdto.ContactFilter) ([]contactdto.Contac
 	if a.localStore == nil {
 		return nil, nil
 	}
-	records, err := a.localStore.ListRecords(contactRecordFilter(filter))
+	summaries, _, err := a.localStore.ListRecordSummaries(contactRecordFilter(filter))
 	if err != nil {
 		return nil, fmt.Errorf("contacts.ListContacts: %w", err)
 	}
-	return contactsFromRecords(records), nil
+	out := make([]contactdto.Contact, 0, len(summaries))
+	for _, summary := range summaries {
+		out = append(out, contactFromRecordSummary(summary))
+	}
+	return out, nil
 }
 
 // BrowseContacts returns the current page plus the full count for the same
@@ -196,17 +200,15 @@ func (a *API) BrowseContacts(filter contactdto.ContactFilter) (contactdto.Contac
 		return contactdto.ContactBrowseResult{}, nil
 	}
 	recordFilter := contactRecordFilter(filter)
-	records, err := a.localStore.ListRecords(recordFilter)
+	summaries, total, err := a.localStore.ListRecordSummaries(recordFilter)
 	if err != nil {
 		return contactdto.ContactBrowseResult{}, fmt.Errorf("contacts.ListContacts: %w", err)
 	}
-	recordFilter.Limit = 0
-	recordFilter.Offset = 0
-	total, err := a.localStore.CountRecords(recordFilter)
-	if err != nil {
-		return contactdto.ContactBrowseResult{}, fmt.Errorf("contacts.ListContacts count: %w", err)
+	items := make([]contactdto.ContactListItem, 0, len(summaries))
+	for _, summary := range summaries {
+		items = append(items, fromRecordSummary(summary))
 	}
-	return contactdto.ContactBrowseResult{Items: contactsFromRecords(records), Total: total}, nil
+	return contactdto.ContactBrowseResult{Items: items, Total: total}, nil
 }
 
 func contactRecordFilter(filter contactdto.ContactFilter) contact.RecordFilter {
@@ -220,14 +222,6 @@ func contactRecordFilter(filter contactdto.ContactFilter) contact.RecordFilter {
 		Limit:     filter.Limit,
 		Offset:    filter.Offset,
 	}
-}
-
-func contactsFromRecords(records []*contact.Record) []contactdto.Contact {
-	out := make([]contactdto.Contact, 0, len(records))
-	for _, rec := range records {
-		out = append(out, fromRecord(rec))
-	}
-	return out
 }
 
 func (a *API) ListAccountGroups() ([]contactdto.ContactAccountGroup, error) {

@@ -37,6 +37,17 @@ type Contact struct {
 	UpdatedAt      time.Time `json:"updatedAt" ts_type:"string"`
 }
 
+// ContactListItem is the compact representation used by the Contacts pane's
+// paged list. Rich fields and associated-account data are loaded separately by
+// Contacts_GetContactDetail only after a row is selected.
+type ContactListItem struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Emails    []string  `json:"emails"`
+	SourceID  string    `json:"sourceId,omitempty"`
+	UpdatedAt time.Time `json:"updatedAt" ts_type:"string"`
+}
+
 // ContactAssociatedAccount is one mail account where a contact appears in
 // related messages. It is distinct from the contact's own email addresses.
 type ContactAssociatedAccount struct {
@@ -61,8 +72,8 @@ type ContactAccountGroup struct {
 // ContactBrowseResult is the paged Contacts-pane list result. Items contains
 // the current page; Total is the full count for the same source/search filter.
 type ContactBrowseResult struct {
-	Items []Contact `json:"items"`
-	Total int       `json:"total"`
+	Items []ContactListItem `json:"items"`
+	Total int               `json:"total"`
 }
 
 // ContactEmail is one email on a Contact, with its TYPE and primary flag.

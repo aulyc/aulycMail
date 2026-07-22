@@ -1172,8 +1172,28 @@ export namespace contactdto {
 	}
 
 
+	export class ContactListItem {
+	    id: string;
+	    name: string;
+	    emails: string[];
+	    sourceId?: string;
+	    updatedAt: string;
+
+	    static createFrom(source: any = {}) {
+	        return new ContactListItem(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.name = source["name"];
+	        this.emails = source["emails"];
+	        this.sourceId = source["sourceId"];
+	        this.updatedAt = source["updatedAt"];
+	    }
+	}
 	export class ContactBrowseResult {
-	    items: Contact[];
+	    items: ContactListItem[];
 	    total: number;
 
 	    static createFrom(source: any = {}) {
@@ -1182,7 +1202,7 @@ export namespace contactdto {
 
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.items = this.convertValues(source["items"], Contact);
+	        this.items = this.convertValues(source["items"], ContactListItem);
 	        this.total = source["total"];
 	    }
 
@@ -1278,6 +1298,7 @@ export namespace contactdto {
 		    return a;
 		}
 	}
+
 
 
 	export class ContactPatch {

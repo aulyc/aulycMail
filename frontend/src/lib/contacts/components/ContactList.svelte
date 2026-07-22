@@ -23,6 +23,7 @@
   import { toasts } from '$lib/stores/toast'
   import { createDebouncer } from '$lib/utils/debounce'
   import { shouldShowContactEmail } from '$contacts/utils/contactPresentation'
+  import { shouldBlockContactList } from '$contacts/utils/contactLoadLifecycle'
   // Canonical list toolbar — owns hamburger placement, title styling, count
   // badge and search-mode swap. Contacts supplies label/count plus search
   // markup and trailing action buttons.
@@ -59,7 +60,7 @@
   // has its own button-triggered confirm dialog; this one fires when the user
   // has the LIST focused and hits Delete/Backspace on the highlighted row.
   let showDeleteConfirm = $state(false)
-  let pendingDelete = $state<contactdto.Contact | null>(null)
+  let pendingDelete = $state<contactdto.ContactListItem | null>(null)
   let deleting = $state(false)
 
   function requestDelete(id: string) {
@@ -172,11 +173,11 @@
     void loadMoreContacts()
   }
 
-  function primaryEmail(c: contactdto.Contact): string {
+  function primaryEmail(c: contactdto.ContactListItem): string {
     return c.emails && c.emails.length > 0 ? c.emails[0] : ''
   }
 
-  function rowKey(c: contactdto.Contact): string {
+  function rowKey(c: contactdto.ContactListItem): string {
     return (c.name || primaryEmail(c) || '').toLowerCase()
   }
 
@@ -293,7 +294,7 @@
     selectedId={contactsView.selectedContactId}
     focusSlot="messageList"
     label={$_('contacts.list.label')}
-    loading={contactsView.loading}
+    loading={shouldBlockContactList(contactsView.loading, sortedContacts.length)}
     selectedScrollSignal={contactsView.selectedContactScrollTopSignal}
     selectedScrollBlock="start"
     onSelect={(id) => focusContact(id)}
@@ -302,7 +303,7 @@
     onFocusSearch={toggleSearchFocus}
     onReachEnd={handleReachEnd}
   >
-    {#snippet row(c: contactdto.Contact, { selected })}
+    {#snippet row(c: contactdto.ContactListItem, { selected })}
       <ListRow {selected} onclick={() => activateContact(c.id)}>
         <span class="flex flex-col min-w-0 flex-1">
           <span class="font-medium truncate text-foreground">{c.name || primaryEmail(c) || $_('contacts.common.unnamed')}</span>
@@ -314,9 +315,22 @@
     {/snippet}
 
     {#snippet empty()}
-      <p class="m-4 text-sm text-muted-foreground">
-        {searchInput ? $_('contacts.list.emptySearch') : $_('contacts.list.empty')}
-      </p>
+      {#if contactsView.loadError}
+        <div class="m-4 flex flex-col items-start gap-2 text-sm text-muted-foreground">
+          <p>{$_('contacts.list.loadFailed')}</p>
+          <button
+            class="rounded text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+            type="button"
+            onclick={() => reloadContacts()}
+          >
+            {$_('contacts.list.retry')}
+          </button>
+        </div>
+      {:else}
+        <p class="m-4 text-sm text-muted-foreground">
+          {searchInput ? $_('contacts.list.emptySearch') : $_('contacts.list.empty')}
+        </p>
+      {/if}
     {/snippet}
   </ListPane>
 

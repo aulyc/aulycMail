@@ -33,8 +33,22 @@
   let loadSequence = 0
   let settingsRegion = $state<'navigation' | 'content'>('navigation')
   let selectedNavigationPage = $state<SettingsPage>('general')
+  let selectedSettingsControlIndex = $state(0)
   let navigationRegionEl = $state<HTMLElement | null>(null)
   let contentRegionEl = $state<HTMLElement | null>(null)
+  let contentPanelEl = $state<HTMLElement | null>(null)
+
+  const SETTINGS_CONTROL_SELECTOR = [
+    'button:not(:disabled):not([aria-disabled="true"])',
+    'a[href]',
+    'input:not(:disabled):not([type="hidden"])',
+    'textarea:not(:disabled)',
+    'select:not(:disabled)',
+    '[role="button"]:not([aria-disabled="true"])',
+    '[role="combobox"]:not([aria-disabled="true"])',
+    '[role="checkbox"]:not([aria-disabled="true"])',
+    '[contenteditable="true"]',
+  ].join(',')
 
   const navigation: NavigationItem[] = $derived([
     { id: 'general', icon: 'lucide:settings-2', label: $_('settings.general') },
@@ -74,8 +88,19 @@
     if (!open) return
     settingsRegion = 'navigation'
     selectedNavigationPage = untrack(() => activePage)
+    selectedSettingsControlIndex = 0
     setKeyboardScope('settings')
     return () => setKeyboardScope('main')
+  })
+
+  $effect(() => {
+    if (!open || draft.loading || settingsRegion !== 'content') return
+    const page = activePage
+    void tick().then(() => requestAnimationFrame(() => {
+      if (open && activePage === page && settingsRegion === 'content') {
+        selectSettingsControl(selectedSettingsControlIndex, false)
+      }
+    }))
   })
 
   $effect(() => {
@@ -101,8 +126,10 @@
   function openBackupActivityLog() { activityInitialType = 'backup'; selectNavigationPage('activity') }
   function selectNavigationPage(page: SettingsPage) {
     if (page === 'activity') activityInitialType = ''
+    if (activePage !== page) selectedSettingsControlIndex = 0
     selectedNavigationPage = page
     activePage = page
+    if (settingsRegion === 'content') scheduleSettingsControlSelection(true)
   }
 
   function keepDialogFromTakingPointerFocus(event: PointerEvent) {
@@ -115,6 +142,83 @@
     settingsRegion = region
     const target = region === 'navigation' ? navigationRegionEl : contentRegionEl
     target?.focus({ preventScroll: true })
+    if (region === 'content') scheduleSettingsControlSelection()
+  }
+
+  function getSettingsControl(row: HTMLElement): HTMLElement | null {
+    return Array.from(row.querySelectorAll<HTMLElement>(SETTINGS_CONTROL_SELECTOR)).find((control) => (
+      !control.hidden && control.getAttribute('aria-hidden') !== 'true'
+    )) ?? null
+  }
+
+  function getSettingsControlRows(): HTMLElement[] {
+    if (!contentPanelEl) return []
+    return Array.from(contentPanelEl.querySelectorAll<HTMLElement>('[data-settings-control-row]'))
+      .filter((row) => getSettingsControl(row) !== null)
+  }
+
+  function selectSettingsControl(index: number, scroll = true) {
+    const allRows = Array.from(contentPanelEl?.querySelectorAll<HTMLElement>('[data-settings-control-row]') ?? [])
+    const settingsControlRows = getSettingsControlRows()
+    allRows.forEach((row) => { row.dataset.settingsControlSelected = 'false' })
+    if (settingsControlRows.length === 0) {
+      selectedSettingsControlIndex = -1
+      return
+    }
+
+    selectedSettingsControlIndex = Math.max(0, Math.min(index, settingsControlRows.length - 1))
+    const selectedRow = settingsControlRows[selectedSettingsControlIndex]
+    selectedRow.dataset.settingsControlSelected = 'true'
+    if (scroll) selectedRow.scrollIntoView({ block: 'nearest' })
+  }
+
+  function scheduleSettingsControlSelection(reset = false) {
+    const page = activePage
+    void tick().then(() => requestAnimationFrame(() => {
+      if (!open || activePage !== page || settingsRegion !== 'content') return
+      selectSettingsControl(reset ? 0 : selectedSettingsControlIndex, false)
+    }))
+  }
+
+  function settingsControlRowForTarget(target: EventTarget | null): HTMLElement | null {
+    if (!(target instanceof Element)) return null
+    const row = target.closest<HTMLElement>('[data-settings-control-row]')
+    return row && contentPanelEl?.contains(row) ? row : null
+  }
+
+  function isNativeSettingsControlTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof Element)) return false
+    const control = target.closest<HTMLElement>(SETTINGS_CONTROL_SELECTOR)
+    return Boolean(control && contentRegionEl?.contains(control))
+  }
+
+  function selectSettingsControlForTarget(target: EventTarget | null) {
+    const row = settingsControlRowForTarget(target)
+    if (!row) return
+    const index = getSettingsControlRows().indexOf(row)
+    if (index >= 0) selectSettingsControl(index, false)
+  }
+
+  function activateSelectedSettingsControl() {
+    const row = getSettingsControlRows()[selectedSettingsControlIndex]
+    const control = row ? getSettingsControl(row) : null
+    if (!control) return
+    control.focus({ preventScroll: true })
+    control.click()
+  }
+
+  function handleContentFocusIn(event: FocusEvent) {
+    settingsRegion = 'content'
+    selectSettingsControlForTarget(event.target)
+    if (event.target === contentRegionEl) selectSettingsControl(selectedSettingsControlIndex, false)
+  }
+
+  function handleContentMouseDown(event: MouseEvent) {
+    settingsRegion = 'content'
+    selectSettingsControlForTarget(event.target)
+    if (!isNativeSettingsControlTarget(event.target)) {
+      requestAnimationFrame(() => contentRegionEl?.focus({ preventScroll: true }))
+    }
   }
 
   function handleOpenAutoFocus(event: Event) {
@@ -125,33 +229,56 @@
   function handleSettingsKeydown(event: KeyboardEvent) {
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || showRestartDialog) return
     const inputState = isInputElement(event.target)
-    if (event.key === 'Escape' && inputState) {
+    const nativeControlState = inputState || isNativeSettingsControlTarget(event.target)
+    const settingsControlState = inputState || Boolean(
+      isNativeSettingsControlTarget(event.target) && settingsControlRowForTarget(event.target),
+    )
+    if (event.key === 'Escape' && settingsControlState) {
       event.preventDefault()
       event.stopPropagation()
       ;(event.target as HTMLElement | null)?.blur?.()
       requestAnimationFrame(() => focusSettingsRegion('content'))
       return
     }
-    if (event.key === 'Tab' && !inputState) {
+    if (event.key === 'Tab' && !nativeControlState) {
       event.preventDefault()
       event.stopPropagation()
       focusSettingsRegion(settingsRegion === 'navigation' ? 'content' : 'navigation')
       return
     }
-    if (settingsRegion !== 'navigation') return
+    if (settingsRegion === 'navigation') {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault()
+        event.stopPropagation()
+        selectNavigationPage(selectedNavigationPage)
+        return
+      }
+      if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
+      event.preventDefault()
+      event.stopPropagation()
+      const currentIndex = navigation.findIndex((item) => item.id === selectedNavigationPage)
+      const nextIndex = nextRovingIndex(event.key as RovingNavigationKey, currentIndex, navigation.length, true)
+      if (nextIndex >= 0) selectNavigationPage(navigation[nextIndex].id)
+      return
+    }
 
+    if (nativeControlState) return
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       event.stopPropagation()
-      selectNavigationPage(selectedNavigationPage)
+      activateSelectedSettingsControl()
       return
     }
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
     event.stopPropagation()
-    const currentIndex = navigation.findIndex((item) => item.id === selectedNavigationPage)
-    const nextIndex = nextRovingIndex(event.key as RovingNavigationKey, currentIndex, navigation.length, true)
-    if (nextIndex >= 0) selectedNavigationPage = navigation[nextIndex].id
+    const settingsControlRows = getSettingsControlRows()
+    const nextIndex = nextRovingIndex(
+      event.key as RovingNavigationKey,
+      selectedSettingsControlIndex,
+      settingsControlRows.length, true,
+    )
+    if (nextIndex >= 0) selectSettingsControl(nextIndex)
   }
 </script>
 
@@ -208,10 +335,11 @@
         data-settings-region="content"
         data-region-active={settingsRegion === 'content'}
         class="keyboard-region flex min-h-0 min-w-0 flex-col bg-background outline-none"
-        onfocusin={() => { settingsRegion = 'content' }}
-        onmousedown={() => { settingsRegion = 'content' }}
+        onfocusin={handleContentFocusIn}
+        onmousedown={handleContentMouseDown}
       >
         <div
+          bind:this={contentPanelEl}
           id={`settings-panel-${activePage}`}
           role="tabpanel"
           aria-labelledby={`settings-tab-${activePage}`}

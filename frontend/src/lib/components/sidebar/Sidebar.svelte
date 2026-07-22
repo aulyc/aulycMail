@@ -1,6 +1,13 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
   import AccountSection from './AccountSection.svelte'
+  import {
+    buildFolderNavigationList,
+    nextSidebarAction,
+    nextSidebarNavigationIndex,
+    type FolderNavItem,
+    type SidebarAction,
+  } from './folderNavigation'
   import AccountDialog from '$lib/components/settings/AccountDialog.svelte'
   import { Button } from '$lib/components/ui/button'
   import { accountStore } from '$lib/stores/accounts.svelte'
@@ -10,18 +17,15 @@
   // @ts-ignore - wailsjs path
   import { account, folder } from '../../../../wailsjs/go/models'
 
-  // Folder item type for flat navigation list
-  interface FolderNavItem {
-    type: 'account-header' | 'folder'
-    accountId?: string
-    folderId?: string
-    folderPath?: string
-    folderName: string
-    folderType?: string
-  }
-
   // Track focused account header for keyboard navigation
   let focusedAccountId = $state<string | null>(null)
+  // Up/Down enters or leaves this horizontal group; Left/Right moves inside it.
+  let sidebarActionsFocused = $state(false)
+  let selectedSidebarAction = $state<SidebarAction>('compose')
+  // Directory-only IMAP nodes remain keyboard-focusable so users can expand
+  // groups such as “Other folders” without changing the selected mailbox.
+  let focusedFolderGroupAccountId = $state<string | null>(null)
+  let focusedFolderGroupId = $state<string | null>(null)
 
   // Ref to scrollable container for auto-scroll
   let scrollContainer: HTMLDivElement | null = null
@@ -125,7 +129,10 @@
 
   // Handle folder selection
   function handleFolderSelect(accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) {
+    sidebarActionsFocused = false
     focusedAccountId = null
+    focusedFolderGroupAccountId = null
+    focusedFolderGroupId = null
     accountStore.selectFolder(accountId, folderId, folderPath, folderName)
     onFolderSelect?.(accountId, folderId, folderPath, folderName, folderType)
   }
@@ -164,58 +171,32 @@
     }
   }
 
-  // Build flat list of all navigable folders including Unified Inbox
-  // The list matches the exact visual order in the sidebar, respecting expanded/collapsed state
+  // Build the visible keyboard order, including top actions, account headers,
+  // and directory-only groups that can be expanded but not selected as mailboxes.
   function buildFolderNavList(): FolderNavItem[] {
-    const items: FolderNavItem[] = []
-
-    // Add account headers and their folders
-    for (const accWithFolders of accountStore.accounts) {
-      // Skip if account is not fully loaded yet (can happen during reauth)
-      if (!accWithFolders.account) continue
-
-      // Always add the account header (so user can navigate to it and expand)
-      items.push({
-        type: 'account-header',
-        accountId: accWithFolders.account.id,
-        folderName: accWithFolders.account.name,
-      })
-
-      // Only add folders if the account is expanded
-      if (expandedAccounts[accWithFolders.account.id]) {
-        const flattenFolders = (trees: folder.FolderTree[]) => {
-          for (const tree of trees) {
-            if (tree.folder && !tree.folder.noSelect) {
-              items.push({
-                type: 'folder',
-                accountId: accWithFolders.account.id,
-                folderId: tree.folder.id,
-                folderPath: tree.folder.path,
-                folderName: tree.folder.name,
-                folderType: tree.folder.type,
-              })
-            }
-            // Skip children of collapsed folders
-            if (tree.children && tree.children.length > 0 && tree.folder && collapsedFolders[tree.folder.id] === false) {
-              flattenFolders(tree.children)
-            }
-          }
-        }
-        flattenFolders(accWithFolders.folders || [])
-      }
-    }
-
-    return items
+    return buildFolderNavigationList(accountStore.accounts, expandedAccounts, collapsedFolders)
   }
 
   // Get current folder index in navigation list
   function getCurrentFolderIndex(): number {
     const navList = buildFolderNavList()
 
+    if (sidebarActionsFocused) {
+      return navList.findIndex(item => item.type === 'sidebar-actions')
+    }
+
     // Check if an account header is focused
     if (focusedAccountId) {
       return navList.findIndex(item =>
         item.type === 'account-header' && item.accountId === focusedAccountId
+      )
+    }
+
+    if (focusedFolderGroupAccountId && focusedFolderGroupId) {
+      return navList.findIndex(item =>
+        item.type === 'folder-group'
+        && item.accountId === focusedFolderGroupAccountId
+        && item.folderId === focusedFolderGroupId
       )
     }
 
@@ -225,24 +206,24 @@
     )
   }
 
-  // Navigate to previous folder (exposed for keyboard navigation)
+  // Navigate to the previous sidebar item and wrap at the top.
   export function selectPreviousFolder() {
     const navList = buildFolderNavList()
     if (navList.length === 0) return
 
     const currentIndex = getCurrentFolderIndex()
-    const newIndex = currentIndex <= 0 ? 0 : currentIndex - 1
+    const newIndex = nextSidebarNavigationIndex(currentIndex, navList.length, -1)
 
     selectFolderByIndex(navList, newIndex)
   }
 
-  // Navigate to next folder (exposed for keyboard navigation)
+  // Navigate to the next sidebar item and wrap at the bottom.
   export function selectNextFolder() {
     const navList = buildFolderNavList()
     if (navList.length === 0) return
 
     const currentIndex = getCurrentFolderIndex()
-    const newIndex = currentIndex >= navList.length - 1 ? navList.length - 1 : currentIndex + 1
+    const newIndex = nextSidebarNavigationIndex(currentIndex, navList.length, 1)
 
     selectFolderByIndex(navList, newIndex)
   }
@@ -255,7 +236,7 @@
     let selector: string | null = null
     if (item.type === 'account-header' && item.accountId) {
       selector = `[data-sidebar-item="account-header"][data-account-id="${item.accountId}"]`
-    } else if (item.type === 'folder' && item.accountId && item.folderId) {
+    } else if ((item.type === 'folder' || item.type === 'folder-group') && item.accountId && item.folderId) {
       selector = `[data-sidebar-item="folder"][data-account-id="${item.accountId}"][data-folder-id="${item.folderId}"]`
     }
 
@@ -270,14 +251,24 @@
     const item = navList[index]
     if (!item) return
 
-    // Clear account header focus when selecting a folder
-    if (item.type !== 'account-header') {
+    // Move the logical keyboard cursor; only selectable folders change mail.
+    if (item.type === 'sidebar-actions') {
+      sidebarActionsFocused = true
       focusedAccountId = null
-    }
-
-    if (item.type === 'account-header' && item.accountId) {
+      focusedFolderGroupAccountId = null
+      focusedFolderGroupId = null
+    } else if (item.type === 'account-header' && item.accountId) {
       // Focus on account header (Enter/Space will toggle expand)
+      sidebarActionsFocused = false
       focusedAccountId = item.accountId
+      focusedFolderGroupAccountId = null
+      focusedFolderGroupId = null
+    } else if (item.type === 'folder-group' && item.accountId && item.folderId) {
+      // Keep the current mailbox selected while focusing a directory-only row.
+      sidebarActionsFocused = false
+      focusedAccountId = null
+      focusedFolderGroupAccountId = item.accountId
+      focusedFolderGroupId = item.folderId
     } else if (item.type === 'folder' && item.accountId && item.folderId && item.folderPath) {
       // Select from account tree - uses handleFolderSelect
       handleFolderSelect(item.accountId, item.folderId, item.folderPath, item.folderName, item.folderType || 'folder')
@@ -294,9 +285,49 @@
     }
   }
 
+  export function hasFocusedSidebarAction(): boolean {
+    return sidebarActionsFocused
+  }
+
+  export function activateFocusedSidebarAction(): void {
+    if (selectedSidebarAction === 'compose') {
+      onCompose?.()
+    } else if (selectedSidebarAction === 'sync') {
+      void toggleSync()
+    }
+  }
+
+  export function moveFocusedSidebarAction(direction: 1 | -1): void {
+    if (!sidebarActionsFocused) return
+    selectedSidebarAction = nextSidebarAction(selectedSidebarAction, direction)
+  }
+
+  function activateSidebarAction(action: SidebarAction): void {
+    sidebarActionsFocused = true
+    selectedSidebarAction = action
+    focusedAccountId = null
+    focusedFolderGroupAccountId = null
+    focusedFolderGroupId = null
+    activateFocusedSidebarAction()
+  }
+
   // Check if an account header is focused
   export function hasFocusedAccount(): boolean {
     return focusedAccountId !== null
+  }
+
+  export function toggleFocusedFolderGroup(): void {
+    if (
+      focusedFolderGroupAccountId
+      && focusedFolderGroupId
+      && folderHasChildren(focusedFolderGroupAccountId, focusedFolderGroupId)
+    ) {
+      toggleFolderCollapsed(focusedFolderGroupId)
+    }
+  }
+
+  export function hasFocusedFolderGroup(): boolean {
+    return focusedFolderGroupId !== null
   }
 
   // Check if the currently selected folder has children
@@ -343,7 +374,10 @@
 
   export function revealFolder(accountId: string, folderId: string) {
     if (!accountId || !folderId) return
+    sidebarActionsFocused = false
     focusedAccountId = null
+    focusedFolderGroupAccountId = null
+    focusedFolderGroupId = null
     expandedAccounts = { ...expandedAccounts, [accountId]: true }
     setAccountExpanded(accountId, true)
 
@@ -372,23 +406,31 @@
   <div class="px-4 py-3 border-b border-border">
     <div class="flex items-center gap-2">
       <button
-        class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+        class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors {!sidebarActionsFocused || selectedSidebarAction === 'compose' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-primary/10 text-primary hover:bg-primary/20'}"
         type="button"
-        onclick={onCompose}
+        tabindex="-1"
+        data-sidebar-item="sidebar-action"
+        data-sidebar-action="compose"
+        data-keyboard-selected={sidebarActionsFocused && selectedSidebarAction === 'compose'}
+        onclick={() => activateSidebarAction('compose')}
       >
         <Icon icon="mdi:email-edit-outline" class="w-4 h-4" />
         <span>{$_('sidebar.compose')}</span>
       </button>
       <button
-        class="h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+        class="h-9 w-9 flex items-center justify-center rounded-md transition-colors flex-shrink-0 {sidebarActionsFocused && selectedSidebarAction === 'sync' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}"
         type="button"
+        tabindex="-1"
+        data-sidebar-item="sidebar-action"
+        data-sidebar-action="sync"
+        data-keyboard-selected={sidebarActionsFocused && selectedSidebarAction === 'sync'}
         title={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
         aria-label={$_(accountStore.isAnySyncing ? 'sidebar.clickToCancel' : 'sidebar.syncAllAccounts')}
-        onclick={toggleSync}
+        onclick={() => activateSidebarAction('sync')}
       >
         <Icon
           icon="mdi:refresh"
-          class="w-5 h-5 {accountStore.isAnySyncing ? 'animate-spin text-primary' : ''}"
+          class="w-5 h-5 {accountStore.isAnySyncing ? `animate-spin ${sidebarActionsFocused && selectedSidebarAction === 'sync' ? 'text-primary-foreground' : 'text-primary'}` : ''}"
         />
       </button>
       {#if showBackButton}
@@ -435,15 +477,32 @@
           selectedFolderId={accountStore.selectedFolder?.folderId ?? selectedFolderId ?? ''}
           {selectionSource}
           isHeaderFocused={focusedAccountId === accWithFolders.account.id}
+          showFolderSelection={!sidebarActionsFocused && focusedAccountId === null && focusedFolderGroupId === null}
+          {focusedFolderGroupAccountId}
+          {focusedFolderGroupId}
           isExpanded={expandedAccounts[accWithFolders.account.id] ?? true}
           {collapsedFolders}
           {onMessagesMoved}
           onFolderSelect={handleFolderSelect}
           onToggleExpanded={() => {
+            sidebarActionsFocused = false
             focusedAccountId = accWithFolders.account.id
+            focusedFolderGroupAccountId = null
+            focusedFolderGroupId = null
             toggleAccountExpanded(accWithFolders.account.id)
           }}
-          onToggleFolderCollapse={toggleFolderCollapsed}
+          onToggleFolderCollapse={(folderId, directoryOnly) => {
+            sidebarActionsFocused = false
+            if (directoryOnly) {
+              focusedAccountId = null
+              focusedFolderGroupAccountId = accWithFolders.account.id
+              focusedFolderGroupId = folderId
+            } else {
+              focusedFolderGroupAccountId = null
+              focusedFolderGroupId = null
+            }
+            toggleFolderCollapsed(folderId)
+          }}
         />
       {/each}
     {/if}

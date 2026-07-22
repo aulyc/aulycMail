@@ -20,7 +20,6 @@ import type { contactdto } from '$wailsjs/go/models'
 // buttons + scrim; this store handles the "which view do we want to be
 // in next" decisions on user actions.
 import { isResponsive, showViewer, hideSidebar } from '$lib/stores/layout.svelte'
-
 const CONTACTS_PAGE_SIZE = 200
 
 // Source ID values the sidebar can dispatch:
@@ -31,11 +30,14 @@ const CONTACTS_PAGE_SIZE = 200
 let selectedSourceId = $state<string>('')
 let searchQuery = $state<string>('')
 let selectedContactId = $state<string | null>(null)
-let contacts = $state<contactdto.Contact[]>([])
+let contacts = $state<contactdto.ContactListItem[]>([])
 let total = $state<number>(0)
 let detail = $state<contactdto.Contact | null>(null)
 let loading = $state<boolean>(false)
 let loadingMore = $state<boolean>(false)
+let loadError = $state<boolean>(false)
+let detailLoading = $state<boolean>(false)
+let detailLoadError = $state<boolean>(false)
 let listResetSignal = $state(0)
 let selectedContactScrollTopSignal = $state(0)
 let contactsLoadSeq = 0
@@ -51,7 +53,7 @@ export const contactsView = {
   get selectedContactId(): string | null {
     return selectedContactId
   },
-  get contacts(): contactdto.Contact[] {
+  get contacts(): contactdto.ContactListItem[] {
     return contacts
   },
   get total(): number {
@@ -65,6 +67,15 @@ export const contactsView = {
   },
   get loadingMore(): boolean {
     return loadingMore
+  },
+  get loadError(): boolean {
+    return loadError
+  },
+  get detailLoading(): boolean {
+    return detailLoading
+  },
+  get detailLoadError(): boolean {
+    return detailLoadError
   },
   get hasMore(): boolean {
     return contacts.length < total
@@ -84,6 +95,11 @@ export function selectSource(sourceId: string): void {
   selectedSourceId = sourceId
   selectedContactId = null
   detail = null
+  contacts = []
+  total = 0
+  loadError = false
+  detailLoading = false
+  detailLoadError = false
   contactDetailSeq += 1
   // Switching category resets the search filter so the new category shows all
   // its contacts (not the intersection with a lingering query). The ContactList
@@ -102,8 +118,10 @@ export function setSearchQuery(q: string): void {
 
 export async function reloadContacts(limit = CONTACTS_PAGE_SIZE, offset = 0, preferredIndex = 0): Promise<void> {
   const seq = ++contactsLoadSeq
+  let nextDetailId: string | null = null
   loading = true
   loadingMore = false
+  loadError = false
   try {
     const result = await BrowseContacts(searchQuery, selectedSourceId, limit, offset)
     if (seq === contactsLoadSeq) {
@@ -112,22 +130,32 @@ export async function reloadContacts(limit = CONTACTS_PAGE_SIZE, offset = 0, pre
       if (contacts.length === 0) {
         selectedContactId = null
         detail = null
+        detailLoading = false
+        detailLoadError = false
         contactDetailSeq += 1
       } else if (!selectedContactId || !contacts.some((contact) => contact.id === selectedContactId)) {
         const index = Math.max(0, Math.min(preferredIndex, contacts.length - 1))
-        await focusContact(contacts[index].id)
+        nextDetailId = contacts[index].id
+        selectedContactId = nextDetailId
+        detail = null
+        contactDetailSeq += 1
       }
     }
   } catch (err) {
     console.error('Failed to list contacts for browse:', err)
     if (seq === contactsLoadSeq) {
-      contacts = []
-      total = 0
+      loadError = true
     }
   } finally {
     if (seq === contactsLoadSeq) {
       loading = false
     }
+  }
+
+  // A slow or stalled detail request must never keep the list in its blocking
+  // loading state. Start it only after the list request has fully settled.
+  if (nextDetailId && seq === contactsLoadSeq) {
+    void focusContact(nextDetailId)
   }
 }
 
@@ -166,15 +194,27 @@ async function selectContact(id: string | null, reveal: boolean): Promise<void> 
   const seq = ++contactDetailSeq
   if (!id) {
     detail = null
+    detailLoading = false
+    detailLoadError = false
     return
   }
   if (reveal && isResponsive()) showViewer()
+  detail = null
+  detailLoading = true
+  detailLoadError = false
   try {
     const loaded = await GetContactDetail(id)
     if (seq === contactDetailSeq && selectedContactId === id) detail = loaded
   } catch (err) {
     console.error('Failed to load contact detail:', err)
-    if (seq === contactDetailSeq && selectedContactId === id) detail = null
+    if (seq === contactDetailSeq && selectedContactId === id) {
+      detail = null
+      detailLoadError = true
+    }
+  } finally {
+    if (seq === contactDetailSeq && selectedContactId === id) {
+      detailLoading = false
+    }
   }
 }
 

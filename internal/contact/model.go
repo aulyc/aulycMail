@@ -52,6 +52,17 @@ type Record struct {
 	Categories []string        `json:"categories,omitempty"`
 }
 
+// RecordSummary is the lightweight shape used by contact-list and global-search
+// reads. Rich sub-table fields stay on Record and are loaded only when the user
+// opens a contact detail.
+type RecordSummary struct {
+	ID           string
+	Source       string
+	Fn           string
+	PrimaryEmail string
+	UpdatedAt    time.Time
+}
+
 // RecordEmail is a single email belonging to a Record. Carries the per-email
 // autocomplete metadata that lived on the legacy `contacts` table.
 type RecordEmail struct {

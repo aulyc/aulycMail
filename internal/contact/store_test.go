@@ -132,6 +132,39 @@ func TestAccountScopedContactGrouping(t *testing.T) {
 		t.Fatalf("acc-b all count = %d, want 1", got)
 	}
 
+	page, total, err := store.ListRecordSummaries(RecordFilter{
+		Source:    "local",
+		AccountID: "acc-a",
+		Limit:     2,
+	})
+	if err != nil {
+		t.Fatalf("ListRecordSummaries: %v", err)
+	}
+	if len(page) != 2 || total != 4 {
+		t.Fatalf("summary page len/total = %d/%d, want 2/4", len(page), total)
+	}
+	for _, item := range page {
+		if item.ID == "" || item.PrimaryEmail == "" {
+			t.Fatalf("summary item missing list identity: %+v", item)
+		}
+	}
+
+	secondPage, secondTotal, err := store.ListRecordSummaries(RecordFilter{
+		Source:    "local",
+		AccountID: "acc-a",
+		Limit:     2,
+		Offset:    2,
+	})
+	if err != nil {
+		t.Fatalf("ListRecordSummaries second page: %v", err)
+	}
+	if len(secondPage) != 2 || secondTotal != 4 {
+		t.Fatalf("second summary page len/total = %d/%d, want 2/4", len(secondPage), secondTotal)
+	}
+	if page[0].ID == secondPage[0].ID || page[1].ID == secondPage[1].ID {
+		t.Fatalf("summary pages overlap: first=%+v second=%+v", page, secondPage)
+	}
+
 	groups, err := store.ListAccountAssociations()
 	if err != nil {
 		t.Fatalf("ListAccountAssociations: %v", err)

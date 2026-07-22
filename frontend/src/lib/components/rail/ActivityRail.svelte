@@ -20,7 +20,6 @@
   let active = $derived(getActivePane())
   let selectedFeature = $state('mail')
   let railEl = $state<HTMLElement | null>(null)
-  let settingsButtonEl = $state<HTMLButtonElement | null>(null)
 
   $effect(() => {
     const activePane = active
@@ -78,7 +77,7 @@
   export function focusSettings() {
     selectedFeature = 'settings'
     setFocusedPane('featureNav')
-    settingsButtonEl?.focus({ preventScroll: true })
+    railEl?.focus({ preventScroll: true })
   }
 </script>
 
@@ -114,7 +113,6 @@
 
   <!-- Settings: pinned to the bottom, available from Mail and Contacts. -->
   <button
-    bind:this={settingsButtonEl}
     tabindex="-1"
     class="mt-auto mb-2 flex items-center justify-center w-12 h-12 border-l-[3px] transition-colors duration-150 cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 {selectedFeature === 'settings' ? 'border-l-primary bg-accent/40 text-primary' : 'border-l-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30'}"
     type="button"

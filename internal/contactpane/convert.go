@@ -96,3 +96,35 @@ func fromRecord(rec *contact.Record) contactdto.Contact {
 	out.Categories = append(out.Categories, rec.Categories...)
 	return out
 }
+
+func fromRecordSummary(summary *contact.RecordSummary) contactdto.ContactListItem {
+	if summary == nil {
+		return contactdto.ContactListItem{Emails: []string{}}
+	}
+	emails := []string{}
+	if summary.PrimaryEmail != "" {
+		emails = append(emails, summary.PrimaryEmail)
+	}
+	sourceID := summary.Source
+	if sourceID == "local" {
+		sourceID = "aulycmail"
+	}
+	return contactdto.ContactListItem{
+		ID:        summary.ID,
+		Name:      summary.Fn,
+		Emails:    emails,
+		SourceID:  sourceID,
+		UpdatedAt: summary.UpdatedAt,
+	}
+}
+
+func contactFromRecordSummary(summary *contact.RecordSummary) contactdto.Contact {
+	item := fromRecordSummary(summary)
+	return contactdto.Contact{
+		ID:        item.ID,
+		Name:      item.Name,
+		Emails:    item.Emails,
+		SourceID:  item.SourceID,
+		UpdatedAt: item.UpdatedAt,
+	}
+}

@@ -37,7 +37,7 @@
 
   onMount(() => {
     initContactRefreshEvents()
-    void loadContactAccountGroups({ force: true })
+    void loadContactAccountGroups()
     if (!accountStore.loading && accountStore.accounts.length === 0) {
       void accountStore.load()
     }

@@ -31,11 +31,16 @@
       "sortAsc": "排序：A → Z",
       "sortDesc": "排序：Z → A",
       "addTooltip": "添加联系人",
+      "loadFailed": "加载联系人失败。",
+      "retry": "重试",
       "emptySearch": "没有符合搜索条件的联系人。",
       "empty": "没有联系人。"
     },
     "detail": {
       "emptyState": "选择一个联系人以查看详细信息。",
+      "loading": "正在加载联系人详情…",
+      "loadFailed": "加载联系人详情失败。",
+      "retry": "重试",
       "edit": "编辑",
       "copyTooltip": "点击复制",
       "relatedMail": "往来邮件",

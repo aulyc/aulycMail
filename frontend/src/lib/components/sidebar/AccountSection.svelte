@@ -16,11 +16,14 @@
     selectedFolderId: string
     selectionSource: 'unified' | 'account' | null
     isHeaderFocused?: boolean
+    showFolderSelection?: boolean
+    focusedFolderGroupAccountId?: string | null
+    focusedFolderGroupId?: string | null
     isExpanded?: boolean
     onFolderSelect?: (accountId: string, folderId: string, folderPath: string, folderName: string, folderType: string) => void
     onToggleExpanded?: () => void
     collapsedFolders?: Record<string, boolean>
-    onToggleFolderCollapse?: (folderId: string) => void
+    onToggleFolderCollapse?: (folderId: string, directoryOnly: boolean) => void
     onMessagesMoved?: () => void
   }
 
@@ -34,6 +37,9 @@
     selectedFolderId,
     selectionSource,
     isHeaderFocused = false,
+    showFolderSelection = true,
+    focusedFolderGroupAccountId = null,
+    focusedFolderGroupId = null,
     isExpanded = true,
     onFolderSelect,
     onToggleExpanded,
@@ -78,7 +84,7 @@
        sidebar header is just an expand/collapse toggle. -->
   <div>
     <button
-      class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground hover:bg-muted/50 transition-colors focus:outline-none {isHeaderFocused ? 'bg-muted' : ''}"
+      class="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors focus:outline-none {isHeaderFocused ? 'bg-primary/10 text-primary' : 'text-foreground hover:bg-muted/50'}"
       tabindex="-1"
       data-sidebar-item="account-header"
       data-account-id={acc.id}
@@ -133,10 +139,13 @@
             {selectedAccountId}
             {selectedFolderId}
             {selectionSource}
+            {showFolderSelection}
+            {focusedFolderGroupAccountId}
+            {focusedFolderGroupId}
             {collapsedFolders}
             {onMessagesMoved}
             onFolderSelect={(f) => selectFolder(f)}
-            onToggleCollapse={(folderId) => onToggleFolderCollapse?.(folderId)}
+            onToggleCollapse={(folderId, directoryOnly) => onToggleFolderCollapse?.(folderId, directoryOnly)}
           />
         {/each}
       {/if}

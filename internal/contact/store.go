@@ -236,53 +236,52 @@ func roleColumn(role string) string {
 	}
 }
 
-func accountRolePredicate(role string) string {
-	sender := `(f.folder_type NOT IN ('sent', 'drafts', 'spam', 'trash') AND LOWER(COALESCE(m.from_email, '')) = LOWER(ce.email))`
-	recipient := `(f.folder_type = 'sent' AND ` + jsonListContainsRecordEmail("m.to_list") + `)`
-	cc := `(f.folder_type = 'sent' AND ` + jsonListContainsRecordEmail("m.cc_list") + `)`
-	bcc := `(f.folder_type = 'sent' AND ` + jsonListContainsRecordEmail("m.bcc_list") + `)`
-
+// accountMatchedRecordsCTE expands the selected account's message participants
+// once and joins them to the indexed contact_emails.email column. The previous
+// query was correlated from contact_records and re-expanded every message JSON
+// list once per contact, which made account-scoped browsing quadratic in
+// contacts x messages.
+func accountMatchedRecordsCTE(role string) string {
 	switch role {
-	case RoleSender:
-		return sender
-	case RoleRecipient:
-		return recipient
-	case RoleCc:
-		return cc
-	case RoleBcc:
-		return bcc
-	case RoleCcBcc:
-		return `(` + cc + ` OR ` + bcc + `)`
+	case "", RoleSender, RoleRecipient, RoleCc, RoleBcc, RoleCcBcc:
 	default:
-		return `(` + strings.Join([]string{sender, recipient, cc, bcc}, ` OR `) + `)`
+		role = ""
 	}
+	selected := []string{}
+	add := func(candidateRole, query string) {
+		if role == "" || role == candidateRole || (role == RoleCcBcc && (candidateRole == RoleCc || candidateRole == RoleBcc)) {
+			selected = append(selected, query)
+		}
+	}
+
+	add(RoleSender, `
+		SELECT DISTINCT ce.record_id
+		FROM folders f
+		CROSS JOIN messages m
+		JOIN contact_emails ce ON ce.email = LOWER(COALESCE(m.from_email, ''))
+		WHERE m.folder_id = f.id
+		  AND f.account_id = (SELECT account_id FROM selected_account)
+		  AND f.folder_type NOT IN ('sent', 'drafts', 'spam', 'trash')`)
+	add(RoleRecipient, accountJSONParticipantRecordsSQL("m.to_list"))
+	add(RoleCc, accountJSONParticipantRecordsSQL("m.cc_list"))
+	add(RoleBcc, accountJSONParticipantRecordsSQL("m.bcc_list"))
+
+	return `WITH selected_account(account_id) AS (VALUES (?)),
+	matched_records(record_id) AS (` + strings.Join(selected, "\n\t\tUNION\n") + `
+	)`
 }
 
-func accountRecordExistsSQL(role string) string {
+func accountJSONParticipantRecordsSQL(column string) string {
 	return `
-		EXISTS (
-			SELECT 1
-			FROM contact_emails ce
-			JOIN messages m ON (
-				LOWER(COALESCE(m.from_email, '')) = LOWER(ce.email)
-				OR ` + jsonListContainsRecordEmail("m.to_list") + `
-				OR ` + jsonListContainsRecordEmail("m.cc_list") + `
-				OR ` + jsonListContainsRecordEmail("m.bcc_list") + `
-			)
-			JOIN folders f ON m.folder_id = f.id
-			WHERE ce.record_id = cr.id
-			  AND f.account_id = ?
-			  AND ` + accountRolePredicate(role) + `
-		)`
-}
-
-func jsonListContainsRecordEmail(column string) string {
-	return `
-		EXISTS (
-			SELECT 1
-			FROM json_each(CASE WHEN json_valid(COALESCE(` + column + `, '')) THEN ` + column + ` ELSE '[]' END) addr
-			WHERE LOWER(COALESCE(json_extract(addr.value, '$.email'), json_extract(addr.value, '$.address'), '')) = LOWER(ce.email)
-		)`
+		SELECT DISTINCT ce.record_id
+		FROM folders f
+		CROSS JOIN messages m
+		JOIN json_each(CASE WHEN json_valid(COALESCE(` + column + `, '')) THEN ` + column + ` ELSE '[]' END) addr
+		JOIN contact_emails ce
+		  ON ce.email = LOWER(COALESCE(json_extract(addr.value, '$.email'), json_extract(addr.value, '$.address'), ''))
+		WHERE m.folder_id = f.id
+		  AND f.account_id = (SELECT account_id FROM selected_account)
+		  AND f.folder_type = 'sent'`
 }
 
 func normalizeEmails(emails []string) []string {
@@ -948,15 +947,21 @@ func (s *Store) loadRecordSubTables(rec *Record) error {
 // Contacts pane. The filter scopes by source/kind and supports a
 // case-insensitive name/email substring query.
 func (s *Store) ListRecords(filter RecordFilter) ([]*Record, error) {
-	where, args := recordFilterWhere(filter)
+	parts := buildRecordFilterSQL(filter)
 
-	query := `SELECT cr.id FROM contact_records cr` + where
+	query := parts.with + ` SELECT cr.id FROM contact_records cr` + parts.join + parts.where
 	query += ` ORDER BY COALESCE(cr.fn, '') ASC, cr.id ASC`
+	args := append([]any{}, parts.args...)
 	if filter.Limit > 0 {
-		query += fmt.Sprintf(" LIMIT %d", filter.Limit)
+		query += ` LIMIT ?`
+		args = append(args, filter.Limit)
 	}
 	if filter.Offset > 0 {
-		query += fmt.Sprintf(" OFFSET %d", filter.Offset)
+		if filter.Limit <= 0 {
+			query += ` LIMIT -1`
+		}
+		query += ` OFFSET ?`
+		args = append(args, filter.Offset)
 	}
 
 	rows, err := s.db.Query(query, args...)
@@ -989,22 +994,103 @@ func (s *Store) ListRecords(filter RecordFilter) ([]*Record, error) {
 	return records, nil
 }
 
+// ListRecordSummaries returns one lightweight page and its full filtered total
+// in a single SQL statement. COUNT(*) OVER() avoids rerunning the account/message
+// participant expansion just to compute the list header count.
+func (s *Store) ListRecordSummaries(filter RecordFilter) ([]*RecordSummary, int, error) {
+	parts := buildRecordFilterSQL(filter)
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = -1
+	}
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	query := parts.with + `
+		SELECT cr.id,
+		       cr.source,
+		       COALESCE(cr.fn, ''),
+		       COALESCE((
+		           SELECT ce.email
+		           FROM contact_emails ce
+		           WHERE ce.record_id = cr.id
+		           ORDER BY ce.is_primary DESC, ce.send_count DESC, ce.email ASC
+		           LIMIT 1
+		       ), ''),
+		       cr.updated_at,
+		       COUNT(*) OVER()
+		FROM contact_records cr` + parts.join + parts.where + `
+		ORDER BY COALESCE(cr.fn, '') ASC, cr.id ASC
+		LIMIT ? OFFSET ?`
+	args := append(append([]any{}, parts.args...), limit, offset)
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list record summaries: %w", err)
+	}
+	defer rows.Close()
+
+	items := make([]*RecordSummary, 0)
+	total := 0
+	for rows.Next() {
+		item := &RecordSummary{}
+		var updatedAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.Source, &item.Fn, &item.PrimaryEmail, &updatedAt, &total); err != nil {
+			return nil, 0, fmt.Errorf("scan record summary: %w", err)
+		}
+		if updatedAt.Valid {
+			item.UpdatedAt = updatedAt.Time
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate record summaries: %w", err)
+	}
+	// A page can become empty between infinite-scroll requests if contacts were
+	// deleted concurrently. Preserve the API's full-total contract in that edge
+	// case without making the normal first-page path execute the filter twice.
+	if len(items) == 0 && offset > 0 {
+		count, err := s.CountRecords(filter)
+		if err != nil {
+			return nil, 0, err
+		}
+		total = count
+	}
+	return items, total, nil
+}
+
 // CountRecords returns the number of contact records matching the same scope
 // and search filters used by ListRecords. Limit and offset are ignored.
 func (s *Store) CountRecords(filter RecordFilter) (int, error) {
-	where, args := recordFilterWhere(filter)
+	parts := buildRecordFilterSQL(filter)
 
 	var count int
-	query := `SELECT COUNT(DISTINCT cr.id) FROM contact_records cr` + where
-	if err := s.db.QueryRow(query, args...).Scan(&count); err != nil {
+	query := parts.with + ` SELECT COUNT(*) FROM contact_records cr` + parts.join + parts.where
+	if err := s.db.QueryRow(query, parts.args...).Scan(&count); err != nil {
 		return 0, fmt.Errorf("failed to count records: %w", err)
 	}
 	return count, nil
 }
 
-func recordFilterWhere(filter RecordFilter) (string, []any) {
+type recordFilterSQL struct {
+	with  string
+	join  string
+	where string
+	args  []any
+}
+
+func buildRecordFilterSQL(filter RecordFilter) recordFilterSQL {
 	conds := []string{}
 	args := []any{}
+	with := ""
+	join := ""
+
+	if filter.AccountID != "" {
+		with = accountMatchedRecordsCTE(filter.Role)
+		join = ` JOIN matched_records mr ON mr.record_id = cr.id`
+		args = append(args, filter.AccountID)
+	}
 
 	if filter.Source != "" {
 		conds = append(conds, `cr.source = ?`)
@@ -1020,10 +1106,6 @@ func recordFilterWhere(filter RecordFilter) (string, []any) {
 			conds = append(conds, `cr.`+col+` = 1`)
 		}
 	}
-	if filter.AccountID != "" {
-		conds = append(conds, accountRecordExistsSQL(filter.Role))
-		args = append(args, filter.AccountID)
-	}
 	if filter.Query != "" {
 		// Match on fn OR any email belonging to the record.
 		pattern := "%" + strings.ToLower(filter.Query) + "%"
@@ -1032,19 +1114,73 @@ func recordFilterWhere(filter RecordFilter) (string, []any) {
 	}
 
 	if len(conds) > 0 {
-		return ` WHERE ` + strings.Join(conds, ` AND `), args
+		return recordFilterSQL{with: with, join: join, where: ` WHERE ` + strings.Join(conds, ` AND `), args: args}
 	}
-	return "", args
+	return recordFilterSQL{with: with, join: join, args: args}
 }
 
 // ListAccountAssociations returns every enabled mail account plus the number of
 // local contacts currently linked to that account overall and by sidebar role.
 func (s *Store) ListAccountAssociations() ([]AccountAssociation, error) {
+	// CROSS JOIN deliberately keeps the small folders table as the outer loop.
+	// A reorderable messages JOIN makes SQLite scan the large messages table for
+	// the sender branch instead of probing the folder_id index.
 	rows, err := s.db.Query(`
-		SELECT id, COALESCE(name, ''), COALESCE(email, '')
-		FROM accounts
-		WHERE enabled = 1
-		ORDER BY order_index ASC, name ASC, email ASC
+		WITH participant_records(account_id, record_id, role) AS (
+			SELECT DISTINCT f.account_id, ce.record_id, 'sender'
+			FROM folders f
+			CROSS JOIN messages m
+			JOIN contact_emails ce ON ce.email = LOWER(COALESCE(m.from_email, ''))
+			WHERE m.folder_id = f.id
+			  AND f.folder_type NOT IN ('sent', 'drafts', 'spam', 'trash')
+
+			UNION ALL
+
+			SELECT DISTINCT f.account_id, ce.record_id, 'recipient'
+			FROM folders f
+			CROSS JOIN messages m
+			JOIN json_each(CASE WHEN json_valid(COALESCE(m.to_list, '')) THEN m.to_list ELSE '[]' END) addr
+			JOIN contact_emails ce
+			  ON ce.email = LOWER(COALESCE(json_extract(addr.value, '$.email'), json_extract(addr.value, '$.address'), ''))
+			WHERE m.folder_id = f.id
+			  AND f.folder_type = 'sent'
+
+			UNION ALL
+
+			SELECT DISTINCT f.account_id, ce.record_id, 'cc'
+			FROM folders f
+			CROSS JOIN messages m
+			JOIN json_each(CASE WHEN json_valid(COALESCE(m.cc_list, '')) THEN m.cc_list ELSE '[]' END) addr
+			JOIN contact_emails ce
+			  ON ce.email = LOWER(COALESCE(json_extract(addr.value, '$.email'), json_extract(addr.value, '$.address'), ''))
+			WHERE m.folder_id = f.id
+			  AND f.folder_type = 'sent'
+
+			UNION ALL
+
+			SELECT DISTINCT f.account_id, ce.record_id, 'bcc'
+			FROM folders f
+			CROSS JOIN messages m
+			JOIN json_each(CASE WHEN json_valid(COALESCE(m.bcc_list, '')) THEN m.bcc_list ELSE '[]' END) addr
+			JOIN contact_emails ce
+			  ON ce.email = LOWER(COALESCE(json_extract(addr.value, '$.email'), json_extract(addr.value, '$.address'), ''))
+			WHERE m.folder_id = f.id
+			  AND f.folder_type = 'sent'
+		)
+		SELECT a.id,
+		       COALESCE(a.name, ''),
+		       COALESCE(a.email, ''),
+		       COUNT(DISTINCT cr.id),
+		       COUNT(DISTINCT CASE WHEN p.role = 'sender' THEN cr.id END),
+		       COUNT(DISTINCT CASE WHEN p.role = 'recipient' THEN cr.id END),
+		       COUNT(DISTINCT CASE WHEN p.role = 'cc' THEN cr.id END),
+		       COUNT(DISTINCT CASE WHEN p.role = 'bcc' THEN cr.id END)
+		FROM accounts a
+		LEFT JOIN participant_records p ON p.account_id = a.id
+		LEFT JOIN contact_records cr ON cr.id = p.record_id AND cr.source = 'local'
+		WHERE a.enabled = 1
+		GROUP BY a.id, a.name, a.email, a.order_index
+		ORDER BY a.order_index ASC, a.name ASC, a.email ASC
 	`)
 	if err != nil {
 		return nil, fmt.Errorf("list contact account associations: %w", err)
@@ -1054,42 +1190,24 @@ func (s *Store) ListAccountAssociations() ([]AccountAssociation, error) {
 	var out []AccountAssociation
 	for rows.Next() {
 		var a AccountAssociation
-		if err := rows.Scan(&a.AccountID, &a.Name, &a.Email); err != nil {
+		if err := rows.Scan(
+			&a.AccountID,
+			&a.Name,
+			&a.Email,
+			&a.Count,
+			&a.SenderCount,
+			&a.RecipientCount,
+			&a.CcCount,
+			&a.BccCount,
+		); err != nil {
 			return nil, fmt.Errorf("scan contact account association: %w", err)
-		}
-		counts := []struct {
-			role string
-			dst  *int
-		}{
-			{"", &a.Count},
-			{RoleSender, &a.SenderCount},
-			{RoleRecipient, &a.RecipientCount},
-			{RoleCc, &a.CcCount},
-			{RoleBcc, &a.BccCount},
-		}
-		for _, c := range counts {
-			count, err := s.countRecordsForAccountRole(a.AccountID, c.role)
-			if err != nil {
-				return nil, err
-			}
-			*c.dst = count
 		}
 		out = append(out, a)
 	}
-	return out, nil
-}
-
-func (s *Store) countRecordsForAccountRole(accountID, role string) (int, error) {
-	var count int
-	query := `
-		SELECT COUNT(DISTINCT cr.id)
-		FROM contact_records cr
-		WHERE cr.source = 'local'
-		  AND ` + accountRecordExistsSQL(role)
-	if err := s.db.QueryRow(query, accountID).Scan(&count); err != nil {
-		return 0, fmt.Errorf("count contact account role: %w", err)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate contact account associations: %w", err)
 	}
-	return count, nil
+	return out, nil
 }
 
 // ListAssociatedAccountsForEmails returns the enabled mail accounts that have

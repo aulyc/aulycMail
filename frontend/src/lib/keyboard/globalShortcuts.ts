@@ -212,6 +212,7 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
     e.preventDefault()
 
     if (ctx.leftAltHeld || focusedPane === 'sidebar') {
+      if (isMailActive() && ctx.sidebarRef?.hasFocusedSidebarAction()) return
       if (!ctx.selectedFolderId) return
       const folderEl = document.querySelector(
         `[data-sidebar-item="folder"][data-account-id="${ctx.selectedAccountId}"][data-folder-id="${ctx.selectedFolderId}"]`
@@ -300,6 +301,9 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
       if (ctx.sidebarRef?.hasFocusedAccount()) {
         e.preventDefault()
         ctx.sidebarRef.toggleFocusedAccount()
+      } else if (ctx.sidebarRef?.hasFocusedFolderGroup()) {
+        e.preventDefault()
+        ctx.sidebarRef.toggleFocusedFolderGroup()
       } else if (ctx.sidebarRef?.hasSelectedFolderWithChildren()) {
         e.preventDefault()
         ctx.sidebarRef.toggleSelectedFolderCollapse()
@@ -342,6 +346,21 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
   // this point may operate the always-mounted, currently hidden mail tree.
   if (!isMailActive()) return
 
+  if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedSidebarAction()) {
+    if (e.key === 'ArrowLeft' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      ctx.sidebarRef.moveFocusedSidebarAction(-1)
+      return
+    }
+    if (e.key === 'ArrowRight' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      ctx.sidebarRef.moveFocusedSidebarAction(1)
+      return
+    }
+  }
+
   if (KEY.LIST_PREV(e) || KEY.LIST_PREV_CHECK(e)) {
     e.preventDefault()
     if (focusedPane === 'sidebar') {
@@ -379,9 +398,15 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
         }
         e.preventDefault()
       }
-      if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedAccount()) {
+      if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedSidebarAction()) {
+        e.preventDefault()
+        ctx.sidebarRef.activateFocusedSidebarAction()
+      } else if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedAccount()) {
         e.preventDefault()
         ctx.sidebarRef.toggleFocusedAccount()
+      } else if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedFolderGroup()) {
+        e.preventDefault()
+        ctx.sidebarRef.toggleFocusedFolderGroup()
       } else if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasSelectedFolderWithChildren()) {
         e.preventDefault()
         ctx.sidebarRef.toggleSelectedFolderCollapse()
@@ -402,8 +427,12 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
         e.preventDefault()
       }
       e.preventDefault()
-      if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedAccount()) {
+      if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedSidebarAction()) {
+        ctx.sidebarRef.activateFocusedSidebarAction()
+      } else if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedAccount()) {
         ctx.sidebarRef.toggleFocusedAccount()
+      } else if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasFocusedFolderGroup()) {
+        ctx.sidebarRef.toggleFocusedFolderGroup()
       } else if (focusedPane === 'sidebar' && ctx.sidebarRef?.hasSelectedFolderWithChildren()) {
         ctx.sidebarRef.toggleSelectedFolderCollapse()
       } else if (focusedPane === 'messageList') {

@@ -25,6 +25,7 @@ const contactListPath = new URL('../src/lib/contacts/components/ContactList.svel
 const contactStorePath = new URL('../src/lib/contacts/stores/contactsView.svelte.ts', import.meta.url)
 const viewerPath = new URL('../src/lib/components/viewer/ConversationViewer.svelte', import.meta.url)
 const settingsPath = new URL('../src/lib/components/settings/SettingsDialog.svelte', import.meta.url)
+const settingsRowPath = new URL('../src/lib/components/settings/shared/SettingsRow.svelte', import.meta.url)
 const backupViewerPath = new URL('../src/lib/components/backup/BackupViewerDialog.svelte', import.meta.url)
 const globalSearchPath = new URL('../src/lib/components/SearchOverlay.svelte', import.meta.url)
 
@@ -221,7 +222,7 @@ test('mail selection remains required across refresh, folder switch, and deletio
   assert.match(messageList, /conversations\.length === 0[\s\S]*onEmptyFolder\?\.\(\)/)
 })
 
-test('settings dialog cycles two regions, traps focus, and restores the settings entry', async () => {
+test('settings dialog cycles two regions, traps focus, and restores the feature rail without outlining the settings button', async () => {
   const [settings, app, activityRail] = await Promise.all([
     readFile(settingsPath, 'utf8'),
     readFile(appPath, 'utf8'),
@@ -229,12 +230,51 @@ test('settings dialog cycles two regions, traps focus, and restores the settings
   ])
 
   assert.match(settings, /settingsRegion = \$state<'navigation' \| 'content'>/)
-  assert.match(settings, /event\.key === 'Tab' && !inputState[\s\S]*settingsRegion === 'navigation' \? 'content' : 'navigation'/)
-  assert.match(settings, /event\.key === 'Escape' && inputState[\s\S]*focusSettingsRegion\('content'\)/)
+  assert.match(settings, /event\.key === 'Tab' && !nativeControlState[\s\S]*settingsRegion === 'navigation' \? 'content' : 'navigation'/)
+  assert.match(settings, /event\.key === 'Escape' && settingsControlState[\s\S]*focusSettingsRegion\('content'\)/)
   assert.match(settings, /setKeyboardScope\('settings'\)[\s\S]*setKeyboardScope\('main'\)/)
   assert.match(settings, /onOpenAutoFocus=\{handleOpenAutoFocus\}/)
   assert.match(app, /requestAnimationFrame\(\(\) => activityRailRef\?\.focusSettings\(\)\)/)
-  assert.match(activityRail, /export function focusSettings\(\)/)
+  const restoreFocusBody = activityRail.match(
+    /export function focusSettings\(\) \{([\s\S]*?)\n\s{2}\}/,
+  )?.[1] ?? ''
+  assert.match(restoreFocusBody, /selectedFeature = 'settings'/)
+  assert.match(restoreFocusBody, /setFocusedPane\('featureNav'\)/)
+  assert.match(restoreFocusBody, /railEl\?\.focus\(\{ preventScroll: true \}\)/)
+  assert.doesNotMatch(activityRail, /settingsButtonEl/)
+})
+
+test('settings navigation arrows immediately activate the highlighted category', async () => {
+  const settings = await readFile(settingsPath, 'utf8')
+  const navigationKeyHandler = settings.match(
+    /const currentIndex = navigation\.findIndex[\s\S]*?if \(nextIndex >= 0\)([^\n]*)/,
+  )?.[1] ?? ''
+
+  assert.match(navigationKeyHandler, /selectNavigationPage\(navigation\[nextIndex\]\.id\)/)
+  assert.doesNotMatch(navigationKeyHandler, /selectedNavigationPage\s*=/)
+})
+
+test('settings content arrows select controls while activation enters native input state', async () => {
+  const [settings, settingsRow] = await Promise.all([
+    readFile(settingsPath, 'utf8'),
+    readFile(settingsRowPath, 'utf8'),
+  ])
+
+  assert.equal(nextRovingIndex('ArrowDown', 4, 5, true), 0)
+  assert.equal(nextRovingIndex('ArrowUp', 0, 5, true), 4)
+  assert.equal(nextRovingIndex('ArrowDown', 0, 0, true), -1)
+  assert.match(settingsRow, /data-settings-control-row/)
+  assert.match(settingsRow, /data-\[settings-control-selected=true\]:bg-primary\/15/)
+  assert.match(settings, /button:not\(:disabled\)/)
+  assert.match(settings, /function getSettingsControlRows/)
+  assert.match(settings, /function selectSettingsControl/)
+  assert.match(settings, /nextRovingIndex\(event\.key as RovingNavigationKey,[\s\S]*settingsControlRows\.length,\s*true/)
+  assert.match(settings, /function activateSelectedSettingsControl/)
+  assert.match(settings, /control\.focus\(\{ preventScroll: true \}\)/)
+  assert.match(settings, /control\.click\(\)/)
+  assert.match(settings, /scrollIntoView\(\{ block: 'nearest' \}\)/)
+  assert.match(settings, /onfocusin=\{handleContentFocusIn\}/)
+  assert.match(settings, /onmousedown=\{handleContentMouseDown\}/)
 })
 
 test('IME composition and dialog priority stay ahead of region shortcuts', async () => {

@@ -31,11 +31,16 @@
       "sortAsc": "Sort: A → Z",
       "sortDesc": "Sort: Z → A",
       "addTooltip": "Add contact",
+      "loadFailed": "Failed to load contacts.",
+      "retry": "Retry",
       "emptySearch": "No contacts match your search.",
       "empty": "No contacts."
     },
     "detail": {
       "emptyState": "Select a contact to view details.",
+      "loading": "Loading contact details…",
+      "loadFailed": "Failed to load contact details.",
+      "retry": "Retry",
       "edit": "Edit",
       "copyTooltip": "Click to copy",
       "relatedMail": "Related mail",

@@ -25,12 +25,12 @@ These shortcuts work anywhere in the application (unless in composer).
 | `Alt+Left` / `Alt+H` | Focus previous pane (viewer -> list -> sidebar) |
 | `Alt+Right` / `Alt+L` | Focus next pane (sidebar -> list -> viewer) |
 
-### Folder Navigation
+### Sidebar Navigation
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+Up` / `Alt+K` | Navigate to previous folder |
-| `Alt+Down` / `Alt+J` | Navigate to next folder |
+| `Alt+Up` / `Alt+K` | Navigate to the previous sidebar item, wrapping at the top |
+| `Alt+Down` / `Alt+J` | Navigate to the next sidebar item, wrapping at the bottom |
 | `Alt+Enter` | Expand/collapse focused account folder tree |
 | `Alt(L)+Alt(R)` | Brings up context menu for the focused folder |
 
@@ -59,8 +59,10 @@ These shortcuts depend on which pane is focused. They are disabled when typing i
 
 | Shortcut | Action |
 |----------|--------|
-| `Up` / `K` | Navigate to previous folder |
-| `Down` / `J` | Navigate to next folder |
+| `Up` / `K` | Enter or leave the Compose/Sync action group toward the previous sidebar item; wraps at the top |
+| `Down` / `J` | Enter or leave the Compose/Sync action group toward the next sidebar item; wraps at the bottom |
+| `Left` / `Right` | Switch between Compose and Sync while the action group is highlighted |
+| `Enter` / `Space` | Activate the highlighted Compose or Sync action |
 | `Alt + Enter` / `Space` | Expand/collapse account (when account header is focused) |
 | `Alt(L) + Alt(R)` | Brings up context menu for the focused folder |
 

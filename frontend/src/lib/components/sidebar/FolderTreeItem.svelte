@@ -15,9 +15,12 @@
     selectedAccountId: string
     selectedFolderId: string
     selectionSource: 'unified' | 'account' | null
+    showFolderSelection?: boolean
+    focusedFolderGroupAccountId?: string | null
+    focusedFolderGroupId?: string | null
     collapsedFolders: Record<string, boolean>
     onFolderSelect?: (f: folder.Folder) => void
-    onToggleCollapse?: (folderId: string) => void
+    onToggleCollapse?: (folderId: string, directoryOnly: boolean) => void
     onMessagesMoved?: () => void
   }
 
@@ -27,6 +30,9 @@
     selectedAccountId,
     selectedFolderId,
     selectionSource,
+    showFolderSelection = true,
+    focusedFolderGroupAccountId = null,
+    focusedFolderGroupId = null,
     collapsedFolders,
     onFolderSelect,
     onToggleCollapse,
@@ -50,7 +56,11 @@
   }
 
   function isFolderSelected(folderId: string): boolean {
-    return selectionSource === 'account' && selectedAccountId === accountId && selectedFolderId === folderId
+    return showFolderSelection && selectionSource === 'account' && selectedAccountId === accountId && selectedFolderId === folderId
+  }
+
+  function isFolderGroupFocused(folderId: string): boolean {
+    return focusedFolderGroupAccountId === accountId && focusedFolderGroupId === folderId
   }
 
   let hasChildren = $derived(tree.children && tree.children.length > 0)
@@ -151,7 +161,7 @@
   function handleFolderClick() {
     if (!tree.folder) return
     if (isDirectoryOnly) {
-      if (hasChildren) onToggleCollapse?.(tree.folder.id)
+      if (hasChildren) onToggleCollapse?.(tree.folder.id, true)
       return
     }
     onFolderSelect?.(tree.folder)
@@ -163,9 +173,11 @@
     <button
       class="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-md transition-colors focus:outline-none {isFolderSelected(tree.folder.id)
         ? 'bg-primary/10 text-primary font-medium'
-        : isDirectoryOnly
-          ? 'text-muted-foreground hover:bg-muted/50'
-          : 'text-foreground hover:bg-muted/50'} {isDragOver ? 'ring-2 ring-primary ring-inset' : ''}"
+        : isFolderGroupFocused(tree.folder.id)
+          ? 'bg-primary/10 text-primary font-medium'
+          : isDirectoryOnly
+            ? 'text-muted-foreground hover:bg-muted/50'
+            : 'text-foreground hover:bg-muted/50'} {isDragOver ? 'ring-2 ring-primary ring-inset' : ''}"
       tabindex="-1"
       data-sidebar-item="folder"
       data-account-id={accountId}
@@ -192,7 +204,7 @@
           tabindex="-1"
           onclick={(e: MouseEvent) => {
             e.stopPropagation()
-            onToggleCollapse?.(tree.folder!.id)
+            onToggleCollapse?.(tree.folder!.id, isDirectoryOnly)
           }}
         >
           <Icon
@@ -227,6 +239,9 @@
           {selectedAccountId}
           {selectedFolderId}
           {selectionSource}
+          {showFolderSelection}
+          {focusedFolderGroupAccountId}
+          {focusedFolderGroupId}
           {collapsedFolders}
           {onFolderSelect}
           {onToggleCollapse}
