@@ -27,7 +27,11 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 	log := logging.WithComponent("app")
 
 	// Initialize the sync scheduler for periodic polling
+	if a.syncCoordinator == nil {
+		a.syncCoordinator = sync.NewCoordinator()
+	}
 	a.syncScheduler = sync.NewScheduler(a.syncEngine, a.accountStore, a.folderStore)
+	a.syncScheduler.SetCoordinator(a.syncCoordinator)
 
 	// Set callback for new mail notifications
 	a.syncScheduler.SetNewMailCallback(func(info sync.NewMailInfo) {
@@ -165,18 +169,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 	if inbox != nil {
 		folderID = inbox.ID
 	}
-
-	// Use composite key for sync tracking
 	syncKey := event.AccountID + ":" + folderID
-
-	// Check if a sync is already running for this folder - skip IDLE sync if so
-	a.syncMu.Lock()
-	if _, exists := a.syncContexts[syncKey]; exists {
-		a.syncMu.Unlock()
-		log.Debug().Str("syncKey", syncKey).Msg("Skipping IDLE sync - sync already in progress")
-		return
-	}
-	a.syncMu.Unlock()
 
 	// Use the scheduler's blocking sync to get new mail info
 	newMailInfo, messageResult, err := a.syncScheduler.SyncAccountInboxBlockingWithResult(event.AccountID)
@@ -197,8 +190,8 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 		}
 		return
 	}
-	// The blocking scheduler reports a no-op when another account sync already
-	// owns the work. Do not fetch bodies or create a synthetic success log.
+	// A duplicate IDLE event may be coalesced into another pending account sync.
+	// Do not fetch bodies or create a synthetic success log for that no-op.
 	if !messageResult.Performed {
 		return
 	}
@@ -684,7 +677,7 @@ func (a *App) syncAfterWake() {
 			a.syncMu.Unlock()
 		}()
 
-		if err := a.SyncAllComplete(); err != nil {
+		if err := a.syncAllComplete(sync.TriggerWake); err != nil {
 			log.Warn().Err(err).Msg("Post-wake sync encountered errors")
 		} else {
 			log.Info().Msg("Post-wake sync completed successfully")

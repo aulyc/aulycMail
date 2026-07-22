@@ -22,7 +22,24 @@ import (
 
 // SyncFolder synchronizes messages for a folder with the IMAP server
 func (a *App) SyncFolder(accountID, folderID string) error {
-	const debounceMs = 500
+	const debounceWindow = 500 * time.Millisecond
+	syncKey := accountID + ":" + folderID
+	a.syncMu.Lock()
+	if lastRequest, exists := a.syncLastRequest[syncKey]; exists && time.Since(lastRequest) < debounceWindow {
+		a.syncMu.Unlock()
+		log := logging.WithComponent("app")
+		log.Debug().Str("account", accountID).Str("folder", folderID).Msg("SyncFolder debounced, skipping")
+		return nil
+	}
+	a.syncLastRequest[syncKey] = time.Now()
+	a.syncMu.Unlock()
+
+	return a.coordinateAccountSync(accountID, syncengine.TriggerManual, func() error {
+		return a.syncFolderDirect(accountID, folderID)
+	})
+}
+
+func (a *App) syncFolderDirect(accountID, folderID string) error {
 	log := logging.WithComponent("app")
 	folderObj, err := a.requireSelectableFolder(folderID)
 	if err != nil {
@@ -36,16 +53,6 @@ func (a *App) SyncFolder(accountID, folderID string) error {
 	syncKey := accountID + ":" + folderID
 
 	a.syncMu.Lock()
-
-	// Check debounce - if last request for this folder was within 500ms, skip
-	if lastReq, exists := a.syncLastRequest[syncKey]; exists {
-		if time.Since(lastReq) < time.Duration(debounceMs)*time.Millisecond {
-			a.syncMu.Unlock()
-			log.Debug().Str("account", accountID).Str("folder", folderID).Msg("SyncFolder debounced, skipping")
-			return nil // Silently ignore
-		}
-	}
-	a.syncLastRequest[syncKey] = time.Now()
 
 	// Cancel existing sync for this specific folder if any
 	if cancel, exists := a.syncContexts[syncKey]; exists {
@@ -255,6 +262,12 @@ func (a *App) recordSyncActivity(accountID, folderID string, result syncengine.M
 // This is useful when attachments weren't extracted properly (e.g., after a fix)
 // or when message content needs to be re-parsed.
 func (a *App) ForceSyncFolder(accountID, folderID string) error {
+	return a.coordinateAccountSync(accountID, syncengine.TriggerManual, func() error {
+		return a.forceSyncFolderDirect(accountID, folderID)
+	})
+}
+
+func (a *App) forceSyncFolderDirect(accountID, folderID string) error {
 	log := logging.WithComponent("app")
 	log.Info().Str("accountID", accountID).Str("folderID", folderID).Msg("Starting force re-sync of folder")
 
@@ -273,13 +286,19 @@ func (a *App) ForceSyncFolder(accountID, folderID string) error {
 	log.Info().Int64("attachmentsDeleted", attachmentsDeleted).Msg("Deleted attachments")
 
 	// Step 3: Trigger normal folder sync (which will re-fetch bodies and extract attachments)
-	return a.SyncFolder(accountID, folderID)
+	return a.syncFolderDirect(accountID, folderID)
 }
 
 // SyncAccountComplete performs a comprehensive sync of an account:
 // 1. Syncs folder list from IMAP
 // 2. Syncs core folders' messages (Inbox, Drafts, Sent)
 func (a *App) SyncAccountComplete(accountID string) error {
+	return a.coordinateAccountSync(accountID, syncengine.TriggerManual, func() error {
+		return a.syncAccountCompleteDirect(accountID)
+	})
+}
+
+func (a *App) syncAccountCompleteDirect(accountID string) error {
 	log := logging.WithComponent("app.masterSync")
 	log.Info().Str("accountID", accountID).Msg("Starting complete account sync")
 
@@ -294,7 +313,7 @@ func (a *App) SyncAccountComplete(accountID string) error {
 	}
 
 	// 1. Sync folder list first (required for message sync)
-	if err := a.SyncFolders(accountID); err != nil {
+	if err := a.syncFoldersDirect(accountID); err != nil {
 		status := activitylog.StatusFailed
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			status = activitylog.StatusCancelled
@@ -338,7 +357,7 @@ func (a *App) SyncAccountComplete(accountID string) error {
 			defer func() { <-sem }() // Release semaphore
 
 			log.Info().Str("path", f.Path).Str("id", f.ID).Msg("Syncing folder")
-			if syncErr := a.SyncFolder(accountID, f.ID); syncErr != nil {
+			if syncErr := a.syncFolderDirect(accountID, f.ID); syncErr != nil {
 				log.Warn().Err(syncErr).Str("folder", f.Path).Msg("Message sync failed")
 				errorsMu.Lock()
 				syncErrors = append(syncErrors, fmt.Sprintf("%s: %v", f.Path, syncErr))
@@ -394,6 +413,10 @@ func (a *App) getCoreOnlyFolders(accountID string) ([]*folder.Folder, error) {
 // SyncAllComplete syncs all enabled accounts completely.
 // This is the master sync function called from the sidebar sync button.
 func (a *App) SyncAllComplete() error {
+	return a.syncAllComplete(syncengine.TriggerManual)
+}
+
+func (a *App) syncAllComplete(trigger syncengine.Trigger) error {
 	log := logging.WithComponent("app.masterSync")
 
 	// Reset cancellation flag for this sync run
@@ -450,7 +473,9 @@ func (a *App) SyncAllComplete() error {
 			break
 		}
 
-		if err := a.SyncAccountComplete(acc.ID); err != nil {
+		if err := a.coordinateAccountSync(acc.ID, trigger, func() error {
+			return a.syncAccountCompleteDirect(acc.ID)
+		}); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", acc.Email, err))
 			// Continue with other accounts
 		}
@@ -467,6 +492,23 @@ func (a *App) SyncAllComplete() error {
 
 	log.Info().Msg("Complete sync of all accounts and contacts finished")
 	return nil
+}
+
+func (a *App) coordinateAccountSync(accountID string, trigger syncengine.Trigger, work func() error) error {
+	if a.syncCoordinator == nil {
+		return work()
+	}
+	parent := a.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
+	err := a.syncCoordinator.Do(parent, accountID, trigger, func(context.Context) error {
+		return work()
+	})
+	if errors.Is(err, syncengine.ErrCoalesced) {
+		return nil
+	}
+	return err
 }
 
 // CancelFolderSync cancels a running sync for a specific folder

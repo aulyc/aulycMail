@@ -122,3 +122,60 @@ func TestFTSIndexerRepairsMissingRowsInCompleteFolder(t *testing.T) {
 		t.Fatalf("FTS matches after repair = %d, want 1", matches)
 	}
 }
+
+func TestFTSIndexerFinalizesInterruptedCompleteBatchWithoutRescan(t *testing.T) {
+	s, accountID, folderID := newBodyFailedTestStore(t)
+	now := time.Now().UTC()
+
+	for i := 1; i <= 3; i++ {
+		msg := &Message{
+			ID:          fmt.Sprintf("interrupted-msg-%d", i),
+			AccountID:   accountID,
+			FolderID:    folderID,
+			UID:         uint32(i),
+			Subject:     fmt.Sprintf("interrupted subject %d", i),
+			BodyText:    fmt.Sprintf("interrupted_needle_%d", i),
+			BodyFetched: true,
+			Date:        now.Add(time.Duration(i) * time.Second),
+		}
+		if err := s.Create(msg); err != nil {
+			t.Fatalf("Create message %d: %v", i, err)
+		}
+	}
+
+	ctx := context.Background()
+	indexer := NewFTSIndexer(s.db.DB)
+	if err := indexer.updateIndexStatus(ctx, folderID, 3, 3, false); err != nil {
+		t.Fatalf("seed interrupted index status: %v", err)
+	}
+
+	progressCalls := 0
+	indexer.SetProgressCallback(func(string, int, int) {
+		progressCalls++
+	})
+	completed := false
+	indexer.SetCompleteCallback(func(gotFolderID string) {
+		if gotFolderID != folderID {
+			t.Fatalf("complete folder = %s, want %s", gotFolderID, folderID)
+		}
+		completed = true
+	})
+
+	if err := indexer.IndexFolder(ctx, folderID); err != nil {
+		t.Fatalf("IndexFolder: %v", err)
+	}
+
+	status, err := indexer.GetIndexStatus(folderID)
+	if err != nil {
+		t.Fatalf("GetIndexStatus: %v", err)
+	}
+	if status == nil || status.IndexedCount != 3 || status.TotalCount != 3 || !status.IsComplete {
+		t.Fatalf("status = %#v, want indexed:3 total:3 complete:true", status)
+	}
+	if progressCalls != 0 {
+		t.Fatalf("progress calls = %d, want 0 for metadata-only repair", progressCalls)
+	}
+	if !completed {
+		t.Fatal("complete callback was not called")
+	}
+}

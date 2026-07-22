@@ -3,7 +3,9 @@
 This document describes the current local development and CI-neutral workflow
 for the Apple Silicon macOS build of aulycMail. Version and release behavior is
 documented separately in [VERSIONING.md](VERSIONING.md) and
-[RELEASE.md](RELEASE.md).
+[RELEASE.md](RELEASE.md). Background synchronization and maintenance-task
+energy constraints are documented in
+[ENERGY_OPTIMIZATION.md](ENERGY_OPTIMIZATION.md).
 
 ## Environment
 

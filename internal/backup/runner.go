@@ -92,6 +92,10 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 		return nil, err
 	}
 	defer viewerIndex.Close()
+	viewerMessageKeys, err := viewerIndex.MessageKeys()
+	if err != nil {
+		return nil, err
+	}
 
 	rows, err := ListMessageRows(db, options.AccountIDs)
 	if err != nil {
@@ -106,7 +110,8 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 	failures := make([]Failure, 0)
 	missing := make([]Failure, 0)
 	unavailable := make([]Failure, 0)
-	emitBackupProgress(options.EmitProgress, Progress{Phase: "running", Total: len(rows), Message: "开始备份"})
+	progressEmitter := newProgressEmitter(options.EmitProgress, 250*time.Millisecond, time.Now)
+	progressEmitter.Emit(Progress{Phase: "running", Total: len(rows), Message: "开始备份"})
 
 	pendingRows := make([]MessageRow, 0, len(rows))
 	recoveryMessageStore := message.NewStore(db)
@@ -124,12 +129,14 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 		if indexed && FileExists(options.Directory, existing.EMLPath) {
 			existing.HasAttachments = BoolPtr(row.HasAttachments)
 			idx.Messages[key] = existing
-			if !viewerIndex.HasMessage(key) {
-				_ = viewerIndex.UpsertMessage(key, existing, ViewerIndexedMessage{})
+			if !viewerMessageKeys[key] {
+				if upsertErr := viewerIndex.UpsertMessage(key, existing, ViewerIndexedMessage{}); upsertErr == nil {
+					viewerMessageKeys[key] = true
+				}
 			}
 			result.Skipped++
 			processed++
-			emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), ""))
+			progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ""))
 			continue
 		}
 		if !row.Selectable {
@@ -158,20 +165,20 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 				result.Failed++
 				failures = append(failures, FailureFromRow(row, lookupErr))
 				processed++
-				emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), lookupErr.Error()))
+				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), lookupErr.Error()))
 				continue
 			}
 			if recoverable {
 				result.Skipped++
 				processed++
-				emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), ""))
+				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ""))
 				continue
 			}
 			reason := fmt.Errorf("raw message unavailable: hierarchy-only folder has no indexed backup file")
 			result.Unavailable++
 			unavailable = append(unavailable, FailureFromRow(row, reason))
 			processed++
-			emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), reason.Error()))
+			progressEmitter.Emit(progressForRow(row, result, processed, len(rows), reason.Error()))
 			continue
 		}
 
@@ -204,7 +211,7 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 					result.Failed++
 					failures = append(failures, FailureFromRow(row, err))
 					processed++
-					emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), err.Error()))
+					progressEmitter.Emit(progressForRow(row, result, processed, len(rows), err.Error()))
 				}
 				continue
 			}
@@ -226,7 +233,7 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 						failures = append(failures, FailureFromRow(row, err))
 					}
 					processed++
-					emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), err.Error()))
+					progressEmitter.Emit(progressForRow(row, result, processed, len(rows), err.Error()))
 					continue
 				}
 
@@ -245,10 +252,12 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 					HasAttachments: BoolPtr(row.HasAttachments),
 					ExportedAt:     time.Now().UTC().Format(time.RFC3339),
 				}
-				_ = viewerIndex.UpsertMessageFromFile(options.Directory, key, idx.Messages[key])
+				if upsertErr := viewerIndex.UpsertMessageFromFile(options.Directory, key, idx.Messages[key]); upsertErr == nil {
+					viewerMessageKeys[key] = true
+				}
 				result.Exported++
 				processed++
-				emitBackupProgress(options.EmitProgress, progressForRow(row, result, processed, len(rows), ""))
+				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ""))
 			}
 		}
 	}
@@ -386,8 +395,28 @@ func progressForRow(row MessageRow, result *RunResult, current, total int, messa
 	}
 }
 
-func emitBackupProgress(emit func(Progress), progress Progress) {
-	if emit != nil {
-		emit(progress)
+type progressEmitter struct {
+	emit        func(Progress)
+	minInterval time.Duration
+	now         func() time.Time
+	lastEmit    time.Time
+	emitted     bool
+}
+
+func newProgressEmitter(emit func(Progress), minInterval time.Duration, now func() time.Time) *progressEmitter {
+	return &progressEmitter{emit: emit, minInterval: minInterval, now: now}
+}
+
+func (e *progressEmitter) Emit(progress Progress) {
+	if e == nil || e.emit == nil {
+		return
 	}
+	now := e.now()
+	isFinal := progress.Total >= 0 && progress.Current >= progress.Total
+	if e.emitted && !isFinal && now.Sub(e.lastEmit) < e.minInterval {
+		return
+	}
+	e.emit(progress)
+	e.lastEmit = now
+	e.emitted = true
 }

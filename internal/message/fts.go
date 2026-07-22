@@ -147,18 +147,38 @@ func (f *FTSIndexer) IndexFolder(ctx context.Context, folderID string) error {
 		return nil
 	}
 
-	logging.Info().Str("folderID", folderID).Int("totalCount", totalCount).Msg("Starting FTS indexing for folder")
-
-	// Initialize status
-	if err := f.updateIndexStatus(ctx, folderID, 0, totalCount, false); err != nil {
-		logging.Warn().Err(err).Str("folderID", folderID).Msg("Failed to initialize index status")
+	// A crash or app shutdown can happen after the final FTS batch commits but
+	// before is_complete is flipped. indexed_count is written only after each
+	// committed batch, so matching counts are sufficient to finish this repair
+	// without reading and re-inserting every message on the next startup.
+	if status != nil && !status.IsComplete &&
+		status.TotalCount == totalCount && status.IndexedCount >= totalCount {
+		if err := f.updateIndexStatus(ctx, folderID, totalCount, totalCount, true); err != nil {
+			return fmt.Errorf("failed to finalize interrupted FTS index: %w", err)
+		}
+		if f.onComplete != nil {
+			f.onComplete(folderID)
+		}
+		logging.Info().Str("folderID", folderID).Int("indexed", totalCount).Msg("Finalized interrupted FTS index")
+		return nil
 	}
+
+	logging.Info().Str("folderID", folderID).Int("totalCount", totalCount).Msg("Starting FTS indexing for folder")
 
 	// Index in batches to avoid blocking
 	const batchSize = 200
 	indexed := 0
+	startOffset := 0
+	if status != nil && !status.IsComplete && status.TotalCount == totalCount &&
+		status.IndexedCount > 0 && status.IndexedCount < totalCount {
+		indexed = status.IndexedCount
+		startOffset = status.IndexedCount
+		logging.Info().Str("folderID", folderID).Int("resumeAt", startOffset).Msg("Resuming interrupted FTS index")
+	} else if err := f.updateIndexStatus(ctx, folderID, 0, totalCount, false); err != nil {
+		logging.Warn().Err(err).Str("folderID", folderID).Msg("Failed to initialize index status")
+	}
 
-	for offset := 0; offset < totalCount; offset += batchSize {
+	for offset := startOffset; offset < totalCount; offset += batchSize {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -230,8 +250,10 @@ func (f *FTSIndexer) IndexFolder(ctx context.Context, folderID string) error {
 			Int("total", totalCount).
 			Msg("FTS indexing progress")
 
-		// Small delay to avoid blocking other operations
-		time.Sleep(10 * time.Millisecond)
+		// Small interruptible yield to keep foreground mail operations responsive.
+		if err := yieldIndexing(ctx, 10*time.Millisecond); err != nil {
+			return err
+		}
 	}
 
 	// Mark as complete
@@ -351,7 +373,9 @@ func (f *FTSIndexer) supplementCompleteFolderIndex(ctx context.Context, folderID
 			Msg("FTS supplement progress")
 
 		if processed < toProcess {
-			time.Sleep(10 * time.Millisecond)
+			if err := yieldIndexing(ctx, 10*time.Millisecond); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -365,6 +389,17 @@ func (f *FTSIndexer) supplementCompleteFolderIndex(ctx context.Context, folderID
 
 	logging.Info().Str("folderID", folderID).Int("indexed", processed).Msg("FTS supplement completed for folder")
 	return nil
+}
+
+func yieldIndexing(ctx context.Context, duration time.Duration) error {
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 // GetIndexStatus returns the indexing status for a folder

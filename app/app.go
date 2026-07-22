@@ -196,8 +196,9 @@ type App struct {
 	syncEngine *sync.Engine
 
 	// Background sync (polling + IDLE)
-	syncScheduler *sync.Scheduler
-	idleManager   *imap.IdleManager
+	syncScheduler   *sync.Scheduler
+	syncCoordinator *sync.Coordinator
+	idleManager     *imap.IdleManager
 
 	// Credentials (keyring with fallback)
 	credStore *credentials.Store

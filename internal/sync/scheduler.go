@@ -55,9 +55,13 @@ type Scheduler struct {
 	runningMu     sync.Mutex
 	checkInterval time.Duration
 
-	// Track syncing accounts to prevent concurrent syncs
-	syncing   map[string]bool
-	syncingMu sync.Mutex
+	coordinator *Coordinator
+
+	// Compact remote snapshots and attempt times are process-local. They avoid
+	// repeated message scans while leaving persisted mail and settings intact.
+	probeMu         sync.Mutex
+	remoteSnapshots map[string]map[string]RemoteFolderSnapshot
+	lastAttempts    map[string]time.Time
 
 	// Per-account cancellation for running syncs
 	syncCancels  map[string]context.CancelFunc
@@ -67,13 +71,23 @@ type Scheduler struct {
 // NewScheduler creates a new sync scheduler
 func NewScheduler(engine *Engine, accountStore *account.Store, folderStore *folder.Store) *Scheduler {
 	return &Scheduler{
-		engine:        engine,
-		accountStore:  accountStore,
-		folderStore:   folderStore,
-		log:           logging.WithComponent("sync-scheduler"),
-		checkInterval: 1 * time.Minute, // Check every minute if any account is due
-		syncing:       make(map[string]bool),
-		syncCancels:   make(map[string]context.CancelFunc),
+		engine:          engine,
+		accountStore:    accountStore,
+		folderStore:     folderStore,
+		log:             logging.WithComponent("sync-scheduler"),
+		checkInterval:   1 * time.Minute, // Check every minute if any account is due
+		coordinator:     NewCoordinator(),
+		remoteSnapshots: make(map[string]map[string]RemoteFolderSnapshot),
+		lastAttempts:    make(map[string]time.Time),
+		syncCancels:     make(map[string]context.CancelFunc),
+	}
+}
+
+// SetCoordinator shares account-level trigger coordination with manual and
+// wake synchronization paths owned by the app layer.
+func (s *Scheduler) SetCoordinator(coordinator *Coordinator) {
+	if coordinator != nil {
+		s.coordinator = coordinator
 	}
 }
 
@@ -205,49 +219,74 @@ func (s *Scheduler) syncDueAccounts() {
 		s.log.Debug().Str("account", acc.Name).Msg("Account is due for sync")
 
 		// Sync in background (don't block the scheduler)
-		go s.syncAccountInbox(acc)
+		go s.syncAccountInbox(acc, TriggerScheduled)
 	}
 }
 
 // isSyncDue returns true if an account's INBOX is due for sync
 func (s *Scheduler) isSyncDue(acc *account.Account) bool {
+	interval := time.Duration(acc.SyncInterval) * time.Minute
+	s.probeMu.Lock()
+	attemptedAt := s.lastAttempts[acc.ID]
+	s.probeMu.Unlock()
+
 	// Get the INBOX folder for this account
 	inbox, err := s.folderStore.GetByType(acc.ID, folder.TypeInbox)
 	if err != nil {
 		s.log.Warn().Err(err).Str("account", acc.ID).Msg("Failed to get INBOX folder")
-		return true // Sync anyway to create the folder
+		return attemptedAt.IsZero() || time.Since(attemptedAt) >= interval
 	}
 	if inbox == nil {
-		return true // No INBOX yet, needs sync
+		return attemptedAt.IsZero() || time.Since(attemptedAt) >= interval
 	}
 
-	// Never synced - definitely due
-	if inbox.LastSync == nil {
+	// Use the newest successful folder sync or scheduled attempt. Failed probes
+	// therefore fall back to the configured account interval instead of being
+	// retried by every one-minute scheduler tick.
+	var reference time.Time
+	if inbox.LastSync != nil {
+		reference = *inbox.LastSync
+	}
+	if attemptedAt.After(reference) {
+		reference = attemptedAt
+	}
+	if reference.IsZero() {
 		return true
 	}
-
-	// Calculate time since last sync
-	elapsed := time.Since(*inbox.LastSync)
-	interval := time.Duration(acc.SyncInterval) * time.Minute
-
+	elapsed := time.Since(reference)
 	return elapsed >= interval
 }
 
 // syncAccountInbox syncs the INBOX for an account
-func (s *Scheduler) syncAccountInbox(acc *account.Account) {
-	// Prevent concurrent syncs for the same account
-	s.syncingMu.Lock()
-	if s.syncing[acc.ID] {
-		s.syncingMu.Unlock()
-		s.log.Debug().Str("account", acc.Name).Msg("Sync already in progress, skipping")
-		return
+func (s *Scheduler) syncAccountInbox(acc *account.Account, trigger Trigger) {
+	parent := s.ctx
+	if parent == nil {
+		parent = context.Background()
 	}
-	s.syncing[acc.ID] = true
-	s.syncingMu.Unlock()
+	err := s.coordinator.Do(parent, acc.ID, trigger, func(ctx context.Context) error {
+		// A scheduled request may have waited behind IDLE/manual work. Recheck at
+		// execution time so completed foreground work subsumes the pending tick.
+		if trigger == TriggerScheduled && !s.isSyncDue(acc) {
+			return nil
+		}
+		if trigger == TriggerScheduled {
+			s.probeMu.Lock()
+			s.lastAttempts[acc.ID] = time.Now()
+			s.probeMu.Unlock()
+		}
+		s.syncAccountInboxWork(ctx, acc, trigger)
+		return nil
+	})
+	if err != nil && !errors.Is(err, ErrCoalesced) && !errors.Is(err, context.Canceled) {
+		s.log.Warn().Err(err).Str("account", acc.Name).Msg("Coordinated sync failed")
+	}
+}
+
+func (s *Scheduler) syncAccountInboxWork(parent context.Context, acc *account.Account, trigger Trigger) {
 
 	// Create a cancellable context with timeout for this sync operation
 	// 30 minute timeout prevents syncs from running forever if connection hangs
-	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Minute)
+	ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 	s.syncCancelMu.Lock()
 	s.syncCancels[acc.ID] = cancel
 	s.syncCancelMu.Unlock()
@@ -258,16 +297,19 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account) {
 		s.syncCancelMu.Lock()
 		delete(s.syncCancels, acc.ID)
 		s.syncCancelMu.Unlock()
-
-		s.syncingMu.Lock()
-		delete(s.syncing, acc.ID)
-		s.syncingMu.Unlock()
 	}()
 
-	s.log.Info().Str("account", acc.Name).Msg("Starting scheduled sync for INBOX")
+	s.log.Info().Str("account", acc.Name).Msg("Starting account INBOX sync")
+	previousInboxCount := 0
+	hadInboxBeforeProbe := false
+	if inboxBeforeProbe, inboxErr := s.folderStore.GetByType(acc.ID, folder.TypeInbox); inboxErr == nil && inboxBeforeProbe != nil {
+		previousInboxCount = inboxBeforeProbe.TotalCount
+		hadInboxBeforeProbe = true
+	}
 
 	// First, ensure folders are synced
-	if err := s.engine.SyncFolders(ctx, acc.ID); err != nil {
+	folderResult, err := s.engine.SyncFoldersWithResult(ctx, acc.ID)
+	if err != nil {
 		if ctx.Err() != nil {
 			s.log.Info().Str("account", acc.Name).Msg("Sync cancelled during folder sync")
 			s.notifySyncCompleted(acc.ID, "", MessageSyncResult{}, ctx.Err())
@@ -277,6 +319,9 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account) {
 		s.notifySyncCompleted(acc.ID, "", MessageSyncResult{}, err)
 		return
 	}
+
+	forceAllFolders := trigger != TriggerScheduled || !folderResult.Complete
+	changedPaths := s.changedFolderPaths(acc.ID, folderResult, forceAllFolders)
 
 	// Get the INBOX folder
 	inbox, err := s.folderStore.GetByType(acc.ID, folder.TypeInbox)
@@ -290,85 +335,101 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account) {
 		s.notifySyncCompleted(acc.ID, "", MessageSyncResult{}, errors.New("INBOX folder not found"))
 		return
 	}
+	if !hadInboxBeforeProbe {
+		previousInboxCount = inbox.TotalCount
+	}
+	if forceAllFolders {
+		changedPaths[inbox.Path] = true
+		if configuredFolders, listErr := s.getAccountSyncFolders(acc); listErr == nil {
+			for _, configuredFolder := range configuredFolders {
+				changedPaths[configuredFolder.Path] = true
+			}
+		}
+	}
 
-	// Get current message count before sync
-	previousCount := inbox.TotalCount
-
-	// Sync messages (use account's retention + daily sync strategy settings)
-	messageResult, err := s.engine.SyncMessagesWithOptionsResult(ctx, acc.ID, inbox.ID, MessageSyncOptionsFromAccount(acc))
-	if err != nil {
-		if ctx.Err() != nil {
-			s.log.Info().Str("account", acc.Name).Msg("Sync cancelled during message sync")
-			// Notify completion even on cancel so frontend clears progress
-			s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, ctx.Err())
+	allSucceeded := true
+	if changedPaths[inbox.Path] {
+		// Sync messages (use account's retention + daily sync strategy settings)
+		messageResult, syncErr := s.engine.SyncMessagesWithOptionsResult(ctx, acc.ID, inbox.ID, MessageSyncOptionsFromAccount(acc))
+		if syncErr != nil {
+			if ctx.Err() != nil {
+				s.log.Info().Str("account", acc.Name).Msg("Sync cancelled during message sync")
+				s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, ctx.Err())
+				return
+			}
+			s.log.Error().Err(syncErr).Str("account", acc.Name).Msg("Failed to sync messages")
+			s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, syncErr)
 			return
 		}
-		s.log.Error().Err(err).Str("account", acc.Name).Msg("Failed to sync messages")
-		// Notify completion with error so frontend clears progress
-		s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, err)
-		return
-	}
 
-	// Get updated folder info
-	updatedInbox, err := s.folderStore.Get(inbox.ID)
-	if err != nil {
-		s.log.Error().Err(err).Str("account", acc.Name).Msg("Failed to get updated INBOX folder")
-		// Notify completion with error
-		s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, err)
-		return
-	}
-
-	// Check if there are new messages
-	if updatedInbox != nil && updatedInbox.TotalCount > previousCount {
-		newCount := updatedInbox.TotalCount - previousCount
-		s.log.Info().
-			Str("account", acc.Name).
-			Int("newMessages", newCount).
-			Msg("New messages arrived")
-
-		// Notify about new mail
-		if s.newMailCallback != nil {
-			s.newMailCallback(NewMailInfo{
-				AccountID:   acc.ID,
-				AccountName: acc.Name,
-				FolderID:    inbox.ID,
-				Count:       newCount,
-			})
+		updatedInbox, updateErr := s.folderStore.Get(inbox.ID)
+		if updateErr != nil {
+			s.log.Error().Err(updateErr).Str("account", acc.Name).Msg("Failed to get updated INBOX folder")
+			s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, updateErr)
+			return
 		}
-	}
+		if updatedInbox != nil && updatedInbox.TotalCount > previousInboxCount {
+			newCount := updatedInbox.TotalCount - previousInboxCount
+			s.log.Info().
+				Str("account", acc.Name).
+				Int("newMessages", newCount).
+				Msg("New messages arrived")
 
-	// Notify that sync completed for Inbox
-	if inbox != nil {
+			// Notify about new mail
+			if s.newMailCallback != nil {
+				s.newMailCallback(NewMailInfo{
+					AccountID:   acc.ID,
+					AccountName: acc.Name,
+					FolderID:    inbox.ID,
+					Count:       newCount,
+				})
+			}
+		}
+
 		s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, nil)
 	}
 
 	// Sync additional subscribed/all folders (beyond Inbox)
-	s.syncAdditionalFolders(ctx, acc, inbox)
+	if !s.syncAdditionalFolders(ctx, acc, inbox, changedPaths) {
+		allSucceeded = false
+	}
 
-	s.log.Debug().Str("account", acc.Name).Msg("Scheduled sync completed")
+	if allSucceeded && folderResult.Complete {
+		s.storeRemoteSnapshot(acc.ID, folderResult.Snapshots)
+	}
+
+	s.log.Debug().Str("account", acc.Name).Int("changedFolders", len(changedPaths)).Msg("Scheduled sync completed")
 }
 
 // syncAdditionalFolders syncs subscribed or all folders beyond Inbox,
 // based on the account's SyncAllFolders setting.
-func (s *Scheduler) syncAdditionalFolders(ctx context.Context, acc *account.Account, inbox *folder.Folder) {
+func (s *Scheduler) syncAdditionalFolders(ctx context.Context, acc *account.Account, inbox *folder.Folder, changedPaths map[string]bool) bool {
 	folders, err := s.getAccountSyncFolders(acc)
 	if err != nil {
 		s.log.Warn().Err(err).Str("account", acc.Name).Msg("Failed to get sync folders")
-		return
+		return false
 	}
 
 	// Filter out Inbox (already synced) and limit to 2 concurrent syncs
 	sem := make(chan struct{}, 2)
 	var wg sync.WaitGroup
+	allSucceeded := true
+	var resultMu sync.Mutex
 
 	for _, f := range folders {
 		// Skip Inbox — already synced above with notification handling
 		if inbox != nil && f.ID == inbox.ID {
 			continue
 		}
+		if !changedPaths[f.Path] {
+			continue
+		}
 
 		// Check context
 		if ctx.Err() != nil {
+			resultMu.Lock()
+			allSucceeded = false
+			resultMu.Unlock()
 			break
 		}
 
@@ -380,6 +441,9 @@ func (s *Scheduler) syncAdditionalFolders(ctx context.Context, acc *account.Acco
 
 			result, syncErr := s.engine.SyncMessagesWithOptionsResult(ctx, acc.ID, f.ID, MessageSyncOptionsFromAccount(acc))
 			if syncErr != nil {
+				resultMu.Lock()
+				allSucceeded = false
+				resultMu.Unlock()
 				if ctx.Err() == nil {
 					s.log.Warn().Err(syncErr).Str("folder", f.Path).Msg("Failed to sync additional folder")
 				}
@@ -389,6 +453,48 @@ func (s *Scheduler) syncAdditionalFolders(ctx context.Context, acc *account.Acco
 		}(f)
 	}
 	wg.Wait()
+	return allSucceeded
+}
+
+func (s *Scheduler) changedFolderPaths(accountID string, result FolderSyncResult, forceAll bool) map[string]bool {
+	changed := make(map[string]bool)
+	if forceAll {
+		for path, snapshot := range result.Snapshots {
+			if !snapshot.NoSelect {
+				changed[path] = true
+			}
+		}
+		return changed
+	}
+
+	s.probeMu.Lock()
+	previous, found := s.remoteSnapshots[accountID]
+	s.probeMu.Unlock()
+	if !found {
+		for path, snapshot := range result.Snapshots {
+			if !snapshot.NoSelect {
+				changed[path] = true
+			}
+		}
+		return changed
+	}
+
+	for path := range ChangedFolderPaths(previous, result.Snapshots) {
+		if snapshot, ok := result.Snapshots[path]; ok && !snapshot.NoSelect {
+			changed[path] = true
+		}
+	}
+	return changed
+}
+
+func (s *Scheduler) storeRemoteSnapshot(accountID string, snapshots map[string]RemoteFolderSnapshot) {
+	copyOfSnapshots := make(map[string]RemoteFolderSnapshot, len(snapshots))
+	for path, snapshot := range snapshots {
+		copyOfSnapshots[path] = snapshot
+	}
+	s.probeMu.Lock()
+	s.remoteSnapshots[accountID] = copyOfSnapshots
+	s.probeMu.Unlock()
 }
 
 // getAccountSyncFolders returns the folders to sync for an account.
@@ -422,7 +528,7 @@ func (s *Scheduler) TriggerSync(accountID string) {
 		return
 	}
 
-	go s.syncAccountInbox(acc)
+	go s.syncAccountInbox(acc, TriggerManual)
 }
 
 // CancelSync cancels any running sync for the specified account
@@ -445,7 +551,7 @@ func (s *Scheduler) TriggerSyncAll() {
 
 	for _, acc := range accounts {
 		if acc.Enabled {
-			go s.syncAccountInbox(acc)
+			go s.syncAccountInbox(acc, TriggerManual)
 		}
 	}
 }
@@ -464,20 +570,29 @@ func (s *Scheduler) SyncAccountInboxBlockingWithResult(accountID string) (*NewMa
 	if err != nil {
 		return nil, MessageSyncResult{}, err
 	}
+	parent := s.ctx
+	if parent == nil {
+		parent = context.Background()
+	}
 
-	// Prevent concurrent syncs for the same account
-	s.syncingMu.Lock()
-	if s.syncing[acc.ID] {
-		s.syncingMu.Unlock()
-		s.log.Debug().Str("account", acc.Name).Msg("Sync already in progress, skipping")
+	var info *NewMailInfo
+	var result MessageSyncResult
+	err = s.coordinator.Do(parent, acc.ID, TriggerIdle, func(ctx context.Context) error {
+		var syncErr error
+		info, result, syncErr = s.syncAccountInboxBlockingWork(ctx, acc)
+		return syncErr
+	})
+	if errors.Is(err, ErrCoalesced) {
+		s.log.Debug().Str("account", acc.Name).Msg("IDLE trigger coalesced into pending account sync")
 		return nil, MessageSyncResult{}, nil
 	}
-	s.syncing[acc.ID] = true
-	s.syncingMu.Unlock()
+	return info, result, err
+}
 
+func (s *Scheduler) syncAccountInboxBlockingWork(parent context.Context, acc *account.Account) (*NewMailInfo, MessageSyncResult, error) {
 	// Create a cancellable context with timeout for this sync operation
 	// 30 minute timeout prevents syncs from running forever if connection hangs
-	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Minute)
+	ctx, cancel := context.WithTimeout(parent, 30*time.Minute)
 	s.syncCancelMu.Lock()
 	s.syncCancels[acc.ID] = cancel
 	s.syncCancelMu.Unlock()
@@ -488,10 +603,6 @@ func (s *Scheduler) SyncAccountInboxBlockingWithResult(accountID string) (*NewMa
 		s.syncCancelMu.Lock()
 		delete(s.syncCancels, acc.ID)
 		s.syncCancelMu.Unlock()
-
-		s.syncingMu.Lock()
-		delete(s.syncing, acc.ID)
-		s.syncingMu.Unlock()
 	}()
 
 	// Get the INBOX folder
@@ -501,20 +612,22 @@ func (s *Scheduler) SyncAccountInboxBlockingWithResult(accountID string) (*NewMa
 	}
 	if inbox == nil {
 		// Try syncing folders first
-		if err := s.engine.SyncFolders(ctx, acc.ID); err != nil {
+		folderResult, err := s.engine.SyncFoldersWithResult(ctx, acc.ID)
+		if err != nil {
 			if ctx.Err() != nil {
 				s.log.Info().Str("account", acc.Name).Msg("Sync cancelled during folder sync")
 				return nil, MessageSyncResult{}, ctx.Err()
 			}
 			return nil, MessageSyncResult{}, err
 		}
+		if folderResult.Complete {
+			s.storeRemoteSnapshot(acc.ID, folderResult.Snapshots)
+		}
 		inbox, err = s.folderStore.GetByType(acc.ID, folder.TypeInbox)
 		if err != nil || inbox == nil {
 			return nil, MessageSyncResult{}, err
 		}
 	}
-
-	// Get current message count before sync
 	previousCount := inbox.TotalCount
 
 	// Sync messages (use account's retention + daily sync strategy settings)
@@ -527,20 +640,16 @@ func (s *Scheduler) SyncAccountInboxBlockingWithResult(accountID string) (*NewMa
 		return nil, messageResult, err
 	}
 
-	// Get updated folder info
 	updatedInbox, err := s.folderStore.Get(inbox.ID)
 	if err != nil {
 		return nil, messageResult, err
 	}
-
-	// Check if there are new messages
 	if updatedInbox != nil && updatedInbox.TotalCount > previousCount {
-		newCount := updatedInbox.TotalCount - previousCount
 		return &NewMailInfo{
 			AccountID:   acc.ID,
 			AccountName: acc.Name,
 			FolderID:    inbox.ID,
-			Count:       newCount,
+			Count:       updatedInbox.TotalCount - previousCount,
 		}, messageResult, nil
 	}
 

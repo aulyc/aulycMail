@@ -23,19 +23,32 @@ const folderStatusWorkers = 5
 
 // SyncFolders synchronizes the folder list for an account
 func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
+	_, err := e.SyncFoldersWithResult(ctx, accountID)
+	return err
+}
+
+// SyncFoldersWithResult synchronizes the folder list and returns a complete
+// remote snapshot when every selectable mailbox STATUS request succeeded.
+// Callers can use that snapshot to avoid expensive message syncs for folders
+// whose remote identity and counters did not change.
+func (e *Engine) SyncFoldersWithResult(ctx context.Context, accountID string) (FolderSyncResult, error) {
+	syncResult := FolderSyncResult{
+		Snapshots: make(map[string]RemoteFolderSnapshot),
+		Complete:  true,
+	}
 	e.log.Debug().Str("account", accountID).Msg("Syncing folders")
 
 	// Get a connection from the pool for LIST
 	conn, err := e.pool.GetConnection(ctx, accountID)
 	if err != nil {
-		return fmt.Errorf("failed to get connection: %w", err)
+		return syncResult, fmt.Errorf("failed to get connection: %w", err)
 	}
 	defer e.pool.Release(conn)
 
 	// List mailboxes from server
 	mailboxes, err := conn.Client().ListMailboxes()
 	if err != nil {
-		return fmt.Errorf("failed to list mailboxes: %w", err)
+		return syncResult, fmt.Errorf("failed to list mailboxes: %w", err)
 	}
 
 	// Fetch subscribed mailbox set (for caching subscription state locally)
@@ -47,7 +60,7 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 	totalFolders := len(mailboxes)
 	if totalFolders == 0 {
 		e.log.Info().Str("account", accountID).Msg("No folders found")
-		return nil
+		return syncResult, nil
 	}
 
 	// Emit initial "folders" phase progress
@@ -56,7 +69,7 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 	// Get existing local folders
 	localFolders, err := e.folderStore.List(accountID)
 	if err != nil {
-		return fmt.Errorf("failed to list local folders: %w", err)
+		return syncResult, fmt.Errorf("failed to list local folders: %w", err)
 	}
 
 	// Build a map of local folders by path
@@ -127,6 +140,9 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 			folderType = override
 		}
 
+		if result.err != nil {
+			syncResult.Complete = false
+		}
 		// Skip folders where STATUS failed entirely
 		if result.err != nil && result.status == nil {
 			e.log.Debug().Err(result.err).Str("mailbox", mb.Name).Msg("Failed to get mailbox status, skipping folder")
@@ -137,6 +153,24 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 
 		// Update subscription state from server
 		isSubscribed := subscribedSet != nil && subscribedSet[mb.Name]
+		snapshotSubscribed := isSubscribed
+		if subscribedSet == nil {
+			if existing, ok := localByPath[mb.Name]; ok {
+				snapshotSubscribed = existing.Subscribed
+			}
+		}
+		snapshot := RemoteFolderSnapshot{
+			NoSelect:   mb.NoSelect,
+			Subscribed: snapshotSubscribed,
+		}
+		if status != nil {
+			snapshot.UIDValidity = status.UIDValidity
+			snapshot.UIDNext = status.UIDNext
+			snapshot.Messages = status.Messages
+			snapshot.Unseen = status.Unseen
+			snapshot.HighestModSeq = status.HighestModSeq
+		}
+		syncResult.Snapshots[mb.Name] = snapshot
 
 		// Check if folder exists locally
 		if existing, ok := localByPath[mb.Name]; ok {
@@ -237,7 +271,7 @@ func (e *Engine) SyncFolders(ctx context.Context, accountID string) error {
 	// (e.g., iCloud's "Sent" and "Sent Messages" both match TypeSent).
 	e.persistAutoDetectedMappings(accountID)
 
-	return nil
+	return syncResult, nil
 }
 
 // persistAutoDetectedMappings checks if the account's folder path mappings are

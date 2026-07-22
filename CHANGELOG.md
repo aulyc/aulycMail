@@ -4,6 +4,30 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Added right-side Settings control navigation so Up/Down selects visible rows
+  and Enter or Space enters the selected control without overriding native input behavior.
+- Restored focus to the feature rail after closing Settings so its left-edge
+  selection marker remains without drawing a full outline around the gear.
+- Included directory-only IMAP groups such as “Other folders” in sidebar
+  arrow-key navigation, with Enter or Space available to expand and collapse them.
+- Unified account headers, directory groups, and folders under one blue sidebar
+  keyboard marker so the previous mailbox no longer stays highlighted separately.
+- Added Compose and Sync as one wrapping sidebar action group: Up/Down enters
+  or leaves it, Left/Right switches actions, and Enter or Space activates one.
+- Synchronized Settings category arrow-key navigation with the active page so
+  the highlighted category and displayed content move together immediately.
+- Prevented the Contacts list from remaining on a permanent loading placeholder
+  when a bridge or detail request stalls, while keeping existing rows visible
+  during background refreshes and offering a retry after a timed-out first load.
+- Reduced background mail energy use without changing configured sync cadence
+  or first-IDLE delivery latency: account work is coordinated, automatic bursts
+  are coalesced, manual sync takes priority, and incomplete remote probes fall
+  back to the existing full sync scope.
+- Reduced maintenance churn by throttling backup progress events, loading backup
+  index keys in bulk, and resuming FTS indexing from committed batches.
+- Added sanitized IMAP IDLE health categories without recording credentials,
+  server addresses, or complete connection errors.
+
 ## [0.6.0-beta.5] — 2026-07-20
 
 - Merged feature-rail keyboard selection and activation so Up/Down immediately

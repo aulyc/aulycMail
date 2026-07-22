@@ -392,10 +392,28 @@ func (v *ViewerIndex) searchMessagesLike(accountEmail, query string, offset, lim
 	return ViewerMessagePage{Messages: messages, Total: total, HasMore: offset+len(messages) < total}, nil
 }
 
-func (v *ViewerIndex) HasMessage(key string) bool {
-	var exists int
-	err := v.db.QueryRow("SELECT 1 FROM messages WHERE key = ? LIMIT 1", key).Scan(&exists)
-	return err == nil && exists == 1
+// MessageKeys loads the compact set of already indexed message keys once per
+// backup run. This avoids one SQLite query for every skipped message during a
+// large incremental backup.
+func (v *ViewerIndex) MessageKeys() (map[string]bool, error) {
+	rows, err := v.db.Query("SELECT key FROM messages")
+	if err != nil {
+		return nil, fmt.Errorf("failed to list backup viewer message keys: %w", err)
+	}
+	defer rows.Close()
+
+	keys := make(map[string]bool)
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
+			return nil, fmt.Errorf("failed to scan backup viewer message key: %w", err)
+		}
+		keys[key] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate backup viewer message keys: %w", err)
+	}
+	return keys, nil
 }
 
 func (v *ViewerIndex) UpsertMessageFromFile(directory, key string, entry IndexMessage) error {

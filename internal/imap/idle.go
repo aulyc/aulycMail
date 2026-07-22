@@ -69,6 +69,7 @@ type IdleConnection struct {
 	folder  string        // Currently watching folder (usually "INBOX")
 	client  *imapclient.Client
 	events  chan<- MailEvent
+	status  IdleStatus
 }
 
 // newIdleConnection creates a new IDLE connection for an account
@@ -80,7 +81,38 @@ func newIdleConnection(accountID, accountName string, config IdleConfig, getCred
 		getCredentials: getCredentials,
 		log:            logging.WithComponent("imap-idle").With().Str("account", accountName).Logger(),
 		folder:         "INBOX",
+		status:         IdleStatus{State: IdleStateDisconnected, LastErrorKind: ConnectionErrorNone},
 	}
+}
+
+func (ic *IdleConnection) Status() IdleStatus {
+	ic.mu.Lock()
+	defer ic.mu.Unlock()
+	return ic.status
+}
+
+func (ic *IdleConnection) setState(state IdleState) {
+	ic.mu.Lock()
+	ic.status.State = state
+	ic.mu.Unlock()
+}
+
+func (ic *IdleConnection) recordConnected() {
+	ic.mu.Lock()
+	ic.status.State = IdleStateIdling
+	ic.status.ConsecutiveFailures = 0
+	ic.status.LastErrorKind = ConnectionErrorNone
+	ic.status.LastConnectedAt = time.Now()
+	ic.mu.Unlock()
+}
+
+func (ic *IdleConnection) recordFailure(err error, state IdleState) {
+	ic.mu.Lock()
+	ic.status.State = state
+	ic.status.ConsecutiveFailures++
+	ic.status.LastErrorKind = ClassifyConnectionError(err)
+	ic.status.LastFailureAt = time.Now()
+	ic.mu.Unlock()
 }
 
 // sendEvent sends an event with timeout to prevent blocking
@@ -108,6 +140,7 @@ func (ic *IdleConnection) Start(ctx context.Context, events chan<- MailEvent) {
 	ic.stopCh = make(chan struct{})
 	ic.doneCh = make(chan struct{})
 	ic.events = events
+	ic.status.State = IdleStateConnecting
 	ic.mu.Unlock()
 
 	go ic.run(ctx)
@@ -122,6 +155,7 @@ func (ic *IdleConnection) Stop() {
 	}
 
 	ic.running = false
+	ic.status.State = IdleStateStopped
 	close(ic.stopCh)
 	doneCh := ic.doneCh
 	timeout := ic.config.ShutdownTimeout
@@ -149,6 +183,7 @@ func (ic *IdleConnection) run(ctx context.Context) {
 	defer func() {
 		ic.mu.Lock()
 		ic.running = false
+		ic.status.State = IdleStateStopped
 		if ic.client != nil {
 			ic.client.Close()
 			ic.client = nil
@@ -181,11 +216,15 @@ func (ic *IdleConnection) run(ctx context.Context) {
 		}
 
 		// Connect if needed
+		ic.setState(IdleStateConnecting)
 		if err := ic.ensureConnected(ctx); err != nil {
+			ic.recordFailure(err, IdleStateBackoff)
+			errorKind := ClassifyConnectionError(err)
 			attempts++
 			if attempts >= ic.config.MaxReconnectAttempts {
 				ic.log.Error().
 					Err(err).
+					Str("errorKind", string(errorKind)).
 					Int("attempts", attempts).
 					Dur("backoff", ic.config.MaxReconnectBackoff).
 					Msg("Max reconnection attempts reached, backing off before retry")
@@ -203,6 +242,7 @@ func (ic *IdleConnection) run(ctx context.Context) {
 
 			ic.log.Warn().
 				Err(err).
+				Str("errorKind", string(errorKind)).
 				Dur("backoff", backoff).
 				Int("attempt", attempts).
 				Msg("Failed to connect for IDLE, retrying")
@@ -223,8 +263,10 @@ func (ic *IdleConnection) run(ctx context.Context) {
 		attempts = 0
 
 		// Run IDLE cycle
+		ic.setState(IdleStateIdling)
 		if err := ic.idleCycle(ctx); err != nil {
-			ic.log.Warn().Err(err).Msg("IDLE cycle failed")
+			ic.recordFailure(err, IdleStateDisconnected)
+			ic.log.Warn().Err(err).Str("errorKind", string(ClassifyConnectionError(err))).Msg("IDLE cycle failed")
 			// Close the connection so we reconnect on next iteration
 			ic.mu.Lock()
 			if ic.client != nil {
@@ -387,6 +429,7 @@ func (ic *IdleConnection) ensureConnected(ctx context.Context) error {
 	ic.mu.Lock()
 	ic.client = client
 	ic.mu.Unlock()
+	ic.recordConnected()
 
 	ic.log.Info().Msg("IDLE connection established")
 	return nil
@@ -525,6 +568,18 @@ func (m *IdleManager) Stop() {
 // Events returns the channel for receiving mail events
 func (m *IdleManager) Events() <-chan MailEvent {
 	return m.events
+}
+
+// AccountStatus returns a sanitized connection-health snapshot. It never
+// exposes server addresses, usernames, credentials, or raw error strings.
+func (m *IdleManager) AccountStatus(accountID string) (IdleStatus, bool) {
+	m.mu.Lock()
+	conn, ok := m.connections[accountID]
+	m.mu.Unlock()
+	if !ok {
+		return IdleStatus{}, false
+	}
+	return conn.Status(), true
 }
 
 // StartAccount starts IDLE for a specific account
