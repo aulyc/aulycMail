@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.10] — 2026-07-24
+
 - Changed Settings right-pane keyboard navigation to select the actual form
   control with a blue inset outline instead of tinting the entire settings row.
 - Made Enter open the selected dropdown in native input mode, then restore
