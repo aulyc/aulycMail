@@ -23,7 +23,12 @@
 
   $effect(() => {
     const activePane = active
-    if (untrack(() => selectedFeature) !== 'settings') selectedFeature = activePane
+    const mainKeyboardScope = isMainKeyboardScope()
+    const focusedPane = getFocusedPane()
+    if (!mainKeyboardScope) return
+    if (focusedPane !== 'featureNav' || untrack(() => selectedFeature) !== 'settings') {
+      selectedFeature = activePane
+    }
   })
 
   function select(name: string) {

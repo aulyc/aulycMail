@@ -96,6 +96,7 @@
   let loading = $state(false)
   let error = $state<string | null>(null)
   let selectedThreadId = $state<string | null>(null)
+  let selectionInputMode = $state<'keyboard' | 'pointer'>('pointer')
   let lastLoadedFolderId = $state<string | null>(null) // Track folder changes
   let loadGeneration = $state(0) // Invalidates stale async results when folder changes mid-load (#200)
 
@@ -864,6 +865,8 @@
   }
 
   function selectConversation(threadId: string, index: number, event?: MouseEvent) {
+    if (event) claimPointerSelection()
+
     // Shift+click: range-select from the anchor to here, seeding with the
     // currently-open conversation so the first click is included in the range.
     if (event?.shiftKey) {
@@ -1078,9 +1081,21 @@
     return activeList.findIndex(c => c.threadId === selectedThreadId)
   }
 
+  function claimKeyboardSelection() {
+    selectionInputMode = 'keyboard'
+  }
+
+  function claimPointerSelection(event?: PointerEvent) {
+    // WebKit can emit a zero-movement pointer event when keyboard scrolling
+    // moves a row beneath a stationary pointer. Keep keyboard ownership then.
+    if (event && event.movementX === 0 && event.movementY === 0) return
+    selectionInputMode = 'pointer'
+  }
+
   function focusConversationAtIndex(index: number) {
     const conv = activeList[index] as any
     if (!conv) return
+    claimKeyboardSelection()
     if (checkedThreadIds.size > 0) checkedThreadIds = new Set()
     selectedThreadId = conv.threadId
     lastClickedIndex = index
@@ -1243,6 +1258,7 @@
     const newIndex = currentIndex - 1
     const conv = activeList[newIndex]
     if (!conv) return
+    claimKeyboardSelection()
 
     // Check both current and new message
     const newChecked = new Set(checkedThreadIds)
@@ -1267,6 +1283,7 @@
     const newIndex = currentIndex + 1
     const conv = activeList[newIndex]
     if (!conv) return
+    claimKeyboardSelection()
 
     // Check both current and new message
     const newChecked = new Set(checkedThreadIds)
@@ -1674,6 +1691,7 @@
             density={getMessageListDensity()}
             selected={isRowSelected(conversation.threadId)}
             current={selectedThreadId === conversation.threadId}
+            instantSelection={selectionInputMode === 'keyboard'}
             checked={checkedThreadIds.has(conversation.threadId)}
             accountId={resolvedAccountId}
             folderId={resolvedFolderId}
@@ -1689,6 +1707,7 @@
             searchFolderType={options.showSearchFields ? conversation.folderType : ''}
             isNonLocal={!!options.showNonLocal && conversation._isLocal === false}
             onSelect={(e?: MouseEvent) => selectConversation(conversation.threadId, index, e)}
+            onPointerMove={claimPointerSelection}
             onContextMenu={() => prepareRowContextMenu(conversation, resolvedAccountId, resolvedFolderId, checkedThreadIds.has(conversation.threadId))}
             onActionComplete={handleActionComplete}
             onOpenDraft={options.allowDraftOpen && folderType === 'drafts' && conversation.messageIds?.[0]

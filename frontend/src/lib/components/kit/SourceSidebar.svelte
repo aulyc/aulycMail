@@ -12,6 +12,7 @@
   import { type Snippet, onMount } from 'svelte'
   import SidebarFrame from './SidebarFrame.svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
+  import { nextRovingIndex } from '$lib/keyboard/regionNavigation'
   import { setFocusedPane, getFocusedPane, isMainKeyboardScope, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
 
   type SourceSection<U extends { id: string }> = {
@@ -26,6 +27,10 @@
     /** Optional action(s) pinned to the right of the title — forwarded to
      *  SidebarFrame's titleAction slot (e.g. a refresh button). */
     titleAction?: Snippet
+    /** Treat marked title buttons as one horizontal item in the sidebar's
+     *  vertical keyboard order. */
+    headerActionsFocused?: boolean
+    selectedHeaderActionId?: string
     sections: SourceSection<T>[]
     selectedId: string | null
     focusSlot?: FocusablePane
@@ -40,10 +45,12 @@
     onSelect: (id: string) => void
   }
 
-  const {
+  let {
     title,
     titleContent,
     titleAction,
+    headerActionsFocused = $bindable(false),
+    selectedHeaderActionId = $bindable(''),
     sections,
     selectedId,
     focusSlot = 'sidebar',
@@ -58,6 +65,7 @@
   let containerRef = $state<HTMLElement | null>(null)
 
   const allItems = $derived(sections.flatMap(s => s.items))
+  const HEADER_ACTION_SELECTOR = '[data-source-sidebar-header-action]'
 
   $effect(() => {
     if (getFocusedPane() === focusSlot && containerRef && document.activeElement !== containerRef) {
@@ -70,17 +78,91 @@
     return allItems.findIndex(it => it.id === id)
   }
 
-  function move(step: number) {
-    if (allItems.length === 0) return
-    const idx = indexOf(selectedId)
-    const next = idx < 0
-      ? (step > 0 ? 0 : allItems.length - 1)
-      : Math.max(0, Math.min(allItems.length - 1, idx + step))
-    onSelect(allItems[next].id)
+  function getHeaderActions(): HTMLElement[] {
+    if (!containerRef) return []
+    return Array.from(containerRef.querySelectorAll<HTMLElement>(HEADER_ACTION_SELECTOR))
+      .filter((action) => !action.hidden && action.getAttribute('aria-hidden') !== 'true' && !action.matches(':disabled'))
+  }
+
+  function focusHeaderActions(): boolean {
+    const actions = getHeaderActions()
+    if (actions.length === 0) return false
+    const selected = actions.find(action => action.dataset.sourceSidebarHeaderAction === selectedHeaderActionId)
+      ?? actions[0]
+    headerActionsFocused = true
+    selectedHeaderActionId = selected.dataset.sourceSidebarHeaderAction ?? ''
+    return true
+  }
+
+  function moveHeaderAction(step: 1 | -1) {
+    const actions = getHeaderActions()
+    if (actions.length === 0) return
+    const currentIndex = actions.findIndex(action => (
+      action.dataset.sourceSidebarHeaderAction === selectedHeaderActionId
+    ))
+    const nextIndex = nextRovingIndex(
+      step === 1 ? 'ArrowDown' : 'ArrowUp',
+      currentIndex,
+      actions.length,
+      true,
+    )
+    const nextAction = actions[nextIndex]
+    if (nextAction) selectedHeaderActionId = nextAction.dataset.sourceSidebarHeaderAction ?? ''
+  }
+
+  function activateHeaderAction() {
+    const action = getHeaderActions().find(item => (
+      item.dataset.sourceSidebarHeaderAction === selectedHeaderActionId
+    ))
+    action?.click()
+  }
+
+  function activateCurrent() {
+    if (headerActionsFocused) {
+      activateHeaderAction()
+      return
+    }
+    if (selectedId !== null) onSelect(selectedId)
+  }
+
+  function move(step: 1 | -1) {
+    const hasHeaderActions = getHeaderActions().length > 0
+    const itemCount = allItems.length + (hasHeaderActions ? 1 : 0)
+    if (itemCount === 0) return
+
+    const itemIndex = indexOf(selectedId)
+    const currentIndex = hasHeaderActions && (headerActionsFocused || itemIndex < 0)
+      ? 0
+      : itemIndex + (hasHeaderActions ? 1 : 0)
+    const nextIndex = nextRovingIndex(
+      step === 1 ? 'ArrowDown' : 'ArrowUp',
+      currentIndex,
+      itemCount,
+      true,
+    )
+
+    if (hasHeaderActions && nextIndex === 0) {
+      focusHeaderActions()
+      return
+    }
+
+    headerActionsFocused = false
+    const nextItem = allItems[nextIndex - (hasHeaderActions ? 1 : 0)]
+    if (nextItem) onSelect(nextItem.id)
   }
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.isComposing || e.keyCode === 229) return
+    if (
+      headerActionsFocused
+      && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+      && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey
+    ) {
+      e.preventDefault()
+      e.stopPropagation()
+      moveHeaderAction(e.key === 'ArrowRight' ? 1 : -1)
+      return
+    }
     if (KEY.LIST_NEXT(e)) {
       e.preventDefault()
       e.stopPropagation()
@@ -95,10 +177,10 @@
     }
     if (KEY.LIST_OPEN(e) || (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey)) {
       if (e.target !== containerRef) return
-      if (selectedId === null) return
+      if (!headerActionsFocused && selectedId === null) return
       e.preventDefault()
       e.stopPropagation()
-      onSelect(selectedId)
+      activateCurrent()
       return
     }
   }
@@ -109,7 +191,17 @@
     }
   }
 
-  function handleMouseDown(_e: MouseEvent) {
+  function handleMouseDown(e: MouseEvent) {
+    if (e.button === 0 && e.target instanceof Element) {
+      const headerAction = e.target.closest<HTMLElement>(HEADER_ACTION_SELECTOR)
+      if (headerAction && containerRef?.contains(headerAction)) {
+        e.preventDefault()
+        headerActionsFocused = true
+        selectedHeaderActionId = headerAction.dataset.sourceSidebarHeaderAction ?? ''
+      } else {
+        headerActionsFocused = false
+      }
+    }
     if (containerRef && document.activeElement !== containerRef) {
       containerRef.focus()
     }
@@ -119,7 +211,7 @@
   onMount(() => registerPaneNav(focusSlot, {
     navigateNext: () => move(1),
     navigatePrev: () => move(-1),
-    activate: () => { if (selectedId !== null) onSelect(selectedId) },
+    activate: activateCurrent,
   }))
 </script>
 
@@ -155,7 +247,7 @@
           {/if}
         {:else}
           {#each section.items as it (it.id)}
-            {@render item(it, { active: it.id === selectedId })}
+            {@render item(it, { active: !headerActionsFocused && it.id === selectedId })}
           {/each}
         {/if}
       {/each}

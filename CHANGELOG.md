@@ -4,6 +4,17 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Added All Contacts and Refresh as one wrapping Contacts sidebar action group:
+  Up/Down enters or leaves it, Left/Right switches actions, and Enter or Space activates one.
+- Kept the Compose and All Contacts solid highlights exclusive to keyboard
+  selection, so selecting a mailbox or contact account no longer highlights the top action.
+- Synchronized the feature-rail selection with the visible Mail or Contacts
+  pane after keyboard focus leaves the restored Settings entry.
+- Kept the Settings category background synchronized with the blue active text
+  during keyboard navigation, without leaving a stale pointer-hover highlight.
+- Made message-list keyboard selection update instantly instead of leaving a
+  300 ms color trail, while retaining the existing pointer hover transition.
+
 ## [0.6.0-beta.8] — 2026-07-22
 
 - Distinguished Junk and Spam unread counts with neutral gray sidebar badges

@@ -10,6 +10,7 @@ import { resolveRequiredSelectionIndex } from '../src/lib/components/list/requir
 
 const modalFramePath = new URL('../src/lib/components/ui/ModalFrame.svelte', import.meta.url)
 const messageListPath = new URL('../src/lib/components/list/MessageList.svelte', import.meta.url)
+const conversationRowPath = new URL('../src/lib/components/list/ConversationRow.svelte', import.meta.url)
 const folderPickerPath = new URL('../src/lib/components/common/FolderPickerDialog.svelte', import.meta.url)
 const globalShortcutsPath = new URL('../src/lib/keyboard/globalShortcuts.ts', import.meta.url)
 const keyboardStorePath = new URL('../src/lib/stores/keyboard.svelte.ts', import.meta.url)
@@ -19,8 +20,10 @@ const activityRailPath = new URL('../src/lib/components/rail/ActivityRail.svelte
 const listRowPath = new URL('../src/lib/components/kit/ListRow.svelte', import.meta.url)
 const railButtonPath = new URL('../src/lib/components/rail/RailButton.svelte', import.meta.url)
 const sourceSidebarPath = new URL('../src/lib/components/kit/SourceSidebar.svelte', import.meta.url)
+const mailSidebarPath = new URL('../src/lib/components/sidebar/Sidebar.svelte', import.meta.url)
 const folderTreeItemPath = new URL('../src/lib/components/sidebar/FolderTreeItem.svelte', import.meta.url)
 const accountSectionPath = new URL('../src/lib/components/sidebar/AccountSection.svelte', import.meta.url)
+const contactsSidebarPath = new URL('../src/lib/contacts/components/ContactsSidebar.svelte', import.meta.url)
 const contactListPath = new URL('../src/lib/contacts/components/ContactList.svelte', import.meta.url)
 const contactStorePath = new URL('../src/lib/contacts/stores/contactsView.svelte.ts', import.meta.url)
 const viewerPath = new URL('../src/lib/components/viewer/ConversationViewer.svelte', import.meta.url)
@@ -45,6 +48,26 @@ test('mail-list search Escape closes search and returns focus to the list', asyn
   assert.match(
     messageList,
     /function handleSearchKeydown[\s\S]*event\.key === 'Escape'[\s\S]*clearSearch\(\)[\s\S]*listContainerRef\?\.focus\(\)/,
+  )
+})
+
+test('keyboard message selection is instant while pointer hover keeps its color transition', async () => {
+  const [messageList, conversationRow] = await Promise.all([
+    readFile(messageListPath, 'utf8'),
+    readFile(conversationRowPath, 'utf8'),
+  ])
+
+  assert.match(messageList, /let selectionInputMode = \$state<'keyboard' \| 'pointer'>\('pointer'\)/)
+  assert.match(messageList, /function focusConversationAtIndex[\s\S]*claimKeyboardSelection\(\)[\s\S]*selectedThreadId = conv\.threadId/)
+  assert.match(messageList, /function selectPreviousWithCheck[\s\S]*claimKeyboardSelection\(\)[\s\S]*selectedThreadId = conv\.threadId/)
+  assert.match(messageList, /function selectNextWithCheck[\s\S]*claimKeyboardSelection\(\)[\s\S]*selectedThreadId = conv\.threadId/)
+  assert.match(messageList, /onPointerMove=\{claimPointerSelection\}/)
+  assert.match(messageList, /instantSelection=\{selectionInputMode === 'keyboard'\}/)
+  assert.match(conversationRow, /instantSelection = false/)
+  assert.match(conversationRow, /onpointermove=\{onPointerMove\}/)
+  assert.match(
+    conversationRow,
+    /instantSelection\s*\? 'transition-none'\s*: 'transition-colors duration-300'/,
   )
 })
 
@@ -142,6 +165,34 @@ test('mouse interaction claims each main region', async () => {
   assert.match(contactList, /data-keyboard-region-visible=\{!isResponsive\(\) \|\| getResponsiveView\(\) === 'default'\}/)
 })
 
+test('contacts sidebar arrows include the All Contacts and Refresh action group', async () => {
+  const [sourceSidebar, contactsSidebar] = await Promise.all([
+    readFile(sourceSidebarPath, 'utf8'),
+    readFile(contactsSidebarPath, 'utf8'),
+  ])
+
+  assert.equal(nextRovingIndex('ArrowUp', 1, 6, true), 0)
+  assert.equal(nextRovingIndex('ArrowDown', 0, 6, true), 1)
+  assert.equal(nextRovingIndex('ArrowUp', 0, 6, true), 5)
+  assert.equal(nextRovingIndex('ArrowDown', 5, 6, true), 0)
+  assert.match(sourceSidebar, /headerActionsFocused = \$bindable\(false\)/)
+  assert.match(sourceSidebar, /function move\(step: 1 \| -1\)[\s\S]*nextRovingIndex[\s\S]*focusHeaderActions/)
+  assert.match(sourceSidebar, /headerActionsFocused[\s\S]*e\.key === 'ArrowLeft'[\s\S]*moveHeaderAction/)
+  assert.match(sourceSidebar, /function activateCurrent[\s\S]*activateHeaderAction/)
+  assert.match(contactsSidebar, /bind:headerActionsFocused[\s\S]*bind:selectedHeaderActionId/)
+  assert.match(contactsSidebar, /data-source-sidebar-header-action="all"/)
+  assert.match(contactsSidebar, /data-source-sidebar-header-action="refresh"/)
+  assert.match(contactsSidebar, /tabindex="-1"/)
+  assert.match(
+    contactsSidebar,
+    /headerActionsFocused && selectedHeaderActionId === 'all'\s*\? 'bg-primary text-primary-foreground hover:bg-primary\/90'/,
+  )
+  assert.doesNotMatch(
+    contactsSidebar,
+    /!headerActionsFocused \|\| selectedHeaderActionId === 'all'/,
+  )
+})
+
 test('mail sidebar rows leave DOM focus on the keyboard region', async () => {
   const [app, folderTreeItem, accountSection] = await Promise.all([
     readFile(appPath, 'utf8'),
@@ -158,6 +209,23 @@ test('mail sidebar rows leave DOM focus on the keyboard region', async () => {
   assert.match(accountSection, /tabindex="-1"[\s\S]*data-sidebar-item="account-header"/)
   assert.match(accountSection, /transition-colors focus:outline-none/)
   assert.doesNotMatch(folderTreeItem + accountSection, /keyboard-selected-item/)
+})
+
+test('mail sidebar only highlights the focused Compose or Sync action', async () => {
+  const sidebar = await readFile(mailSidebarPath, 'utf8')
+
+  assert.match(
+    sidebar,
+    /sidebarActionsFocused && selectedSidebarAction === 'compose'\s*\? 'bg-primary text-primary-foreground hover:bg-primary\/90'/,
+  )
+  assert.doesNotMatch(
+    sidebar,
+    /!sidebarActionsFocused \|\| selectedSidebarAction === 'compose'/,
+  )
+  assert.match(
+    sidebar,
+    /sidebarActionsFocused && selectedSidebarAction === 'sync'\s*\? 'bg-primary text-primary-foreground hover:bg-primary\/90'/,
+  )
 })
 
 test('input Escape returns to its region while search scope Tab remains unchanged', async () => {
@@ -244,6 +312,19 @@ test('settings dialog cycles two regions, traps focus, and restores the feature 
   assert.doesNotMatch(activityRail, /settingsButtonEl/)
 })
 
+test('leaving restored Settings focus selects the feature matching the visible main pane', async () => {
+  const activityRail = await readFile(activityRailPath, 'utf8')
+
+  assert.match(
+    activityRail,
+    /const focusedPane = getFocusedPane\(\)[\s\S]*focusedPane !== 'featureNav'[\s\S]*selectedFeature = activePane/,
+  )
+  assert.match(
+    activityRail,
+    /export function focusSettings\(\)[\s\S]*selectedFeature = 'settings'[\s\S]*setFocusedPane\('featureNav'\)/,
+  )
+})
+
 test('settings navigation arrows immediately activate the highlighted category', async () => {
   const settings = await readFile(settingsPath, 'utf8')
   const navigationKeyHandler = settings.match(
@@ -252,6 +333,22 @@ test('settings navigation arrows immediately activate the highlighted category',
 
   assert.match(navigationKeyHandler, /selectNavigationPage\(navigation\[nextIndex\]\.id\)/)
   assert.doesNotMatch(navigationKeyHandler, /selectedNavigationPage\s*=/)
+})
+
+test('settings keyboard navigation moves the category background with its active text', async () => {
+  const settings = await readFile(settingsPath, 'utf8')
+
+  assert.match(settings, /settingsNavigationInputMode = \$state<'keyboard' \| 'pointer'>\('pointer'\)/)
+  assert.match(
+    settings,
+    /\['ArrowUp', 'ArrowDown', 'Home', 'End'\][\s\S]*settingsNavigationInputMode = 'keyboard'[\s\S]*selectNavigationPage\(navigation\[nextIndex\]\.id\)/,
+  )
+  assert.match(settings, /onpointermove=\{\(\) => \{ settingsNavigationInputMode = 'pointer' \}\}/)
+  assert.match(settings, /activePage === item\.id[\s\S]*'bg-background\/70 text-primary'/)
+  assert.match(
+    settings,
+    /settingsNavigationInputMode === 'pointer'[\s\S]*hover:bg-background\/70 hover:text-foreground/,
+  )
 })
 
 test('settings content arrows select controls while activation enters native input state', async () => {

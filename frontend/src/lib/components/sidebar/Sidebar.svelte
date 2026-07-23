@@ -406,7 +406,7 @@
   <div class="px-4 py-3 border-b border-border">
     <div class="flex items-center gap-2">
       <button
-        class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors {!sidebarActionsFocused || selectedSidebarAction === 'compose' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-primary/10 text-primary hover:bg-primary/20'}"
+        class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors {sidebarActionsFocused && selectedSidebarAction === 'compose' ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-primary/10 text-primary hover:bg-primary/20'}"
         type="button"
         tabindex="-1"
         data-sidebar-item="sidebar-action"

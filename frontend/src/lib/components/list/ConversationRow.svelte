@@ -14,6 +14,7 @@
     density?: 'micro' | 'compact' | 'standard' | 'large'
     selected: boolean
     current?: boolean
+    instantSelection?: boolean
     checked: boolean
     accountId: string
     folderId: string
@@ -29,6 +30,7 @@
     searchFolderType?: string       // Folder type for icon in search results
     isNonLocal?: boolean            // Show cloud icon for non-local server search results
     onSelect: (e?: MouseEvent) => void
+    onPointerMove?: (e: PointerEvent) => void
     onContextMenu?: (e: MouseEvent) => void
     onActionComplete?: (autoSelectNext?: boolean) => void
     onOpenDraft?: () => void  // Double-click in the Drafts folder → open the draft in the composer
@@ -39,6 +41,7 @@
     density = 'standard',
     selected,
     current = false,
+    instantSelection = false,
     checked,
     accountId,
     folderId: _folderId,
@@ -54,6 +57,7 @@
     searchFolderType: _searchFolderType = '',
     isNonLocal = false,
     onSelect,
+    onPointerMove,
     onContextMenu,
     onActionComplete,
     onOpenDraft,
@@ -200,12 +204,15 @@
 	  data-row-index={rowIndex}
 	  draggable="true"
 	  style="height: {densityRowHeight[density]}px; min-height: {densityRowHeight[density]}px;"
-	  class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border transition-colors duration-300 cursor-pointer outline-none {selected
-	    ? 'bg-primary/20'
-	    : current
-	      ? 'bg-primary/10'
-	      : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
+	  class="group w-full flex items-start {densityClasses.row[density]} text-left border-b border-border {instantSelection
+	    ? 'transition-none'
+	    : 'transition-colors duration-300'} cursor-pointer outline-none {selected
+	      ? 'bg-primary/20'
+	      : current
+	        ? 'bg-primary/10'
+	        : 'hover:bg-muted/50'} {getAccentBarUnread() && hasUnread ? 'border-l-[3px] border-l-primary' : ''}"
   onclick={(e) => onSelect(e)}
+  onpointermove={onPointerMove}
   ondblclick={() => onOpenDraft?.()}
   onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() }}}
   ondragstart={handleDragStart}

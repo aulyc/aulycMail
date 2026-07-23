@@ -28,6 +28,8 @@
   const { onSelect }: Props = $props()
 
   let refreshing = $state(false)
+  let headerActionsFocused = $state(false)
+  let selectedHeaderActionId = $state('all')
   let accountGroups = $derived(contactAccountGroups.groups)
   let retriedAfterAccountsLoaded = $state(false)
 
@@ -133,12 +135,23 @@
   {sections}
   selectedId={contactsView.selectedSourceId}
   onSelect={pick}
+  bind:headerActionsFocused
+  bind:selectedHeaderActionId
 >
   {#snippet titleContent()}
     <button
-      class="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-colors whitespace-nowrap"
+      class="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap {headerActionsFocused && selectedHeaderActionId === 'all'
+        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+        : 'bg-primary/10 text-primary hover:bg-primary/20'}"
       aria-pressed={contactsView.selectedSourceId === ''}
-      onclick={() => pick('')}
+      data-source-sidebar-header-action="all"
+      data-keyboard-selected={headerActionsFocused && selectedHeaderActionId === 'all'}
+      tabindex="-1"
+      onclick={() => {
+        headerActionsFocused = true
+        selectedHeaderActionId = 'all'
+        pick('')
+      }}
       type="button"
     >
       {$_('contacts.sidebar.all')}
@@ -147,14 +160,28 @@
 
   {#snippet titleAction()}
     <button
-      class="h-9 w-9 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2"
+      class="h-9 w-9 flex items-center justify-center rounded-md transition-colors disabled:opacity-50 flex-shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2 {headerActionsFocused && selectedHeaderActionId === 'refresh'
+        ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+        : 'text-muted-foreground hover:text-foreground hover:bg-muted'}"
       title={$_('contacts.sidebar.refresh')}
       aria-label={$_('contacts.sidebar.refresh')}
-      onclick={runRefresh}
+      data-source-sidebar-header-action="refresh"
+      data-keyboard-selected={headerActionsFocused && selectedHeaderActionId === 'refresh'}
+      tabindex="-1"
+      onclick={() => {
+        headerActionsFocused = true
+        selectedHeaderActionId = 'refresh'
+        void runRefresh()
+      }}
       disabled={refreshing}
       type="button"
     >
-      <Icon icon="mdi:refresh" class="w-5 h-5 {contactRefresh.active ? 'animate-spin text-primary' : ''}" />
+      <Icon
+        icon="mdi:refresh"
+        class="w-5 h-5 {contactRefresh.active
+          ? `animate-spin ${headerActionsFocused && selectedHeaderActionId === 'refresh' ? 'text-primary-foreground' : 'text-primary'}`
+          : ''}"
+      />
     </button>
   {/snippet}
 

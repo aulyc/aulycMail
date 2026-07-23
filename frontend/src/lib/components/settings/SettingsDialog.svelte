@@ -32,6 +32,7 @@
   let activityInitialType = $state('')
   let loadSequence = 0
   let settingsRegion = $state<'navigation' | 'content'>('navigation')
+  let settingsNavigationInputMode = $state<'keyboard' | 'pointer'>('pointer')
   let selectedNavigationPage = $state<SettingsPage>('general')
   let selectedSettingsControlIndex = $state(0)
   let navigationRegionEl = $state<HTMLElement | null>(null)
@@ -256,6 +257,7 @@
       if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
       event.preventDefault()
       event.stopPropagation()
+      settingsNavigationInputMode = 'keyboard'
       const currentIndex = navigation.findIndex((item) => item.id === selectedNavigationPage)
       const nextIndex = nextRovingIndex(event.key as RovingNavigationKey, currentIndex, navigation.length, true)
       if (nextIndex >= 0) selectNavigationPage(navigation[nextIndex].id)
@@ -297,6 +299,7 @@
         class="keyboard-region flex min-h-0 flex-col border-r border-border bg-muted/35 px-3 py-6 outline-none"
         onfocusin={() => { settingsRegion = 'navigation' }}
         onmousedown={() => { settingsRegion = 'navigation' }}
+        onpointermove={() => { settingsNavigationInputMode = 'pointer' }}
       >
         <h1 class="mb-6 flex h-5 items-center px-2 text-lg font-semibold leading-5">{$_('settings.title')}</h1>
         <nav aria-label={$_('settings.title')}>
@@ -311,10 +314,12 @@
                 aria-selected={activePage === item.id}
                 aria-controls={`settings-panel-${item.id}`}
                 class="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium transition-colors focus:outline-none {activePage === item.id
-                  ? 'bg-primary/12 text-primary'
+                  ? 'bg-background/70 text-primary'
                   : selectedNavigationPage === item.id
-                    ? 'bg-background/70 text-foreground'
-                    : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}"
+                    ? 'bg-background/70 text-primary'
+                    : settingsNavigationInputMode === 'pointer'
+                      ? 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
+                      : 'text-muted-foreground'}"
                 onclick={() => selectNavigationPage(item.id)}
               >
                 <Icon icon={item.icon} class="h-[18px] w-[18px] shrink-0" /><span class="truncate">{item.label}</span>
