@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.9] — 2026-07-24
+
 - Added All Contacts and Refresh as one wrapping Contacts sidebar action group:
   Up/Down enters or leaves it, Left/Right switches actions, and Enter or Space activates one.
 - Kept the Compose and All Contacts solid highlights exclusive to keyboard
