@@ -298,8 +298,8 @@ test('settings dialog cycles two regions, traps focus, and restores the feature 
   ])
 
   assert.match(settings, /settingsRegion = \$state<'navigation' \| 'content'>/)
-  assert.match(settings, /event\.key === 'Tab' && !nativeControlState[\s\S]*settingsRegion === 'navigation' \? 'content' : 'navigation'/)
-  assert.match(settings, /event\.key === 'Escape' && settingsControlState[\s\S]*focusSettingsRegion\('content'\)/)
+  assert.match(settings, /event\.key === 'Tab' && settingsContentMode === 'browse'[\s\S]*settingsRegion === 'navigation' \? 'content' : 'navigation'/)
+  assert.match(settings, /event\.key === 'Escape' && settingsContentMode === 'input'[\s\S]*finishSettingsInput\(\)/)
   assert.match(settings, /setKeyboardScope\('settings'\)[\s\S]*setKeyboardScope\('main'\)/)
   assert.match(settings, /onOpenAutoFocus=\{handleOpenAutoFocus\}/)
   assert.match(app, /requestAnimationFrame\(\(\) => activityRailRef\?\.focusSettings\(\)\)/)
@@ -351,7 +351,7 @@ test('settings keyboard navigation moves the category background with its active
   )
 })
 
-test('settings content arrows select controls while activation enters native input state', async () => {
+test('settings content browse mode selects actual controls and enters native input state only on activation', async () => {
   const [settings, settingsRow] = await Promise.all([
     readFile(settingsPath, 'utf8'),
     readFile(settingsRowPath, 'utf8'),
@@ -361,17 +361,55 @@ test('settings content arrows select controls while activation enters native inp
   assert.equal(nextRovingIndex('ArrowUp', 0, 5, true), 4)
   assert.equal(nextRovingIndex('ArrowDown', 0, 0, true), -1)
   assert.match(settingsRow, /data-settings-control-row/)
-  assert.match(settingsRow, /data-\[settings-control-selected=true\]:bg-primary\/15/)
+  assert.doesNotMatch(settingsRow, /settings-control-selected/)
+  assert.doesNotMatch(settingsRow, /data-\[settings-control-selected=true\]:bg-primary\/15/)
+  assert.match(settings, /settingsContentMode = \$state<'browse' \| 'input'>\('browse'\)/)
   assert.match(settings, /button:not\(:disabled\)/)
-  assert.match(settings, /function getSettingsControlRows/)
+  assert.match(settings, /function getSettingsControls/)
+  assert.match(settings, /function getSettingsContentItems/)
   assert.match(settings, /function selectSettingsControl/)
-  assert.match(settings, /nextRovingIndex\(event\.key as RovingNavigationKey,[\s\S]*settingsControlRows\.length,\s*true/)
+  assert.match(settings, /settingsKeyboardSelected = 'true'/)
+  assert.match(settings, /data-settings-keyboard-selected='true'/)
+  assert.match(settings, /nextRovingIndex\(event\.key as RovingNavigationKey,[\s\S]*settingsContentItems\.length,\s*true/)
   assert.match(settings, /function activateSelectedSettingsControl/)
+  assert.match(settings, /settingsContentMode = 'input'/)
   assert.match(settings, /control\.focus\(\{ preventScroll: true \}\)/)
   assert.match(settings, /control\.click\(\)/)
   assert.match(settings, /scrollIntoView\(\{ block: 'nearest' \}\)/)
   assert.match(settings, /onfocusin=\{handleContentFocusIn\}/)
   assert.match(settings, /onmousedown=\{handleContentMouseDown\}/)
+})
+
+test('settings Tab changes regions once while select confirmation and Escape return to control browse mode', async () => {
+  const settings = await readFile(settingsPath, 'utf8')
+
+  assert.match(
+    settings,
+    /event\.key === 'Tab' && settingsContentMode === 'browse'[\s\S]*settingsRegion === 'navigation' \? 'content' : 'navigation'/,
+  )
+  assert.match(settings, /function observeSelectLifecycle/)
+  assert.match(settings, /attributeFilter: \['aria-expanded', 'data-state'\]/)
+  assert.match(settings, /sawOpen[\s\S]*finishSettingsInput\(\)/)
+  assert.match(
+    settings,
+    /event\.key === 'Escape' && settingsContentMode === 'input'[\s\S]*finishSettingsInput\(\)/,
+  )
+  assert.match(settings, /function finishSettingsInput[\s\S]*settingsContentMode = 'browse'/)
+  assert.match(settings, /function finishSettingsInput[\s\S]*contentRegionEl\?\.focus\(\{ preventScroll: true \}\)/)
+})
+
+test('settings final control moves into a Cancel and Save action group', async () => {
+  const settings = await readFile(settingsPath, 'utf8')
+
+  assert.match(settings, /data-settings-footer-actions/)
+  assert.match(settings, /data-settings-footer-action="cancel"/)
+  assert.match(settings, /data-settings-footer-action="save"/)
+  assert.match(settings, /kind: 'footer'/)
+  assert.match(
+    settings,
+    /event\.key === 'ArrowLeft' \|\| event\.key === 'ArrowRight'[\s\S]*selectSettingsFooterAction/,
+  )
+  assert.match(settings, /activateSelectedSettingsControl[\s\S]*selectedAction\?\.click\(\)/)
 })
 
 test('IME composition and dialog priority stay ahead of region shortcuts', async () => {

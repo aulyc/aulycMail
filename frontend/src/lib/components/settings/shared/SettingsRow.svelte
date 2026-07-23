@@ -10,8 +10,7 @@
 
 <div
   data-settings-control-row
-  data-settings-control-selected="false"
-  class="flex min-h-14 items-center justify-between gap-6 rounded-lg py-2.5 transition-colors data-[settings-control-selected=true]:bg-primary/15 {border ? 'border-b border-border/75 last:border-b-0' : ''}"
+  class="flex min-h-14 items-center justify-between gap-6 py-2.5 {border ? 'border-b border-border/75 last:border-b-0' : ''}"
 >
   <div class="min-w-0">
     <div class="text-sm font-medium text-foreground">{label}</div>

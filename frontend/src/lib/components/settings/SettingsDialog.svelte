@@ -22,6 +22,9 @@
   import AboutTab from './AboutTab.svelte'
 
   type SettingsPage = 'general' | 'appearance' | 'mail' | 'accounts' | 'backup' | 'activity' | 'about'
+  type SettingsContentItem =
+    | { kind: 'control'; element: HTMLElement }
+    | { kind: 'footer'; element: HTMLElement }
   interface NavigationItem { id: SettingsPage; icon: string; label: string }
   interface Props { open?: boolean; activePage?: SettingsPage; onClose?: () => void }
   let { open = $bindable(false), activePage = $bindable('general'), onClose }: Props = $props()
@@ -32,12 +35,16 @@
   let activityInitialType = $state('')
   let loadSequence = 0
   let settingsRegion = $state<'navigation' | 'content'>('navigation')
+  let settingsContentMode = $state<'browse' | 'input'>('browse')
   let settingsNavigationInputMode = $state<'keyboard' | 'pointer'>('pointer')
   let selectedNavigationPage = $state<SettingsPage>('general')
   let selectedSettingsControlIndex = $state(0)
+  let selectedSettingsFooterActionIndex = $state(0)
   let navigationRegionEl = $state<HTMLElement | null>(null)
   let contentRegionEl = $state<HTMLElement | null>(null)
   let contentPanelEl = $state<HTMLElement | null>(null)
+  let contentFooterEl = $state<HTMLElement | null>(null)
+  let selectStateObserver: MutationObserver | null = null
 
   const SETTINGS_CONTROL_SELECTOR = [
     'button:not(:disabled):not([aria-disabled="true"])',
@@ -88,10 +95,15 @@
   $effect(() => {
     if (!open) return
     settingsRegion = 'navigation'
+    settingsContentMode = 'browse'
     selectedNavigationPage = untrack(() => activePage)
     selectedSettingsControlIndex = 0
+    selectedSettingsFooterActionIndex = 0
     setKeyboardScope('settings')
-    return () => setKeyboardScope('main')
+    return () => {
+      stopObservingSelectLifecycle()
+      setKeyboardScope('main')
+    }
   })
 
   $effect(() => {
@@ -140,37 +152,75 @@
   }
 
   function focusSettingsRegion(region: 'navigation' | 'content') {
+    stopObservingSelectLifecycle()
+    settingsContentMode = 'browse'
     settingsRegion = region
     const target = region === 'navigation' ? navigationRegionEl : contentRegionEl
     target?.focus({ preventScroll: true })
     if (region === 'content') scheduleSettingsControlSelection()
   }
 
-  function getSettingsControl(row: HTMLElement): HTMLElement | null {
-    return Array.from(row.querySelectorAll<HTMLElement>(SETTINGS_CONTROL_SELECTOR)).find((control) => (
-      !control.hidden && control.getAttribute('aria-hidden') !== 'true'
-    )) ?? null
+  function isAvailableSettingsControl(control: HTMLElement): boolean {
+    return !control.hidden
+      && !control.matches(':disabled')
+      && control.getAttribute('aria-disabled') !== 'true'
+      && control.getAttribute('aria-hidden') !== 'true'
+      && !control.closest('[hidden], [aria-hidden="true"]')
   }
 
-  function getSettingsControlRows(): HTMLElement[] {
+  function getSettingsControls(): HTMLElement[] {
     if (!contentPanelEl) return []
-    return Array.from(contentPanelEl.querySelectorAll<HTMLElement>('[data-settings-control-row]'))
-      .filter((row) => getSettingsControl(row) !== null)
+    return Array.from(contentPanelEl.querySelectorAll<HTMLElement>(SETTINGS_CONTROL_SELECTOR))
+      .filter(isAvailableSettingsControl)
+  }
+
+  function getSettingsFooterActions(): HTMLElement[] {
+    if (!contentFooterEl) return []
+    return Array.from(contentFooterEl.querySelectorAll<HTMLElement>(
+      '[data-settings-footer-action]:not(:disabled):not([aria-disabled="true"])',
+    )).filter(isAvailableSettingsControl)
+  }
+
+  function getSettingsContentItems(): SettingsContentItem[] {
+    const controls = getSettingsControls().map((element): SettingsContentItem => ({ kind: 'control', element }))
+    const footerActions = getSettingsFooterActions()
+    if (footerActions.length === 0 || !contentFooterEl) return controls
+    return [...controls, { kind: 'footer', element: contentFooterEl }]
+  }
+
+  function clearSettingsKeyboardSelection() {
+    contentRegionEl?.querySelectorAll<HTMLElement>('[data-settings-keyboard-selected]')
+      .forEach((element) => { delete element.dataset.settingsKeyboardSelected })
   }
 
   function selectSettingsControl(index: number, scroll = true) {
-    const allRows = Array.from(contentPanelEl?.querySelectorAll<HTMLElement>('[data-settings-control-row]') ?? [])
-    const settingsControlRows = getSettingsControlRows()
-    allRows.forEach((row) => { row.dataset.settingsControlSelected = 'false' })
-    if (settingsControlRows.length === 0) {
+    const settingsContentItems = getSettingsContentItems()
+    clearSettingsKeyboardSelection()
+    if (settingsContentItems.length === 0) {
       selectedSettingsControlIndex = -1
       return
     }
 
-    selectedSettingsControlIndex = Math.max(0, Math.min(index, settingsControlRows.length - 1))
-    const selectedRow = settingsControlRows[selectedSettingsControlIndex]
-    selectedRow.dataset.settingsControlSelected = 'true'
-    if (scroll) selectedRow.scrollIntoView({ block: 'nearest' })
+    selectedSettingsControlIndex = Math.max(0, Math.min(index, settingsContentItems.length - 1))
+    const selectedItem = settingsContentItems[selectedSettingsControlIndex]
+    let selectedElement = selectedItem.element
+    if (selectedItem.kind === 'footer') {
+      const footerActions = getSettingsFooterActions()
+      selectedSettingsFooterActionIndex = Math.max(
+        0,
+        Math.min(selectedSettingsFooterActionIndex, footerActions.length - 1),
+      )
+      selectedElement = footerActions[selectedSettingsFooterActionIndex] ?? selectedItem.element
+    }
+    selectedElement.dataset.settingsKeyboardSelected = 'true'
+    if (scroll) selectedElement.scrollIntoView({ block: 'nearest' })
+  }
+
+  function selectSettingsFooterAction(index: number) {
+    const footerActions = getSettingsFooterActions()
+    if (footerActions.length === 0) return
+    selectedSettingsFooterActionIndex = Math.max(0, Math.min(index, footerActions.length - 1))
+    selectSettingsControl(selectedSettingsControlIndex, false)
   }
 
   function scheduleSettingsControlSelection(reset = false) {
@@ -181,29 +231,96 @@
     }))
   }
 
-  function settingsControlRowForTarget(target: EventTarget | null): HTMLElement | null {
+  function settingsControlForTarget(target: EventTarget | null): HTMLElement | null {
     if (!(target instanceof Element)) return null
-    const row = target.closest<HTMLElement>('[data-settings-control-row]')
-    return row && contentPanelEl?.contains(row) ? row : null
+    const control = target.closest<HTMLElement>(SETTINGS_CONTROL_SELECTOR)
+    return control && contentPanelEl?.contains(control) ? control : null
+  }
+
+  function settingsFooterActionForTarget(target: EventTarget | null): HTMLElement | null {
+    if (!(target instanceof Element)) return null
+    const action = target.closest<HTMLElement>('[data-settings-footer-action]')
+    return action && contentFooterEl?.contains(action) ? action : null
   }
 
   function isNativeSettingsControlTarget(target: EventTarget | null): boolean {
-    if (!(target instanceof Element)) return false
-    const control = target.closest<HTMLElement>(SETTINGS_CONTROL_SELECTOR)
-    return Boolean(control && contentRegionEl?.contains(control))
+    return Boolean(settingsControlForTarget(target) || settingsFooterActionForTarget(target))
   }
 
   function selectSettingsControlForTarget(target: EventTarget | null) {
-    const row = settingsControlRowForTarget(target)
-    if (!row) return
-    const index = getSettingsControlRows().indexOf(row)
-    if (index >= 0) selectSettingsControl(index, false)
+    const control = settingsControlForTarget(target)
+    if (control) {
+      const index = getSettingsControls().indexOf(control)
+      if (index >= 0) selectSettingsControl(index, false)
+      return
+    }
+
+    const footerAction = settingsFooterActionForTarget(target)
+    if (!footerAction) return
+    const footerActions = getSettingsFooterActions()
+    const actionIndex = footerActions.indexOf(footerAction)
+    if (actionIndex < 0) return
+    selectedSettingsFooterActionIndex = actionIndex
+    selectSettingsControl(getSettingsControls().length, false)
+  }
+
+  function stopObservingSelectLifecycle() {
+    selectStateObserver?.disconnect()
+    selectStateObserver = null
+  }
+
+  function isOpenSelect(control: HTMLElement): boolean {
+    return control.getAttribute('aria-expanded') === 'true' || control.dataset.state === 'open'
+  }
+
+  function finishSettingsInput() {
+    stopObservingSelectLifecycle()
+    settingsContentMode = 'browse'
+    requestAnimationFrame(() => {
+      if (!open) return
+      contentRegionEl?.focus({ preventScroll: true })
+      selectSettingsControl(selectedSettingsControlIndex, false)
+    })
+  }
+
+  function observeSelectLifecycle(control: HTMLElement) {
+    stopObservingSelectLifecycle()
+    let sawOpen = isOpenSelect(control)
+    selectStateObserver = new MutationObserver(() => {
+      if (isOpenSelect(control)) {
+        sawOpen = true
+        return
+      }
+      if (sawOpen) finishSettingsInput()
+    })
+    selectStateObserver.observe(control, {
+      attributes: true,
+      attributeFilter: ['aria-expanded', 'data-state'],
+    })
+  }
+
+  function beginSettingsInput(control: HTMLElement, activate = true) {
+    settingsContentMode = 'input'
+    if (control.matches('[role="combobox"]')) observeSelectLifecycle(control)
+    if (!activate) return
+    control.focus({ preventScroll: true })
+    control.click()
   }
 
   function activateSelectedSettingsControl() {
-    const row = getSettingsControlRows()[selectedSettingsControlIndex]
-    const control = row ? getSettingsControl(row) : null
-    if (!control) return
+    const selectedItem = getSettingsContentItems()[selectedSettingsControlIndex]
+    if (!selectedItem) return
+    if (selectedItem.kind === 'footer') {
+      const selectedAction = getSettingsFooterActions()[selectedSettingsFooterActionIndex]
+      selectedAction?.click()
+      return
+    }
+
+    const control = selectedItem.element
+    if (isInputElement(control)) {
+      beginSettingsInput(control)
+      return
+    }
     control.focus({ preventScroll: true })
     control.click()
   }
@@ -217,6 +334,13 @@
   function handleContentMouseDown(event: MouseEvent) {
     settingsRegion = 'content'
     selectSettingsControlForTarget(event.target)
+    const control = settingsControlForTarget(event.target)
+    if (control && isInputElement(control)) {
+      beginSettingsInput(control, false)
+    } else {
+      stopObservingSelectLifecycle()
+      settingsContentMode = 'browse'
+    }
     if (!isNativeSettingsControlTarget(event.target)) {
       requestAnimationFrame(() => contentRegionEl?.focus({ preventScroll: true }))
     }
@@ -229,19 +353,14 @@
 
   function handleSettingsKeydown(event: KeyboardEvent) {
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229 || showRestartDialog) return
-    const inputState = isInputElement(event.target)
-    const nativeControlState = inputState || isNativeSettingsControlTarget(event.target)
-    const settingsControlState = inputState || Boolean(
-      isNativeSettingsControlTarget(event.target) && settingsControlRowForTarget(event.target),
-    )
-    if (event.key === 'Escape' && settingsControlState) {
+    if (event.key === 'Escape' && settingsContentMode === 'input') {
       event.preventDefault()
       event.stopPropagation()
       ;(event.target as HTMLElement | null)?.blur?.()
-      requestAnimationFrame(() => focusSettingsRegion('content'))
+      finishSettingsInput()
       return
     }
-    if (event.key === 'Tab' && !nativeControlState) {
+    if (event.key === 'Tab' && settingsContentMode === 'browse') {
       event.preventDefault()
       event.stopPropagation()
       focusSettingsRegion(settingsRegion === 'navigation' ? 'content' : 'navigation')
@@ -264,7 +383,25 @@
       return
     }
 
-    if (nativeControlState) return
+    if (settingsContentMode === 'input') return
+    const selectedItem = getSettingsContentItems()[selectedSettingsControlIndex]
+    if (
+      selectedItem?.kind === 'footer'
+      && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      const footerActions = getSettingsFooterActions()
+      const directionKey = event.key === 'ArrowLeft' ? 'ArrowUp' : 'ArrowDown'
+      const nextActionIndex = nextRovingIndex(
+        directionKey,
+        selectedSettingsFooterActionIndex,
+        footerActions.length,
+        true,
+      )
+      if (nextActionIndex >= 0) selectSettingsFooterAction(nextActionIndex)
+      return
+    }
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       event.stopPropagation()
@@ -274,11 +411,11 @@
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
     event.stopPropagation()
-    const settingsControlRows = getSettingsControlRows()
+    const settingsContentItems = getSettingsContentItems()
     const nextIndex = nextRovingIndex(
       event.key as RovingNavigationKey,
       selectedSettingsControlIndex,
-      settingsControlRows.length, true,
+      settingsContentItems.length, true,
     )
     if (nextIndex >= 0) selectSettingsControl(nextIndex)
   }
@@ -297,8 +434,16 @@
         data-settings-region="navigation"
         data-region-active={settingsRegion === 'navigation'}
         class="keyboard-region flex min-h-0 flex-col border-r border-border bg-muted/35 px-3 py-6 outline-none"
-        onfocusin={() => { settingsRegion = 'navigation' }}
-        onmousedown={() => { settingsRegion = 'navigation' }}
+        onfocusin={() => {
+          stopObservingSelectLifecycle()
+          settingsContentMode = 'browse'
+          settingsRegion = 'navigation'
+        }}
+        onmousedown={() => {
+          stopObservingSelectLifecycle()
+          settingsContentMode = 'browse'
+          settingsRegion = 'navigation'
+        }}
         onpointermove={() => { settingsNavigationInputMode = 'pointer' }}
       >
         <h1 class="mb-6 flex h-5 items-center px-2 text-lg font-semibold leading-5">{$_('settings.title')}</h1>
@@ -360,16 +505,20 @@
           {:else if activePage === 'backup'}<BackupSettingsPage {draft} onOpenActivityLog={openBackupActivityLog} />
           {:else}<ActivityLogPage initialType={activityInitialType} />{/if}
         </div>
-        <footer class="flex h-16 shrink-0 items-center justify-between border-t border-border bg-background/95 px-7">
+        <footer
+          bind:this={contentFooterEl}
+          data-settings-footer-actions
+          class="flex h-16 shrink-0 items-center justify-between border-t border-border bg-background/95 px-7"
+        >
           {#if showDraftActions}
             <span class="text-xs text-muted-foreground">{draft.dirty ? $_('settings.unsavedChanges') : ''}</span>
             <div class="flex items-center gap-2">
-              <Button variant="ghost" onclick={close} disabled={draft.saving}>{$_('common.cancel')}</Button>
-              <Button onclick={save} disabled={draft.saving || draft.loading || !draft.dirty}>{#if draft.saving}<Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />{/if}{$_('common.save')}</Button>
+              <Button data-settings-footer-action="cancel" variant="ghost" onclick={close} disabled={draft.saving}>{$_('common.cancel')}</Button>
+              <Button data-settings-footer-action="save" onclick={save} disabled={draft.saving || draft.loading || !draft.dirty}>{#if draft.saving}<Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />{/if}{$_('common.save')}</Button>
             </div>
           {:else}
             <span></span>
-            <Button onclick={close}>{$_('common.close')}</Button>
+            <Button data-settings-footer-action="close" onclick={close}>{$_('common.close')}</Button>
           {/if}
         </footer>
       </div>
@@ -378,3 +527,10 @@
 </Dialog.Root>
 
 <ConfirmDialog bind:open={showRestartDialog} title={$_('settingsGeneral.restartRequired')} description={$_('settingsGeneral.restartRequiredDescription')} confirmLabel={$_('settingsGeneral.quitNow')} cancelLabel={$_('settingsGeneral.restartLater')} onConfirm={() => QuitApp()} onCancel={() => showRestartDialog = false} />
+
+<style>
+  :global([data-settings-keyboard-selected='true']) {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: -2px;
+  }
+</style>

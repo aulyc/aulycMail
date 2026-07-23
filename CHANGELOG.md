@@ -4,6 +4,12 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Changed Settings right-pane keyboard navigation to select the actual form
+  control with a blue inset outline instead of tinting the entire settings row.
+- Made Enter open the selected dropdown in native input mode, then restore
+  control navigation after confirmation or Escape; the final setting now moves
+  into a keyboard-navigable Cancel/Save action group.
+
 ## [0.6.0-beta.9] — 2026-07-24
 
 - Added All Contacts and Refresh as one wrapping Contacts sidebar action group:
