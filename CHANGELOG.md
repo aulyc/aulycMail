@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.11] — 2026-07-24
+
 - Fixed Settings dropdown keyboard activation so one Enter opens the selected
   control, Enter confirms and closes it, and subsequent Up/Down moves between
   controls instead of reopening the previous dropdown.
