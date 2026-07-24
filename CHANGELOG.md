@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.12] — 2026-07-24
+
 - Fixed Settings dropdown activation so one Enter opens the native menu, and
   prevented native focus from leaving a second blue outline behind when
   keyboard selection moves between controls.
