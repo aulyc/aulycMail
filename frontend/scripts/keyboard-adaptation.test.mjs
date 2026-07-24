@@ -374,10 +374,36 @@ test('settings content browse mode selects actual controls and enters native inp
   assert.match(settings, /function activateSelectedSettingsControl/)
   assert.match(settings, /settingsContentMode = 'input'/)
   assert.match(settings, /control\.focus\(\{ preventScroll: true \}\)/)
-  assert.match(settings, /control\.click\(\)/)
+  assert.match(settings, /activateSelectedSettingsControl\(activationKey: 'Enter' \| ' '\)/)
+  assert.match(settings, /activateSelectedSettingsControl\(event\.key\)/)
   assert.match(settings, /scrollIntoView\(\{ block: 'nearest' \}\)/)
   assert.match(settings, /onfocusin=\{handleContentFocusIn\}/)
   assert.match(settings, /onmousedown=\{handleContentMouseDown\}/)
+})
+
+test('settings select activation uses native keydown and never leaves two blue indicators', async () => {
+  const settings = await readFile(settingsPath, 'utf8')
+
+  assert.match(
+    settings,
+    /function beginSettingsInput\([\s\S]*settingsContentMode = 'input'[\s\S]*control\.focus\(\{ preventScroll: true \}\)[\s\S]*clearSettingsKeyboardSelection\(\)/,
+  )
+  assert.match(
+    settings,
+    /control\.matches\('\[role="combobox"\]'\)[\s\S]*control\.dispatchEvent\([\s\S]*new KeyboardEvent\('keydown',[\s\S]*key: activationKey/,
+  )
+  assert.match(
+    settings,
+    /function selectSettingsControlForTarget\(target: EventTarget \| null, showSelection = true\)[\s\S]*if \(showSelection\) selectSettingsControl\([\s\S]*else clearSettingsKeyboardSelection\(\)/,
+  )
+  assert.match(
+    settings,
+    /function handleContentFocusIn[\s\S]*selectSettingsControlForTarget\(event\.target, settingsContentMode === 'browse'\)/,
+  )
+  assert.match(
+    settings,
+    /if \(!\['ArrowUp', 'ArrowDown', 'Home', 'End'\]\.includes\(event\.key\)\) return[\s\S]*contentRegionEl\?\.focus\(\{ preventScroll: true \}\)[\s\S]*selectSettingsControl\(nextIndex\)/,
+  )
 })
 
 test('settings captures browse keys before selects while confirmation and Escape return to control browse mode', async () => {

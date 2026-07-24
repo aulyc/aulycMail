@@ -230,11 +230,15 @@
     return Boolean(settingsControlForTarget(target) || settingsFooterActionForTarget(target))
   }
 
-  function selectSettingsControlForTarget(target: EventTarget | null) {
+  function selectSettingsControlForTarget(target: EventTarget | null, showSelection = true) {
     const control = settingsControlForTarget(target)
     if (control) {
       const index = getSettingsControls().indexOf(control)
-      if (index >= 0) selectSettingsControl(index, false)
+      if (index >= 0) {
+        selectedSettingsControlIndex = index
+        if (showSelection) selectSettingsControl(index, false)
+        else clearSettingsKeyboardSelection()
+      }
       return
     }
 
@@ -246,7 +250,11 @@
     ))
     if (!footerItem) return
     const itemIndex = contentItems.indexOf(footerItem)
-    if (itemIndex >= 0) selectSettingsControl(itemIndex, false)
+    if (itemIndex >= 0) {
+      selectedSettingsControlIndex = itemIndex
+      if (showSelection) selectSettingsControl(itemIndex, false)
+      else clearSettingsKeyboardSelection()
+    }
   }
 
   function stopObservingSelectLifecycle() {
@@ -284,15 +292,34 @@
     })
   }
 
-  function beginSettingsInput(control: HTMLElement, activate = true) {
+  function beginSettingsInput(
+    control: HTMLElement,
+    activate = true,
+    activationKey: 'Enter' | ' ' = 'Enter',
+  ) {
     settingsContentMode = 'input'
-    if (control.matches('[role="combobox"]')) observeSelectLifecycle(control)
-    if (!activate) return
+    const isCombobox = control.matches('[role="combobox"]')
+    if (isCombobox) observeSelectLifecycle(control)
+    if (!activate) {
+      clearSettingsKeyboardSelection()
+      return
+    }
     control.focus({ preventScroll: true })
+    clearSettingsKeyboardSelection()
+    if (isCombobox) {
+      control.dispatchEvent(new KeyboardEvent('keydown', {
+        key: activationKey,
+        code: activationKey === ' ' ? 'Space' : 'Enter',
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+      }))
+      return
+    }
     control.click()
   }
 
-  function activateSelectedSettingsControl() {
+  function activateSelectedSettingsControl(activationKey: 'Enter' | ' ') {
     const selectedItem = getSettingsContentItems()[selectedSettingsControlIndex]
     if (!selectedItem) return
     if (selectedItem.kind === 'footer') {
@@ -302,7 +329,7 @@
 
     const control = selectedItem.element
     if (isInputElement(control)) {
-      beginSettingsInput(control)
+      beginSettingsInput(control, true, activationKey)
       return
     }
     control.focus({ preventScroll: true })
@@ -311,13 +338,12 @@
 
   function handleContentFocusIn(event: FocusEvent) {
     settingsRegion = 'content'
-    selectSettingsControlForTarget(event.target)
+    selectSettingsControlForTarget(event.target, settingsContentMode === 'browse')
     if (event.target === contentRegionEl) selectSettingsControl(selectedSettingsControlIndex, false)
   }
 
   function handleContentMouseDown(event: MouseEvent) {
     settingsRegion = 'content'
-    selectSettingsControlForTarget(event.target)
     const control = settingsControlForTarget(event.target)
     if (control && isInputElement(control)) {
       beginSettingsInput(control, false)
@@ -325,6 +351,7 @@
       stopObservingSelectLifecycle()
       settingsContentMode = 'browse'
     }
+    selectSettingsControlForTarget(event.target, settingsContentMode === 'browse')
     if (!isNativeSettingsControlTarget(event.target)) {
       requestAnimationFrame(() => contentRegionEl?.focus({ preventScroll: true }))
     }
@@ -393,7 +420,7 @@
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault()
       event.stopPropagation()
-      activateSelectedSettingsControl()
+      activateSelectedSettingsControl(event.key)
       return
     }
     if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
@@ -405,7 +432,10 @@
       selectedSettingsControlIndex,
       settingsContentItems.length, true,
     )
-    if (nextIndex >= 0) selectSettingsControl(nextIndex)
+    if (nextIndex >= 0) {
+      contentRegionEl?.focus({ preventScroll: true })
+      selectSettingsControl(nextIndex)
+    }
   }
 </script>
 
