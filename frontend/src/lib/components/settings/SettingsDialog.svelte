@@ -39,7 +39,6 @@
   let settingsNavigationInputMode = $state<'keyboard' | 'pointer'>('pointer')
   let selectedNavigationPage = $state<SettingsPage>('general')
   let selectedSettingsControlIndex = $state(0)
-  let selectedSettingsFooterActionIndex = $state(0)
   let navigationRegionEl = $state<HTMLElement | null>(null)
   let contentRegionEl = $state<HTMLElement | null>(null)
   let contentPanelEl = $state<HTMLElement | null>(null)
@@ -98,7 +97,6 @@
     settingsContentMode = 'browse'
     selectedNavigationPage = untrack(() => activePage)
     selectedSettingsControlIndex = 0
-    selectedSettingsFooterActionIndex = 0
     setKeyboardScope('settings')
     return () => {
       stopObservingSelectLifecycle()
@@ -126,6 +124,7 @@
     const nativeTitleBarChanged = draft.nativeTitleBar !== draft.originalNativeTitleBar
     try {
       await draft.saveAll()
+      scheduleSettingsControlSelection()
       addToast({ type: 'success', message: $_('toast.settingsSaved') })
       if (nativeTitleBarChanged) { draft.originalNativeTitleBar = draft.nativeTitleBar; showRestartDialog = true; return }
     } catch (error) {
@@ -184,8 +183,8 @@
   function getSettingsContentItems(): SettingsContentItem[] {
     const controls = getSettingsControls().map((element): SettingsContentItem => ({ kind: 'control', element }))
     const footerActions = getSettingsFooterActions()
-    if (footerActions.length === 0 || !contentFooterEl) return controls
-    return [...controls, { kind: 'footer', element: contentFooterEl }]
+      .map((element): SettingsContentItem => ({ kind: 'footer', element }))
+    return [...controls, ...footerActions]
   }
 
   function clearSettingsKeyboardSelection() {
@@ -203,24 +202,8 @@
 
     selectedSettingsControlIndex = Math.max(0, Math.min(index, settingsContentItems.length - 1))
     const selectedItem = settingsContentItems[selectedSettingsControlIndex]
-    let selectedElement = selectedItem.element
-    if (selectedItem.kind === 'footer') {
-      const footerActions = getSettingsFooterActions()
-      selectedSettingsFooterActionIndex = Math.max(
-        0,
-        Math.min(selectedSettingsFooterActionIndex, footerActions.length - 1),
-      )
-      selectedElement = footerActions[selectedSettingsFooterActionIndex] ?? selectedItem.element
-    }
-    selectedElement.dataset.settingsKeyboardSelected = 'true'
-    if (scroll) selectedElement.scrollIntoView({ block: 'nearest' })
-  }
-
-  function selectSettingsFooterAction(index: number) {
-    const footerActions = getSettingsFooterActions()
-    if (footerActions.length === 0) return
-    selectedSettingsFooterActionIndex = Math.max(0, Math.min(index, footerActions.length - 1))
-    selectSettingsControl(selectedSettingsControlIndex, false)
+    selectedItem.element.dataset.settingsKeyboardSelected = 'true'
+    if (scroll) selectedItem.element.scrollIntoView({ block: 'nearest' })
   }
 
   function scheduleSettingsControlSelection(reset = false) {
@@ -257,11 +240,13 @@
 
     const footerAction = settingsFooterActionForTarget(target)
     if (!footerAction) return
-    const footerActions = getSettingsFooterActions()
-    const actionIndex = footerActions.indexOf(footerAction)
-    if (actionIndex < 0) return
-    selectedSettingsFooterActionIndex = actionIndex
-    selectSettingsControl(getSettingsControls().length, false)
+    const contentItems = getSettingsContentItems()
+    const footerItem = contentItems.find((item) => (
+      item.kind === 'footer' && item.element === footerAction
+    ))
+    if (!footerItem) return
+    const itemIndex = contentItems.indexOf(footerItem)
+    if (itemIndex >= 0) selectSettingsControl(itemIndex, false)
   }
 
   function stopObservingSelectLifecycle() {
@@ -311,8 +296,7 @@
     const selectedItem = getSettingsContentItems()[selectedSettingsControlIndex]
     if (!selectedItem) return
     if (selectedItem.kind === 'footer') {
-      const selectedAction = getSettingsFooterActions()[selectedSettingsFooterActionIndex]
-      selectedAction?.click()
+      selectedItem.element.click()
       return
     }
 
@@ -391,15 +375,19 @@
     ) {
       event.preventDefault()
       event.stopPropagation()
-      const footerActions = getSettingsFooterActions()
+      const settingsContentItems = getSettingsContentItems()
+      const footerItems = settingsContentItems.filter((item) => item.kind === 'footer')
+      const currentFooterIndex = footerItems.indexOf(selectedItem)
       const directionKey = event.key === 'ArrowLeft' ? 'ArrowUp' : 'ArrowDown'
-      const nextActionIndex = nextRovingIndex(
+      const nextFooterIndex = nextRovingIndex(
         directionKey,
-        selectedSettingsFooterActionIndex,
-        footerActions.length,
+        currentFooterIndex,
+        footerItems.length,
         true,
       )
-      if (nextActionIndex >= 0) selectSettingsFooterAction(nextActionIndex)
+      if (nextFooterIndex >= 0) {
+        selectSettingsControl(settingsContentItems.indexOf(footerItems[nextFooterIndex]))
+      }
       return
     }
     if (event.key === 'Enter' || event.key === ' ') {
@@ -425,7 +413,7 @@
   <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0 !outline-none focus:!outline-none focus-visible:!outline-none focus:ring-0 focus-visible:ring-0 [&>button]:hidden" onOpenAutoFocus={handleOpenAutoFocus} preventCloseAutoFocus onpointerdown={keepDialogFromTakingPointerFocus} onInteractOutside={(event) => event.preventDefault()}>
     <Dialog.Title class="sr-only">{$_('settings.title')}</Dialog.Title>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="grid min-h-0 flex-1 grid-cols-[210px_minmax(0,1fr)]" onkeydown={handleSettingsKeydown}>
+    <div class="grid min-h-0 flex-1 grid-cols-[210px_minmax(0,1fr)]" onkeydowncapture={handleSettingsKeydown}>
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <aside
@@ -532,5 +520,9 @@
   :global([data-settings-keyboard-selected='true']) {
     outline: 2px solid hsl(var(--primary));
     outline-offset: -2px;
+  }
+
+  :global([data-settings-footer-action][data-settings-keyboard-selected='true']) {
+    outline-offset: 2px;
   }
 </style>

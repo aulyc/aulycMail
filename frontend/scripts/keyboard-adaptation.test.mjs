@@ -380,9 +380,11 @@ test('settings content browse mode selects actual controls and enters native inp
   assert.match(settings, /onmousedown=\{handleContentMouseDown\}/)
 })
 
-test('settings Tab changes regions once while select confirmation and Escape return to control browse mode', async () => {
+test('settings captures browse keys before selects while confirmation and Escape return to control browse mode', async () => {
   const settings = await readFile(settingsPath, 'utf8')
 
+  assert.match(settings, /onkeydowncapture=\{handleSettingsKeydown\}/)
+  assert.doesNotMatch(settings, /onkeydown=\{handleSettingsKeydown\}/)
   assert.match(
     settings,
     /event\.key === 'Tab' && settingsContentMode === 'browse'[\s\S]*settingsRegion === 'navigation' \? 'content' : 'navigation'/,
@@ -398,18 +400,31 @@ test('settings Tab changes regions once while select confirmation and Escape ret
   assert.match(settings, /function finishSettingsInput[\s\S]*contentRegionEl\?\.focus\(\{ preventScroll: true \}\)/)
 })
 
-test('settings final control moves into a Cancel and Save action group', async () => {
+test('settings final control moves through distinct Cancel and Save actions', async () => {
   const settings = await readFile(settingsPath, 'utf8')
 
   assert.match(settings, /data-settings-footer-actions/)
   assert.match(settings, /data-settings-footer-action="cancel"/)
   assert.match(settings, /data-settings-footer-action="save"/)
-  assert.match(settings, /kind: 'footer'/)
   assert.match(
     settings,
-    /event\.key === 'ArrowLeft' \|\| event\.key === 'ArrowRight'[\s\S]*selectSettingsFooterAction/,
+    /getSettingsFooterActions\(\)[\s\S]*?\.map\(\(element\): SettingsContentItem => \(\{ kind: 'footer', element \}\)\)/,
   )
-  assert.match(settings, /activateSelectedSettingsControl[\s\S]*selectedAction\?\.click\(\)/)
+  assert.doesNotMatch(settings, /selectedSettingsFooterActionIndex/)
+  assert.doesNotMatch(settings, /function selectSettingsFooterAction/)
+  assert.match(
+    settings,
+    /settingsControlForTarget\(target\)[\s\S]*settingsFooterActionForTarget\(target\)[\s\S]*contentItems\.indexOf\(footerItem\)/,
+  )
+  assert.match(settings, /selectedItem\.kind === 'footer'[\s\S]*selectedItem\.element\.click\(\)/)
+  assert.match(
+    settings,
+    /data-settings-keyboard-selected='true'[\s\S]*outline: 2px solid hsl\(var\(--primary\)\)/,
+  )
+  assert.match(
+    settings,
+    /data-settings-footer-action\]\[data-settings-keyboard-selected='true'\][\s\S]*outline-offset: 2px/,
+  )
 })
 
 test('IME composition and dialog priority stay ahead of region shortcuts', async () => {

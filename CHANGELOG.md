@@ -4,6 +4,12 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Fixed Settings dropdown keyboard activation so one Enter opens the selected
+  control, Enter confirms and closes it, and subsequent Up/Down moves between
+  controls instead of reopening the previous dropdown.
+- Made Cancel and Save distinct Up/Down navigation stops and added a visible
+  keyboard-selection outline around the active footer action.
+
 ## [0.6.0-beta.10] — 2026-07-24
 
 - Changed Settings right-pane keyboard navigation to select the actual form
