@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Fixed Settings Select detection to use the rendered trigger contract, so
+  Enter opens the highlighted dropdown instead of only moving DOM focus to it.
+
 ## [0.6.0-beta.12] — 2026-07-24
 
 - Fixed Settings dropdown activation so one Enter opens the native menu, and

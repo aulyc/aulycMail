@@ -29,6 +29,7 @@ const contactStorePath = new URL('../src/lib/contacts/stores/contactsView.svelte
 const viewerPath = new URL('../src/lib/components/viewer/ConversationViewer.svelte', import.meta.url)
 const settingsPath = new URL('../src/lib/components/settings/SettingsDialog.svelte', import.meta.url)
 const settingsRowPath = new URL('../src/lib/components/settings/shared/SettingsRow.svelte', import.meta.url)
+const selectTriggerPath = new URL('../src/lib/components/ui/select/select-trigger.svelte', import.meta.url)
 const backupViewerPath = new URL('../src/lib/components/backup/BackupViewerDialog.svelte', import.meta.url)
 const globalSearchPath = new URL('../src/lib/components/SearchOverlay.svelte', import.meta.url)
 
@@ -382,16 +383,23 @@ test('settings content browse mode selects actual controls and enters native inp
 })
 
 test('settings select activation uses native keydown and never leaves two blue indicators', async () => {
-  const settings = await readFile(settingsPath, 'utf8')
+  const [settings, selectTrigger] = await Promise.all([
+    readFile(settingsPath, 'utf8'),
+    readFile(selectTriggerPath, 'utf8'),
+  ])
 
+  assert.match(selectTrigger, /data-keyboard-input="true"/)
+  assert.match(selectTrigger, /data-keyboard-select-trigger="true"/)
+  assert.match(settings, /function isSettingsSelectTrigger[\s\S]*data-keyboard-select-trigger/)
   assert.match(
     settings,
     /function beginSettingsInput\([\s\S]*settingsContentMode = 'input'[\s\S]*control\.focus\(\{ preventScroll: true \}\)[\s\S]*clearSettingsKeyboardSelection\(\)/,
   )
   assert.match(
     settings,
-    /control\.matches\('\[role="combobox"\]'\)[\s\S]*control\.dispatchEvent\([\s\S]*new KeyboardEvent\('keydown',[\s\S]*key: activationKey/,
+    /isSettingsSelectTrigger\(control\)[\s\S]*control\.dispatchEvent\([\s\S]*new KeyboardEvent\('keydown',[\s\S]*key: activationKey/,
   )
+  assert.doesNotMatch(settings, /control\.matches\('\[role="combobox"\]'\)/)
   assert.match(
     settings,
     /function selectSettingsControlForTarget\(target: EventTarget \| null, showSelection = true\)[\s\S]*if \(showSelection\) selectSettingsControl\([\s\S]*else clearSettingsKeyboardSelection\(\)/,

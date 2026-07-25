@@ -230,6 +230,10 @@
     return Boolean(settingsControlForTarget(target) || settingsFooterActionForTarget(target))
   }
 
+  function isSettingsSelectTrigger(control: HTMLElement): boolean {
+    return control.matches('[data-keyboard-select-trigger="true"]')
+  }
+
   function selectSettingsControlForTarget(target: EventTarget | null, showSelection = true) {
     const control = settingsControlForTarget(target)
     if (control) {
@@ -298,15 +302,15 @@
     activationKey: 'Enter' | ' ' = 'Enter',
   ) {
     settingsContentMode = 'input'
-    const isCombobox = control.matches('[role="combobox"]')
-    if (isCombobox) observeSelectLifecycle(control)
+    const isSelectTrigger = isSettingsSelectTrigger(control)
+    if (isSelectTrigger) observeSelectLifecycle(control)
     if (!activate) {
       clearSettingsKeyboardSelection()
       return
     }
     control.focus({ preventScroll: true })
     clearSettingsKeyboardSelection()
-    if (isCombobox) {
+    if (isSelectTrigger) {
       control.dispatchEvent(new KeyboardEvent('keydown', {
         key: activationKey,
         code: activationKey === ' ' ? 'Space' : 'Enter',
@@ -328,7 +332,7 @@
     }
 
     const control = selectedItem.element
-    if (isInputElement(control)) {
+    if (isSettingsSelectTrigger(control) || isInputElement(control)) {
       beginSettingsInput(control, true, activationKey)
       return
     }
