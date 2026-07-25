@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.14] — 2026-07-26
+
 - Kept open Settings dropdown triggers free of a second native focus ring, and
   made the Save action fill only when it is the current keyboard selection.
 - Kept the Settings unsaved indicator synchronized after Save by making the
