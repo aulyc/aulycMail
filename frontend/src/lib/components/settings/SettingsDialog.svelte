@@ -536,7 +536,7 @@
             <span class="text-xs text-muted-foreground">{draft.dirty ? $_('settings.unsavedChanges') : ''}</span>
             <div class="flex items-center gap-2">
               <Button data-settings-footer-action="cancel" variant="ghost" onclick={close} disabled={draft.saving}>{$_('common.cancel')}</Button>
-              <Button data-settings-footer-action="save" onclick={save} disabled={draft.saving || draft.loading || !draft.dirty}>{#if draft.saving}<Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />{/if}{$_('common.save')}</Button>
+              <Button data-settings-footer-action="save" variant="outline" onclick={save} disabled={draft.saving || draft.loading || !draft.dirty}>{#if draft.saving}<Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />{/if}{$_('common.save')}</Button>
             </div>
           {:else}
             <span></span>
@@ -558,5 +558,11 @@
 
   :global([data-settings-footer-action][data-settings-keyboard-selected='true']) {
     outline-offset: 2px;
+  }
+
+  :global([data-settings-footer-action='save'][data-settings-keyboard-selected='true']) {
+    border-color: hsl(var(--primary));
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
   }
 </style>

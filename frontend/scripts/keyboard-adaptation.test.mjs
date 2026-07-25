@@ -28,6 +28,7 @@ const contactListPath = new URL('../src/lib/contacts/components/ContactList.svel
 const contactStorePath = new URL('../src/lib/contacts/stores/contactsView.svelte.ts', import.meta.url)
 const viewerPath = new URL('../src/lib/components/viewer/ConversationViewer.svelte', import.meta.url)
 const settingsPath = new URL('../src/lib/components/settings/SettingsDialog.svelte', import.meta.url)
+const settingsDraftPath = new URL('../src/lib/components/settings/settingsDraft.svelte.ts', import.meta.url)
 const settingsRowPath = new URL('../src/lib/components/settings/shared/SettingsRow.svelte', import.meta.url)
 const selectTriggerPath = new URL('../src/lib/components/ui/select/select-trigger.svelte', import.meta.url)
 const backupViewerPath = new URL('../src/lib/components/backup/BackupViewerDialog.svelte', import.meta.url)
@@ -390,6 +391,10 @@ test('settings select activation uses native keydown and never leaves two blue i
 
   assert.match(selectTrigger, /data-keyboard-input="true"/)
   assert.match(selectTrigger, /data-keyboard-select-trigger="true"/)
+  assert.match(
+    selectTrigger,
+    /data-keyboard-select-trigger='true'\]\[data-state='open'\]:focus-visible[\s\S]*box-shadow: none/,
+  )
   assert.match(settings, /function isSettingsSelectTrigger[\s\S]*data-keyboard-select-trigger/)
   assert.match(
     settings,
@@ -442,6 +447,10 @@ test('settings final control moves through distinct Cancel and Save actions', as
   assert.match(settings, /data-settings-footer-action="save"/)
   assert.match(
     settings,
+    /Button data-settings-footer-action="save" variant="outline"/,
+  )
+  assert.match(
+    settings,
     /getSettingsFooterActions\(\)[\s\S]*?\.map\(\(element\): SettingsContentItem => \(\{ kind: 'footer', element \}\)\)/,
   )
   assert.doesNotMatch(settings, /selectedSettingsFooterActionIndex/)
@@ -458,6 +467,21 @@ test('settings final control moves through distinct Cancel and Save actions', as
   assert.match(
     settings,
     /data-settings-footer-action\]\[data-settings-keyboard-selected='true'\][\s\S]*outline-offset: 2px/,
+  )
+  assert.match(
+    settings,
+    /data-settings-footer-action='save'\]\[data-settings-keyboard-selected='true'\][\s\S]*background-color: hsl\(var\(--primary\)\)[\s\S]*color: hsl\(var\(--primary-foreground\)\)/,
+  )
+})
+
+test('settings saved baselines remain reactive so the dirty indicator clears with Save', async () => {
+  const settingsDraft = await readFile(settingsDraftPath, 'utf8')
+
+  assert.match(settingsDraft, /private original = \$state\(''\)/)
+  assert.match(settingsDraft, /private originalBackup = \$state\(''\)/)
+  assert.match(
+    settingsDraft,
+    /private capture\(\): void \{[\s\S]*this\.original = JSON\.stringify\(this\.snapshot\(\)\)[\s\S]*this\.originalBackup = JSON\.stringify\(this\.backupSnapshot\(\)\)/,
   )
 })
 

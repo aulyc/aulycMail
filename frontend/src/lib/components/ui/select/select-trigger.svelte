@@ -28,3 +28,9 @@
     <Icon icon="mdi:chevron-down" class="h-4 w-4 opacity-50" />
   {/if}
 </SelectPrimitive.Trigger>
+
+<style>
+  :global([data-keyboard-select-trigger='true'][data-state='open']:focus-visible) {
+    box-shadow: none;
+  }
+</style>

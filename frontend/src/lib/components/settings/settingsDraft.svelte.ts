@@ -90,8 +90,8 @@ export class SettingsDraft {
   loading = $state(false)
   saving = $state(false)
   originalNativeTitleBar = false
-  private original = ''
-  private originalBackup = ''
+  private original = $state('')
+  private originalBackup = $state('')
 
   get dirty(): boolean {
     return this.original !== JSON.stringify(this.snapshot()) || this.backupDirty
