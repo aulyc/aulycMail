@@ -219,6 +219,7 @@ func contactRecordFilter(filter contactdto.ContactFilter) contact.RecordFilter {
 		Role:      scope.role,
 		AccountID: scope.accountID,
 		Query:     filter.Query,
+		SortOrder: filter.SortOrder,
 		Limit:     filter.Limit,
 		Offset:    filter.Offset,
 	}

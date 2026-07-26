@@ -110,15 +110,16 @@ func (b *ContactsBridge) Contacts_ListContactsForBrowse(query, sourceID string, 
 // Contacts_BrowseContacts returns a paged list and the full total for the
 // current source/search filter. The older Contacts_ListContactsForBrowse method
 // stays array-shaped for existing lightweight search callers.
-func (b *ContactsBridge) Contacts_BrowseContacts(query, sourceID string, limit, offset int) (contactdto.ContactBrowseResult, error) {
+func (b *ContactsBridge) Contacts_BrowseContacts(query, sourceID, sortOrder string, limit, offset int) (contactdto.ContactBrowseResult, error) {
 	if err := b.ensureInit(); err != nil {
 		return contactdto.ContactBrowseResult{}, err
 	}
 	return b.api.BrowseContacts(contactdto.ContactFilter{
-		Query:    query,
-		SourceID: sourceID,
-		Limit:    limit,
-		Offset:   offset,
+		Query:     query,
+		SourceID:  sourceID,
+		SortOrder: sortOrder,
+		Limit:     limit,
+		Offset:    offset,
 	})
 }
 

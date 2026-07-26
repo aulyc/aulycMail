@@ -110,9 +110,15 @@ type RecordFilter struct {
 	Role      string // for collected: 'sender' | 'recipient' | 'ccbcc' | '' for any
 	AccountID string // optional mail account scope for dynamic message-role grouping
 	Query     string // optional case-insensitive fn/email substring
+	SortOrder string // 'name-asc' (default) | 'name-desc'
 	Limit     int
 	Offset    int
 }
+
+const (
+	RecordSortNameAsc  = "name-asc"
+	RecordSortNameDesc = "name-desc"
+)
 
 // AccountAssociation summarizes which mail account(s) a contact record is
 // associated with, and how many local contacts are visible under each role for

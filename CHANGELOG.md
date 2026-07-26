@@ -4,6 +4,13 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Changed Settings footer navigation so Left/Right switches between Cancel and
+  Save, while Up/Down from either action returns to the settings controls.
+- Added a destructive confirmation before removing an address or domain from
+  the remote-image whitelist.
+- Fixed account switching in Contacts so the selected row and scroll position
+  start at the first contact in the visible A–Z or Z–A order.
+
 ## [0.6.0-beta.14] — 2026-07-26
 
 - Kept open Settings dropdown triggers free of a second native focus ring, and

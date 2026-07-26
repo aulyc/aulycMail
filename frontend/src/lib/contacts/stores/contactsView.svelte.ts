@@ -21,6 +21,7 @@ import type { contactdto } from '$wailsjs/go/models'
 // in next" decisions on user actions.
 import { isResponsive, showViewer, hideSidebar } from '$lib/stores/layout.svelte'
 const CONTACTS_PAGE_SIZE = 200
+export type ContactSortOrder = 'name-asc' | 'name-desc'
 
 // Source ID values the sidebar can dispatch:
 //   ""                  → all local contacts
@@ -29,6 +30,7 @@ const CONTACTS_PAGE_SIZE = 200
 //   "local:collected"   → auto-collected local contacts (sent-mail recipients)
 let selectedSourceId = $state<string>('')
 let searchQuery = $state<string>('')
+let sortOrder = $state<ContactSortOrder>('name-asc')
 let selectedContactId = $state<string | null>(null)
 let contacts = $state<contactdto.ContactListItem[]>([])
 let total = $state<number>(0)
@@ -49,6 +51,9 @@ export const contactsView = {
   },
   get searchQuery(): string {
     return searchQuery
+  },
+  get sortOrder(): ContactSortOrder {
+    return sortOrder
   },
   get selectedContactId(): string | null {
     return selectedContactId
@@ -116,6 +121,10 @@ export function setSearchQuery(q: string): void {
   searchQuery = q
 }
 
+export function setSortOrder(order: ContactSortOrder): void {
+  sortOrder = order
+}
+
 export async function reloadContacts(limit = CONTACTS_PAGE_SIZE, offset = 0, preferredIndex = 0): Promise<void> {
   const seq = ++contactsLoadSeq
   let nextDetailId: string | null = null
@@ -123,7 +132,7 @@ export async function reloadContacts(limit = CONTACTS_PAGE_SIZE, offset = 0, pre
   loadingMore = false
   loadError = false
   try {
-    const result = await BrowseContacts(searchQuery, selectedSourceId, limit, offset)
+    const result = await BrowseContacts(searchQuery, selectedSourceId, sortOrder, limit, offset)
     if (seq === contactsLoadSeq) {
       contacts = result?.items || []
       total = result?.total ?? contacts.length
@@ -166,7 +175,7 @@ export async function loadMoreContacts(limit = CONTACTS_PAGE_SIZE): Promise<void
   const offset = contacts.length
   loadingMore = true
   try {
-    const result = await BrowseContacts(searchQuery, selectedSourceId, limit, offset)
+    const result = await BrowseContacts(searchQuery, selectedSourceId, sortOrder, limit, offset)
     if (seq === contactsLoadSeq) {
       const existing = new Set(contacts.map(c => c.id))
       const next = (result?.items || []).filter(c => !existing.has(c.id))

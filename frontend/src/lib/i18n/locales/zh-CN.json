@@ -776,6 +776,9 @@
     "noAddresses": "白名单中没有任何地址。在邮件查看器中使用「始终加载 > 针对发件人」来添加地址。",
     "noDomains": "白名单中没有任何域名。在邮件查看器中使用「始终加载 > 针对域名」来添加域名。",
     "removeButton": "从白名单中移除",
-    "removed": "已从白名单中移除"
+    "removed": "已从白名单中移除",
+    "removeConfirmTitle": "从白名单中移除？",
+    "removeConfirmDescription": "确定要将「{value}」从白名单中移除吗？确认后会立即生效。",
+    "confirmRemove": "移除"
   }
 }

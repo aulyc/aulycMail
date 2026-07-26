@@ -8,10 +8,9 @@
   // so the global Ctrl+S handler cycles through the same three states mail
   // uses: closed → focused → closed.
   //
-  // Sort is local component state (A-Z / Z-A). Lists are small enough that
-  // sorting client-side via $derived is cheaper than a backend round-trip.
-  // Filter UI is intentionally omitted — comes when contacts gains tags or
-  // groups in a later phase.
+  // Sort is owned by the contacts store and applied by the backend before
+  // pagination. That keeps the visible first row, default selection, and every
+  // infinite-scroll page in one stable order.
 
   import Icon from '@iconify/svelte'
   import { tick } from 'svelte'
@@ -19,7 +18,7 @@
   import ListPane from '$lib/components/kit/ListPane.svelte'
   import ListRow from '$lib/components/kit/ListRow.svelte'
   import ConfirmDialog from '$lib/components/kit/ConfirmDialog.svelte'
-  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, deleteLocalContact } from '$contacts/stores/contactsView.svelte'
+  import { contactsView, reloadContacts, loadMoreContacts, focusContact, activateContact, setSearchQuery, setSortOrder, deleteLocalContact } from '$contacts/stores/contactsView.svelte'
   import { toasts } from '$lib/stores/toast'
   import { createDebouncer } from '$lib/utils/debounce'
   import { shouldShowContactEmail } from '$contacts/utils/contactPresentation'
@@ -44,8 +43,6 @@
 
   let { onAdd }: Props = $props()
 
-  type SortOrder = 'name-asc' | 'name-desc'
-
   let showSearch = $state(false)
   let searchInput = $state('')
   // Plain `let` (not $state) — same as App.svelte's component refs. The
@@ -53,7 +50,6 @@
   // check against document.activeElement), never in a reactive context, so
   // making it $state adds overhead without benefit.
   let searchInputEl: HTMLInputElement | null = null
-  let sortOrder = $state<SortOrder>('name-asc')
   let regionEl = $state<HTMLElement | null>(null)
 
   // Delete-confirmation state for keyboard-triggered deletes. ContactDetail
@@ -165,7 +161,8 @@
   }
 
   function toggleSort() {
-    sortOrder = sortOrder === 'name-asc' ? 'name-desc' : 'name-asc'
+    setSortOrder(contactsView.sortOrder === 'name-asc' ? 'name-desc' : 'name-asc')
+    void reloadContacts()
   }
 
   function handleReachEnd() {
@@ -176,25 +173,6 @@
   function primaryEmail(c: contactdto.ContactListItem): string {
     return c.emails && c.emails.length > 0 ? c.emails[0] : ''
   }
-
-  function rowKey(c: contactdto.ContactListItem): string {
-    return (c.name || primaryEmail(c) || '').toLowerCase()
-  }
-
-  // Client-side sort of the already-loaded list. Backend handles query
-  // filtering; sort is purely a view concern.
-  const sortedContacts = $derived.by(() => {
-    const items = [...contactsView.contacts]
-    const dir = sortOrder === 'name-asc' ? 1 : -1
-    items.sort((a, b) => {
-      const ka = rowKey(a)
-      const kb = rowKey(b)
-      if (ka < kb) return -1 * dir
-      if (ka > kb) return 1 * dir
-      return 0
-    })
-    return items
-  })
 
   // Header label tracks the sidebar's selected category — mirrors mail's
   // MessageList showing the active folder name. Unknown ids fall back to the
@@ -267,12 +245,12 @@
     {#snippet actions()}
       <button
         class="p-2 rounded-md hover:bg-muted transition-colors"
-        title={sortOrder === 'name-asc' ? $_('contacts.list.sortAsc') : $_('contacts.list.sortDesc')}
+        title={contactsView.sortOrder === 'name-asc' ? $_('contacts.list.sortAsc') : $_('contacts.list.sortDesc')}
         onclick={toggleSort}
         type="button"
       >
         <Icon
-          icon={sortOrder === 'name-asc' ? 'mdi:sort-alphabetical-ascending' : 'mdi:sort-alphabetical-descending'}
+          icon={contactsView.sortOrder === 'name-asc' ? 'mdi:sort-alphabetical-ascending' : 'mdi:sort-alphabetical-descending'}
           class="w-5 h-5 text-muted-foreground"
         />
       </button>
@@ -290,11 +268,11 @@
   </ListHeader>
 
   <ListPane
-    items={sortedContacts}
+    items={contactsView.contacts}
     selectedId={contactsView.selectedContactId}
     focusSlot="messageList"
     label={$_('contacts.list.label')}
-    loading={shouldBlockContactList(contactsView.loading, sortedContacts.length)}
+    loading={shouldBlockContactList(contactsView.loading, contactsView.contacts.length)}
     selectedScrollSignal={contactsView.selectedContactScrollTopSignal}
     selectedScrollBlock="start"
     onSelect={(id) => focusContact(id)}

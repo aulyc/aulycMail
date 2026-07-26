@@ -33,7 +33,7 @@ export function ClearActivityLogs(arg1:activitylog.Query):Promise<number>;
 
 export function ClearOfflineBodyCache(arg1:string):Promise<app.OfflineBodyCacheClearResult>;
 
-export function Contacts_BrowseContacts(arg1:string,arg2:string,arg3:number,arg4:number):Promise<contactdto.ContactBrowseResult>;
+export function Contacts_BrowseContacts(arg1:string,arg2:string,arg3:string,arg4:number,arg5:number):Promise<contactdto.ContactBrowseResult>;
 
 export function Contacts_CreateContact(arg1:contactdto.ContactCreateInput):Promise<string>;
 

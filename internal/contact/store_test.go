@@ -185,6 +185,78 @@ func TestAccountScopedContactGrouping(t *testing.T) {
 	}
 }
 
+func TestListRecordSummariesSortsByVisibleNameBeforePagination(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db.DB)
+
+	for _, item := range []struct {
+		email string
+		name  string
+	}{
+		{email: "bravo@example.com"},
+		{email: "zulu@example.com", name: "Zulu"},
+		{email: "anaconda@example.com", name: "Anaconda"},
+	} {
+		if err := store.AddOrUpdate(item.email, item.name); err != nil {
+			t.Fatalf("add %s: %v", item.email, err)
+		}
+	}
+
+	visibleKey := func(item *RecordSummary) string {
+		if item.Fn != "" {
+			return item.Fn
+		}
+		return item.PrimaryEmail
+	}
+	keys := func(items []*RecordSummary) []string {
+		out := make([]string, 0, len(items))
+		for _, item := range items {
+			out = append(out, visibleKey(item))
+		}
+		return out
+	}
+
+	asc, total, err := store.ListRecordSummaries(RecordFilter{
+		Source:    "local",
+		SortOrder: RecordSortNameAsc,
+		Limit:     2,
+	})
+	if err != nil {
+		t.Fatalf("list ascending summaries: %v", err)
+	}
+	if total != 3 {
+		t.Fatalf("ascending total = %d, want 3", total)
+	}
+	if got, want := strings.Join(keys(asc), ","), "Anaconda,bravo@example.com"; got != want {
+		t.Fatalf("ascending first page = %q, want %q", got, want)
+	}
+
+	ascTail, _, err := store.ListRecordSummaries(RecordFilter{
+		Source:    "local",
+		SortOrder: RecordSortNameAsc,
+		Limit:     2,
+		Offset:    2,
+	})
+	if err != nil {
+		t.Fatalf("list ascending tail: %v", err)
+	}
+	if got, want := strings.Join(keys(ascTail), ","), "Zulu"; got != want {
+		t.Fatalf("ascending tail = %q, want %q", got, want)
+	}
+
+	desc, _, err := store.ListRecordSummaries(RecordFilter{
+		Source:    "local",
+		SortOrder: RecordSortNameDesc,
+		Limit:     2,
+	})
+	if err != nil {
+		t.Fatalf("list descending summaries: %v", err)
+	}
+	if got, want := strings.Join(keys(desc), ","), "Zulu,bravo@example.com"; got != want {
+		t.Fatalf("descending first page = %q, want %q", got, want)
+	}
+}
+
 func TestUpsert(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db.DB)

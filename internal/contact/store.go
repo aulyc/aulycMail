@@ -1007,22 +1007,31 @@ func (s *Store) ListRecordSummaries(filter RecordFilter) ([]*RecordSummary, int,
 	if offset < 0 {
 		offset = 0
 	}
+	sortDirection := "ASC"
+	if filter.SortOrder == RecordSortNameDesc {
+		sortDirection = "DESC"
+	}
 
 	query := parts.with + `
-		SELECT cr.id,
-		       cr.source,
-		       COALESCE(cr.fn, ''),
-		       COALESCE((
-		           SELECT ce.email
-		           FROM contact_emails ce
-		           WHERE ce.record_id = cr.id
-		           ORDER BY ce.is_primary DESC, ce.send_count DESC, ce.email ASC
-		           LIMIT 1
-		       ), ''),
-		       cr.updated_at,
-		       COUNT(*) OVER()
-		FROM contact_records cr` + parts.join + parts.where + `
-		ORDER BY COALESCE(cr.fn, '') ASC, cr.id ASC
+		SELECT id, source, fn, primary_email, updated_at, total
+		FROM (
+			SELECT cr.id,
+			       cr.source,
+			       COALESCE(cr.fn, '') AS fn,
+			       COALESCE((
+			           SELECT ce.email
+			           FROM contact_emails ce
+			           WHERE ce.record_id = cr.id
+			           ORDER BY ce.is_primary DESC, ce.send_count DESC, ce.email ASC
+			           LIMIT 1
+			       ), '') AS primary_email,
+			       cr.updated_at,
+			       COUNT(*) OVER() AS total
+			FROM contact_records cr` + parts.join + parts.where + `
+		)
+		ORDER BY
+			CASE WHEN fn <> '' THEN fn ELSE primary_email END COLLATE NOCASE ` + sortDirection + `,
+			id ASC
 		LIMIT ? OFFSET ?`
 	args := append(append([]any{}, parts.args...), limit, offset)
 	rows, err := s.db.Query(query, args...)

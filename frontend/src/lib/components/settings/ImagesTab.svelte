@@ -33,6 +33,8 @@
   let addressesCollapsed = $state(false)
   let domainsCollapsed = $state(false)
   let showAlwaysLoadImagesConfirm = $state(false)
+  let pendingRemoval = $state<settings.AllowlistEntry | null>(null)
+  let removing = $state(false)
 
   // Derived
   let addresses = $derived(entries.filter(e => e.type === 'sender'))
@@ -57,9 +59,16 @@
     }
   }
 
-  async function handleRemove(id: number) {
+  function requestRemove(entry: settings.AllowlistEntry) {
+    pendingRemoval = entry
+  }
+
+  async function confirmRemove() {
+    const entry = pendingRemoval
+    if (!entry || removing) return
+    removing = true
     try {
-      await RemoveImageAllowlist(id)
+      await RemoveImageAllowlist(entry.id)
       await loadData()
       refreshImageAllowlist()
       addToast({
@@ -68,6 +77,9 @@
       })
     } catch (err) {
       console.error('Failed to remove allowlist entry:', err)
+    } finally {
+      removing = false
+      pendingRemoval = null
     }
   }
 
@@ -113,7 +125,7 @@
                 <div class="flex items-center gap-3 p-2 rounded-md border border-border">
                   <Icon icon="mdi:email-outline" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <span class="text-sm flex-1 truncate">{entry.value}</span>
-                  <Button variant="ghost" size="sm" onclick={() => handleRemove(entry.id)} title={$_('images.removeButton')}>
+                  <Button variant="ghost" size="sm" onclick={() => requestRemove(entry)} title={$_('images.removeButton')}>
                     <Icon icon="mdi:close" class="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -142,7 +154,7 @@
                 <div class="flex items-center gap-3 p-2 rounded-md border border-border">
                   <Icon icon="mdi:web" class="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <span class="text-sm flex-1 truncate">{entry.value}</span>
-                  <Button variant="ghost" size="sm" onclick={() => handleRemove(entry.id)} title={$_('images.removeButton')}>
+                  <Button variant="ghost" size="sm" onclick={() => requestRemove(entry)} title={$_('images.removeButton')}>
                     <Icon icon="mdi:close" class="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -164,4 +176,16 @@
   variant="destructive"
   onConfirm={() => { onAlwaysLoadImagesChange?.(true) }}
   onCancel={() => { alwaysLoadImages = false }}
+/>
+
+<ConfirmDialog
+  open={pendingRemoval !== null}
+  title={$_('images.removeConfirmTitle')}
+  description={$_('images.removeConfirmDescription', { values: { value: pendingRemoval?.value ?? '' } })}
+  confirmLabel={$_('images.confirmRemove')}
+  cancelLabel={$_('common.cancel')}
+  variant="destructive"
+  loading={removing}
+  onConfirm={confirmRemove}
+  onCancel={() => { pendingRemoval = null }}
 />

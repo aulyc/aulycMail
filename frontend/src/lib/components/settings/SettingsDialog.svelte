@@ -402,11 +402,21 @@
     const selectedItem = getSettingsContentItems()[selectedSettingsControlIndex]
     if (
       selectedItem?.kind === 'footer'
-      && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+      && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
     ) {
       event.preventDefault()
       event.stopPropagation()
       const settingsContentItems = getSettingsContentItems()
+      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        const controlItems = settingsContentItems.filter((item) => item.kind === 'control')
+        const targetControl = event.key === 'ArrowUp' ? controlItems.at(-1) : controlItems[0]
+        if (targetControl) {
+          contentRegionEl?.focus({ preventScroll: true })
+          selectSettingsControl(settingsContentItems.indexOf(targetControl))
+        }
+        return
+      }
+
       const footerItems = settingsContentItems.filter((item) => item.kind === 'footer')
       const currentFooterIndex = footerItems.indexOf(selectedItem)
       const directionKey = event.key === 'ArrowLeft' ? 'ArrowUp' : 'ArrowDown'

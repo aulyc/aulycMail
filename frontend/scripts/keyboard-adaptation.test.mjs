@@ -439,7 +439,7 @@ test('settings captures browse keys before selects while confirmation and Escape
   assert.match(settings, /function finishSettingsInput[\s\S]*contentRegionEl\?\.focus\(\{ preventScroll: true \}\)/)
 })
 
-test('settings final control moves through distinct Cancel and Save actions', async () => {
+test('settings footer uses horizontal actions and both actions return vertically to controls', async () => {
   const settings = await readFile(settingsPath, 'utf8')
 
   assert.match(settings, /data-settings-footer-actions/)
@@ -460,6 +460,18 @@ test('settings final control moves through distinct Cancel and Save actions', as
     /settingsControlForTarget\(target\)[\s\S]*settingsFooterActionForTarget\(target\)[\s\S]*contentItems\.indexOf\(footerItem\)/,
   )
   assert.match(settings, /selectedItem\.kind === 'footer'[\s\S]*selectedItem\.element\.click\(\)/)
+  assert.match(
+    settings,
+    /selectedItem\?\.kind === 'footer'[\s\S]*\['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'\]\.includes\(event\.key\)/,
+  )
+  assert.match(
+    settings,
+    /event\.key === 'ArrowUp' \|\| event\.key === 'ArrowDown'[\s\S]*controlItems[\s\S]*event\.key === 'ArrowUp' \? controlItems\.at\(-1\) : controlItems\[0\][\s\S]*selectSettingsControl\(settingsContentItems\.indexOf\(targetControl\)\)/,
+  )
+  assert.match(
+    settings,
+    /event\.key === 'ArrowLeft' \? 'ArrowUp' : 'ArrowDown'[\s\S]*footerItems\.length[\s\S]*selectSettingsControl\(settingsContentItems\.indexOf\(footerItems\[nextFooterIndex\]\)\)/,
+  )
   assert.match(
     settings,
     /data-settings-keyboard-selected='true'[\s\S]*outline: 2px solid hsl\(var\(--primary\)\)/,
