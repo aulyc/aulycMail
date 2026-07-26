@@ -1,7 +1,7 @@
 {
   "name": "aulycmail",
   "private": true,
-  "version": "0.6.0-beta.14",
+  "version": "0.6.0-beta.15",
   "type": "module",
   "scripts": {
     "gen-icons": "node scripts/gen-icons.cjs",
