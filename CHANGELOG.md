@@ -4,6 +4,10 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.16] — 2026-07-27
+
+- Test release.
+
 ## [0.6.0-beta.15] — 2026-07-27
 
 - Changed Settings footer navigation so Left/Right switches between Cancel and
