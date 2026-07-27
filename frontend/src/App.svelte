@@ -14,6 +14,7 @@
   import SettingsDialog from './lib/components/settings/SettingsDialog.svelte'
   import SearchOverlay from './lib/components/SearchOverlay.svelte'
   import BackupViewerDialog from './lib/components/backup/BackupViewerDialog.svelte'
+  import KeyboardActionMenu from './lib/components/keyboard/KeyboardActionMenu.svelte'
   import { activateContactFromGlobalSearch } from '$contacts/stores/contactsView.svelte'
   import ContactsPane from '$contacts/components/ContactsPane.svelte'
   import { preloadContactAccountGroups } from '$contacts/stores/contactAccountGroups.svelte'
@@ -43,6 +44,7 @@
   // @ts-ignore - wailsjs runtime
   import { WindowShow, WindowHide, EventsOn, WindowSetMinSize } from '../wailsjs/runtime/runtime'
   import { _ } from '$lib/i18n'
+  import { keyboardActionMenu } from '$lib/stores/keyboardActionMenu.svelte'
 
   // Component refs for keyboard navigation. Plain `let` (not $state) is
   // intentional: svelte-check warns "Changing its value will not correctly
@@ -927,6 +929,7 @@
       setFocusMode: (mode) => { focusMode = mode },
       setFocusedMessageIdInFocus: (messageId) => { focusedMessageIdInFocus = messageId },
       focusContextMenu,
+      openRegionActionMenu: () => { keyboardActionMenu.showForRegion(getFocusedPane()) },
       handleQuit,
       handleCompose,
       handleReply,
@@ -1186,6 +1189,8 @@
     await activateContactFromGlobalSearch(c.id)
   }}
 />
+
+<KeyboardActionMenu />
 
 
 <!-- Certificate TOFU Dialog (for background sync cert errors) -->

@@ -4,6 +4,13 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Added a saved Enhanced Keyboard Navigation setting that keeps the four-region
+  orange Tab model when enabled, disables app-specific keyboard actions when
+  disabled, and leaves Command+F search available in both states.
+- Added a searchable Shift+F10 action list for every visible action in the
+  current region, completed composer toolbar and attachment keyboard access,
+  and fixed macOS Option-letter shortcuts by matching physical key codes.
+
 ## [0.6.0-beta.16] — 2026-07-27
 
 - Test release.

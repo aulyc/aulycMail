@@ -226,6 +226,7 @@ export interface ComposerEditorHandlers {
   onDropFile?: (file: File) => void
   onDropFilePaths?: (paths: string[]) => void
   onShiftTab?: () => void
+  isEnhancedKeyboardNavigationEnabled?: () => boolean
   getDarkFilterMode?: () => ComposerDarkFilterMode
 }
 
@@ -309,10 +310,11 @@ export function createComposerEditor(
         addKeyboardShortcuts() {
           return {
             'Shift-Tab': () => {
+              if (handlers.isEnhancedKeyboardNavigationEnabled?.() === false) return false
               handlers.onShiftTab?.()
               return true
             },
-            'Mod-Enter': () => true,
+            'Mod-Enter': () => handlers.isEnhancedKeyboardNavigationEnabled?.() ?? true,
           }
         },
       }),

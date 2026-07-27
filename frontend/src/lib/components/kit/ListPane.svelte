@@ -16,6 +16,7 @@
   import { onMount, type Snippet } from 'svelte'
   import { KEY } from '$lib/keyboard/shortcuts'
   import { setFocusedPane, getFocusedPane, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
+  import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
 
   type Density = 'micro' | 'compact' | 'standard' | 'large'
   type ScrollBlock = 'start' | 'center' | 'end' | 'nearest'
@@ -124,7 +125,12 @@
 
   // Take DOM focus when this slot becomes the focused pane.
   $effect(() => {
-    if (getFocusedPane() === focusSlot && containerRef && document.activeElement !== containerRef) {
+    if (
+      getEnhancedKeyboardNavigation()
+      && getFocusedPane() === focusSlot
+      && containerRef
+      && document.activeElement !== containerRef
+    ) {
       containerRef.focus()
     }
   })
@@ -166,7 +172,7 @@
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.isComposing || e.keyCode === 229) return
+    if (!getEnhancedKeyboardNavigation() || e.isComposing || e.keyCode === 229) return
     // Range-extend (Shift+J / Shift+ArrowDown / Shift+K / Shift+ArrowUp) —
     // checked before LIST_NEXT/PREV because those predicates require !shiftKey.
     // Match mail's selectNextWithCheck / selectPreviousWithCheck pattern: cursor

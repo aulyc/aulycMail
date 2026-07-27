@@ -8,6 +8,7 @@
   // @ts-ignore - wailsjs path
   import { GetFolders } from '../../../../wailsjs/go/app/App'
   import { _ } from '$lib/i18n'
+  import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
 
   interface Props {
     open: boolean
@@ -175,7 +176,7 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (!active || !eventTargetsFolderNavigation(e)) return
+    if (!getEnhancedKeyboardNavigation() || !active || !eventTargetsFolderNavigation(e)) return
     const folders = displayFolders()
     if (folders.length === 0) return
 

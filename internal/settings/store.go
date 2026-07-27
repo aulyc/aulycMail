@@ -14,28 +14,29 @@ import (
 
 // Known setting keys
 const (
-	KeyReadReceiptResponsePolicy = "read_receipt_response_policy"
-	KeyMarkAsReadDelay           = "mark_as_read_delay"
-	KeyMessageListDensity        = "message_list_density"
-	KeyMessageListSortOrder      = "message_list_sort_order"
-	KeyThemeMode                 = "theme_mode"
-	KeyShowTitleBar              = "show_title_bar"
-	KeyTermsAccepted             = "terms_accepted"
-	KeyRunBackground             = "run_background"
-	KeyStartHidden               = "start_hidden"
-	KeyAutostart                 = "autostart"
-	KeyLanguage                  = "language"
-	KeyComposerFormat            = "composer_format"
-	KeyNativeTitleBar            = "native_titlebar"
-	KeyAlwaysLoadImages          = "always_load_images"
-	KeyDarkMailContent           = "dark_mail_content"
-	KeyAccentBarUnread           = "accent_bar_unread"
-	KeyMenuBarIcon               = "menu_bar_icon"
-	KeyDeveloperMode             = "developer_mode"
-	KeyLastSeenVersion           = "last_seen_version" // for "What's new in this version" launch dialog
-	KeyBackupDirectory           = "backup_directory"
-	KeyBackupScope               = "backup_scope"
-	KeyBackupSelectedAccountIDs  = "backup_selected_account_ids"
+	KeyReadReceiptResponsePolicy  = "read_receipt_response_policy"
+	KeyMarkAsReadDelay            = "mark_as_read_delay"
+	KeyMessageListDensity         = "message_list_density"
+	KeyMessageListSortOrder       = "message_list_sort_order"
+	KeyThemeMode                  = "theme_mode"
+	KeyShowTitleBar               = "show_title_bar"
+	KeyTermsAccepted              = "terms_accepted"
+	KeyRunBackground              = "run_background"
+	KeyStartHidden                = "start_hidden"
+	KeyAutostart                  = "autostart"
+	KeyLanguage                   = "language"
+	KeyComposerFormat             = "composer_format"
+	KeyNativeTitleBar             = "native_titlebar"
+	KeyAlwaysLoadImages           = "always_load_images"
+	KeyDarkMailContent            = "dark_mail_content"
+	KeyAccentBarUnread            = "accent_bar_unread"
+	KeyMenuBarIcon                = "menu_bar_icon"
+	KeyDeveloperMode              = "developer_mode"
+	KeyEnhancedKeyboardNavigation = "enhanced_keyboard_navigation"
+	KeyLastSeenVersion            = "last_seen_version" // for "What's new in this version" launch dialog
+	KeyBackupDirectory            = "backup_directory"
+	KeyBackupScope                = "backup_scope"
+	KeyBackupSelectedAccountIDs   = "backup_selected_account_ids"
 )
 
 // Density values for message list
@@ -280,6 +281,27 @@ func (s *Store) SetDeveloperMode(enabled bool) error {
 		v = "true"
 	}
 	return s.Set(KeyDeveloperMode, v)
+}
+
+// GetEnhancedKeyboardNavigation returns whether aulycMail's custom keyboard
+// region navigation and application shortcuts are enabled. It defaults to
+// enabled to preserve the established interaction model for existing users.
+func (s *Store) GetEnhancedKeyboardNavigation() (bool, error) {
+	value, err := s.Get(KeyEnhancedKeyboardNavigation)
+	if err != nil {
+		return true, err
+	}
+	return value != "false", nil
+}
+
+// SetEnhancedKeyboardNavigation enables or disables aulycMail's custom
+// keyboard region navigation and application shortcuts.
+func (s *Store) SetEnhancedKeyboardNavigation(enabled bool) error {
+	v := "false"
+	if enabled {
+		v = "true"
+	}
+	return s.Set(KeyEnhancedKeyboardNavigation, v)
 }
 
 // GetMessageListSortOrder returns the current message list sort order

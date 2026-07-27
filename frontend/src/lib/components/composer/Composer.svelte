@@ -9,7 +9,12 @@
   import { EventsOn } from '../../../../wailsjs/runtime/runtime.js'
   import { type ComposerApi, COMPOSER_API_KEY, createMainWindowApi } from '$lib/composerApi'
   import { isImageAllowedSync } from '$lib/stores/imageAllowlist.svelte'
-  import { getAlwaysLoadImages } from '$lib/stores/settings.svelte'
+  import {
+    getAlwaysLoadImages,
+    getComposerFormat,
+    getDarkMailContent,
+    getEnhancedKeyboardNavigation,
+  } from '$lib/stores/settings.svelte'
   import RecipientInput from './RecipientInput.svelte'
   import EditorToolbar from './EditorToolbar.svelte'
   import ComposerAttachmentList from './ComposerAttachmentList.svelte'
@@ -60,6 +65,8 @@
     handleComposerTabNavigation,
     type ComposerFocusRefs,
   } from './composerFocus'
+  import { isOptionCodeShortcut } from '$lib/keyboard/keyboardPolicy'
+  import { keyboardActionMenu } from '$lib/stores/keyboardActionMenu.svelte'
   import {
     buildDraftContentHash,
     getDraftStatusMeta,
@@ -87,7 +94,6 @@
   } from './composerInlineImages'
   import * as Select from '$lib/components/ui/select'
   import { addToast } from '$lib/stores/toast'
-  import { getComposerFormat, getDarkMailContent } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
   import { buildDarkMailFilterStyles, getDarkMailSurfaceBackground } from '$lib/utils/dark-mail'
   import { _ } from '$lib/i18n'
@@ -1494,6 +1500,7 @@
       onDropFile: handleDroppedFile,
       onDropFilePaths: handleDroppedFilePaths,
       onShiftTab: () => document.getElementById('composer-subject')?.focus(),
+      isEnhancedKeyboardNavigationEnabled: getEnhancedKeyboardNavigation,
       getDarkFilterMode: getDisplayMode,
     })
   }
@@ -1531,9 +1538,22 @@
   }
 
   // Keyboard shortcuts
-  function handleKeyDown(e: KeyboardEvent) {
-    if (e.defaultPrevented) return
+  function focusComposerBody() {
+    if (isPlainTextMode) {
+      plainTextRef?.focus()
+      return
+    }
+    editor?.commands.focus()
+  }
 
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.defaultPrevented || !getEnhancedKeyboardNavigation()) return
+
+    if (e.key === 'F10' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault()
+      keyboardActionMenu.showForRoot(composerRootElement)
+      return
+    }
     if (e.key === 'Tab') {
       handleComposerTabKeydown(e)
       return
@@ -1543,12 +1563,12 @@
       handleSend()
     }
     // Alt+T to focus toolbar (hint mode)
-    if (e.key === 't' && e.altKey) {
+    if (isOptionCodeShortcut(e, 'KeyT')) {
       e.preventDefault()
       toolbarRef?.focus()
     }
     // Alt+A to attach files
-    if (e.key === 'a' && e.altKey) {
+    if (isOptionCodeShortcut(e, 'KeyA')) {
       e.preventDefault()
       handleAttachFiles()
     }
@@ -1952,6 +1972,7 @@
       showDarkFilter={composerDarkFilterAvailable()}
       darkFilterEnabled={composerDarkFilterActive()}
       onToggleDarkFilter={toggleComposerDarkFilter}
+      onReturnFocus={focusComposerBody}
     />
 
     <!-- Remote images blocked bar -->

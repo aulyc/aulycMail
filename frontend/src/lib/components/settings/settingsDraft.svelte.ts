@@ -7,6 +7,7 @@ import {
   GetComposerFormat,
   GetDarkMailContent,
   GetDeveloperMode,
+  GetEnhancedKeyboardNavigation,
   GetLanguage,
   GetMarkAsReadDelay,
   GetMenuBarIcon,
@@ -23,6 +24,7 @@ import {
   SetComposerFormat,
   SetDarkMailContent,
   SetDeveloperMode,
+  SetEnhancedKeyboardNavigation,
   SetLanguage,
   SetMarkAsReadDelay,
   SetMenuBarIcon,
@@ -39,6 +41,7 @@ import {
   setComposerFormat as updateComposerFormatStore,
   setDarkMailContent as updateDarkMailContentStore,
   setDeveloperMode as updateDeveloperModeStore,
+  setEnhancedKeyboardNavigation as updateEnhancedKeyboardNavigationStore,
   setLanguage as updateLanguageStore,
   setMessageListDensity as updateDensityStore,
   setThemeMode as updateThemeStore,
@@ -66,6 +69,7 @@ type Snapshot = {
   accentBarUnread: boolean
   menuBarIcon: boolean
   developerMode: boolean
+  enhancedKeyboardNavigation: boolean
 }
 
 export class SettingsDraft {
@@ -84,6 +88,7 @@ export class SettingsDraft {
   accentBarUnread = $state(false)
   menuBarIcon = $state(false)
   developerMode = $state(false)
+  enhancedKeyboardNavigation = $state(true)
   backupDirectory = $state('')
   backupScope = $state<BackupScope>('all')
   backupSelectedAccountIds = $state<string[]>([])
@@ -104,11 +109,11 @@ export class SettingsDraft {
   async load(): Promise<void> {
     this.loading = true
     try {
-      const [policy, delayMs, density, theme, runBg, startHid, autoSt, lang, compFmt, nativeTB, alwaysImages, darkMail, accentBar, menuBar, devMode, backup] = await Promise.all([
+      const [policy, delayMs, density, theme, runBg, startHid, autoSt, lang, compFmt, nativeTB, alwaysImages, darkMail, accentBar, menuBar, devMode, keyboardNavigation, backup] = await Promise.all([
         GetReadReceiptResponsePolicy(), GetMarkAsReadDelay(), GetMessageListDensity(), GetThemeMode(),
         GetRunBackground(), GetStartHidden(), GetAutostart(), GetLanguage(), GetComposerFormat(),
         GetNativeTitleBar(), GetAlwaysLoadImages(), GetDarkMailContent(), GetAccentBarUnread(),
-        GetMenuBarIcon(), GetDeveloperMode(), GetBackupSettings(),
+        GetMenuBarIcon(), GetDeveloperMode(), GetEnhancedKeyboardNavigation(), GetBackupSettings(),
       ])
       this.readReceiptResponsePolicy = policy
       this.markAsReadDelaySeconds = delayMs < 0 ? -1 : delayMs / 1000
@@ -125,6 +130,7 @@ export class SettingsDraft {
       this.accentBarUnread = Boolean(accentBar)
       this.menuBarIcon = Boolean(menuBar)
       this.developerMode = Boolean(devMode)
+      this.enhancedKeyboardNavigation = keyboardNavigation ?? true
       this.backupDirectory = backup?.directory ?? ''
       this.backupScope = backup?.scope === 'selected' ? 'selected' : 'all'
       this.backupSelectedAccountIds = backup?.selectedAccountIds ?? []
@@ -155,6 +161,7 @@ export class SettingsDraft {
       await SetAccentBarUnread(this.accentBarUnread)
       await SetMenuBarIcon(this.menuBarIcon)
       await SetDeveloperMode(this.developerMode)
+      await SetEnhancedKeyboardNavigation(this.enhancedKeyboardNavigation)
       if (this.backupDirty) await this.saveBackup()
 
       this.runBackground = effectiveRunBackground
@@ -166,6 +173,7 @@ export class SettingsDraft {
       updateDarkMailContentStore(this.darkMailContent)
       updateAccentBarUnreadStore(this.accentBarUnread)
       updateDeveloperModeStore(this.developerMode)
+      updateEnhancedKeyboardNavigationStore(this.enhancedKeyboardNavigation)
       this.capture()
     } finally {
       this.saving = false
@@ -212,6 +220,7 @@ export class SettingsDraft {
       accentBarUnread: this.accentBarUnread,
       menuBarIcon: this.menuBarIcon,
       developerMode: this.developerMode,
+      enhancedKeyboardNavigation: this.enhancedKeyboardNavigation,
     }
   }
 }

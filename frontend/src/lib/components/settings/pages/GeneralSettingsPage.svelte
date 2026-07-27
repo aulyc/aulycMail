@@ -44,6 +44,12 @@
     <SettingsRow label={$_('settingsGeneral.autostartOnLogin')}>
       <BoolSelect bind:checked={draft.autostart} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>
+    <SettingsRow
+      label={$_('settingsGeneral.enhancedKeyboardNavigation')}
+      description={$_('settingsGeneral.enhancedKeyboardNavigationDescription')}
+    >
+      <BoolSelect bind:checked={draft.enhancedKeyboardNavigation} class={SETTINGS_SELECT_WIDTH_CLASS} />
+    </SettingsRow>
     <SettingsRow label={$_('settingsGeneral.developerMode')}>
       <BoolSelect bind:checked={draft.developerMode} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>

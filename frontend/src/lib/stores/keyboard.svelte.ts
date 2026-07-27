@@ -9,6 +9,7 @@ import {
   nextVisibleRegion,
   type MainKeyboardRegion,
 } from '$lib/keyboard/regionNavigation'
+import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
 
 export type FocusablePane = MainKeyboardRegion
 
@@ -38,7 +39,7 @@ export function setKeyboardScope(scope: 'main' | 'settings'): void {
 }
 
 export function isMainKeyboardScope(): boolean {
-  return keyboardScope === 'main'
+  return getEnhancedKeyboardNavigation() && keyboardScope === 'main'
 }
 
 function isVisibleRegionElement(element: HTMLElement): boolean {
@@ -59,6 +60,7 @@ function getVisiblePanes(): FocusablePane[] {
 
 /** Focus the pane-level keyboard target without traversing its child controls. */
 export function focusPane(pane: FocusablePane): boolean {
+  if (!getEnhancedKeyboardNavigation()) return false
   const region = getRegionElement(pane)
   if (!region) return false
   setFocusedPane(pane)

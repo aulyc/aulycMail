@@ -2,7 +2,7 @@
 // Provides reactive state for application settings
 
 // @ts-ignore - wailsjs path
-import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetLanguage, GetComposerFormat, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread, GetDeveloperMode } from '../../../wailsjs/go/app/App'
+import { GetMessageListDensity, GetMessageListSortOrder, GetThemeMode, GetLanguage, GetComposerFormat, GetAlwaysLoadImages, GetDarkMailContent, GetAccentBarUnread, GetDeveloperMode, GetEnhancedKeyboardNavigation } from '../../../wailsjs/go/app/App'
 import { setLocale as setI18nLocale, detectSystemLocale } from '$lib/i18n'
 import { loadDateFnsLocale, getDateFnsLocale } from '$lib/i18n/dateFnsLocale'
 import type { Locale } from 'date-fns'
@@ -31,6 +31,7 @@ let alwaysLoadImages = $state<boolean>(false)
 let darkMailContent = $state<boolean>(false)
 let accentBarUnread = $state<boolean>(false)
 let developerMode = $state<boolean>(false)
+let enhancedKeyboardNavigation = $state<boolean>(true)
 
 // Getter functions to access the state
 export function getMessageListDensity(): MessageListDensity {
@@ -63,6 +64,10 @@ export function getAccentBarUnread(): boolean {
 
 export function getDeveloperMode(): boolean {
   return developerMode
+}
+
+export function getEnhancedKeyboardNavigation(): boolean {
+  return enhancedKeyboardNavigation
 }
 
 export function getCurrentDateFnsLocale(): Locale | undefined {
@@ -112,10 +117,14 @@ export function setDeveloperMode(v: boolean) {
   developerMode = v
 }
 
+export function setEnhancedKeyboardNavigation(v: boolean) {
+  enhancedKeyboardNavigation = v
+}
+
 // Load settings from backend (call on app startup)
 export async function loadSettings(): Promise<ThemeMode> {
   try {
-    const [density, sortOrder, theme, lang, compFormat, alwaysImages, darkMail, accentBar, devMode] = await Promise.all([
+    const [density, sortOrder, theme, lang, compFormat, alwaysImages, darkMail, accentBar, devMode, keyboardNavigation] = await Promise.all([
       GetMessageListDensity(),
       GetMessageListSortOrder(),
       GetThemeMode(),
@@ -125,6 +134,7 @@ export async function loadSettings(): Promise<ThemeMode> {
       GetDarkMailContent(),
       GetAccentBarUnread(),
       GetDeveloperMode(),
+      GetEnhancedKeyboardNavigation(),
     ])
     // 'micro' was removed from the UI; fold any stored value into 'compact' (小).
     messageListDensity = (density === 'micro' ? 'compact' : (density as MessageListDensity)) || 'standard'
@@ -135,6 +145,7 @@ export async function loadSettings(): Promise<ThemeMode> {
     darkMailContent = darkMail ?? false
     accentBarUnread = accentBar ?? false
     developerMode = devMode ?? false
+    enhancedKeyboardNavigation = keyboardNavigation ?? true
     // Apply saved language (if set, overrides system detection from initI18n)
     if (lang) {
       language = lang

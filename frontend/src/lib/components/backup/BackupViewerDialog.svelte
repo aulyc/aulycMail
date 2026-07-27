@@ -20,7 +20,11 @@
   // @ts-ignore - wailsjs path
   import type { app } from '../../../../wailsjs/go/models'
   import { toasts } from '$lib/stores/toast'
-  import { getDarkMailContent, getThemeMode } from '$lib/stores/settings.svelte'
+  import {
+    getDarkMailContent,
+    getEnhancedKeyboardNavigation,
+    getThemeMode,
+  } from '$lib/stores/settings.svelte'
   import { buildDarkMailFilterStyles } from '$lib/utils/dark-mail'
   import { createDebouncer } from '$lib/utils/debounce'
   import { formatLocalDateTime, formatLocalDateTimeShort, parseFlexibleDate } from '$lib/utils/date'
@@ -30,6 +34,7 @@
   } from '$lib/utils/backup-directory-history'
   import { dialogGuardClose, dialogGuardOpen } from '$lib/stores/dialogGuard'
   import { nextRovingIndex, type RovingNavigationKey } from '$lib/keyboard/regionNavigation'
+  import { keyboardActionMenu } from '$lib/stores/keyboardActionMenu.svelte'
 
   interface Props {
     open?: boolean
@@ -155,6 +160,24 @@
       }
       return
     }
+    if (
+      getEnhancedKeyboardNavigation()
+      && event.key === 'F10'
+      && event.shiftKey
+      && !event.ctrlKey
+      && !event.metaKey
+      && !event.altKey
+      && !searchOpen
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      keyboardActionMenu.showForRoot(
+        document.querySelector<HTMLElement>('[data-backup-viewer-root]'),
+      )
+      return
+    }
+    if (!getEnhancedKeyboardNavigation() && event.key !== 'Escape') return
     if (event.key === '/' && !event.ctrlKey && !event.metaKey && !event.altKey && !isEditableTarget(event.target)) {
       if (!catalog?.messageCount) return
       event.preventDefault()
@@ -433,7 +456,7 @@
   }
 
   function handleMessageListKeydown(event: KeyboardEvent) {
-    if (event.isComposing || event.keyCode === 229) return
+    if (!getEnhancedKeyboardNavigation() || event.isComposing || event.keyCode === 229) return
     if (['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
       event.preventDefault()
       event.stopPropagation()

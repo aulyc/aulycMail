@@ -2,51 +2,63 @@
 
 Complete reference of all keyboard shortcuts in aulycMail.
 
+On macOS, `Command` is the primary application modifier. The tables use
+`Command` for macOS shortcuts; `Ctrl` is accepted where the frontend explicitly
+supports both modifiers.
+
+All aulycMail-specific navigation and action shortcuts are controlled by
+**Settings → General → Enhanced keyboard navigation**. The setting defaults to
+on and applies only after Save. Turning it off removes the orange region
+indicator and leaves custom navigation/actions to native WebKit behavior.
+`Command+F` and the complete search flow remain available.
+
 ## Global Shortcuts
 
-These shortcuts work anywhere in the application (unless in composer).
+These shortcuts work when enhanced keyboard navigation is on unless marked
+always available.
 
 ### Application
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Q` | Quit application |
-| `Ctrl+N` | Compose new message |
-| `Ctrl+S` | Focus search bar |
-| `Ctrl+Shift+A` | Sync all accounts |
-| `Ctrl+Shift+S` | Sync selected folder |
-| `Ctrl+Tab` | Switch to next rail pane (Mail / Contacts) |
-| `` Ctrl+` `` | Switch to previous rail pane |
+| `Command+F` | Open global search (always available, including when enhanced keyboard navigation is off) |
+| `Command+Q` | Quit application |
+| `Command+N` | Compose new message |
+| `Command+Shift+A` | Sync all accounts |
+| `Command+Shift+S` | Sync selected folder |
+| `Command+Tab` | Switch to next rail pane (Mail / Contacts) when delivered to the webview |
+| `` Command+` `` | Switch to previous rail pane when delivered to the webview |
+| `Tab` / `Shift+Tab` | Move forward/backward through the orange-marked major regions |
+| `Shift+F10` | Open every visible action in the current region |
 
 ### Pane Navigation
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+Left` / `Alt+H` | Focus previous pane (viewer -> list -> sidebar) |
-| `Alt+Right` / `Alt+L` | Focus next pane (sidebar -> list -> viewer) |
+| `Option+Left` / `Option+H` | Focus previous pane (viewer -> list -> sidebar) |
+| `Option+Right` / `Option+L` | Focus next pane (sidebar -> list -> viewer) |
 
 ### Sidebar Navigation
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+Up` / `Alt+K` | Navigate to the previous sidebar item, wrapping at the top |
-| `Alt+Down` / `Alt+J` | Navigate to the next sidebar item, wrapping at the bottom |
-| `Alt+Enter` | Expand/collapse focused account folder tree |
-| `Alt(L)+Alt(R)` | Brings up context menu for the focused folder |
+| `Option+Up` / `Option+K` | Navigate to the previous sidebar item, wrapping at the top |
+| `Option+Down` / `Option+J` | Navigate to the next sidebar item, wrapping at the bottom |
+| `Option+Enter` | Expand/collapse focused account folder tree |
+| `Option(L)+Option(R)` | Brings up context menu for the focused folder |
 
 ### Message Actions (when message is selected/focused)
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+R` | Reply to last message (requires viewed conversation) |
-| `Ctrl+Shift+R` | Reply All to last message (requires viewed conversation) |
-| `Ctrl+F` | Forward last message (requires viewed conversation) |
-| `Ctrl+U` | Mark as read (keyboard-focused or checked messages) |
-| `Ctrl+Shift+U` | Mark as unread (keyboard-focused or checked messages) |
-| `Ctrl+K` | Archive (keyboard-focused or checked messages) |
-| `Ctrl+J` | Mark as spam (keyboard-focused or checked messages) |
-| `Ctrl+L` | Load remote images in viewed message |
-| `Ctrl+Shift+L` | Open "Always Load Images" dropdown |
+| `Command+R` | Reply to last message (requires viewed conversation) |
+| `Command+Shift+R` | Reply All to last message (requires viewed conversation) |
+| `Command+U` | Mark as read (keyboard-focused or checked messages) |
+| `Command+Shift+U` | Mark as unread (keyboard-focused or checked messages) |
+| `Command+K` | Archive (keyboard-focused or checked messages) |
+| `Command+J` | Mark as spam (keyboard-focused or checked messages) |
+| `Command+L` | Load remote images in viewed message |
+| `Command+Shift+L` | Open "Always Load Images" dropdown |
 | `Shift+F` | Toggle focus mode for the message |
 
 ---
@@ -63,8 +75,8 @@ These shortcuts depend on which pane is focused. They are disabled when typing i
 | `Down` / `J` | Enter or leave the Compose/Sync action group toward the next sidebar item; wraps at the bottom |
 | `Left` / `Right` | Switch between Compose and Sync while the action group is highlighted |
 | `Enter` / `Space` | Activate the highlighted Compose or Sync action |
-| `Alt + Enter` / `Space` | Expand/collapse account (when account header is focused) |
-| `Alt(L) + Alt(R)` | Brings up context menu for the focused folder |
+| `Option + Enter` / `Space` | Expand/collapse account (when account header is focused) |
+| `Option(L) + Option(R)` | Brings up context menu for the focused folder |
 
 ### Message List
 
@@ -77,8 +89,8 @@ These shortcuts depend on which pane is focused. They are disabled when typing i
 | `Space` | Toggle checkbox on current conversation |
 | `Enter` / `V` | Open selected conversation in viewer |
 | `D` | Delete selected/checked message(s) — move to Trash (same as `Delete`) |
-| `CTRL+A` | Select all messages in folder |
-| `Alt(R)` | Brings up context menu for the selected message(s) |
+| `Command+A` | Select all messages in folder |
+| `Option(R)` | Brings up context menu for the selected message(s) |
 
 ### Conversation Viewer
 
@@ -86,11 +98,11 @@ These shortcuts depend on which pane is focused. They are disabled when typing i
 |----------|--------|
 | `Up` / `K` | Scroll up |
 | `Down` / `J` | Scroll down |
-| `Tab` | Cycle through messages when focused on conversation viewer |
 | `Delete` / `Backspace` | Delete focused message when focused on conversation viewer |
-| `Ctrl + A` | Select all text of message in viewport |
-| `Alt(R)` | Brings up context menu for the message focused |
+| `Command + A` | Select all text of message in viewport |
+| `Option(R)` | Brings up context menu for the message focused |
 | `F` | Toggles focus mode on the current thread (conversation) |
+| `Shift+F10` | Open viewer buttons, per-message expand/collapse, copy-address, receipt, and attachment actions |
 
 ---
 
@@ -113,10 +125,11 @@ These only work when the composer is open.
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Enter` | Send message |
-| `Alt+T` | Activate/Deactivate toolbar mode |
-| `Alt+A` | Attach a file |
-| `Ctrl+D` | Pop out/detach composer to separate window |
+| `Command+Enter` | Send message |
+| `Option+T` | Activate/Deactivate toolbar mode |
+| `Option+A` | Attach a file |
+| `Command+D` | Pop out/detach composer to separate window |
+| `Shift+F10` | Open every visible composer action without adding buttons to the Tab cycle |
 | `Escape` | Close composer (prompts to save draft if unsaved) |
 
 ---
@@ -125,10 +138,10 @@ These only work when the composer is open.
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+B` | Bold |
-| `Ctrl+I` | Italic |
-| `Ctrl+U` | Underline |
-| `Alt+T`  | Toggle toolbar and follow hint to choose |
+| `Command+B` | Bold |
+| `Command+I` | Italic |
+| `Command+U` | Underline |
+| `Option+T`  | Enter toolbar mode; use arrows and Enter, or the displayed hints |
 
 ---
 
@@ -136,44 +149,45 @@ These only work when the composer is open.
 
 ```
 NAVIGATION
-  Alt + Arrow Keys    Pane focus (Left/Right) or Folder nav (Up/Down)
-  Alt + H/J/K/L       Vim-style: pane (H/L) or folder (J/K)
-  Alt(L) + Alt(R)     Brings context menu up for the focused folder
-  Alt + Enter         Expand/collapse account
-  Ctrl + Tab          Switch to next rail pane
-  Ctrl + `            Switch to previous rail pane
+  Tab / Shift + Tab   Move between orange-marked major regions
+  Option + Arrow Keys Pane focus (Left/Right) or Folder nav (Up/Down)
+  Option + H/J/K/L    Vim-style: pane (H/L) or folder (J/K)
+  Option(L)+Option(R) Brings context menu up for the focused folder
+  Option + Enter      Expand/collapse account
+  Command + Tab       Switch to next rail pane when delivered to the webview
+  Command + `         Switch to previous rail pane when delivered to the webview
   Arrow Keys / HJKL   Navigate within focused pane
   Enter               Open conversation / Expand account
   Space               Toggle checkbox / Expand account
+  Shift + F10         Current region actions
 
 COMPOSE & REPLY
-  Ctrl + N            New message
-  Ctrl + R            Reply
-  Ctrl + Shift + R    Reply All
-  Ctrl + F            Forward
-  Ctrl + Enter        Send (in composer)
-  Ctrl + D            Detach composer
-  Alt  + T            Toggle format toolbar mode
+  Command + N         New message
+  Command + R         Reply
+  Command + Shift + R Reply All
+  Command + Enter     Send (in composer)
+  Command + D         Detach composer
+  Option + T          Toggle format toolbar mode
 SELECTION
-  Ctrl + A            Select all messages (list) / text (viewer)
+  Command + A         Select all messages (list) / text (viewer)
 
 MESSAGE ACTIONS
   S                   Star/Unstar
-  Ctrl + U            Mark read
-  Ctrl + Shift + U    Mark unread
-  Ctrl + K            Archive
-  Ctrl + J            Spam
+  Command + U         Mark read
+  Command + Shift + U Mark unread
+  Command + K         Archive
+  Command + J         Spam
   V                   View message
   Delete / D          Trash
   Shift + Delete      Permanent delete
-  Alt(R)              Context Menu
+  Option(R)           Context Menu
 
 OTHER
-  Ctrl + Shift + A    Sync all accounts
-  Ctrl + Shift + S    Sync selected folder
-  Ctrl + S            Search
-  Ctrl + L            Load images
-  Ctrl + Q            Quit
+  Command + F         Global search (always available)
+  Command + Shift + A Sync all accounts
+  Command + Shift + S Sync selected folder
+  Command + L         Load images
+  Command + Q         Quit
   Escape              Clear/Close
 ```
 
@@ -183,16 +197,27 @@ OTHER
 
 ### Pane Focus Model
 
-The UI has three panes with visual focus indication:
-1. **Sidebar** - Account/folder list
-2. **Message List** - Conversations in selected folder
-3. **Conversation Viewer** - Selected conversation content
+The main window has four keyboard regions:
 
-Clicking a pane focuses it. Focus is indicated by a subtle border flash animation.
+1. **Feature rail** — Mail, Contacts, and Settings
+2. **Sidebar** — account/folder or contact-source list
+3. **Message/contact list**
+4. **Conversation/contact detail**
+
+`Tab` and `Shift+Tab` move only between these regions. The active region is
+shown by one orange top border. Tab never degrades into traversing every child
+button. Within a region, arrows move its logical selection, Enter/Space
+activate the selected item, and `Shift+F10` opens a searchable list of the
+region's visible actions.
+
+On compact Apple keyboards, `Fn+Left` and `Fn+Right` normally arrive as
+`Home` and `End`; lists that support first/last-item movement therefore work
+without requiring dedicated Home/End keys. Depending on the macOS function-key
+setting, `Shift+F10` may need to be pressed as `Fn+Shift+F10`.
 
 ### Folder Navigation
 
-`Alt+Up/Down` navigates through all folders in visual order:
+`Option+Up/Down` navigates through all folders in visual order:
 1. Unified Inbox (All Inboxes)
 2. Individual account inboxes under Unified Inbox
 3. Account 1 header
@@ -216,13 +241,17 @@ First `Escape` clears checkboxes, second `Escape` closes the conversation viewer
 ### Composer Blocking
 
 When the composer is open:
-- `Ctrl+R`, `Ctrl+Shift+R`, `Ctrl+F` are blocked to prevent accidental replies
-- Other global shortcuts continue to work
+- `Command+R` and `Command+Shift+R` are blocked to prevent accidental replies.
+- `Command+F` still opens global search.
+- Composer shortcuts obey the enhanced-keyboard setting; native editing and IME
+  behavior do not.
 
 ### Rail Navigation
 
-`Ctrl+Tab` cycles forward through the rail items: Mail → Contacts → Mail.
-`` Ctrl+` `` cycles backward. The active rail pane is persisted across launches.
+`Command+Tab` cycles forward through the rail items when macOS delivers it to
+the webview: Mail → Contacts → Mail. `` Command+` `` cycles backward. The
+active rail pane is persisted across launches. The feature rail remains the
+reliable in-app route because macOS may reserve these combinations.
 
 Composer state is preserved across switches: switching to Contacts and back does not unmount or clear the composer.
 
@@ -236,9 +265,13 @@ When viewing Unified Inbox and replying:
 
 ## Contacts Pane
 
-Contacts shortcuts only fire when Contacts is the active rail pane (selected via `Ctrl+Tab` / `` Ctrl+` ``). They never trigger while Mail is active, so shortcuts that overlap with Mail's are routed by the active rail pane.
+Contacts shortcuts only fire when Contacts is the active rail pane (selected
+from the feature rail, or via `Command+Tab` / `` Command+` `` when delivered to
+the webview). They never trigger while Mail is active, so shortcuts that
+overlap with Mail's are routed by the active rail pane.
 
-Pane-local navigation (Up/Down/J/K, Enter, Space, Alt+H/L for pane cycling, Alt+Up/Down for sidebar) uses the same kit-shared predicates Mail does.
+Pane-local navigation (Up/Down/J/K, Enter, Space, Option+H/L for pane cycling,
+Option+Up/Down for the sidebar) uses the same kit-shared predicates Mail does.
 
 **Sidebar navigation (works from any pane)**
 
@@ -246,21 +279,21 @@ Mirrors mail's "Folder Navigation" shortcuts. These fire regardless of which con
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+Up` / `Alt+K` | Move to previous group in the sidebar |
-| `Alt+Down` / `Alt+J` | Move to next group in the sidebar |
+| `Option+Up` / `Option+K` | Move to previous group in the sidebar |
+| `Option+Down` / `Option+J` | Move to next group in the sidebar |
 
 **Pane cycling**
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+Left` / `Alt+H` | Focus previous pane (detail → list → sidebar) |
-| `Alt+Right` / `Alt+L` | Focus next pane (sidebar → list → detail) |
+| `Option+Left` / `Option+H` | Focus previous pane (detail → list → sidebar) |
+| `Option+Right` / `Option+L` | Focus next pane (sidebar → list → detail) |
 
 **Actions**
 
 | Shortcut | Action |
 |----------|--------|
 | `E` | Edit the currently-focused contact |
-| `Ctrl+N` | Open the new-contact dialog |
+| `Command+N` | Open the new-contact dialog |
 
 > Within a focused pane, `Up`/`K` and `Down`/`J` cycle rows (contact list, sidebar sources) and `Enter` opens / activates — same kit predicates Mail's list and folder tree use.

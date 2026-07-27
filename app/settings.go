@@ -90,6 +90,18 @@ func (a *App) SetDeveloperMode(enabled bool) error {
 	return a.settingsStore.SetDeveloperMode(enabled)
 }
 
+// GetEnhancedKeyboardNavigation returns whether custom region navigation and
+// application shortcuts are enabled.
+func (a *App) GetEnhancedKeyboardNavigation() (bool, error) {
+	return a.settingsStore.GetEnhancedKeyboardNavigation()
+}
+
+// SetEnhancedKeyboardNavigation enables or disables custom region navigation
+// and application shortcuts.
+func (a *App) SetEnhancedKeyboardNavigation(enabled bool) error {
+	return a.settingsStore.SetEnhancedKeyboardNavigation(enabled)
+}
+
 // GetMessageListSortOrder returns the message list sort order setting
 func (a *App) GetMessageListSortOrder() (string, error) {
 	return a.settingsStore.GetMessageListSortOrder()

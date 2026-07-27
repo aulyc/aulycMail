@@ -8,6 +8,7 @@
   import Icon from '@iconify/svelte'
   import { _ } from 'svelte-i18n'
   import { getFocusedPane, isMainKeyboardScope, setFocusedPane, type FocusablePane } from '$lib/stores/keyboard.svelte'
+  import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
   // Self-managed responsive (mobile + tablet) behavior — read the layout
   // store directly so pane consumers never forward responsive
   // props. At medium (≤1024px) and narrow (≤767px) the detail pane renders
@@ -60,7 +61,7 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.isComposing || event.keyCode === 229 || event.target !== containerEl) return
+    if (!getEnhancedKeyboardNavigation() || event.isComposing || event.keyCode === 229 || event.target !== containerEl) return
     if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return
     event.preventDefault()
     event.stopPropagation()

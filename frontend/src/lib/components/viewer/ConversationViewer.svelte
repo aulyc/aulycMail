@@ -18,7 +18,11 @@
   import MessageContextMenu from '$lib/components/common/MessageContextMenu.svelte'
   import { _ } from '$lib/i18n'
   import { isDialogGuardActive, onDialogGuardChange } from '$lib/stores/dialogGuard'
-  import { getDarkMailContent, getDeveloperMode } from '$lib/stores/settings.svelte'
+  import {
+    getDarkMailContent,
+    getDeveloperMode,
+    getEnhancedKeyboardNavigation,
+  } from '$lib/stores/settings.svelte'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
   import {
     archiveMessages,
@@ -261,7 +265,7 @@
     // Focused-message deletion stays local to the viewer. Region-level Tab
     // navigation is owned by the app's single global shortcut dispatcher.
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.isComposing || e.keyCode === 229) return
+      if (!getEnhancedKeyboardNavigation() || e.isComposing || e.keyCode === 229) return
       // Only handle if viewer pane is focused
       if (!isFocused) return
 
@@ -1252,6 +1256,8 @@
                 <!-- Message Header (always visible, clickable to expand/collapse) -->
                 <div
                   class="w-full flex items-start gap-3 p-4 text-left hover:bg-muted/50 transition-colors cursor-pointer {!isExpanded ? 'bg-muted/30' : ''}"
+                  aria-label={`${isExpanded ? $_('viewer.collapseMessage') : $_('viewer.expandMessage')}: ${msg.fromName || msg.fromEmail}`}
+                  data-keyboard-action-context={msg.fromName || msg.fromEmail}
                   onclick={() => toggleMessage(msg.id)}
                   onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleMessage(msg.id) }}
                   onfocus={() => focusedMessageId = msg.id}
@@ -1267,6 +1273,7 @@
                         tabindex="0"
                         class="text-sm text-muted-foreground hover:text-primary hover:underline cursor-pointer"
                         title={$_('viewer.copyEmail')}
+                        data-keyboard-action-context={msg.fromEmail}
                         onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(msg.fromName, msg.fromEmail), $_('viewer.from')) }}
                         onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(msg.fromName, msg.fromEmail), $_('viewer.from')) }}}
                       >&lt;{msg.fromEmail}&gt;</span>
@@ -1288,6 +1295,7 @@
                           tabindex="0"
                           class="hover:text-primary hover:underline cursor-pointer text-muted-foreground"
                           title={$_('viewer.copyEmail')}
+                          data-keyboard-action-context={msg.replyTo}
                           onclick={(e) => { e.stopPropagation(); copyToClipboard(msg.replyTo!, $_('viewer.replyTo')) }}
                           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(msg.replyTo!, $_('viewer.replyTo')) }}}
                         >{msg.replyTo}</span>
@@ -1304,6 +1312,7 @@
                             tabindex="0"
                             class="hover:text-primary hover:underline cursor-pointer text-muted-foreground"
                             title={$_('viewer.copyEmail')}
+                            data-keyboard-action-context={recipient.email}
                             onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.to')) }}
                             onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.to')) }}}
                           >{recipient.name || recipient.email}{i < recipients.length - 1 ? ',' : ''}</span>
@@ -1322,6 +1331,7 @@
                               tabindex="0"
                               class="hover:text-primary hover:underline cursor-pointer text-muted-foreground"
                               title={$_('viewer.copyEmail')}
+                              data-keyboard-action-context={recipient.email}
                               onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.cc')) }}
                               onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.cc')) }}}
                             >{recipient.name || recipient.email}{i < ccRecipients.length - 1 ? ',' : ''}</span>
@@ -1341,6 +1351,7 @@
                               tabindex="0"
                               class="hover:text-primary hover:underline cursor-pointer text-muted-foreground"
                               title={$_('viewer.copyEmail')}
+                              data-keyboard-action-context={recipient.email}
                               onclick={(e) => { e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.bcc')) }}
                               onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); copyToClipboard(formatEmailForCopy(recipient.name, recipient.email), $_('viewer.bcc')) }}}
                             >{recipient.name || recipient.email}{i < bccRecipients.length - 1 ? ',' : ''}</span>

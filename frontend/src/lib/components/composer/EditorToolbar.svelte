@@ -2,6 +2,7 @@
   import Icon from '@iconify/svelte'
   import type { Editor } from '@tiptap/core'
   import { _ } from '$lib/i18n'
+  import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
 
   interface Props {
     editor: Editor | null
@@ -11,6 +12,7 @@
     showDarkFilter?: boolean
     darkFilterEnabled?: boolean
     onToggleDarkFilter?: () => void
+    onReturnFocus?: () => void
   }
 
   let {
@@ -21,11 +23,13 @@
     showDarkFilter = false,
     darkFilterEnabled = false,
     onToggleDarkFilter,
+    onReturnFocus,
   }: Props = $props()
 
   // Hint mode state (Alt+T shows numbered hints on buttons)
   let hintMode = $state(false)
   let toolbarRef = $state<HTMLElement | null>(null)
+  let selectedToolbarIndex = $state(0)
 
   // Generate hint keys: 1-9, then a-z
   const hintKeys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z']
@@ -33,21 +37,73 @@
   // Toggle hint mode (called via Alt+T from parent)
   export function focus() {
     hintMode = !hintMode
+    if (!hintMode) {
+      clearToolbarSelection()
+      onReturnFocus?.()
+      return
+    }
+    selectedToolbarIndex = 0
+    toolbarRef?.focus({ preventScroll: true })
+    syncToolbarSelection()
   }
 
   // Get all enabled buttons in the toolbar
   function getToolbarButtons(): HTMLButtonElement[] {
     if (!toolbarRef) return []
-    return Array.from(toolbarRef.querySelectorAll('button:not([disabled])')) as HTMLButtonElement[]
+    return (Array.from(toolbarRef.querySelectorAll('button:not([disabled])')) as HTMLButtonElement[])
+      .sort((left, right) => left.getBoundingClientRect().left - right.getBoundingClientRect().left)
+  }
+
+  function clearToolbarSelection() {
+    toolbarRef?.querySelectorAll<HTMLElement>('[data-keyboard-toolbar-selected]')
+      .forEach((element) => { delete element.dataset.keyboardToolbarSelected })
+  }
+
+  function syncToolbarSelection() {
+    clearToolbarSelection()
+    const buttons = getToolbarButtons()
+    if (buttons.length === 0) return
+    selectedToolbarIndex = Math.max(0, Math.min(selectedToolbarIndex, buttons.length - 1))
+    buttons[selectedToolbarIndex].dataset.keyboardToolbarSelected = 'true'
+    buttons[selectedToolbarIndex].scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }
 
   // Handle hint key press
   function handleHintKeydown(e: KeyboardEvent) {
     if (!hintMode) return
+    if (!getEnhancedKeyboardNavigation()) {
+      hintMode = false
+      clearToolbarSelection()
+      return
+    }
 
     if (e.key === 'Escape') {
       e.preventDefault()
       hintMode = false
+      clearToolbarSelection()
+      onReturnFocus?.()
+      return
+    }
+
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+      e.preventDefault()
+      e.stopPropagation()
+      const buttons = getToolbarButtons()
+      if (buttons.length === 0) return
+      const delta = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1
+      selectedToolbarIndex = (selectedToolbarIndex + delta + buttons.length) % buttons.length
+      syncToolbarSelection()
+      return
+    }
+
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      e.stopPropagation()
+      const selected = getToolbarButtons()[selectedToolbarIndex]
+      selected?.click()
+      hintMode = false
+      clearToolbarSelection()
+      onReturnFocus?.()
       return
     }
 
@@ -60,6 +116,8 @@
       e.preventDefault()
       buttons[hintIndex].click()
       hintMode = false
+      clearToolbarSelection()
+      onReturnFocus?.()
     }
   }
 
@@ -67,6 +125,7 @@
   function handleClickOutsideHints(_e: MouseEvent) {
     if (hintMode) {
       hintMode = false
+      clearToolbarSelection()
     }
   }
 
@@ -578,3 +637,10 @@
     {/if}
   </div>
 </div>
+
+<style>
+  :global([data-keyboard-toolbar-selected='true']) {
+    outline: 2px solid hsl(var(--primary));
+    outline-offset: 1px;
+  }
+</style>

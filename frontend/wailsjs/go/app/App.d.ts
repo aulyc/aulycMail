@@ -117,6 +117,8 @@ export function GetDeveloperMode():Promise<boolean>;
 
 export function GetDraft(arg1:string):Promise<smtp.ComposeMessage>;
 
+export function GetEnhancedKeyboardNavigation():Promise<boolean>;
+
 export function GetFTSIndexStatus(arg1:string):Promise<message.FTSIndexStatus>;
 
 export function GetFolderTree(arg1:string):Promise<Array<folder.FolderTree>>;
@@ -284,6 +286,8 @@ export function SetDarkMailContent(arg1:boolean):Promise<void>;
 export function SetDefaultIdentity(arg1:string,arg2:string):Promise<void>;
 
 export function SetDeveloperMode(arg1:boolean):Promise<void>;
+
+export function SetEnhancedKeyboardNavigation(arg1:boolean):Promise<void>;
 
 export function SetLanguage(arg1:string):Promise<void>;
 

@@ -5,6 +5,7 @@
   import { getActivePane, setActivePane } from '$lib/stores/uiState.svelte'
   import { BUILT_IN_RAIL_PANES } from '$lib/rail/panes'
   import { getFocusedPane, isMainKeyboardScope, setFocusedPane } from '$lib/stores/keyboard.svelte'
+  import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
   import { _ } from '$lib/i18n'
 
   interface Props {
@@ -57,7 +58,7 @@
   }
 
   function handleKeydown(event: KeyboardEvent) {
-    if (event.isComposing || event.keyCode === 229) return
+    if (!getEnhancedKeyboardNavigation() || event.isComposing || event.keyCode === 229) return
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       event.stopPropagation()

@@ -14,6 +14,7 @@
   import { KEY } from '$lib/keyboard/shortcuts'
   import { nextRovingIndex } from '$lib/keyboard/regionNavigation'
   import { setFocusedPane, getFocusedPane, isMainKeyboardScope, registerPaneNav, type FocusablePane } from '$lib/stores/keyboard.svelte'
+  import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
 
   type SourceSection<U extends { id: string }> = {
     heading?: string
@@ -68,7 +69,12 @@
   const HEADER_ACTION_SELECTOR = '[data-source-sidebar-header-action]'
 
   $effect(() => {
-    if (getFocusedPane() === focusSlot && containerRef && document.activeElement !== containerRef) {
+    if (
+      getEnhancedKeyboardNavigation()
+      && getFocusedPane() === focusSlot
+      && containerRef
+      && document.activeElement !== containerRef
+    ) {
       containerRef.focus()
     }
   })
@@ -152,7 +158,7 @@
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.isComposing || e.keyCode === 229) return
+    if (!getEnhancedKeyboardNavigation() || e.isComposing || e.keyCode === 229) return
     if (
       headerActionsFocused
       && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')

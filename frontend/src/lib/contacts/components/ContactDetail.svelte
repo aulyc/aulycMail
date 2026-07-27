@@ -185,6 +185,7 @@
                   tabindex="0"
                   class="text-primary hover:underline cursor-pointer"
                   title={$_('contacts.detail.copyTooltip')}
+                  data-keyboard-action-context={item.email}
                   onclick={(e) => { e.stopPropagation(); copyEmail(item.email) }}
                   onkeydown={(e) => handleKeydown(e, item.email)}
                 >{item.email}</span>
@@ -202,6 +203,7 @@
                   tabindex="0"
                   class="text-primary hover:underline cursor-pointer"
                   title={$_('contacts.detail.copyTooltip')}
+                  data-keyboard-action-context={email}
                   onclick={(e) => { e.stopPropagation(); copyEmail(email) }}
                   onkeydown={(e) => handleKeydown(e, email)}
                 >{email}</span>

@@ -92,6 +92,8 @@
     "markAsUnread": "Mark as unread",
     "expandAll": "Expand All",
     "collapseAll": "Collapse All",
+    "expandMessage": "Expand message",
+    "collapseMessage": "Collapse message",
     "editDraft": "Edit Draft",
     "copyEmail": "Click to copy email address",
     "copySource": "Copy source",
@@ -287,6 +289,8 @@
     "runInBackground": "Run in background",
     "menuBarIcon": "Menu bar icon",
     "autostartOnLogin": "Autostart on login",
+    "enhancedKeyboardNavigation": "Enhanced keyboard navigation",
+    "enhancedKeyboardNavigationDescription": "Use Tab to switch the orange-marked regions and Shift-F10 for current-region actions. Turning this off disables aulycMail shortcuts; Command-F search remains available.",
     "developerMode": "Developer mode",
     "densityCompact": "Small",
     "densityStandard": "Medium",
@@ -301,6 +305,12 @@
     "alwaysLoadImagesWarningTitle": "Privacy & security risk",
     "alwaysLoadImagesWarningDescription": "Loading remote images automatically can expose your IP address, confirm when you read an email, and allow tracking by senders. Are you sure you want to disable image blocking?",
     "disable": "Disable"
+  },
+  "keyboardActions": {
+    "title": "Current region actions",
+    "searchPlaceholder": "Filter actions",
+    "empty": "No matching actions",
+    "hint": "Use Up/Down to choose and Enter to run"
   },
   "settingsAccounts": {
     "noAccountsConfigured": "No email accounts configured",

@@ -20,6 +20,8 @@ import {
   showSidebar,
   showViewer,
 } from '$lib/stores/layout.svelte'
+import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
+import { resolveAppKeyboardPolicy } from '$lib/keyboard/keyboardPolicy'
 
 type FocusMode = 'off' | 'thread' | 'message'
 
@@ -38,6 +40,7 @@ export interface GlobalShortcutContext {
   setFocusMode(mode: FocusMode): void
   setFocusedMessageIdInFocus(messageId: string | null): void
   focusContextMenu(): void
+  openRegionActionMenu(): void
   handleQuit(): void
   handleCompose(): void
   handleReply(mode: 'reply' | 'reply-all' | 'forward', messageId: string, imagesLoaded?: boolean): void
@@ -62,17 +65,32 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
   if (document.querySelector('[role="menu"]')) return
   if (isDialogGuardActive()) return
 
-  if (!inInput && dispatchPaneShortcut(e)) {
+  // Command/Ctrl+F is the intentionally always-on baseline, including while
+  // the composer is open.
+  const keyboardPolicy = resolveAppKeyboardPolicy(e, getEnhancedKeyboardNavigation())
+  if (keyboardPolicy === 'search') {
     e.preventDefault()
-    e.stopPropagation()
+    ctx.setSearchOverlay(true)
     return
   }
 
   if (ctx.showComposer) {
-    if ((e.ctrlKey || e.metaKey) && ['r', 'f'].includes(e.key.toLowerCase())) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r') {
       e.preventDefault()
       return
     }
+    return
+  }
+
+  // "native" means the event is left untouched for WebKit/macOS when enhanced
+  // navigation is disabled.
+  if (keyboardPolicy === 'native') {
+    return
+  }
+
+  if (!inInput && dispatchPaneShortcut(e)) {
+    e.preventDefault()
+    e.stopPropagation()
     return
   }
 
@@ -319,6 +337,13 @@ export function handleGlobalShortcut(e: KeyboardEvent, ctx: GlobalShortcutContex
       ;(e.target as HTMLElement | null)?.blur?.()
       requestAnimationFrame(() => focusCurrentPane())
     }
+    return
+  }
+
+  if (e.key === 'F10' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault()
+    e.stopPropagation()
+    ctx.openRegionActionMenu()
     return
   }
 

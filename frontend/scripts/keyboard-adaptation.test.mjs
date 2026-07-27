@@ -7,6 +7,10 @@ import {
   nextVisibleRegion,
 } from '../src/lib/keyboard/regionNavigation.ts'
 import { resolveRequiredSelectionIndex } from '../src/lib/components/list/requiredSelection.ts'
+import {
+  isOptionCodeShortcut,
+  resolveAppKeyboardPolicy,
+} from '../src/lib/keyboard/keyboardPolicy.ts'
 
 const modalFramePath = new URL('../src/lib/components/ui/ModalFrame.svelte', import.meta.url)
 const messageListPath = new URL('../src/lib/components/list/MessageList.svelte', import.meta.url)
@@ -20,6 +24,8 @@ const activityRailPath = new URL('../src/lib/components/rail/ActivityRail.svelte
 const listRowPath = new URL('../src/lib/components/kit/ListRow.svelte', import.meta.url)
 const railButtonPath = new URL('../src/lib/components/rail/RailButton.svelte', import.meta.url)
 const sourceSidebarPath = new URL('../src/lib/components/kit/SourceSidebar.svelte', import.meta.url)
+const listPanePath = new URL('../src/lib/components/kit/ListPane.svelte', import.meta.url)
+const detailPanePath = new URL('../src/lib/components/kit/DetailPane.svelte', import.meta.url)
 const mailSidebarPath = new URL('../src/lib/components/sidebar/Sidebar.svelte', import.meta.url)
 const folderTreeItemPath = new URL('../src/lib/components/sidebar/FolderTreeItem.svelte', import.meta.url)
 const accountSectionPath = new URL('../src/lib/components/sidebar/AccountSection.svelte', import.meta.url)
@@ -29,10 +35,20 @@ const contactStorePath = new URL('../src/lib/contacts/stores/contactsView.svelte
 const viewerPath = new URL('../src/lib/components/viewer/ConversationViewer.svelte', import.meta.url)
 const settingsPath = new URL('../src/lib/components/settings/SettingsDialog.svelte', import.meta.url)
 const settingsDraftPath = new URL('../src/lib/components/settings/settingsDraft.svelte.ts', import.meta.url)
+const settingsStorePath = new URL('../src/lib/stores/settings.svelte.ts', import.meta.url)
+const generalSettingsPath = new URL('../src/lib/components/settings/pages/GeneralSettingsPage.svelte', import.meta.url)
 const settingsRowPath = new URL('../src/lib/components/settings/shared/SettingsRow.svelte', import.meta.url)
 const selectTriggerPath = new URL('../src/lib/components/ui/select/select-trigger.svelte', import.meta.url)
 const backupViewerPath = new URL('../src/lib/components/backup/BackupViewerDialog.svelte', import.meta.url)
 const globalSearchPath = new URL('../src/lib/components/SearchOverlay.svelte', import.meta.url)
+const keyboardActionStorePath = new URL('../src/lib/stores/keyboardActionMenu.svelte.ts', import.meta.url)
+const keyboardActionMenuPath = new URL('../src/lib/components/keyboard/KeyboardActionMenu.svelte', import.meta.url)
+const composerPath = new URL('../src/lib/components/composer/Composer.svelte', import.meta.url)
+const composerEditorPath = new URL('../src/lib/components/composer/composerEditor.ts', import.meta.url)
+const editorToolbarPath = new URL('../src/lib/components/composer/EditorToolbar.svelte', import.meta.url)
+const attachmentListPath = new URL('../src/lib/components/viewer/AttachmentList.svelte', import.meta.url)
+const emailBodyPath = new URL('../src/lib/components/viewer/EmailBody.svelte', import.meta.url)
+const threeOptionDialogPath = new URL('../src/lib/components/ui/confirm-dialog/ThreeOptionDialog.svelte', import.meta.url)
 
 test('custom modal frames close on Escape, contain Tab focus, and restore prior focus', async () => {
   const modalFrame = await readFile(modalFramePath, 'utf8')
@@ -79,7 +95,141 @@ test('folder-picker arrows and Enter only run from its search or folder list', a
   assert.match(folderPicker, /function eventTargetsFolderNavigation/)
   assert.match(folderPicker, /target === searchInput/)
   assert.match(folderPicker, /listEl\?\.contains\(target\)/)
-  assert.match(folderPicker, /if \(!active \|\| !eventTargetsFolderNavigation\(e\)\) return/)
+  assert.match(
+    folderPicker,
+    /if \(!getEnhancedKeyboardNavigation\(\) \|\| !active \|\| !eventTargetsFolderNavigation\(e\)\) return/,
+  )
+})
+
+test('enhanced keyboard policy leaves native keys alone while keeping Command-F search', () => {
+  const event = (overrides = {}) => ({
+    key: '',
+    code: '',
+    altKey: false,
+    ctrlKey: false,
+    metaKey: false,
+    ...overrides,
+  })
+
+  assert.equal(resolveAppKeyboardPolicy(event({ key: 'Tab' }), false), 'native')
+  assert.equal(resolveAppKeyboardPolicy(event({ key: 'Tab' }), true), 'enhanced')
+  assert.equal(resolveAppKeyboardPolicy(event({ key: 'f', metaKey: true }), false), 'search')
+  assert.equal(resolveAppKeyboardPolicy(event({ key: 'F', ctrlKey: true }), false), 'search')
+  assert.equal(resolveAppKeyboardPolicy(event({ key: 'f', metaKey: true, altKey: true }), false), 'native')
+})
+
+test('macOS Option-letter shortcuts match physical codes instead of produced symbols', () => {
+  const optionSymbolEvent = (key, code) => ({
+    key,
+    code,
+    altKey: true,
+    ctrlKey: false,
+    metaKey: false,
+  })
+
+  assert.equal(isOptionCodeShortcut(optionSymbolEvent('†', 'KeyT'), 'KeyT'), true)
+  assert.equal(isOptionCodeShortcut(optionSymbolEvent('å', 'KeyA'), 'KeyA'), true)
+  assert.equal(isOptionCodeShortcut(optionSymbolEvent('t', 'KeyY'), 'KeyT'), false)
+})
+
+test('enhanced keyboard setting is save-only, defaults on, and updates the runtime store', async () => {
+  const [settingsDraft, settingsStore, generalSettings, keyboardStore] = await Promise.all([
+    readFile(settingsDraftPath, 'utf8'),
+    readFile(settingsStorePath, 'utf8'),
+    readFile(generalSettingsPath, 'utf8'),
+    readFile(keyboardStorePath, 'utf8'),
+  ])
+
+  assert.match(generalSettings, /bind:checked=\{draft\.enhancedKeyboardNavigation\}/)
+  assert.match(settingsDraft, /GetEnhancedKeyboardNavigation\(\)/)
+  assert.match(settingsDraft, /this\.enhancedKeyboardNavigation = keyboardNavigation \?\? true/)
+  assert.match(settingsDraft, /await SetEnhancedKeyboardNavigation\(this\.enhancedKeyboardNavigation\)/)
+  assert.match(settingsDraft, /updateEnhancedKeyboardNavigationStore\(this\.enhancedKeyboardNavigation\)/)
+  assert.match(settingsDraft, /enhancedKeyboardNavigation: this\.enhancedKeyboardNavigation/)
+  assert.match(settingsStore, /let enhancedKeyboardNavigation = \$state<boolean>\(true\)/)
+  assert.match(settingsStore, /enhancedKeyboardNavigation = keyboardNavigation \?\? true/)
+  assert.match(
+    keyboardStore,
+    /export function isMainKeyboardScope\(\): boolean \{[\s\S]*getEnhancedKeyboardNavigation\(\) && keyboardScope === 'main'/,
+  )
+})
+
+test('current-region action menu exposes visible controls without changing Tab routing', async () => {
+  const [globalShortcuts, actionStore, actionMenu, composer, toolbar, attachments] = await Promise.all([
+    readFile(globalShortcutsPath, 'utf8'),
+    readFile(keyboardActionStorePath, 'utf8'),
+    readFile(keyboardActionMenuPath, 'utf8'),
+    readFile(composerPath, 'utf8'),
+    readFile(editorToolbarPath, 'utf8'),
+    readFile(attachmentListPath, 'utf8'),
+  ])
+
+  assert.match(globalShortcuts, /e\.key === 'F10' && e\.shiftKey[\s\S]*ctx\.openRegionActionMenu\(\)/)
+  assert.match(actionStore, /data-keyboard-action-context/)
+  assert.match(actionStore, /showForRegion\(region: string\)/)
+  assert.match(actionStore, /requestAnimationFrame\(\(\) => action\.element\.click\(\)\)/)
+  assert.match(actionMenu, /event\.key === 'ArrowDown'[\s\S]*moveSelection\(1\)/)
+  assert.match(actionMenu, /event\.key === 'ArrowUp'[\s\S]*moveSelection\(-1\)/)
+  assert.match(actionMenu, /event\.key === 'Enter'[\s\S]*activate\(filteredActions\[selectedIndex\]\)/)
+  assert.match(composer, /keyboardActionMenu\.showForRoot\(composerRootElement\)/)
+  assert.match(toolbar, /data-keyboard-toolbar-selected/)
+  assert.match(toolbar, /e\.key === 'Enter' \|\| e\.key === ' '/)
+  assert.match(attachments, /data-keyboard-action-context=\{att\.filename\}/)
+  assert.match(attachments, /group-focus-within:opacity-100/)
+})
+
+test('turning enhanced keyboard navigation off guards every region owner but not search', async () => {
+  const [
+    globalShortcuts,
+    activityRail,
+    sourceSidebar,
+    listPane,
+    detailPane,
+    viewer,
+    composer,
+    settings,
+    backupViewer,
+    emailBody,
+    composerEditor,
+    toolbar,
+    threeOptionDialog,
+  ] = await Promise.all([
+    readFile(globalShortcutsPath, 'utf8'),
+    readFile(activityRailPath, 'utf8'),
+    readFile(sourceSidebarPath, 'utf8'),
+    readFile(listPanePath, 'utf8'),
+    readFile(detailPanePath, 'utf8'),
+    readFile(viewerPath, 'utf8'),
+    readFile(composerPath, 'utf8'),
+    readFile(settingsPath, 'utf8'),
+    readFile(backupViewerPath, 'utf8'),
+    readFile(emailBodyPath, 'utf8'),
+    readFile(composerEditorPath, 'utf8'),
+    readFile(editorToolbarPath, 'utf8'),
+    readFile(threeOptionDialogPath, 'utf8'),
+  ])
+
+  assert.ok(
+    globalShortcuts.indexOf("keyboardPolicy === 'search'")
+      < globalShortcuts.indexOf('if (ctx.showComposer)'),
+  )
+  assert.match(globalShortcuts, /keyboardPolicy === 'native'[\s\S]*return/)
+  for (const source of [activityRail, sourceSidebar, listPane, detailPane, viewer, composer, settings, backupViewer]) {
+    assert.match(source, /getEnhancedKeyboardNavigation\(\)/)
+  }
+  assert.match(
+    emailBody,
+    /enhancedKeyboardNavigation && e\.altKey[\s\S]*getEnhancedKeyboardNavigation\(\)/,
+  )
+  assert.match(
+    composerEditor,
+    /isEnhancedKeyboardNavigationEnabled\?\.\(\) === false[\s\S]*return false/,
+  )
+  assert.match(toolbar, /if \(!getEnhancedKeyboardNavigation\(\)\)/)
+  assert.match(
+    threeOptionDialog,
+    /if \(!getEnhancedKeyboardNavigation\(\) && !isTab\) return/,
+  )
 })
 
 test('four visible regions cycle forward, backward, and across hidden regions', () => {
@@ -507,7 +657,10 @@ test('IME composition and dialog priority stay ahead of region shortcuts', async
   assert.match(globalShortcuts, /e\.isComposing \|\| e\.keyCode === 229/)
   assert.ok(globalShortcuts.indexOf('if (ctx.showSearchOverlay) return') < globalShortcuts.indexOf("e.key === 'Tab'"))
   assert.ok(globalShortcuts.indexOf('if (isDialogGuardActive()) return') < globalShortcuts.indexOf("e.key === 'Tab'"))
-  assert.match(settings, /event\.isComposing \|\| event\.keyCode === 229 \|\| showRestartDialog/)
+  assert.match(
+    settings,
+    /!getEnhancedKeyboardNavigation\(\)[\s\S]*event\.isComposing[\s\S]*event\.keyCode === 229[\s\S]*showRestartDialog/,
+  )
   assert.match(backupViewer, /event\.isComposing \|\| event\.keyCode === 229/)
 })
 

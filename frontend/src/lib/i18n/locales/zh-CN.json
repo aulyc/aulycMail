@@ -92,6 +92,8 @@
     "markAsUnread": "标记为未读",
     "expandAll": "全部展开",
     "collapseAll": "全部折叠",
+    "expandMessage": "展开邮件",
+    "collapseMessage": "折叠邮件",
     "editDraft": "编辑草稿",
     "copyEmail": "点击复制电子邮件地址",
     "copySource": "复制源码",
@@ -287,6 +289,8 @@
     "runInBackground": "后台运行",
     "menuBarIcon": "菜单栏图标",
     "autostartOnLogin": "登录时自动启动",
+    "enhancedKeyboardNavigation": "启用增强键盘操作",
+    "enhancedKeyboardNavigationDescription": "使用 Tab 切换橙色标记的大区域，按 Shift-F10 打开当前区域操作。关闭后停用 aulycMail 快捷键，但仍可使用 Command-F 搜索。",
     "developerMode": "开发者模式",
     "densityCompact": "小",
     "densityStandard": "中",
@@ -301,6 +305,12 @@
     "alwaysLoadImagesWarningTitle": "隐私与安全风险",
     "alwaysLoadImagesWarningDescription": "自动加载远程图片可能会暴露您的 IP 地址、确认您已阅读邮件，并允许发件人追踪您。确定要停用图片拦截吗？",
     "disable": "停用"
+  },
+  "keyboardActions": {
+    "title": "当前区域操作",
+    "searchPlaceholder": "筛选操作",
+    "empty": "没有匹配的操作",
+    "hint": "使用上下键选择，按 Enter 执行"
   },
   "settingsAccounts": {
     "noAccountsConfigured": "尚未配置电子邮件账户",

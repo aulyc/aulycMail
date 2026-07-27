@@ -210,6 +210,10 @@ export function GetDraft(arg1) {
   return window['go']['app']['App']['GetDraft'](arg1);
 }
 
+export function GetEnhancedKeyboardNavigation() {
+  return window['go']['app']['App']['GetEnhancedKeyboardNavigation']();
+}
+
 export function GetFTSIndexStatus(arg1) {
   return window['go']['app']['App']['GetFTSIndexStatus'](arg1);
 }
@@ -544,6 +548,10 @@ export function SetDefaultIdentity(arg1, arg2) {
 
 export function SetDeveloperMode(arg1) {
   return window['go']['app']['App']['SetDeveloperMode'](arg1);
+}
+
+export function SetEnhancedKeyboardNavigation(arg1) {
+  return window['go']['app']['App']['SetEnhancedKeyboardNavigation'](arg1);
 }
 
 export function SetLanguage(arg1) {

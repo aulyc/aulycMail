@@ -4,10 +4,14 @@
   import { getCached, setCache } from '../../stores/inlineAttachmentCache'
   import { isImageAllowedSync, refreshImageAllowlist } from '$lib/stores/imageAllowlist.svelte'
   import { setFocusedPane, focusPreviousPane, focusNextPane } from '$lib/stores/keyboard.svelte'
+  import {
+    getAlwaysLoadImages,
+    getEnhancedKeyboardNavigation,
+    getThemeMode,
+  } from '$lib/stores/settings.svelte'
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu'
   import { _ } from '$lib/i18n'
   import { toasts } from '$lib/stores/toast'
-  import { getAlwaysLoadImages, getThemeMode } from '$lib/stores/settings.svelte'
   import { buildDarkMailFilterStyles, getDarkMailSurfaceBackground } from '$lib/utils/dark-mail'
   import { EMAIL_ADDRESS_PATTERN } from '$lib/utils/email'
 
@@ -220,6 +224,7 @@
   function buildIframeContent(html: string, applyDarken: boolean): string {
     const processedHtml = processHtml(html, imagesBlocked)
     const imgSrc = imagesBlocked ? "'self' data:" : '* data:'
+    const enhancedKeyboardNavigation = getEnhancedKeyboardNavigation()
 
     // Double-invert: page-level invert + image-level re-invert keeps photos
     // looking normal while flipping text, backgrounds, and CSS-defined colors.
@@ -238,6 +243,8 @@
 `
 
     const iframeScript = `
+      var enhancedKeyboardNavigation = ${enhancedKeyboardNavigation ? 'true' : 'false'};
+
       function sendHeight() {
         var height = document.body.scrollHeight;
         window.parent.postMessage({ type: 'iframe-height', height: height }, '*');
@@ -352,7 +359,7 @@
         // Only forward events that need global handling
         if (e.altKey || e.ctrlKey || e.metaKey || e.key === 'Escape') {
           // For pane navigation, blur inside iframe first
-          if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'h' || e.key === 'l')) {
+          if (enhancedKeyboardNavigation && e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'h' || e.key === 'l')) {
             if (document.activeElement) {
               document.activeElement.blur();
             }
@@ -477,7 +484,7 @@ ${processedHtml}
       handleLinkClick(message.url)
     } else if (message.type === 'iframe-keydown') {
       // Handle Alt+arrow/hjkl directly for pane navigation
-      if (message.altKey) {
+      if (message.altKey && getEnhancedKeyboardNavigation()) {
         const key = message.key
         if (key === 'ArrowLeft' || key === 'h') {
           focusPreviousPane()
@@ -638,6 +645,7 @@ ${processedHtml}
     const html = bodyHtml
     void imagesBlocked // dependency only
     void getThemeMode() // rebuild when theme changes so dark-mail invert re-derives
+    void getEnhancedKeyboardNavigation()
     const applyDarken = darken
 
     if (iframeElement && html) {

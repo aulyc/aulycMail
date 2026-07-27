@@ -321,6 +321,20 @@ func TestSetGetBoolSettings(t *testing.T) {
 			value:  false,
 			defVal: false,
 		},
+		{
+			name:   "EnhancedKeyboardNavigation_true",
+			set:    (*Store).SetEnhancedKeyboardNavigation,
+			get:    (*Store).GetEnhancedKeyboardNavigation,
+			value:  true,
+			defVal: true,
+		},
+		{
+			name:   "EnhancedKeyboardNavigation_false",
+			set:    (*Store).SetEnhancedKeyboardNavigation,
+			get:    (*Store).GetEnhancedKeyboardNavigation,
+			value:  false,
+			defVal: true,
+		},
 	}
 
 	for _, tt := range tests {

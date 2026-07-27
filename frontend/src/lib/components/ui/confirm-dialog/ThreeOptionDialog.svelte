@@ -2,6 +2,7 @@
   import * as AlertDialog from '$lib/components/ui/alert-dialog'
   import Icon from '@iconify/svelte'
   import { tick } from 'svelte'
+  import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
 
   interface Props {
     open: boolean                    // bindable
@@ -86,6 +87,8 @@
     function onKeydown(e: KeyboardEvent) {
       if (!open || e.altKey || e.ctrlKey || e.metaKey) return
       const isShiftTab = (e.key === 'Tab' || e.key === 'ISO_Left_Tab') && e.shiftKey
+      const isTab = isShiftTab || (e.key === 'Tab' && !e.shiftKey)
+      if (!getEnhancedKeyboardNavigation() && !isTab) return
       const isPrev = ['ArrowLeft', 'ArrowUp', 'h'].includes(e.key) || isShiftTab
       const isNext = ['ArrowRight', 'ArrowDown', 'l'].includes(e.key) || (e.key === 'Tab' && !e.shiftKey)
       if (!isPrev && !isNext) return
