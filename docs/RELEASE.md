@@ -130,6 +130,9 @@ tools cross-check:
 - app Info.plist version/build/commit, Bundle ID, and minimum macOS version;
 - app executable `--version`;
 - `lipo` and `file` arm64 results;
+- required `Contents/Resources/Legal` files, including the complete Aerion
+  Apache-2.0 license, Aerion copyright, modification, and non-endorsement
+  notices;
 - app and DMG code-signing type and Team ID;
 - Hardened Runtime flags;
 - formal stapler and Gatekeeper results;

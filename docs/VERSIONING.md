@@ -157,3 +157,19 @@ remains `com.aulyc.aulycmail`; user data remains under
 
 Mail databases, attachments, settings, passwords, tokens, Keychain data, and
 other user data are never release metadata or app-replacement payloads.
+
+Every generated App bundle must include the following non-empty legal resources
+under `Contents/Resources/Legal`:
+
+- `LICENSE.txt`;
+- `THIRD_PARTY_NOTICES.md`;
+- `Aerion-Apache-2.0.txt`;
+- `AERION_MODIFICATIONS.md`; and
+- `Nunito-OFL.txt`.
+
+Packaging fails closed when a required source notice is missing or empty. The
+candidate, release-artifact, and installed-App gates verify the bundled
+attribution, complete Aerion license and copyright notice, modification
+statement, and non-endorsement statement. When the exact tagged source is
+available, verification also requires the bundled files to byte-match their
+source-tree counterparts.

@@ -136,4 +136,7 @@ else
   spctl -a -vvv -t exec "$APP"
 fi
 
+bash "$(cd "$(dirname "$0")" && pwd)/verify_legal_resources.sh" \
+  --app "$APP"
+
 echo "Verified app identity $EXPECTED_VERSION (build $EXPECTED_BUILD, $EXPECTED_SIGNATURE, arm64)."

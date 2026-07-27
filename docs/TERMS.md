@@ -1,6 +1,6 @@
 # Terms of Use
 
-**Last Updated:** January 20, 2026
+**Last Updated:** July 27, 2026
 
 ## Acceptance of Terms
 
@@ -18,10 +18,16 @@ storage, or server infrastructure.
 
 ## License Notices
 
-The application includes third-party components and license notices. Those
-notices remain subject to their respective license terms. The application bundle
-and distribution materials should preserve required license and copyright
-notices, including the bundled legal notices where provided.
+The application includes and modifies portions of Aerion
+(https://github.com/hkdb/aerion), Copyright 2024-2025 Aerion Contributors,
+under the Apache License, Version 2.0. aulycMail is an independent product and
+is not affiliated with, sponsored by, or endorsed by Aerion or its
+contributors.
+
+Other third-party components remain subject to their respective license terms.
+The application bundle and distribution materials preserve the complete
+Aerion license, the Aerion modification notice, and other required license and
+copyright notices in `Contents/Resources/Legal`.
 
 ## User Responsibilities
 

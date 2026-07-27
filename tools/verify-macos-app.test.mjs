@@ -14,9 +14,20 @@ test('verifies an app whose mounted-volume path contains spaces', { skip: !isSup
   const app = path.join(root, 'Mounted Volume', 'aulycMail.app')
   const executable = path.join(app, 'Contents', 'MacOS', 'aulycMail')
   const info = path.join(app, 'Contents', 'Info.plist')
+  const legal = path.join(app, 'Contents', 'Resources', 'Legal')
   const manifest = path.join(root, 'manifest.json')
   const source = path.join(root, 'main.go')
   fs.mkdirSync(path.dirname(executable), { recursive: true })
+  fs.mkdirSync(legal, { recursive: true })
+  for (const [sourcePath, bundledName] of [
+    ['LICENSE', 'LICENSE.txt'],
+    ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],
+    ['LICENSES/Aerion-Apache-2.0.txt', 'Aerion-Apache-2.0.txt'],
+    ['AERION_MODIFICATIONS.md', 'AERION_MODIFICATIONS.md'],
+    ['frontend/src/assets/fonts/OFL.txt', 'Nunito-OFL.txt'],
+  ]) {
+    fs.copyFileSync(path.resolve(sourcePath), path.join(legal, bundledName))
+  }
   fs.writeFileSync(source, `package main
 import "fmt"
 func main() { fmt.Println("1.2.3 (build 4)") }

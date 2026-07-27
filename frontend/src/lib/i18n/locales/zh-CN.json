@@ -450,7 +450,7 @@
     },
     "terms": {
       "title": "使用条款",
-      "intro": "最后更新：2026 年 1 月 20 日\n\n下载、安装或使用 aulycMail 即表示您同意本使用条款；如果您不同意，请不要使用本应用。",
+      "intro": "最后更新：2026 年 7 月 27 日\n\n下载、安装或使用 aulycMail 即表示您同意本使用条款；如果您不同意，请不要使用本应用。",
       "descriptionTitle": "服务说明",
       "descriptionBody": "aulycMail 是在本地运行的桌面邮件客户端，可通过 IMAP/SMTP 连接邮箱、收发邮件、管理本地邮件状态并使用本地联系人。应用不提供邮箱托管、云存储或服务器基础设施。",
       "responsibilitiesTitle": "用户责任",
@@ -464,7 +464,7 @@
       "disclaimerTitle": "免责声明与责任限制",
       "disclaimerBody": "本应用按“现状”和“可用状态”提供，不作任何明示或默示保证。在法律允许的最大范围内，aulycMail 的开发者不对间接、附带、特殊、后果性或惩罚性损失承担责任，包括数据丢失、利润损失或无法使用应用。",
       "thirdPartyTitle": "第三方服务与许可",
-      "thirdPartyBody": "邮箱服务商的服务受其自身条款和隐私政策约束。应用包含第三方组件，这些组件继续受各自许可条款约束；分发时保留适用的许可和版权声明。",
+      "thirdPartyBody": "邮箱服务商的服务受其自身条款和隐私政策约束。aulycMail 包含经修改的 Aerion 代码，原版权为 Copyright 2024–2025 Aerion Contributors，并继续受 Apache-2.0 约束。aulycMail 是独立产品，与 Aerion 无隶属、赞助或背书关系；其他组件继续受各自许可约束。",
       "contactTitle": "更新与联系",
       "contactBody": "本条款可能随产品变化更新。联系邮箱：xaulyc@gmail.com"
     },
@@ -479,7 +479,7 @@
       "communityTitle": "用户与反馈",
       "communityBody": "感谢每一位使用、测试并提出意见的用户。你们对稳定性、易用性和细节的关注持续推动产品改进。",
       "licenseTitle": "第三方声明",
-      "licenseBody": "aulycMail 应用整体为专有软件；其中使用的第三方组件仍受各自许可条款约束。完整第三方声明随应用一同提供在应用包的 Legal 资源目录中。"
+      "licenseBody": "aulycMail 应用整体为专有软件；源自 Aerion 的部分继续受 Apache-2.0 约束，其他第三方组件继续受各自许可约束。完整许可证、署名、修改及无背书声明随应用一同提供在应用包的 Legal 资源目录中。"
     }
   },
   "account": {

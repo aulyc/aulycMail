@@ -109,11 +109,11 @@
     },
     {
       "path": "docs/VERSIONING.md",
-      "sha256": "c6e2115ded6a9637ef05fd02043ed9399ac21e40048e15d71c666186ddfc18ef"
+      "sha256": "75d36be3b1b8f65e370e0dc4e6da156bcd3d2c92d1fc14595c9d80608cf319ae"
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "50a4e4553fbdcc8c0d43ad3d3514de0dee7cb741da52b5cf70416ea32b3c49f5"
+      "sha256": "4f60365f86065b2f91457da12cb07791da5a96de06f9fd0144829292c10f7c4e"
     },
     {
       "path": "Makefile",
@@ -145,7 +145,7 @@
     },
     {
       "path": "tools/package_macos_app.sh",
-      "sha256": "7af16c303c1f6df26e3cd98dd58e7e98fdbafae14ae6ae2b9432f41206c25a6e"
+      "sha256": "5569eb824da21a98dd1dc1501c914f1cd1f9c198d8f2f9530290124530397463"
     },
     {
       "path": "tools/package_macos_dmg.sh",
@@ -153,11 +153,43 @@
     },
     {
       "path": "tools/verify_release_candidate.sh",
-      "sha256": "63aec5d9c87601eabd82c9456f45f9360d9e1056ed20eef31e9e37d21fc864ca"
+      "sha256": "abec04a43237772d9e2c980967e1996aa7870cffac5e8f49921a9608561b87ba"
     },
     {
       "path": "tools/build-output-layout.test.mjs",
-      "sha256": "8d836f65c40a5ee01088bd76fe1811dd7a2be591daeafc00ee42fca4ba8bbf48"
+      "sha256": "3f5fb97fa9ebb731ead0c83ed13110b59d5e7cfd3d1b437c35eac3ca6003dd32"
+    },
+    {
+      "path": "tools/verify_legal_resources.sh",
+      "sha256": "c1c0b1de4e27a102d49115d38654b4053721be183cb82400e4715a9ac1949335"
+    },
+    {
+      "path": "tools/verify_macos_app.sh",
+      "sha256": "301a4420e245383ee9e7bc8cc253cd3552e28ae14362295f0c07842490de2974"
+    },
+    {
+      "path": "tools/verify-macos-app.test.mjs",
+      "sha256": "e37cacb5c6cdcdd527a49ffda872868bfeaed50fa253e4efaae605b0be20e40b"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "3c0a8cd773591803ca4ec64df76eefd75ddf54fd74d90bc6d2bf544fd1f13d1e"
+    },
+    {
+      "path": "AERION_MODIFICATIONS.md",
+      "sha256": "cc13bb51d10921e88ab2e365fe5db46c2e81f7e1a237446dec10daf2cb729d1d"
+    },
+    {
+      "path": "LICENSES/Aerion-Apache-2.0.txt",
+      "sha256": "00beca992fe61ef1e5fe34a2d8e817c2721d38b3db55b7a79bc0d08c5411284c"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "68f5f26e25776d5ce93e21cc10ffaa1778e84b49ddbc455b514a5b681cd974a3"
+    },
+    {
+      "path": "frontend/src/assets/fonts/OFL.txt",
+      "sha256": "8656c2a27357b3140047a39b27e3cd928256544ad8a004ef77087f761358208c"
     },
     {
       "path": "tools/install_macos_dmg.sh",
@@ -186,6 +218,14 @@
       "tools/package_macos_app.sh",
       "tools/package_macos_dmg.sh",
       "tools/verify_release_candidate.sh",
+      "tools/verify_legal_resources.sh",
+      "tools/verify_macos_app.sh",
+      "tools/verify-macos-app.test.mjs",
+      "LICENSE",
+      "AERION_MODIFICATIONS.md",
+      "LICENSES/Aerion-Apache-2.0.txt",
+      "THIRD_PARTY_NOTICES.md",
+      "frontend/src/assets/fonts/OFL.txt",
       "tools/install_macos_dmg.sh"
     ],
     "ciPaths": [
@@ -195,7 +235,15 @@
       "wails.json",
       "tools/package_macos_app.sh",
       "tools/package_macos_dmg.sh",
-      "tools/verify_release_candidate.sh"
+      "tools/verify_release_candidate.sh",
+      "tools/verify_legal_resources.sh",
+      "tools/verify_macos_app.sh",
+      "tools/verify-macos-app.test.mjs",
+      "LICENSE",
+      "AERION_MODIFICATIONS.md",
+      "LICENSES/Aerion-Apache-2.0.txt",
+      "THIRD_PARTY_NOTICES.md",
+      "frontend/src/assets/fonts/OFL.txt"
     ]
   }
 }

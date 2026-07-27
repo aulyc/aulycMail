@@ -79,5 +79,7 @@ if [[ "$RUNTIME_VERSION" != "$EXPECTED_VERSION (build $EXPECTED_BUILD)" ]]; then
   exit 1
 fi
 codesign --verify --deep --strict --verbose=2 "$APP"
+bash "$SOURCE_ROOT/tools/verify_legal_resources.sh" \
+  --app "$APP" --source-root "$SOURCE_ROOT"
 
 echo "Verified aulycMail release candidate $EXPECTED_VERSION (build $EXPECTED_BUILD, arm64, com.aulyc.aulycmail)."

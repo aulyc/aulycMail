@@ -13,6 +13,11 @@ CONTENTS="$APP/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
 LEGAL="$RESOURCES/Legal"
+PROPRIETARY_LICENSE="$ROOT/LICENSE"
+THIRD_PARTY_NOTICES="$ROOT/THIRD_PARTY_NOTICES.md"
+AERION_LICENSE="$ROOT/LICENSES/Aerion-Apache-2.0.txt"
+AERION_MODIFICATIONS="$ROOT/AERION_MODIFICATIONS.md"
+NUNITO_LICENSE="$ROOT/frontend/src/assets/fonts/OFL.txt"
 
 if [[ ! "$SEMANTIC_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?([+][0-9A-Za-z.-]+)?$ ]]; then
   echo "Invalid semantic version: $SEMANTIC_VERSION" >&2
@@ -36,6 +41,20 @@ if [ ! -x "$BIN" ]; then
   exit 1
 fi
 
+required_legal_files=(
+  "$PROPRIETARY_LICENSE"
+  "$THIRD_PARTY_NOTICES"
+  "$AERION_LICENSE"
+  "$AERION_MODIFICATIONS"
+  "$NUNITO_LICENSE"
+)
+for required_legal_file in "${required_legal_files[@]}"; do
+  if [ ! -s "$required_legal_file" ]; then
+    echo "Missing or empty required legal file: $required_legal_file" >&2
+    exit 1
+  fi
+done
+
 rm -rf "$APP"
 mkdir -p "$MACOS" "$RESOURCES" "$LEGAL"
 cp "$BIN" "$MACOS/aulycMail"
@@ -43,15 +62,13 @@ chmod 0755 "$MACOS/aulycMail"
 if [ -f "$ROOT/build/menubar-icon.png" ]; then
   cp "$ROOT/build/menubar-icon.png" "$RESOURCES/MenuBarIcon.png"
 fi
-if [ -f "$ROOT/LICENSE" ]; then
-  cp "$ROOT/LICENSE" "$LEGAL/LICENSE.txt"
-fi
-if [ -f "$ROOT/THIRD_PARTY_NOTICES.md" ]; then
-  cp "$ROOT/THIRD_PARTY_NOTICES.md" "$LEGAL/THIRD_PARTY_NOTICES.md"
-fi
-if [ -f "$ROOT/frontend/src/assets/fonts/OFL.txt" ]; then
-  cp "$ROOT/frontend/src/assets/fonts/OFL.txt" "$LEGAL/Nunito-OFL.txt"
-fi
+cp "$PROPRIETARY_LICENSE" "$LEGAL/LICENSE.txt"
+cp "$THIRD_PARTY_NOTICES" "$LEGAL/THIRD_PARTY_NOTICES.md"
+cp "$AERION_LICENSE" "$LEGAL/Aerion-Apache-2.0.txt"
+cp "$AERION_MODIFICATIONS" "$LEGAL/AERION_MODIFICATIONS.md"
+cp "$NUNITO_LICENSE" "$LEGAL/Nunito-OFL.txt"
+bash "$ROOT/tools/verify_legal_resources.sh" \
+  --app "$APP" --source-root "$ROOT"
 
 cat > "$CONTENTS/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
