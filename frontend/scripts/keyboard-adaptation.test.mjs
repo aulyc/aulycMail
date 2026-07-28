@@ -533,7 +533,7 @@ test('settings content browse mode selects actual controls and enters native inp
   assert.match(settings, /onmousedown=\{handleContentMouseDown\}/)
 })
 
-test('settings select activation uses native keydown and never leaves two blue indicators', async () => {
+test('settings select activation uses native keydown and keeps one blue indicator while open', async () => {
   const [settings, selectTrigger] = await Promise.all([
     readFile(settingsPath, 'utf8'),
     readFile(selectTriggerPath, 'utf8'),
@@ -543,8 +543,9 @@ test('settings select activation uses native keydown and never leaves two blue i
   assert.match(selectTrigger, /data-keyboard-select-trigger="true"/)
   assert.match(
     selectTrigger,
-    /data-keyboard-select-trigger='true'\]\[data-state='open'\]:focus-visible[\s\S]*box-shadow: none/,
+    /data-keyboard-select-trigger='true'\]\[data-state='open'\][\s\S]*box-shadow:[\s\S]*hsl\(var\(--ring\)\)/,
   )
+  assert.doesNotMatch(selectTrigger, /data-state='open'[\s\S]*box-shadow: none/)
   assert.match(settings, /function isSettingsSelectTrigger[\s\S]*data-keyboard-select-trigger/)
   assert.match(
     settings,

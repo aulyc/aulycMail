@@ -30,7 +30,9 @@
 </SelectPrimitive.Trigger>
 
 <style>
-  :global([data-keyboard-select-trigger='true'][data-state='open']:focus-visible) {
-    box-shadow: none;
+  :global([data-keyboard-select-trigger='true'][data-state='open']) {
+    box-shadow:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--ring));
   }
 </style>

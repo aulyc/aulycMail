@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Kept one blue focus indicator visible around a Settings dropdown while its
+  menu is open, without restoring the previous duplicate keyboard outline.
+
 ## [0.6.0-beta.17] — 2026-07-27
 
 - Added a saved Enhanced Keyboard Navigation setting that keeps the four-region
