@@ -598,11 +598,24 @@ test('account row actions use left-right within a row and up-down between accoun
   ])
 
   assert.match(accountsTab, /data-settings-horizontal-group="account-actions"/)
+  assert.match(accountsTab, /data-settings-horizontal-context=\{acc\.id\}/)
   for (const action of ['test', 'move-up', 'move-down', 'edit', 'delete']) {
     assert.match(accountsTab, new RegExp(`data-settings-horizontal-action="${action}"`))
   }
+  assert.match(
+    accountsTab,
+    /await accountStore\.reorderAccounts\(ids\)[\s\S]*onAccountOrderChanged\?\.\(accountId, 'move-up'\)/,
+  )
+  assert.match(
+    accountsTab,
+    /await accountStore\.reorderAccounts\(ids\)[\s\S]*onAccountOrderChanged\?\.\(accountId, 'move-down'\)/,
+  )
   assert.match(settings, /function getSettingsHorizontalGroups/)
   assert.match(settings, /function getSettingsHorizontalGroupControls/)
+  assert.match(
+    settings,
+    /function restoreSettingsHorizontalControlAfterRender[\s\S]*dataset\.settingsHorizontalContext === context[\s\S]*resolveHorizontalActionIndex[\s\S]*selectSettingsControlElement\(target\)/,
+  )
   assert.match(
     settings,
     /selectedHorizontalGroup[\s\S]*\['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'\]\.includes\(event\.key\)/,

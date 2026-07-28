@@ -3,6 +3,14 @@
   import { _ } from '$lib/i18n'
   import AccountsTab from '../AccountsTab.svelte'
   import SettingsPageHeader from '../shared/SettingsPageHeader.svelte'
+
+  interface Props {
+    onAccountOrderChanged?: (
+      accountId: string,
+      action: 'move-up' | 'move-down',
+    ) => void
+  }
+  let { onAccountOrderChanged }: Props = $props()
   let accountsTab: AccountsTab | null = null
 </script>
 <div class="space-y-6">
@@ -13,5 +21,5 @@
       </button>
     {/snippet}
   </SettingsPageHeader>
-  <AccountsTab bind:this={accountsTab} />
+  <AccountsTab bind:this={accountsTab} {onAccountOrderChanged} />
 </div>

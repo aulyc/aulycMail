@@ -8,6 +8,7 @@
   import { dialogGuardClose, dialogGuardOpen } from '$lib/stores/dialogGuard'
   import { isInputElement, setKeyboardScope } from '$lib/stores/keyboard.svelte'
   import { nextRovingIndex, type RovingNavigationKey } from '$lib/keyboard/regionNavigation'
+  import { resolveHorizontalActionIndex } from '$lib/keyboard/settingsHorizontalNavigation'
   import { getEnhancedKeyboardNavigation } from '$lib/stores/settings.svelte'
   import { keyboardActionMenu } from '$lib/stores/keyboardActionMenu.svelte'
   import { _ } from '$lib/i18n'
@@ -285,6 +286,37 @@
     if (nextIndex < 0) return
     const target = closestAvailableHorizontalGroupControl(control, groups[nextIndex])
     if (target) selectSettingsControlElement(target)
+  }
+
+  function restoreSettingsHorizontalControlAfterRender(
+    context: string,
+    action: 'move-up' | 'move-down',
+  ) {
+    void tick().then(() => requestAnimationFrame(() => {
+      if (!open || activePage !== 'accounts' || settingsRegion !== 'content') return
+      const group = getSettingsHorizontalGroups().find((candidate) => (
+        candidate.dataset.settingsHorizontalContext === context
+      ))
+      if (!group) return
+
+      const controls = getSettingsHorizontalGroupControls(group, true)
+      const targetIndex = resolveHorizontalActionIndex(
+        controls.map((control) => ({
+          action: control.dataset.settingsHorizontalAction ?? '',
+          available: isAvailableSettingsControl(control),
+        })),
+        action,
+      )
+      const target = controls[targetIndex]
+      if (!target) return
+
+      if (getEnhancedKeyboardNavigation()) {
+        settingsContentMode = 'browse'
+        selectSettingsControlElement(target)
+      } else {
+        target.focus({ preventScroll: true })
+      }
+    }))
   }
 
   function clearSettingsKeyboardSelection() {
@@ -678,7 +710,7 @@
           {:else if activePage === 'general'}<GeneralSettingsPage {draft} />
           {:else if activePage === 'appearance'}<AppearanceSettingsPage {draft} />
           {:else if activePage === 'mail'}<MailSettingsPage {draft} />
-          {:else if activePage === 'accounts'}<AccountsSettingsPage />
+          {:else if activePage === 'accounts'}<AccountsSettingsPage onAccountOrderChanged={restoreSettingsHorizontalControlAfterRender} />
           {:else if activePage === 'backup'}<BackupSettingsPage {draft} onOpenActivityLog={openBackupActivityLog} />
           {:else}<ActivityLogPage initialType={activityInitialType} />{/if}
         </div>

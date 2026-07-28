@@ -12,6 +12,12 @@
   import type { account } from '../../../../wailsjs/go/models'
   import { _ } from '$lib/i18n'
 
+  type AccountOrderAction = 'move-up' | 'move-down'
+  interface Props {
+    onAccountOrderChanged?: (accountId: string, action: AccountOrderAction) => void
+  }
+  let { onAccountOrderChanged }: Props = $props()
+
   // Filter out shared mailboxes — they're managed from the parent account's Identity tab
   const regularAccounts = $derived(accountStore.accounts.filter(acc => !acc.account.sharedMailboxParentId))
 
@@ -95,18 +101,20 @@
     deletingAccount = null
   }
 
-  async function moveUp(index: number) {
+  async function moveUp(index: number, accountId: string) {
     if (index <= 0) return
     const ids = accountStore.accounts.map(a => a.account.id)
     ;[ids[index - 1], ids[index]] = [ids[index], ids[index - 1]]
     await accountStore.reorderAccounts(ids)
+    onAccountOrderChanged?.(accountId, 'move-up')
   }
 
-  async function moveDown(index: number) {
+  async function moveDown(index: number, accountId: string) {
     if (index >= accountStore.accounts.length - 1) return
     const ids = accountStore.accounts.map(a => a.account.id)
     ;[ids[index], ids[index + 1]] = [ids[index + 1], ids[index]]
     await accountStore.reorderAccounts(ids)
+    onAccountOrderChanged?.(accountId, 'move-down')
   }
 </script>
 
@@ -142,6 +150,7 @@
           </span>
           <div
             data-settings-horizontal-group="account-actions"
+            data-settings-horizontal-context={acc.id}
             data-keyboard-action-context={acc.email}
             class="flex items-center gap-3"
           >
@@ -163,7 +172,7 @@
                 size="icon"
                 variant="ghost"
                 class="h-7 w-7"
-                onclick={() => moveUp(index)}
+                onclick={() => moveUp(index, acc.id)}
                 disabled={index === 0}
                 title={$_('settingsAccounts.moveUp')}
               >
@@ -174,7 +183,7 @@
                 size="icon"
                 variant="ghost"
                 class="h-7 w-7"
-                onclick={() => moveDown(index)}
+                onclick={() => moveDown(index, acc.id)}
                 disabled={index === accountStore.accounts.length - 1}
                 title={$_('settingsAccounts.moveDown')}
               >
