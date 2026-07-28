@@ -46,7 +46,8 @@
     </SettingsRow>
     <SettingsRow
       label={$_('settingsGeneral.enhancedKeyboardNavigation')}
-      description={$_('settingsGeneral.enhancedKeyboardNavigationDescription')}
+      help={$_('settingsGeneral.enhancedKeyboardNavigationDescription')}
+      helpLabel={$_('settingsGeneral.enhancedKeyboardNavigationHelp')}
     >
       <BoolSelect bind:checked={draft.enhancedKeyboardNavigation} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>

@@ -200,6 +200,93 @@
     return [...controls, ...footerActions]
   }
 
+  function getSettingsHorizontalGroupControls(
+    group: HTMLElement,
+    includeUnavailable = false,
+  ): HTMLElement[] {
+    const controls = Array.from(group.querySelectorAll<HTMLElement>(
+      '[data-settings-horizontal-action]',
+    ))
+    return includeUnavailable ? controls : controls.filter(isAvailableSettingsControl)
+  }
+
+  function getSettingsHorizontalGroups(): HTMLElement[] {
+    if (!contentPanelEl) return []
+    return Array.from(contentPanelEl.querySelectorAll<HTMLElement>(
+      '[data-settings-horizontal-group]',
+    )).filter((group) => getSettingsHorizontalGroupControls(group).length > 0)
+  }
+
+  function settingsHorizontalGroupForControl(control: HTMLElement): HTMLElement | null {
+    const group = control.closest<HTMLElement>('[data-settings-horizontal-group]')
+    return group && contentPanelEl?.contains(group) ? group : null
+  }
+
+  function selectSettingsControlElement(control: HTMLElement) {
+    const itemIndex = getSettingsContentItems().findIndex((item) => (
+      item.kind === 'control' && item.element === control
+    ))
+    if (itemIndex < 0) return
+    contentRegionEl?.focus({ preventScroll: true })
+    selectSettingsControl(itemIndex)
+  }
+
+  function selectHorizontalGroupControl(control: HTMLElement, direction: -1 | 1) {
+    const group = settingsHorizontalGroupForControl(control)
+    if (!group) return
+    const controls = getSettingsHorizontalGroupControls(group)
+    const currentIndex = controls.indexOf(control)
+    const nextIndex = nextRovingIndex(
+      direction === -1 ? 'ArrowUp' : 'ArrowDown',
+      currentIndex,
+      controls.length,
+      true,
+    )
+    if (nextIndex >= 0) selectSettingsControlElement(controls[nextIndex])
+  }
+
+  function closestAvailableHorizontalGroupControl(
+    sourceControl: HTMLElement,
+    targetGroup: HTMLElement,
+  ): HTMLElement | null {
+    const availableControls = getSettingsHorizontalGroupControls(targetGroup)
+    if (availableControls.length === 0) return null
+
+    const sourceAction = sourceControl.dataset.settingsHorizontalAction
+    const matchingAction = availableControls.find((control) => (
+      control.dataset.settingsHorizontalAction === sourceAction
+    ))
+    if (matchingAction) return matchingAction
+
+    const sourceGroup = settingsHorizontalGroupForControl(sourceControl)
+    const sourceSlot = sourceGroup
+      ? getSettingsHorizontalGroupControls(sourceGroup, true).indexOf(sourceControl)
+      : 0
+    const targetControls = getSettingsHorizontalGroupControls(targetGroup, true)
+    return availableControls.reduce((closest, candidate) => (
+      Math.abs(targetControls.indexOf(candidate) - sourceSlot)
+        < Math.abs(targetControls.indexOf(closest) - sourceSlot)
+        ? candidate
+        : closest
+    ))
+  }
+
+  function selectAdjacentHorizontalGroup(control: HTMLElement, direction: -1 | 1) {
+    const currentGroup = settingsHorizontalGroupForControl(control)
+    if (!currentGroup) return
+    const groups = getSettingsHorizontalGroups()
+    const currentIndex = groups.indexOf(currentGroup)
+    const nextIndex = nextRovingIndex(
+      direction === -1 ? 'ArrowUp' : 'ArrowDown',
+      currentIndex,
+      groups.length,
+      true,
+    )
+    if (nextIndex < 0) return
+    const target = closestAvailableHorizontalGroupControl(control, groups[nextIndex])
+    if (target) selectSettingsControlElement(target)
+  }
+
   function clearSettingsKeyboardSelection() {
     contentRegionEl?.querySelectorAll<HTMLElement>('[data-settings-keyboard-selected]')
       .forEach((element) => { delete element.dataset.settingsKeyboardSelected })
@@ -405,6 +492,12 @@
       return
     }
     if (event.key === 'Escape' && settingsContentMode === 'input') {
+      const activeControl = settingsControlForTarget(event.target)
+      if (
+        activeControl
+        && isSettingsSelectTrigger(activeControl)
+        && isOpenSelect(activeControl)
+      ) return
       event.preventDefault()
       event.stopPropagation()
       ;(event.target as HTMLElement | null)?.blur?.()
@@ -436,6 +529,22 @@
 
     if (settingsContentMode === 'input') return
     const selectedItem = getSettingsContentItems()[selectedSettingsControlIndex]
+    const selectedHorizontalGroup = selectedItem?.kind === 'control'
+      ? settingsHorizontalGroupForControl(selectedItem.element)
+      : null
+    if (
+      selectedHorizontalGroup
+      && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        selectHorizontalGroupControl(selectedItem.element, event.key === 'ArrowLeft' ? -1 : 1)
+      } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+        selectAdjacentHorizontalGroup(selectedItem.element, event.key === 'ArrowUp' ? -1 : 1)
+      }
+      return
+    }
     if (
       selectedItem?.kind === 'footer'
       && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)

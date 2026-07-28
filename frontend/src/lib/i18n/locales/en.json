@@ -291,6 +291,7 @@
     "autostartOnLogin": "Autostart on login",
     "enhancedKeyboardNavigation": "Enhanced keyboard navigation",
     "enhancedKeyboardNavigationDescription": "Use Tab to switch the orange-marked regions and Shift-F10 for current-region actions. Turning this off disables aulycMail shortcuts; Command-F search remains available.",
+    "enhancedKeyboardNavigationHelp": "Show enhanced keyboard navigation help",
     "developerMode": "Developer mode",
     "densityCompact": "Small",
     "densityStandard": "Medium",

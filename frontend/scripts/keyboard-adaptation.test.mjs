@@ -37,6 +37,7 @@ const settingsPath = new URL('../src/lib/components/settings/SettingsDialog.svel
 const settingsDraftPath = new URL('../src/lib/components/settings/settingsDraft.svelte.ts', import.meta.url)
 const settingsStorePath = new URL('../src/lib/stores/settings.svelte.ts', import.meta.url)
 const generalSettingsPath = new URL('../src/lib/components/settings/pages/GeneralSettingsPage.svelte', import.meta.url)
+const accountsTabPath = new URL('../src/lib/components/settings/AccountsTab.svelte', import.meta.url)
 const settingsRowPath = new URL('../src/lib/components/settings/shared/SettingsRow.svelte', import.meta.url)
 const selectTriggerPath = new URL('../src/lib/components/ui/select/select-trigger.svelte', import.meta.url)
 const backupViewerPath = new URL('../src/lib/components/backup/BackupViewerDialog.svelte', import.meta.url)
@@ -570,7 +571,7 @@ test('settings select activation uses native keydown and keeps one blue indicato
   )
 })
 
-test('settings captures browse keys before selects while confirmation and Escape return to control browse mode', async () => {
+test('settings lets an open select handle Escape before returning to control browse mode', async () => {
   const settings = await readFile(settingsPath, 'utf8')
 
   assert.match(settings, /onkeydowncapture=\{handleSettingsKeydown\}/)
@@ -584,10 +585,54 @@ test('settings captures browse keys before selects while confirmation and Escape
   assert.match(settings, /sawOpen[\s\S]*finishSettingsInput\(\)/)
   assert.match(
     settings,
-    /event\.key === 'Escape' && settingsContentMode === 'input'[\s\S]*finishSettingsInput\(\)/,
+    /event\.key === 'Escape' && settingsContentMode === 'input'[\s\S]*isSettingsSelectTrigger\(activeControl\)[\s\S]*isOpenSelect\(activeControl\)[\s\S]*return[\s\S]*finishSettingsInput\(\)/,
   )
   assert.match(settings, /function finishSettingsInput[\s\S]*settingsContentMode = 'browse'/)
   assert.match(settings, /function finishSettingsInput[\s\S]*contentRegionEl\?\.focus\(\{ preventScroll: true \}\)/)
+})
+
+test('account row actions use left-right within a row and up-down between account groups', async () => {
+  const [settings, accountsTab] = await Promise.all([
+    readFile(settingsPath, 'utf8'),
+    readFile(accountsTabPath, 'utf8'),
+  ])
+
+  assert.match(accountsTab, /data-settings-horizontal-group="account-actions"/)
+  for (const action of ['test', 'move-up', 'move-down', 'edit', 'delete']) {
+    assert.match(accountsTab, new RegExp(`data-settings-horizontal-action="${action}"`))
+  }
+  assert.match(settings, /function getSettingsHorizontalGroups/)
+  assert.match(settings, /function getSettingsHorizontalGroupControls/)
+  assert.match(
+    settings,
+    /selectedHorizontalGroup[\s\S]*\['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'\]\.includes\(event\.key\)/,
+  )
+  assert.match(
+    settings,
+    /event\.key === 'ArrowLeft' \|\| event\.key === 'ArrowRight'[\s\S]*selectHorizontalGroupControl/,
+  )
+  assert.match(
+    settings,
+    /event\.key === 'ArrowUp' \|\| event\.key === 'ArrowDown'[\s\S]*selectAdjacentHorizontalGroup/,
+  )
+})
+
+test('enhanced keyboard explanation is exposed through a question-mark popover', async () => {
+  const [generalSettings, settingsRow] = await Promise.all([
+    readFile(generalSettingsPath, 'utf8'),
+    readFile(settingsRowPath, 'utf8'),
+  ])
+
+  assert.match(generalSettings, /help=\{\$_\('settingsGeneral\.enhancedKeyboardNavigationDescription'\)\}/)
+  assert.doesNotMatch(
+    generalSettings,
+    /description=\{\$_\('settingsGeneral\.enhancedKeyboardNavigationDescription'\)\}/,
+  )
+  assert.match(settingsRow, /help\?: string/)
+  assert.match(settingsRow, /<Popover\.Root>/)
+  assert.match(settingsRow, /<Popover\.Trigger[\s\S]*data-settings-help-trigger/)
+  assert.match(settingsRow, /icon="lucide:circle-help"/)
+  assert.match(settingsRow, /<Popover\.Content[\s\S]*\{help\}/)
 })
 
 test('settings footer uses horizontal actions and both actions return vertically to controls', async () => {

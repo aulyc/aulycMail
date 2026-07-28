@@ -140,61 +140,72 @@
               ? $_('account.lastConnected', { values: { time: relTime(connOk[acc.id]) } })
               : $_('account.neverConnected')}
           </span>
-          <Button
-            size="icon"
-            variant="ghost"
-            class="h-7 w-7"
-            onclick={() => runTest(acc.id)}
-            title={$_('account.testConnection')}
+          <div
+            data-settings-horizontal-group="account-actions"
+            data-keyboard-action-context={acc.email}
+            class="flex items-center gap-3"
           >
-            <Icon icon="mdi:lan-connect" class="w-4 h-4" />
-          </Button>
-
-          <!-- Up/Down buttons -->
-          <div class="flex items-center gap-1">
             <Button
+              data-settings-horizontal-action="test"
               size="icon"
               variant="ghost"
               class="h-7 w-7"
-              onclick={() => moveUp(index)}
-              disabled={index === 0}
-              title={$_('settingsAccounts.moveUp')}
+              onclick={() => runTest(acc.id)}
+              title={$_('account.testConnection')}
             >
-              <Icon icon="mdi:chevron-up" class="w-4 h-4" />
+              <Icon icon="mdi:lan-connect" class="w-4 h-4" />
             </Button>
+
+            <!-- Up/Down buttons -->
+            <div class="flex items-center gap-1">
+              <Button
+                data-settings-horizontal-action="move-up"
+                size="icon"
+                variant="ghost"
+                class="h-7 w-7"
+                onclick={() => moveUp(index)}
+                disabled={index === 0}
+                title={$_('settingsAccounts.moveUp')}
+              >
+                <Icon icon="mdi:chevron-up" class="w-4 h-4" />
+              </Button>
+              <Button
+                data-settings-horizontal-action="move-down"
+                size="icon"
+                variant="ghost"
+                class="h-7 w-7"
+                onclick={() => moveDown(index)}
+                disabled={index === accountStore.accounts.length - 1}
+                title={$_('settingsAccounts.moveDown')}
+              >
+                <Icon icon="mdi:chevron-down" class="w-4 h-4" />
+              </Button>
+            </div>
+
+            <!-- Edit button -->
             <Button
+              data-settings-horizontal-action="edit"
               size="icon"
               variant="ghost"
               class="h-7 w-7"
-              onclick={() => moveDown(index)}
-              disabled={index === accountStore.accounts.length - 1}
-              title={$_('settingsAccounts.moveDown')}
+              onclick={() => openEdit(acc)}
+              title={$_('settingsAccounts.editAccount')}
             >
-              <Icon icon="mdi:chevron-down" class="w-4 h-4" />
+              <Icon icon="mdi:pencil" class="w-4 h-4" />
+            </Button>
+
+            <!-- Delete button -->
+            <Button
+              data-settings-horizontal-action="delete"
+              size="icon"
+              variant="ghost"
+              class="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onclick={() => openDelete(acc)}
+              title={$_('settingsAccounts.deleteAccount')}
+            >
+              <Icon icon="mdi:delete-outline" class="w-4 h-4" />
             </Button>
           </div>
-
-          <!-- Edit button -->
-          <Button
-            size="icon"
-            variant="ghost"
-            class="h-7 w-7"
-            onclick={() => openEdit(acc)}
-            title={$_('settingsAccounts.editAccount')}
-          >
-            <Icon icon="mdi:pencil" class="w-4 h-4" />
-          </Button>
-
-          <!-- Delete button -->
-          <Button
-            size="icon"
-            variant="ghost"
-            class="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onclick={() => openDelete(acc)}
-            title={$_('settingsAccounts.deleteAccount')}
-          >
-            <Icon icon="mdi:delete-outline" class="w-4 h-4" />
-          </Button>
         </div>
       {/each}
     </div>
