@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.20] — 2026-07-28
+
 - Fixed account reordering so keyboard focus and the selected action remain on
   the moved account after its row is re-rendered.
 
