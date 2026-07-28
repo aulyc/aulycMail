@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.19] — 2026-07-28
+
 - Changed account-row action navigation so Left/Right switches actions within
   one account and Up/Down keeps the same action while moving between accounts.
 - Replaced the inline Enhanced Keyboard Navigation explanation with an
