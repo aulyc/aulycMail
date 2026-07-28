@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.18] — 2026-07-28
+
 - Kept one blue focus indicator visible around a Settings dropdown while its
   menu is open, without restoring the previous duplicate keyboard outline.
 
