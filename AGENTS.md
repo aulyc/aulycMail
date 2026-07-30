@@ -132,7 +132,8 @@ successful aggregate target unless diagnosing a failure.
 - Release profile: `macos-arm64-app`.
 - Architecture and distribution: Apple Silicon `arm64` only; test releases use
   ad-hoc App/DMG signing, while formal releases use a Developer ID DMG with
-  Hardened Runtime and Apple notarization.
+  Hardened Runtime and Apple notarization distributed through explicit
+  `aulyc-dual-mirror-v1` public mirrors.
 - Authoritative version and build-number source: `version.json`; every test and
   formal release requires a new positive build number.
 - Product metadata: the built App's `Info.plist`, Mach-O executable, Wails
@@ -165,3 +166,19 @@ successful aggregate target unless diagnosing a failure.
   `aulyc/aulycMail`, `main`, both remote commits, and the verification time.
   Test releases are not pushed by this project-owned backup step.
 - Read `docs/VERSIONING.md` and `docs/RELEASE.md` before release work.
+
+### Dual-mirror release policy
+
+- Explicit policy: `aulyc-dual-mirror-v1` `1.1.0`; the Release Profile remains
+  `macos-arm64-app`.
+- Private source authority: `aulyc/aulycMail`; public release mirrors:
+  `aulyc/aulycMail-releases` on GitHub and Gitee.
+- Project adapter: `bash tools/dual-mirror-release.sh
+  <prepare|preflight|publish|verify> ...`; full contract:
+  `docs/DUAL_MIRROR_RELEASE.md`.
+- Updater: `N/A`. Any future updater must implement fixed GitHub-first/Gitee
+  fallback and identical version/build/Commit/Bundle ID/arm64/SHA-256/
+  provenance/trust verification.
+- Only an explicitly authorized `publish` may write remote state. Missing
+  mirrors, one-sided failure or conflicts must fail/record partial state;
+  never push source to Gitee or overwrite an old release.
