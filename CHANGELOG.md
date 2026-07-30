@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.21] — 2026-07-30
+
 - Improved Settings keyboard navigation across backup and activity-log controls:
   highlighted the Start Backup action, made the backup directory subcontrols
   follow the intended arrow-key order, restored focus when opening logs, and
