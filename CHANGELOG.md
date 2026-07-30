@@ -4,6 +4,14 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Fixed Settings keyboard activation and focus handoff for the Clear Logs menu
+  and nested information or confirmation dialogs, preventing inactive Return
+  presses and macOS alert sounds.
+- Corrected Activity Log vertical navigation so it visits expandable log rows
+  before Load More and Close while the toolbar continues to use Left/Right.
+- Removed the duplicate focus ring around the Enhanced Keyboard Navigation
+  help icon.
+
 ## [0.6.0-beta.21] — 2026-07-30
 
 - Improved Settings keyboard navigation across backup and activity-log controls:
