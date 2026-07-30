@@ -646,6 +646,10 @@ test('enhanced keyboard explanation is exposed through a question-mark popover',
   assert.match(settingsRow, /<Popover\.Trigger[\s\S]*data-settings-help-trigger/)
   assert.match(settingsRow, /icon="lucide:circle-help"/)
   assert.match(settingsRow, /<Popover\.Content[\s\S]*\{help\}/)
+  const helpTrigger = settingsRow.match(/<Popover\.Trigger[\s\S]*?<\/Popover\.Trigger>/)?.[0] ?? ''
+  assert.match(helpTrigger, /focus-visible:ring-0/)
+  assert.match(helpTrigger, /focus-visible:ring-offset-0/)
+  assert.doesNotMatch(helpTrigger, /focus-visible:ring-2/)
 })
 
 test('settings footer uses horizontal actions and both actions return vertically to controls', async () => {

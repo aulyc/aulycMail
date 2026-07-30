@@ -17,8 +17,6 @@
   class="flex flex-wrap items-center justify-between gap-3"
   data-settings-horizontal-group="activity-toolbar"
   data-settings-horizontal-arrows-only
-  data-settings-arrow-down-target="activity-load-more"
-  data-settings-arrow-down-fallback="close"
 >
   <div class="inline-flex rounded-lg bg-muted p-1">
     {#each filters as filter (filter.key)}

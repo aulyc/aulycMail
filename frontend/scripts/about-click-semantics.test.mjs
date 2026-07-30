@@ -24,3 +24,14 @@ test('about links share aligned icon and text columns', async () => {
   assert.match(aboutTab, /class="flex w-full items-center justify-start gap-2 text-left[^"]*"/)
   assert.match(aboutTab, /icon="lucide:heart-handshake" class="h-5 w-5 shrink-0"/)
 })
+
+test('about information dialogs autofocus the primary close action for keyboard activation', async () => {
+  const aboutInfoDialog = await readFile(aboutInfoDialogPath, 'utf8')
+
+  assert.match(
+    aboutInfoDialog,
+    /function handleOpenAutoFocus[\s\S]*event\.preventDefault\(\)[\s\S]*if \(open\) primaryAction\?\.focus\(\{ preventScroll: true \}\)/,
+  )
+  assert.match(aboutInfoDialog, /onOpenAutoFocus=\{handleOpenAutoFocus\}/)
+  assert.match(aboutInfoDialog, /bind:this=\{primaryAction\}/)
+})

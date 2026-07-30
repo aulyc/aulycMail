@@ -463,6 +463,10 @@
     return control.matches('[data-keyboard-select-trigger="true"]')
   }
 
+  function isSettingsMenuTrigger(control: HTMLElement): boolean {
+    return control.matches('[data-keyboard-menu-trigger="true"]')
+  }
+
   function selectSettingsControlForTarget(target: EventTarget | null, showSelection = true) {
     const control = settingsControlForTarget(target)
     if (control) {
@@ -504,6 +508,10 @@
     settingsContentMode = 'browse'
     requestAnimationFrame(() => {
       if (!open) return
+      const nestedDialog = [...document.querySelectorAll<HTMLElement>(
+        '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]',
+      )].find((dialog) => !dialog.contains(contentRegionEl))
+      if (nestedDialog) return
       contentRegionEl?.focus({ preventScroll: true })
       selectSettingsControl(selectedSettingsControlIndex, false)
     })
@@ -531,15 +539,15 @@
     activationKey: 'Enter' | ' ' = 'Enter',
   ) {
     settingsContentMode = 'input'
-    const isSelectTrigger = isSettingsSelectTrigger(control)
-    if (isSelectTrigger) observeSelectLifecycle(control)
+    const isPopupTrigger = isSettingsSelectTrigger(control) || isSettingsMenuTrigger(control)
+    if (isPopupTrigger) observeSelectLifecycle(control)
     if (!activate) {
       clearSettingsKeyboardSelection()
       return
     }
     control.focus({ preventScroll: true })
     clearSettingsKeyboardSelection()
-    if (isSelectTrigger) {
+    if (isPopupTrigger) {
       control.dispatchEvent(new KeyboardEvent('keydown', {
         key: activationKey,
         code: activationKey === ' ' ? 'Space' : 'Enter',
@@ -561,7 +569,7 @@
     }
 
     const control = selectedItem.element
-    if (isSettingsSelectTrigger(control) || isInputElement(control)) {
+    if (isSettingsSelectTrigger(control) || isSettingsMenuTrigger(control) || isInputElement(control)) {
       beginSettingsInput(control, true, activationKey)
       return
     }
@@ -624,7 +632,7 @@
       const activeControl = settingsControlForTarget(event.target)
       if (
         activeControl
-        && isSettingsSelectTrigger(activeControl)
+        && (isSettingsSelectTrigger(activeControl) || isSettingsMenuTrigger(activeControl))
         && isOpenSelect(activeControl)
       ) return
       event.preventDefault()

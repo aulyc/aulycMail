@@ -1,7 +1,6 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
   import * as Dialog from '$lib/components/ui/dialog'
-  import { Button } from '$lib/components/ui/button'
   import { _ } from '$lib/i18n'
 
   interface InfoSection {
@@ -18,14 +17,25 @@
   }
 
   let { open = $bindable(false), title, intro, sections }: Props = $props()
+  let primaryAction = $state<HTMLButtonElement | null>(null)
 
   function close() {
     open = false
   }
+
+  function handleOpenAutoFocus(event: Event) {
+    event.preventDefault()
+    requestAnimationFrame(() => {
+      if (open) primaryAction?.focus({ preventScroll: true })
+    })
+  }
 </script>
 
 <Dialog.Root bind:open>
-  <Dialog.Content class="max-h-[78vh] w-[min(680px,90vw)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 !outline-none focus:!outline-none focus-visible:!outline-none focus:ring-0 focus-visible:ring-0 [&>button]:hidden">
+  <Dialog.Content
+    class="max-h-[78vh] w-[min(680px,90vw)] max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 !outline-none focus:!outline-none focus-visible:!outline-none focus:ring-0 focus-visible:ring-0 [&>button]:hidden"
+    onOpenAutoFocus={handleOpenAutoFocus}
+  >
     <header class="shrink-0 border-b border-border px-6 py-5 pr-12">
       <Dialog.Title class="text-lg font-semibold text-foreground">{title}</Dialog.Title>
       <button
@@ -54,7 +64,14 @@
     </div>
 
     <footer class="flex shrink-0 justify-end border-t border-border px-6 py-4">
-      <Button variant="outline" onclick={close}>{$_('common.close')}</Button>
+      <button
+        bind:this={primaryAction}
+        type="button"
+        class="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        onclick={close}
+      >
+        {$_('common.close')}
+      </button>
     </footer>
   </Dialog.Content>
 </Dialog.Root>

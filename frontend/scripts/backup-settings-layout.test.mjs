@@ -115,29 +115,41 @@ test('opening backup logs restores settings focus and keyboard-selects the backu
   assert.match(settingsDialog, /selectOutsideHorizontalGroup\(selectedHorizontalGroup/)
 })
 
-test('activity toolbar jumps to load more and repeated loads preserve keyboard position', async () => {
-  const [activityFilters, activityLogPage, activityList, settingsDialog] = await Promise.all([
+test('activity toolbar enters visible log rows before load more or close', async () => {
+  const [activityFilters, activityItem, activityLogPage, activityList, settingsDialog] = await Promise.all([
     readFile(paths.activityFilters, 'utf8'),
+    readFile(paths.activityItem, 'utf8'),
     readFile(paths.activityLogPage, 'utf8'),
     readFile(paths.activityList, 'utf8'),
     readFile(paths.settingsDialog, 'utf8'),
   ])
 
-  assert.match(activityFilters, /data-settings-arrow-down-target="activity-load-more"/)
-  assert.match(activityFilters, /data-settings-arrow-down-fallback="close"/)
+  assert.doesNotMatch(activityFilters, /data-settings-arrow-down-target=/)
+  assert.doesNotMatch(activityFilters, /data-settings-arrow-down-fallback=/)
   assert.match(activityFilters, /data-settings-horizontal-action="date"/)
+  assert.match(activityItem, /<button[\s\S]*disabled=\{!expandable\}/)
   assert.match(activityList, /data-settings-control-id="activity-load-more"/)
   assert.match(activityList, /await store\.loadMore\(\)[\s\S]*onLoadMoreFinished\?\.\(store\.hasMore\)/)
   assert.match(activityLogPage, /<ActivityLogList \{store\} \{onLoadMoreFinished\}/)
   assert.match(
     settingsDialog,
+    /selectedHorizontalGroup\.hasAttribute\('data-settings-horizontal-arrows-only'\)[\s\S]*selectExplicitHorizontalGroupTarget[\s\S]*selectOutsideHorizontalGroup\(selectedHorizontalGroup, direction\)/,
+  )
+  assert.match(
+    settingsDialog,
     /restoreActivityLogPositionAfterLoad\(hasMore: boolean\)[\s\S]*activity-load-more[\s\S]*settingsFooterAction === 'close'/,
   )
-  assert.match(settingsDialog, /selectExplicitHorizontalGroupTarget\(selectedHorizontalGroup, direction\)/)
+  assert.match(
+    settingsDialog,
+    /selectedItem\?\.kind === 'footer'[\s\S]*event\.key === 'ArrowUp' \? controlItems\.at\(-1\) : controlItems\[0\]/,
+  )
 })
 
 test('activity log clear trigger and menu use the same fixed width', async () => {
-  const source = await readFile(paths.activityClearMenu, 'utf8')
+  const [source, settingsDialog] = await Promise.all([
+    readFile(paths.activityClearMenu, 'utf8'),
+    readFile(paths.settingsDialog, 'utf8'),
+  ])
 
   assert.match(
     source,
@@ -148,6 +160,17 @@ test('activity log clear trigger and menu use the same fixed width', async () =>
     source,
     /<DropdownMenu\.Content[^>]*class="[^"]*\bw-40\b[^"]*"/,
     'the clear-log menu should use the same fixed width',
+  )
+  assert.match(source, /data-keyboard-menu-trigger="true"/)
+  assert.match(settingsDialog, /function isSettingsMenuTrigger/)
+  assert.match(
+    settingsDialog,
+    /isSettingsSelectTrigger\(control\) \|\| isSettingsMenuTrigger\(control\)[\s\S]*control\.dispatchEvent\([\s\S]*new KeyboardEvent\('keydown'/,
+  )
+  assert.match(
+    settingsDialog,
+    /document\.querySelectorAll<HTMLElement>[\s\S]*role="alertdialog"[\s\S]*find\(\(dialog\) => !dialog\.contains\(contentRegionEl\)\)[\s\S]*if \(nestedDialog\) return/,
+    'closing the menu into a confirmation dialog must not steal focus back to Settings',
   )
 })
 

@@ -10,7 +10,13 @@
 </script>
 
 <DropdownMenu.Root>
-  <DropdownMenu.Trigger data-settings-horizontal-action="clear" class="inline-flex h-9 w-40 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50" disabled={store.clearing || store.total === 0}>
+  <DropdownMenu.Trigger
+    data-settings-horizontal-action="clear"
+    data-keyboard-input="true"
+    data-keyboard-menu-trigger="true"
+    class="inline-flex h-9 w-40 shrink-0 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+    disabled={store.clearing || store.total === 0}
+  >
     <Icon icon="mdi:delete-sweep-outline" class="mr-1.5 h-4 w-4" />{$_('activityLog.clear')}
   </DropdownMenu.Trigger>
   <DropdownMenu.Content align="end" class="w-40">

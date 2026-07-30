@@ -27,7 +27,7 @@
             data-settings-help-trigger
             aria-label={helpLabel || label}
             title={helpLabel || label}
-            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
           >
             <Icon icon="lucide:circle-help" class="h-4 w-4" />
           </Popover.Trigger>
