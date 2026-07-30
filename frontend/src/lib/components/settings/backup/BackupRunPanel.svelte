@@ -16,6 +16,7 @@
 
 <Button
   size="sm"
+  data-settings-contrast-selection
   onclick={onStart}
   disabled={store.loading || (!store.running && !canStart)}
 >

@@ -4,12 +4,20 @@
   import { _ } from '$lib/i18n'
   import type { ActivityLogsStore } from './activityLogs.svelte'
   import ActivityLogItem from './ActivityLogItem.svelte'
-  interface Props { store: ActivityLogsStore }
-  let { store }: Props = $props()
+  interface Props {
+    store: ActivityLogsStore
+    onLoadMoreFinished?: (hasMore: boolean) => void
+  }
+  let { store, onLoadMoreFinished }: Props = $props()
   let expandedId = $state<string | null>(null)
 
   function toggleExpanded(id: string) {
     expandedId = expandedId === id ? null : id
+  }
+
+  async function loadMore() {
+    await store.loadMore()
+    onLoadMoreFinished?.(store.hasMore)
   }
 </script>
 
@@ -25,7 +33,7 @@
       <ActivityLogItem {log} expanded={expandedId === log.id} onToggle={() => toggleExpanded(log.id)} />
     {/each}
     {#if store.hasMore}
-      <div class="flex justify-center p-3"><Button variant="ghost" size="sm" onclick={() => store.loadMore()} disabled={store.loading}>{$_('activityLog.loadMore')}</Button></div>
+      <div class="flex justify-center p-3"><Button data-settings-control-id="activity-load-more" variant="ghost" size="sm" onclick={loadMore} disabled={store.loading}>{$_('activityLog.loadMore')}</Button></div>
     {/if}
   {/if}
 </div>

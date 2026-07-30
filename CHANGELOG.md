@@ -4,6 +4,17 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Improved Settings keyboard navigation across backup and activity-log controls:
+  highlighted the Start Backup action, made the backup directory subcontrols
+  follow the intended arrow-key order, restored focus when opening logs, and
+  kept Load More selected until pagination is exhausted.
+- Changed the activity-log toolbar to use Left/Right within the filter row and
+  Up/Down to leave it, including direct navigation to Load More or Close.
+- Moved Clear Offline Body Cache beside Test Connection in the account footer
+  and report its result with a toast.
+- Renamed the activity-log cleanup action to Clear Logs, aligned its trigger
+  and menu widths, and removed the redundant native summary hover tooltip.
+
 ## [0.6.0-beta.20] — 2026-07-28
 
 - Fixed account reordering so keyboard focus and the selected action remain on

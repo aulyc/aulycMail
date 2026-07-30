@@ -149,13 +149,36 @@
 
   function close() { open = false; onClose?.() }
   function handleOpenChange(value: boolean) { open = value; if (!value) onClose?.() }
-  function openBackupActivityLog() { activityInitialType = 'backup'; selectNavigationPage('activity') }
-  function selectNavigationPage(page: SettingsPage) {
-    if (page === 'activity') activityInitialType = ''
+  function openBackupActivityLog() { selectNavigationPage('activity', 'backup') }
+  function restoreActivityLogPositionAfterLoad(hasMore: boolean) {
+    void tick().then(() => requestAnimationFrame(() => {
+      if (!open || activePage !== 'activity' || settingsRegion !== 'content') return
+      if (hasMore) {
+        const loadMore = getSettingsControls().find((control) => (
+          control.dataset.settingsControlId === 'activity-load-more'
+        ))
+        if (loadMore) {
+          selectSettingsControlElement(loadMore)
+          return
+        }
+      }
+
+      const footerActions = getSettingsFooterActions()
+      const closeAction = footerActions.find((action) => (
+        action.dataset.settingsFooterAction === 'close'
+      )) ?? footerActions.at(-1)
+      if (!closeAction) return
+      contentRegionEl?.focus({ preventScroll: true })
+      selectSettingsControlForTarget(closeAction)
+    }))
+  }
+
+  function selectNavigationPage(page: SettingsPage, initialActivityType = '') {
+    if (page === 'activity') activityInitialType = initialActivityType
     if (activePage !== page) selectedSettingsControlIndex = 0
     selectedNavigationPage = page
     activePage = page
-    if (settingsRegion === 'content') scheduleSettingsControlSelection(true)
+    if (settingsRegion === 'content') scheduleSettingsControlSelection(true, true)
   }
 
   function keepDialogFromTakingPointerFocus(event: PointerEvent) {
@@ -183,8 +206,24 @@
 
   function getSettingsControls(): HTMLElement[] {
     if (!contentPanelEl) return []
-    return Array.from(contentPanelEl.querySelectorAll<HTMLElement>(SETTINGS_CONTROL_SELECTOR))
+    const controls = Array.from(contentPanelEl.querySelectorAll<HTMLElement>(SETTINGS_CONTROL_SELECTOR))
       .filter(isAvailableSettingsControl)
+    const orderGroups = new Map<HTMLElement, Array<{ control: HTMLElement; index: number; order: number }>>()
+    controls.forEach((control, index) => {
+      const group = control.closest<HTMLElement>('[data-settings-keyboard-order-group]')
+      const order = Number(control.dataset.settingsKeyboardOrder)
+      if (!group || !Number.isFinite(order)) return
+      const entries = orderGroups.get(group) ?? []
+      entries.push({ control, index, order })
+      orderGroups.set(group, entries)
+    })
+
+    for (const entries of orderGroups.values()) {
+      const slots = entries.map(({ index }) => index).sort((left, right) => left - right)
+      const ordered = [...entries].sort((left, right) => left.order - right.order)
+      slots.forEach((slot, index) => { controls[slot] = ordered[index].control })
+    }
+    return controls
   }
 
   function getSettingsFooterActions(): HTMLElement[] {
@@ -288,6 +327,54 @@
     if (target) selectSettingsControlElement(target)
   }
 
+  function selectOutsideHorizontalGroup(group: HTMLElement, direction: -1 | 1) {
+    const items = getSettingsContentItems()
+    const groupIndices = items.flatMap((item, index) => (
+      item.kind === 'control' && group.contains(item.element) ? [index] : []
+    ))
+    if (groupIndices.length === 0) return
+
+    const boundaryIndex = direction === -1
+      ? Math.min(...groupIndices)
+      : Math.max(...groupIndices)
+    const nextIndex = nextRovingIndex(
+      direction === -1 ? 'ArrowUp' : 'ArrowDown',
+      boundaryIndex,
+      items.length,
+      true,
+    )
+    if (nextIndex < 0) return
+    contentRegionEl?.focus({ preventScroll: true })
+    selectSettingsControl(nextIndex)
+  }
+
+  function selectExplicitHorizontalGroupTarget(group: HTMLElement, direction: -1 | 1): boolean {
+    const targetID = direction === -1
+      ? group.dataset.settingsArrowUpTarget
+      : group.dataset.settingsArrowDownTarget
+    if (!targetID) return false
+
+    const target = getSettingsControls().find((control) => (
+      control.dataset.settingsControlId === targetID
+    ))
+    if (target) {
+      selectSettingsControlElement(target)
+      return true
+    }
+
+    const fallbackActionID = direction === -1
+      ? group.dataset.settingsArrowUpFallback
+      : group.dataset.settingsArrowDownFallback
+    if (!fallbackActionID) return false
+    const fallbackAction = getSettingsFooterActions().find((action) => (
+      action.dataset.settingsFooterAction === fallbackActionID
+    ))
+    if (!fallbackAction) return false
+    contentRegionEl?.focus({ preventScroll: true })
+    selectSettingsControlForTarget(fallbackAction)
+    return true
+  }
+
   function restoreSettingsHorizontalControlAfterRender(
     context: string,
     action: 'move-up' | 'move-down',
@@ -338,11 +425,21 @@
     if (scroll) selectedItem.element.scrollIntoView({ block: 'nearest' })
   }
 
-  function scheduleSettingsControlSelection(reset = false) {
+  function scheduleSettingsControlSelection(reset = false, restoreFocus = false) {
     const page = activePage
     void tick().then(() => requestAnimationFrame(() => {
       if (!open || activePage !== page || settingsRegion !== 'content') return
-      selectSettingsControl(reset ? 0 : selectedSettingsControlIndex, false)
+      if (restoreFocus) contentRegionEl?.focus({ preventScroll: true })
+      const preferredIndex = reset
+        ? getSettingsContentItems().findIndex((item) => (
+          item.kind === 'control'
+          && item.element.dataset.settingsInitialSelection === 'true'
+        ))
+        : -1
+      selectSettingsControl(
+        preferredIndex >= 0 ? preferredIndex : reset ? 0 : selectedSettingsControlIndex,
+        false,
+      )
     }))
   }
 
@@ -572,6 +669,11 @@
       event.stopPropagation()
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
         selectHorizontalGroupControl(selectedItem.element, event.key === 'ArrowLeft' ? -1 : 1)
+      } else if (selectedHorizontalGroup.hasAttribute('data-settings-horizontal-arrows-only')) {
+        const direction = event.key === 'ArrowUp' ? -1 : 1
+        if (!selectExplicitHorizontalGroupTarget(selectedHorizontalGroup, direction)) {
+          selectOutsideHorizontalGroup(selectedHorizontalGroup, direction)
+        }
       } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         selectAdjacentHorizontalGroup(selectedItem.element, event.key === 'ArrowUp' ? -1 : 1)
       }
@@ -712,7 +814,7 @@
           {:else if activePage === 'mail'}<MailSettingsPage {draft} />
           {:else if activePage === 'accounts'}<AccountsSettingsPage onAccountOrderChanged={restoreSettingsHorizontalControlAfterRender} />
           {:else if activePage === 'backup'}<BackupSettingsPage {draft} onOpenActivityLog={openBackupActivityLog} />
-          {:else}<ActivityLogPage initialType={activityInitialType} />{/if}
+          {:else}<ActivityLogPage initialType={activityInitialType} onLoadMoreFinished={restoreActivityLogPositionAfterLoad} />{/if}
         </div>
         <footer
           bind:this={contentFooterEl}
@@ -745,6 +847,11 @@
 
   :global([data-settings-footer-action][data-settings-keyboard-selected='true']) {
     outline-offset: 2px;
+  }
+
+  :global([data-settings-contrast-selection][data-settings-keyboard-selected='true']) {
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px hsl(var(--background));
   }
 
   :global([data-settings-footer-action='save'][data-settings-keyboard-selected='true']) {

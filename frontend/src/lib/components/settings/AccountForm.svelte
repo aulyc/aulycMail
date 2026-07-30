@@ -26,6 +26,7 @@
   import AccountIdentityTab from './account/AccountIdentityTab.svelte'
   import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
   import { accountStore } from '$lib/stores/accounts.svelte'
+  import { addToast } from '$lib/stores/toast'
   import { _ } from '$lib/i18n'
   import { isEmailAddress } from '$lib/utils/email'
   import { formatLocalDate } from '$lib/utils/date'
@@ -208,7 +209,6 @@
   let showRemoveConfirm = $state(false)
   let showClearOfflineBodyCacheConfirm = $state(false)
   let clearingOfflineBodyCache = $state(false)
-  let offlineBodyCacheStatus = $state<{ kind: 'success' | 'error'; message: string } | null>(null)
 
   // SMTP authentication is hardcoded to "same as incoming server": there is
   // no separate-SMTP-credentials UI anymore. Force the hidden values empty so
@@ -329,19 +329,18 @@
   async function confirmClearOfflineBodyCache() {
     if (!editAccount) return
     clearingOfflineBodyCache = true
-    offlineBodyCacheStatus = null
     try {
       const result = await ClearOfflineBodyCache(editAccount.id)
-      offlineBodyCacheStatus = {
-        kind: 'success',
+      addToast({
+        type: 'success',
         message: $_('account.offlineBodyCacheCleared', { values: { count: result?.bodiesCleared ?? 0 } }),
-      }
+      })
     } catch (err) {
       console.error('Failed to clear offline body cache:', err)
-      offlineBodyCacheStatus = {
-        kind: 'error',
+      addToast({
+        type: 'error',
         message: $_('account.offlineBodyCacheClearFailed'),
-      }
+      })
     } finally {
       clearingOfflineBodyCache = false
     }
@@ -980,37 +979,6 @@
             </Select.Root>
           </div>
 
-          {#if editAccount}
-            <div class="flex items-center justify-between gap-4">
-              <div class="min-w-0">
-                <Label>{$_('account.offlineBodyCache')}</Label>
-                {#if offlineBodyCacheStatus}
-                  <p
-                    class="mt-1 truncate text-xs {offlineBodyCacheStatus.kind === 'error' ? 'text-destructive' : 'text-muted-foreground'}"
-                    title={offlineBodyCacheStatus.message}
-                  >
-                    {offlineBodyCacheStatus.message}
-                  </p>
-                {/if}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                class="w-48 shrink-0"
-                onclick={() => showClearOfflineBodyCacheConfirm = true}
-                disabled={clearingOfflineBodyCache || submitting}
-              >
-                {#if clearingOfflineBodyCache}
-                  <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-                {:else}
-                  <Icon icon="mdi:database-remove-outline" class="w-4 h-4 mr-2" />
-                {/if}
-                {$_('account.clearOfflineBodyCache')}
-              </Button>
-            </div>
-          {/if}
-
           <div class="flex items-center justify-between gap-4">
             <Label>{$_('account.checkNewMail')}</Label>
             <Select.Root bind:value={syncInterval}>
@@ -1235,19 +1203,37 @@
 
   <!-- Actions (pinned footer — stays visible while the fields scroll) -->
   <div class="flex items-center justify-between pt-4 mt-4 border-t border-border shrink-0">
-    <Button
-      type="button"
-      variant="outline"
-      onclick={handleTestConnection}
-      disabled={testing || submitting}
-    >
-      {#if testing}
-        <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
-      {:else}
-        <Icon icon="mdi:connection" class="w-4 h-4 mr-2" />
+    <div class="flex items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        onclick={handleTestConnection}
+        disabled={testing || submitting}
+      >
+        {#if testing}
+          <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
+        {:else}
+          <Icon icon="mdi:connection" class="w-4 h-4 mr-2" />
+        {/if}
+        {$_('account.testConnection')}
+      </Button>
+
+      {#if editAccount}
+        <Button
+          type="button"
+          variant="outline"
+          onclick={() => showClearOfflineBodyCacheConfirm = true}
+          disabled={clearingOfflineBodyCache || submitting}
+        >
+          {#if clearingOfflineBodyCache}
+            <Icon icon="mdi:loading" class="w-4 h-4 mr-2 animate-spin" />
+          {:else}
+            <Icon icon="mdi:database-remove-outline" class="w-4 h-4 mr-2" />
+          {/if}
+          {$_('account.clearOfflineBodyCache')}
+        </Button>
       {/if}
-      {$_('account.testConnection')}
-    </Button>
+    </div>
 
     <div class="flex gap-2">
       <Button type="button" variant="ghost" onclick={onCancel} disabled={submitting}>

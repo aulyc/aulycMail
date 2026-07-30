@@ -23,7 +23,7 @@
   >
     <Icon icon={statusIcon} class="h-5 w-5 shrink-0 {statusClass}" />
     <span class="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">{activityTypeLabel(log.type)}</span>
-    <span class="min-w-0 flex-1 truncate text-sm text-foreground" title={activitySummary(log)}>{activitySummary(log)}</span>
+    <span class="min-w-0 flex-1 truncate text-sm text-foreground">{activitySummary(log)}</span>
     <time class="shrink-0 text-xs tabular-nums text-muted-foreground/75">{activityTime(log.createdAt)}</time>
     <span class="w-14 shrink-0 text-right text-xs {statusClass}">{activityStatusLabel(log.status)}</span>
     {#if expandable}<Icon icon={expanded ? 'mdi:chevron-up' : 'mdi:chevron-down'} class="h-4 w-4 shrink-0 text-muted-foreground" />{/if}

@@ -121,9 +121,10 @@
   }
 </script>
 
-<div class="relative min-w-0" bind:this={pickerEl}>
+<div class="relative min-w-0" bind:this={pickerEl} data-settings-keyboard-order-group>
   <button
     type="button"
+    data-settings-keyboard-order="2"
     class="flex h-10 w-full min-w-0 items-center gap-2 rounded-md border border-border bg-background py-2 pl-11 pr-3 text-left text-sm text-foreground outline-none transition hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
     aria-haspopup="listbox"
     aria-expanded={menuOpen}
@@ -137,6 +138,7 @@
 
   <button
     type="button"
+    data-settings-keyboard-order="1"
     class="absolute left-1.5 top-1/2 z-10 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-35"
     aria-label={$_('backupViewer.openDirectory')}
     title={$_('backupViewer.openDirectory')}
