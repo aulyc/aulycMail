@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.22] — 2026-07-30
+
 - Fixed Settings keyboard activation and focus handoff for the Clear Logs menu
   and nested information or confirmation dialogs, preventing inactive Return
   presses and macOS alert sounds.
