@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0-beta.23] — 2026-07-31
+
 - Fixed scheduled background sync so INBOX, Drafts, and Sent always perform
   incremental UID checks even when an IMAP server returns stale STATUS
   snapshots, and the status bar advances only after the required account sync
