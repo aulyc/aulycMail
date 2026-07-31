@@ -12,7 +12,7 @@
         quit-running-darwin launch-darwin uninstall-darwin version-check version-test \
         prepare-test-release prepare-formal-release release-preflight release-golangci-lint release-check \
         release-tag release-tag-check release-backup-preflight release-backup-push \
-        release-test release-formal help
+        release-test release-formal release-test-install release-formal-install help
 
 # Go module path
 MODULE := aulyc.local/aulycmail
@@ -44,7 +44,7 @@ OBSOLETE_BUILD_OUTPUT_DIR := build/bin
 APP_BUNDLE := $(BUILD_OUTPUT_DIR)/aulycMail.app
 APP_BINARY := $(BUILD_OUTPUT_DIR)/aulycMail
 DMG_PATH ?= dist/aulycMail-$(VERSION)-build.$(BUNDLE_BUILD_NUMBER).dmg
-RELEASE_DMG_PATH := dist/aulycMail-$(VERSION)-build.$(BUILD_NUMBER).dmg
+RELEASE_DMG_PATH ?= dist/aulycMail-$(VERSION)-build.$(BUILD_NUMBER).dmg
 DMG_VOLUME_NAME ?= aulycMail Installer
 SIGN_IDENTITY ?=
 NOTARY_PROFILE ?=
@@ -229,22 +229,22 @@ isolated-release-artifact:
 install-dmg: quit-running-darwin
 	@./tools/install_macos_dmg.sh --dmg "$(DMG_PATH)"
 
-# Build a signed/notarized release DMG, then install that exact artifact locally.
-install-release-dmg: release-dmg quit-running-darwin
+# Install an already built and verified formal DMG.
+install-release-dmg: quit-running-darwin
 	@./tools/install_macos_dmg.sh --dmg "$(RELEASE_DMG_PATH)"
 
-# Build and install the exact tagged, ad-hoc signed test release.
-install-test-release-dmg: test-release-dmg quit-running-darwin
+# Install an already built and verified test DMG.
+install-test-release-dmg: quit-running-darwin
 	@./tools/install_macos_dmg.sh --dmg "$(RELEASE_DMG_PATH)" --allow-adhoc
 
-# Prepare, commit, validate, tag, build, and install a beta/RC test release.
+# Prepare, commit, validate, tag, and build a beta/RC test release.
 # Recursive Make calls re-read version.json after the automatic release commit.
 release-test:
 	@$(MAKE) prepare-test-release RELEASE_BUMP="$(RELEASE_BUMP)"
 	@$(MAKE) release-tag
-	@$(MAKE) install-test-release-dmg
+	@$(MAKE) test-release-dmg
 
-# Prepare, commit, validate, tag, notarize, build, and install a stable release.
+# Prepare, commit, validate, tag, notarize, build, and publish source refs.
 release-formal:
 	@if [ -z "$(SIGN_IDENTITY)" ]; then \
 		echo 'SIGN_IDENTITY is required for a formal release.'; \
@@ -257,8 +257,17 @@ release-formal:
 	@$(MAKE) release-backup-preflight
 	@$(MAKE) prepare-formal-release RELEASE_BUMP="$(RELEASE_BUMP)"
 	@$(MAKE) release-tag
-	@$(MAKE) install-release-dmg
+	@$(MAKE) release-dmg
 	@$(MAKE) release-backup-push
+
+# Explicit combined operations; installation starts only after release succeeds.
+release-test-install:
+	@$(MAKE) release-test RELEASE_BUMP="$(RELEASE_BUMP)"
+	@$(MAKE) install-test-release-dmg
+
+release-formal-install:
+	@$(MAKE) release-formal RELEASE_BUMP="$(RELEASE_BUMP)" SIGN_IDENTITY="$(SIGN_IDENTITY)" NOTARY_PROFILE="$(NOTARY_PROFILE)"
+	@$(MAKE) install-release-dmg
 
 ## Code Quality
 
@@ -550,8 +559,10 @@ help:
 	@echo "  make dev-race     - Run in development mode with race detector"
 	@echo "  make generate     - Generate Wails TypeScript bindings"
 	@echo "  make dmg          - Package the current app bundle as a non-release local DMG"
-	@echo "  make release-test - Auto-version, commit, tag, ad-hoc sign, and install a test release"
-	@echo "  make release-formal - Auto-version, commit, tag, notarize, and install a stable release"
+	@echo "  make release-test - Auto-version, commit, tag, and build a test release without installation"
+	@echo "  make release-formal - Auto-version, commit, tag, notarize, and publish source refs without installation"
+	@echo "  make release-test-install - Complete a test release, then install its exact DMG"
+	@echo "  make release-formal-install - Complete a formal release, then install its exact DMG"
 	@echo "  make release-check - Require golangci-lint v2.12.2, run gates, and build the candidate"
 	@echo "  make release-tag  - Create the annotated no-v tag after release checks pass"
 	@echo "  make release-backup-preflight - Verify the private backup remote before formal release"
@@ -562,8 +573,8 @@ help:
 	@echo "Installation:"
 	@echo "  make install      - Build, install, and launch aulycMail from /Applications"
 	@echo "  make install-dmg  - Verify and install DMG_PATH into /Applications"
-	@echo "  make install-test-release-dmg - Build and install the exact tagged test DMG"
-	@echo "  make install-release-dmg - Build signed DMG, install it, and launch aulycMail"
+	@echo "  make install-test-release-dmg - Install the existing verified test DMG"
+	@echo "  make install-release-dmg - Install the existing verified formal DMG"
 	@echo "  make uninstall    - Uninstall aulycMail from /Applications"
 	@echo ""
 	@echo "Code Quality:"

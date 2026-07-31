@@ -1,6 +1,6 @@
 # 双发布源接入
 
-本项目显式采用中央可选策略 `aulyc-dual-mirror-v1` `1.1.0`，Release Profile
+本项目显式采用中央可选策略 `aulyc-dual-mirror-v1` `1.2.0`，Release Profile
 仍是 `macos-arm64-app`。私有 GitHub 仓库 `aulyc/aulycMail` 是唯一源码权威；
 不得向 Gitee 推送源码。
 
@@ -10,10 +10,11 @@ DMG checksum、最终 provenance、provenance checksum 和 `latest.json`。
 
 当前应用没有应用内更新检查或下载器，`updater: N/A`。未来新增前必须先实现
 GitHub manifest 优先、Gitee fallback，并对任一来源执行相同的版本、build、
-Commit、Bundle ID、arm64、SHA-256、provenance、Developer ID、公证、安装身份
-和 installed-runtime 验证。
+Commit、Bundle ID、arm64、SHA-256、provenance、Developer ID、公证和发布产物
+身份验证。installed-runtime 只在明确要求安装时验证。
 
-项目现有流程仍负责 DMG、最终 provenance、Changelog、签名、公证和安装验证。
+项目现有流程仍负责 DMG、最终 provenance、Changelog、签名、公证和发布产物
+验证。
 源码 branch/tag 已推送并回写最终 provenance 后：
 
 ```bash
@@ -36,3 +37,7 @@ bash tools/dual-mirror-release.sh verify \
 `prepare` 只生成项目内 staging；`preflight` 只读；只有明确授权的 `publish`
 写远端。任一端失败都保留无凭据状态并只允许同计划向前重试。公开镜像仓库未创建
 时预检必须失败，不得绕过或临时改用源码仓库。
+
+纯正式发版不写入 `/Applications`，完成时报告
+`installationStatus: not-requested`。只有“正式发版安装”才在双端发布完整成功
+后执行 `make install-release-dmg`。

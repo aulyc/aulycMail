@@ -53,12 +53,19 @@ provenance over convenience or broad rewrites.
 - Full non-release CI gate and production build: `make ci`.
 - Local development installation: `make install-darwin`; this is not a release.
 - Test release: `GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build make release-test`.
+- Test release and installation: `GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build make release-test-install`.
 - Formal release: `GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build make release-formal SIGN_IDENTITY="Developer ID Application: nan ma (M9M7M2ARFD)" NOTARY_PROFILE=aulyc-notary`.
+- Formal release and installation: use the same credentials with `make release-formal-install`.
 - Formal release backup: remote `backup`, branch `main`; `make release-formal`
   must run the central GitHub preflight before changing release metadata, then
   atomically push and verify the formal release commit and annotated tag after
-  installation succeeds. The central gate also finalizes and verifies the
+  the signed/notarized DMG is verified. The central gate also finalizes and verifies the
   GitHub source fields in the release provenance.
+
+`测试发版`、`正式发版`和`完整发版`都不写入 `/Applications`。只有带
+`-install` 的组合目标才执行“测试发版安装”或“正式发版安装”。
+`install-test-release-dmg` 与 `install-release-dmg` 只安装既有 DMG，不构建或
+创建发布。纯发版报告 `installationStatus: not-requested`。
 
 Do not install, release, tag, sign, notarize, or publish unless the user
 explicitly requests that operation.
@@ -169,7 +176,7 @@ successful aggregate target unless diagnosing a failure.
 
 ### Dual-mirror release policy
 
-- Explicit policy: `aulyc-dual-mirror-v1` `1.1.0`; the Release Profile remains
+- Explicit policy: `aulyc-dual-mirror-v1` `1.2.0`; the Release Profile remains
   `macos-arm64-app`.
 - Private source authority: `aulyc/aulycMail`; public release mirrors:
   `aulyc/aulycMail-releases` on GitHub and Gitee.

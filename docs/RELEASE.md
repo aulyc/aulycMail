@@ -37,11 +37,13 @@ Both release channels perform the same identity steps:
 8. Build the final app and DMG in the isolated worktree. The caller worktree is
    never used as the final artifact source.
 9. Derive and validate release provenance against Git and the actual artifact.
-10. Verify the DMG and contained app, install to
-    `/Applications/aulycMail.app`, verify the installed app, then launch.
+10. Verify the DMG and contained app without modifying `/Applications`.
 11. For a formal release, atomically push the release commit to `backup/main`
     together with the annotated release tag, then read both remote refs back
     and require them to resolve to the exact release commit.
+12. Only for an explicitly requested combined release-install operation,
+    install that exact verified DMG to `/Applications/aulycMail.app`, verify the
+    installed app, and launch it after the release succeeds.
 
 Existing same-version DMGs or provenance files are not overwritten. To reuse an
 existing artifact, verify and install that unchanged artifact. If content or
@@ -67,6 +69,10 @@ notary credentials, never uploads to Apple, records `notarized: false`, and
 does not run or claim formal Gatekeeper trust. Installation requires the
 explicit internal `--allow-adhoc` path.
 
+`make release-test` only produces and verifies the tagged test DMG. It does not
+install or launch the App. Use `make release-test-install` only when the user
+explicitly requests a test release installation.
+
 ## Formal release
 
 Prerequisites:
@@ -87,9 +93,9 @@ GOCACHE=/Users/crp/Projects/aulyc/aulycMail/.cache/go-build \
 The isolated tagged app is Developer ID signed with Hardened Runtime. The DMG
 is signed, submitted with `notarytool --wait`, and must return `Accepted`.
 Stapling, `stapler validate`, DMG Gatekeeper assessment, contained-app
-assessment, installed-app assessment, and manifest verification must all pass.
+assessment, and manifest verification must all pass.
 Credentials remain in Keychain and are not written to logs or release provenance.
-Only after those checks and the installed-app verification succeed does the
+Only after those artifact checks succeed does the
 formal flow use the central GitHub gate to push `main` and the annotated tag to
 the private backup repository. The push is atomic and never forced; a
 conflicting remote ref stops the release instead of overwriting remote history.
@@ -98,13 +104,19 @@ conflicting remote ref stops the release instead of overwriting remote history.
 
 The central registry binds this project to `aulyc/aulycMail`, Git remote
 `backup`, and formal branch `main`. `make release-formal` runs the central
-preflight before release metadata changes. After the installed formal App is
-verified, the same flow passes the real `.manifest.json` provenance file to the
+preflight before release metadata changes. After the formal DMG and contained
+App are verified, the same flow passes the real `.manifest.json` provenance file to the
 central `push` phase, atomically publishes the branch and annotated tag, reads
 both refs back, and writes `sourceRepository`, `sourceBranch`,
 `sourceRemoteCommit`, `sourceRemoteTagCommit`, and
 `sourceRemoteVerifiedAt` from that remote evidence. A missing or invalid `gh`
 login, URL mismatch, non-atomic push, or ref mismatch stops the release.
+
+`make release-formal` and “完整发版” do not install or launch the App and report
+`installationStatus: not-requested`. Only “正式发版安装” maps to
+`make release-formal-install`. “安装正式版” maps to
+`make install-release-dmg RELEASE_DMG_PATH=<existing-dmg>` and creates no
+release metadata, tag, or remote mutation.
 
 ## Release provenance and artifact verification
 
@@ -162,6 +174,8 @@ make release-check
 make release-tag
 make test-release-dmg
 make release-dmg
+make release-test-install
+make release-formal-install
 make install-test-release-dmg
 make install-release-dmg
 ```

@@ -3,19 +3,25 @@
   "schemaVersion": 1,
   "projectId": "aulycmail",
   "applicability": "applicable",
-  "coreVersion": "2.1.0",
+  "coreVersion": "3.0.0",
   "artifacts": [
     {
       "id": "aulycmail-macos-app",
       "type": "macos-arm64-app",
       "profile": "macos-arm64-app",
-      "profileVersion": "1.0.0"
+      "profileVersion": "2.0.0",
+      "operations": {
+        "testRelease": "release-only",
+        "testReleaseInstall": "release-and-live-target",
+        "formalRelease": "release-only",
+        "formalReleaseInstall": "release-and-live-target"
+      }
     }
   ],
   "releasePolicies": [
     {
       "id": "aulyc-dual-mirror-v1",
-      "version": "1.1.0"
+      "version": "1.2.0"
     }
   ],
   "ruleBindings": [
@@ -83,6 +89,10 @@
       "evidence": ["AGENTS.md#dual-mirror-release-policy", "docs/DUAL_MIRROR_RELEASE.md"]
     },
     {
+      "ruleId": "REL-016",
+      "evidence": ["AGENTS.md#command-mapping", "Makefile", "tools/release-operation-separation.test.mjs"]
+    },
+    {
       "ruleId": "DMR-001",
       "evidence": ["docs/DUAL_MIRROR_RELEASE.md"]
     },
@@ -111,6 +121,10 @@
       "evidence": ["AGENTS.md#dual-mirror-release-policy", "tools/dual-mirror-release.sh"]
     },
     {
+      "ruleId": "DMR-008",
+      "evidence": ["AGENTS.md#command-mapping", "docs/DUAL_MIRROR_RELEASE.md"]
+    },
+    {
       "ruleId": "MAC-001",
       "evidence": ["AGENTS.md#versioning-and-release-profile"]
     },
@@ -133,13 +147,21 @@
     {
       "ruleId": "MAC-006",
       "evidence": ["docs/RELEASE.md#release-provenance-and-artifact-verification"]
+    },
+    {
+      "ruleId": "MAC-007",
+      "evidence": [
+        "docs/RELEASE.md#release-provenance-and-artifact-verification",
+        "tools/package_macos_dmg.sh",
+        "tools/verify_macos_app.sh"
+      ]
     }
   ],
   "exceptions": [],
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "d8712c11a458bafa140ffd4e1eff2f297d40de4e7180f5d93541c1721d6ccc68"
+      "sha256": "47afa6195dcf18a6d3be23104d44a9f3ab72baaf23f76847b226464e3ae26ef7"
     },
     {
       "path": "docs/DEVELOPMENT.md",
@@ -151,11 +173,11 @@
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "4f60365f86065b2f91457da12cb07791da5a96de06f9fd0144829292c10f7c4e"
+      "sha256": "ac036685a80c30b2e3a425cbbe0a35669d710eb6dec9b58d8dff2a16f77d38ea"
     },
     {
       "path": "Makefile",
-      "sha256": "645863175b9948423831ccd77c4882846690319fc038a127244ae1ed6c75e8e0"
+      "sha256": "4ead049704ada9a5537f5bebc983f78fcb10a53559550d3208c4b50783c083ea"
     },
     {
       "path": ".golangci.yml",
@@ -235,7 +257,7 @@
     },
     {
       "path": "docs/DUAL_MIRROR_RELEASE.md",
-      "sha256": "d4a2f2db3855200380931d0361c869f38461ab314d3e687c7ee18ad4befc36a4"
+      "sha256": "799fecdf6bbb9566f53ea4e6b612bfaf02a1d67f5dc0efc96958311fc6778900"
     },
     {
       "path": "tools/dual-mirror-release.sh",
