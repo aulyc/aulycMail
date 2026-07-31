@@ -35,8 +35,9 @@ type SyncCompletedCallback func(accountID, folderID string, err error)
 type SyncCompletedResultCallback func(accountID, folderID string, result MessageSyncResult, err error)
 
 // AccountSyncFinishedCallback is called once after an account-level scheduler
-// run returns, including no-change probes, failures, and cancellations.
-type AccountSyncFinishedCallback func(accountID string)
+// run returns. succeeded is true only when the remote folder probe and every
+// required message-folder sync completed successfully.
+type AccountSyncFinishedCallback func(accountID string, succeeded bool)
 
 // Scheduler handles periodic background sync of email accounts
 type Scheduler struct {
@@ -116,13 +117,14 @@ func (s *Scheduler) SetAccountSyncFinishedCallback(callback AccountSyncFinishedC
 	s.accountFinished = callback
 }
 
-func (s *Scheduler) runAccountSyncLifecycle(accountID string, work func()) {
+func (s *Scheduler) runAccountSyncLifecycle(accountID string, work func() bool) {
+	succeeded := false
 	defer func() {
 		if s.accountFinished != nil {
-			s.accountFinished(accountID)
+			s.accountFinished(accountID, succeeded)
 		}
 	}()
-	work()
+	succeeded = work()
 }
 
 func (s *Scheduler) notifySyncCompleted(accountID, folderID string, result MessageSyncResult, err error) {
@@ -293,8 +295,8 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account, trigger Trigger) {
 			s.lastAttempts[acc.ID] = time.Now()
 			s.probeMu.Unlock()
 		}
-		s.runAccountSyncLifecycle(acc.ID, func() {
-			s.syncAccountInboxWork(ctx, acc, trigger)
+		s.runAccountSyncLifecycle(acc.ID, func() bool {
+			return s.syncAccountInboxWork(ctx, acc, trigger)
 		})
 		return nil
 	})
@@ -303,7 +305,7 @@ func (s *Scheduler) syncAccountInbox(acc *account.Account, trigger Trigger) {
 	}
 }
 
-func (s *Scheduler) syncAccountInboxWork(parent context.Context, acc *account.Account, trigger Trigger) {
+func (s *Scheduler) syncAccountInboxWork(parent context.Context, acc *account.Account, trigger Trigger) bool {
 
 	// Create a cancellable context with timeout for this sync operation
 	// 30 minute timeout prevents syncs from running forever if connection hangs
@@ -334,11 +336,11 @@ func (s *Scheduler) syncAccountInboxWork(parent context.Context, acc *account.Ac
 		if ctx.Err() != nil {
 			s.log.Info().Str("account", acc.Name).Msg("Sync cancelled during folder sync")
 			s.notifySyncCompleted(acc.ID, "", MessageSyncResult{}, ctx.Err())
-			return
+			return false
 		}
 		s.log.Error().Err(err).Str("account", acc.Name).Msg("Failed to sync folders")
 		s.notifySyncCompleted(acc.ID, "", MessageSyncResult{}, err)
-		return
+		return false
 	}
 
 	forceAllFolders := trigger != TriggerScheduled || !folderResult.Complete
@@ -349,23 +351,24 @@ func (s *Scheduler) syncAccountInboxWork(parent context.Context, acc *account.Ac
 	if err != nil {
 		s.log.Error().Err(err).Str("account", acc.Name).Msg("Failed to get INBOX folder")
 		s.notifySyncCompleted(acc.ID, "", MessageSyncResult{}, err)
-		return
+		return false
 	}
 	if inbox == nil {
 		s.log.Warn().Str("account", acc.Name).Msg("INBOX folder not found")
 		s.notifySyncCompleted(acc.ID, "", MessageSyncResult{}, errors.New("INBOX folder not found"))
-		return
+		return false
 	}
 	if !hadInboxBeforeProbe {
 		previousInboxCount = inbox.TotalCount
 	}
-	if forceAllFolders {
-		changedPaths[inbox.Path] = true
-		if configuredFolders, listErr := s.getAccountSyncFolders(acc); listErr == nil {
-			for _, configuredFolder := range configuredFolders {
-				changedPaths[configuredFolder.Path] = true
-			}
-		}
+
+	// STATUS is only a fast-path hint. Some IMAP servers can return a stale
+	// STATUS snapshot for Sent or Drafts after another client writes there.
+	// Always perform the cheap incremental UID check for the core folders;
+	// continue using snapshot deltas for unchanged non-core folders.
+	changedPaths[inbox.Path] = true
+	if configuredFolders, listErr := s.getAccountSyncFolders(acc); listErr == nil {
+		includeRequiredFolderPaths(changedPaths, configuredFolders, forceAllFolders)
 	}
 
 	allSucceeded := true
@@ -376,18 +379,18 @@ func (s *Scheduler) syncAccountInboxWork(parent context.Context, acc *account.Ac
 			if ctx.Err() != nil {
 				s.log.Info().Str("account", acc.Name).Msg("Sync cancelled during message sync")
 				s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, ctx.Err())
-				return
+				return false
 			}
 			s.log.Error().Err(syncErr).Str("account", acc.Name).Msg("Failed to sync messages")
 			s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, syncErr)
-			return
+			return false
 		}
 
 		updatedInbox, updateErr := s.folderStore.Get(inbox.ID)
 		if updateErr != nil {
 			s.log.Error().Err(updateErr).Str("account", acc.Name).Msg("Failed to get updated INBOX folder")
 			s.notifySyncCompleted(acc.ID, inbox.ID, messageResult, updateErr)
-			return
+			return false
 		}
 		if updatedInbox != nil && updatedInbox.TotalCount > previousInboxCount {
 			newCount := updatedInbox.TotalCount - previousInboxCount
@@ -420,6 +423,27 @@ func (s *Scheduler) syncAccountInboxWork(parent context.Context, acc *account.Ac
 	}
 
 	s.log.Debug().Str("account", acc.Name).Int("changedFolders", len(changedPaths)).Msg("Scheduled sync completed")
+	return allSucceeded && folderResult.Complete
+}
+
+func includeRequiredFolderPaths(changedPaths map[string]bool, configuredFolders []*folder.Folder, forceAll bool) {
+	for _, configuredFolder := range configuredFolders {
+		if configuredFolder == nil || configuredFolder.NoSelect {
+			continue
+		}
+		if forceAll || isCoreFolderType(configuredFolder.Type) {
+			changedPaths[configuredFolder.Path] = true
+		}
+	}
+}
+
+func isCoreFolderType(folderType folder.Type) bool {
+	switch folderType {
+	case folder.TypeInbox, folder.TypeDrafts, folder.TypeSent:
+		return true
+	default:
+		return false
+	}
 }
 
 // syncAdditionalFolders syncs subscribed or all folders beyond Inbox,

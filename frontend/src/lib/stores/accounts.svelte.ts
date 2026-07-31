@@ -22,7 +22,7 @@ interface AccountWithFolders {
   loading: boolean
   syncing: boolean
   error: string | null
-  lastSync: Date | null
+  lastCompleteSync: Date | null
 }
 
 interface SyncProgress {
@@ -141,8 +141,6 @@ class AccountStore {
           if (acc.syncing) {
             acc.syncing = false
           }
-          // Update lastSync time (handles wake-from-sleep syncs too)
-          acc.lastSync = new Date()
           this.accounts = [...this.accounts]
         }
       }
@@ -160,7 +158,7 @@ class AccountStore {
     // A scheduled remote probe can finish without syncing any message folder.
     // Clear the account-level progress entry even when no folder:synced event
     // was needed, and also cover folder-list failures and cancellation.
-    EventsOn('sync:accountFinished', (data: { accountId: string }) => {
+    EventsOn('sync:accountFinished', (data: { accountId: string; succeeded: boolean }) => {
       if (this.syncProgress[data.accountId]) {
         delete this.syncProgress[data.accountId]
         this.syncProgress = { ...this.syncProgress }
@@ -169,6 +167,9 @@ class AccountStore {
       const acc = this.accounts.find((a) => a.account.id === data.accountId)
       if (acc) {
         acc.syncing = false
+        if (data.succeeded) {
+          acc.lastCompleteSync = new Date()
+        }
         this.accounts = [...this.accounts]
       }
     })
@@ -307,7 +308,7 @@ class AccountStore {
         loading: false,
         syncing: false,
         error: null,
-        lastSync: null,
+        lastCompleteSync: null,
       }))
 
       // Load folders for each account in parallel
@@ -360,7 +361,7 @@ class AccountStore {
     try {
       // Use SyncAccountComplete to sync folders + core folder messages (Inbox, Drafts, Sent)
       await SyncAccountComplete(accountId)
-      acc.lastSync = new Date()
+      acc.lastCompleteSync = new Date()
       // Reload folders after sync
       await this.loadFolders(accountId)
     } catch (err) {
@@ -390,7 +391,7 @@ class AccountStore {
       // Update last sync time for all accounts
       const now = new Date()
       for (const acc of this.accounts) {
-        acc.lastSync = now
+        acc.lastCompleteSync = now
       }
       // Reload folders for all accounts
       for (const acc of this.accounts) {
@@ -438,7 +439,7 @@ class AccountStore {
       loading: false,
       syncing: false,
       error: null,
-      lastSync: null,
+      lastCompleteSync: null,
     })
 
     // Start sync in background (don't await - let dialog close immediately)
@@ -541,15 +542,15 @@ class AccountStore {
   }
 
   /**
-   * Get the most recent sync time across all accounts
+   * Get the last time every enabled account completed its required sync.
+   * The oldest per-account completion is the truthful global boundary.
    */
-  get lastSyncTime(): Date | null {
-    const syncs = this.accounts
-      .map((a) => a.lastSync)
-      .filter((d): d is Date => d !== null)
+  get lastCompleteSyncTime(): Date | null {
+    const enabledAccounts = this.accounts.filter((a) => a.account.enabled)
+    if (enabledAccounts.length === 0) return null
+    if (enabledAccounts.some((a) => a.lastCompleteSync === null)) return null
 
-    if (syncs.length === 0) return null
-    return new Date(Math.max(...syncs.map((d) => d.getTime())))
+    return new Date(Math.min(...enabledAccounts.map((a) => a.lastCompleteSync!.getTime())))
   }
 
   /**

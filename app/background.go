@@ -77,9 +77,10 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 		}
 		a.refreshUnreadBadges()
 	})
-	a.syncScheduler.SetAccountSyncFinishedCallback(func(accountID string) {
+	a.syncScheduler.SetAccountSyncFinishedCallback(func(accountID string, succeeded bool) {
 		wailsRuntime.EventsEmit(a.ctx, "sync:accountFinished", map[string]interface{}{
 			"accountId": accountID,
+			"succeeded": succeeded,
 		})
 	})
 

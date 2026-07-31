@@ -81,7 +81,7 @@
       return { accountName: null, label: $_('sidebar.offline'), percentage: null }
     }
 
-    if (!accountStore.lastSyncTime) {
+    if (!accountStore.lastCompleteSyncTime) {
       return { accountName: null, label: $_('sidebar.notSynced'), percentage: null }
     }
 
@@ -89,7 +89,7 @@
       accountName: null,
       label: $_('sidebar.synced', {
         values: {
-          time: formatDistanceToNow(accountStore.lastSyncTime, {
+          time: formatDistanceToNow(accountStore.lastCompleteSyncTime, {
             addSuffix: true,
             locale: getCurrentDateFnsLocale(),
           }),

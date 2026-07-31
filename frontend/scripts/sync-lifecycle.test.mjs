@@ -14,6 +14,25 @@ test('an unchanged scheduled folder probe still clears account sync state', asyn
   ])
 
   assert.match(scheduler, /runAccountSyncLifecycle\(acc\.ID,[\s\S]*syncAccountInboxWork\(ctx, acc, trigger\)/)
-  assert.match(appBackground, /SetAccountSyncFinishedCallback\([\s\S]*EventsEmit\(a\.ctx, "sync:accountFinished"/)
+  assert.match(appBackground, /SetAccountSyncFinishedCallback\([\s\S]*EventsEmit\(a\.ctx, "sync:accountFinished"[\s\S]*"succeeded": succeeded/)
   assert.match(accountStore, /EventsOn\('sync:accountFinished'[\s\S]*delete this\.syncProgress\[data\.accountId\][\s\S]*acc\.syncing = false/)
+})
+
+test('only a successful account-level sync advances the complete sync timestamp', async () => {
+  const accountStore = await readFile(accountStorePath, 'utf8')
+
+  const folderSyncedBlock = accountStore.match(
+    /EventsOn\('folder:synced'[\s\S]*?\n {4}\}\)\n\n {4}\/\/ A scheduled remote probe/,
+  )?.[0]
+  assert.ok(folderSyncedBlock, 'folder:synced handler should be present')
+  assert.doesNotMatch(folderSyncedBlock, /lastCompleteSync\s*=/)
+
+  assert.match(
+    accountStore,
+    /EventsOn\('sync:accountFinished', \(data: \{ accountId: string; succeeded: boolean \}\)[\s\S]*if \(data\.succeeded\)[\s\S]*acc\.lastCompleteSync = new Date\(\)/,
+  )
+  assert.match(
+    accountStore,
+    /get lastCompleteSyncTime\(\): Date \| null[\s\S]*enabledAccounts\.some\(\(a\) => a\.lastCompleteSync === null\)[\s\S]*Math\.min/,
+  )
 })
