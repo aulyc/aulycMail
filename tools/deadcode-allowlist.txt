@@ -1,0 +1,13 @@
+# Objective-C/C entry points invoked outside Go's static call graph.
+# Keep entries exact as path:function; stale entries fail make deadcode-check.
+internal/notification/notifier_darwin.go:dispatchNotificationSettings
+internal/notification/notifier_darwin.go:goNotificationCallback
+internal/notification/notifier_darwin.go:goNotificationSettingsCallback
+internal/platform/activation_darwin.go:dispatchActivation
+internal/platform/activation_darwin.go:goAppActivated
+internal/platform/activation_darwin.go:goAppReopen
+internal/platform/menu_darwin.go:goMenuAction
+internal/platform/network_darwin.go:DarwinNetworkMonitor.updateState
+internal/platform/network_darwin.go:goNetworkStatusCallback
+internal/platform/sleep_darwin.go:goSleepWakeCallback
+internal/platform/statusitem_darwin.go:goStatusItemAction

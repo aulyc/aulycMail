@@ -37,11 +37,13 @@ golangci-lint version --json
 ```
 
 Do not rely on an unpinned Homebrew upgrade for the release tool. Local
-development remains usable without it: `make check-go` reports the missing
-tool and falls back to `go vet`. Releases are fail-closed: `make release-check`
-requires the machine-readable version to equal `2.12.2`, validates
-`.golangci.yml` as a v2 configuration, and runs `golangci-lint run` without a
-fallback.
+development remains usable without it: the golangci-lint step in
+`make check-go` reports the missing tool and falls back to `go vet`.
+`make check-go` also runs the fail-closed, pinned deadcode gate; its exact
+Objective-C/C callback allowlist lives in `tools/deadcode-allowlist.txt`.
+Releases are fail-closed: `make release-check` requires the machine-readable
+version to equal `2.12.2`, validates `.golangci.yml` as a v2 configuration, and
+runs `golangci-lint run` without a fallback.
 
 ## Architecture
 
@@ -78,7 +80,8 @@ Support or Keychain storage.
 
 ```text
 make fmt-check       Non-mutating gofmt verification
-make check-go        fmt-check + Go tests + golangci-lint (or explicit go vet fallback)
+make deadcode-check  Pinned production reachability gate + exact native-callback allowlist
+make check-go        fmt-check + Go tests + lint/vet + deadcode-check
 make check-frontend  unit tests + svelte-check + i18n + ESLint + knip
 make security-audit  npm audit for all production and development dependencies
 make check           version checks/tests + check-go + check-frontend

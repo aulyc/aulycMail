@@ -45,29 +45,10 @@ type draftOps struct {
 	imapPool     *imap.Pool
 }
 
-// getSpecialFolder looks up a special folder for an account, checking manual
-// mappings first and falling back to auto-detected folder type.
+// getSpecialFolder uses the shared resolver so draft sync and deletion apply
+// the same mapping, selectability, fallback, and error semantics as App paths.
 func (ops *draftOps) getSpecialFolder(accountID string, folderType folder.Type) (*folder.Folder, error) {
-	acc, err := ops.accountStore.Get(accountID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get account: %w", err)
-	}
-	if acc == nil {
-		return nil, fmt.Errorf("account not found: %s", accountID)
-	}
-
-	mappedPath := acc.GetFolderMapping(string(folderType))
-	if mappedPath != "" {
-		f, err := ops.folderStore.GetByPath(accountID, mappedPath)
-		if err != nil {
-			return nil, err
-		}
-		if f != nil {
-			return f, nil
-		}
-	}
-
-	return ops.folderStore.GetByType(accountID, folderType)
+	return resolveSpecialFolder(ops.accountStore, ops.folderStore, accountID, folderType)
 }
 
 // resolveAttachmentContent resolves ContentBase64 to Content for all attachments,

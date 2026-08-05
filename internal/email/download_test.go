@@ -64,16 +64,16 @@ func TestUniqueAttachmentPathAvoidsCollisions(t *testing.T) {
 	}
 }
 
-func TestSaveAttachmentDefaultPathSanitizesFilename(t *testing.T) {
+func TestAttachmentSavePathSanitizesDefaultFilename(t *testing.T) {
 	downloader := NewAttachmentDownloader(t.TempDir())
 	att := &message.Attachment{
 		MessageID: "msg",
 		Filename:  "../../evil.txt",
 	}
 
-	path, err := downloader.SaveAttachment(att, []byte("content"), "")
+	path, err := downloader.attachmentSavePath(att, "")
 	if err != nil {
-		t.Fatalf("SaveAttachment() error = %v", err)
+		t.Fatalf("attachmentSavePath() error = %v", err)
 	}
 	if filepath.Base(path) != "evil.txt" {
 		t.Fatalf("saved basename = %q, want evil.txt", filepath.Base(path))

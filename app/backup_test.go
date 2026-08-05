@@ -237,16 +237,16 @@ func TestParseBackupTimeAcceptsGoTimeString(t *testing.T) {
 	}
 }
 
-func TestBackupIndexedFilePathRejectsTraversal(t *testing.T) {
+func TestBackupViewerUsesIndexedFilePathContract(t *testing.T) {
 	dir := t.TempDir()
 
-	if _, err := backupIndexedFilePath(dir, "../outside.eml"); err == nil {
+	if _, err := mailBackup.IndexedFilePath(dir, "../outside.eml"); err == nil {
 		t.Fatal("expected traversal path to be rejected")
 	}
-	if _, err := backupIndexedFilePath(dir, filepath.Join(dir, "message.eml")); err == nil {
+	if _, err := mailBackup.IndexedFilePath(dir, filepath.Join(dir, "message.eml")); err == nil {
 		t.Fatal("expected absolute path to be rejected")
 	}
-	got, err := backupIndexedFilePath(dir, "eml/user@example.com/INBOX/message.eml")
+	got, err := mailBackup.IndexedFilePath(dir, "eml/user@example.com/INBOX/message.eml")
 	if err != nil {
 		t.Fatalf("expected valid backup path: %v", err)
 	}

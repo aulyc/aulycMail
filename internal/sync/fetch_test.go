@@ -92,7 +92,8 @@ func TestReadRawMessageLiteralWithLimitRejectsOversized(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected oversized raw message to fail")
 	}
-	if !IsRawMessageTooLargeError(fmt.Errorf("wrapped: %w", err)) {
+	var tooLarge RawMessageTooLargeError
+	if !errors.As(fmt.Errorf("wrapped: %w", err), &tooLarge) {
 		t.Fatalf("expected RawMessageTooLargeError, got %T %v", err, err)
 	}
 }

@@ -138,11 +138,6 @@ func (e RawMessageTooLargeError) Error() string {
 	return fmt.Sprintf("message too large to load into memory: UID %d exceeds %d bytes", e.UID, e.LimitBytes)
 }
 
-func IsRawMessageTooLargeError(err error) bool {
-	var tooLarge RawMessageTooLargeError
-	return errors.As(err, &tooLarge)
-}
-
 type HeaderLiteralTooLargeError struct {
 	LimitBytes int64
 }

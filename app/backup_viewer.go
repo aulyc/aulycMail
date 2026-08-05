@@ -564,10 +564,6 @@ func backupViewerIndexedAttachmentCount(entry mailBackup.IndexMessage) int {
 	return 0
 }
 
-func backupIndexedFilePath(directory, relativePath string) (string, error) {
-	return mailBackup.IndexedFilePath(directory, relativePath)
-}
-
 func parseBackupViewerEML(key string, entry mailBackup.IndexMessage, reader io.Reader) (*BackupViewerMessageDetail, error) {
 	entity, err := gomessage.Read(reader)
 	if err != nil {

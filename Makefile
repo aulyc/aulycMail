@@ -5,7 +5,7 @@
 #   make dev      - Run in development mode
 #   make help     - Show all available targets
 
-.PHONY: all build build-app dev dev-race generate clean test lint lint-go lint-frontend \
+.PHONY: all build build-app dev dev-race generate clean test deadcode-check lint lint-go lint-frontend \
         fmt fmt-check check-go check-frontend security-audit check ci release-candidate isolated-release-artifact \
         frontend-deps frontend-update normalize-wails-bindings remove-obsolete-build-output prepare-wails-build-assets install uninstall \
         dmg release-dmg test-release-dmg install-dmg install-release-dmg install-test-release-dmg install-darwin \
@@ -83,6 +83,10 @@ GO_PACKAGES := $(shell find . \
 	-path './frontend/node_modules' -prune -o \
 	-path './frontend/dist' -prune -o \
 	-name '*.go' -print | xargs -n1 dirname | sort -u | sed 's,^\./,./,')
+
+DEADCODE_VERSION := v0.38.0
+DEADCODE_ALLOWLIST := tools/deadcode-allowlist.txt
+DEADCODE_OUTPUT_DIR := .cache/deadcode
 
 # Default target
 all: build
@@ -295,8 +299,10 @@ fmt-check:
 	fi; \
 	echo 'Go formatting verified.'
 
-# Go-only quality gate. golangci-lint degrades explicitly to go vet.
-check-go: fmt-check test lint-go
+# Go-only quality gate. golangci-lint degrades explicitly to go vet; deadcode
+# remains fail-closed because it covers production functions reachable only
+# from tests, which the default golangci-lint package graph treats as used.
+check-go: fmt-check test lint-go deadcode-check
 
 # Frontend-only quality gate.
 check-frontend:
@@ -439,6 +445,41 @@ test:
 	@echo "Running tests..."
 	$(DARWIN_LINK_WARN_ENV) go test $(GO_PACKAGES)
 
+# Find production functions unreachable from the application entry point. The
+# exact allowlist contains Objective-C/C callbacks that enter Go outside its
+# static call graph. Tool failures, new findings, and stale allowlist entries
+# all fail the gate.
+deadcode-check:
+	@echo "Running deadcode $(DEADCODE_VERSION)..."
+	@set -eu; \
+		mkdir -p "$(DEADCODE_OUTPUT_DIR)"; \
+		raw="$(DEADCODE_OUTPUT_DIR)/raw.txt"; \
+		detected_unsorted="$(DEADCODE_OUTPUT_DIR)/detected.unsorted.txt"; \
+		detected="$(DEADCODE_OUTPUT_DIR)/detected.txt"; \
+		allowed_unsorted="$(DEADCODE_OUTPUT_DIR)/allowed.unsorted.txt"; \
+		allowed="$(DEADCODE_OUTPUT_DIR)/allowed.txt"; \
+		if ! go run golang.org/x/tools/cmd/deadcode@$(DEADCODE_VERSION) $(GO_PACKAGES) > "$$raw"; then \
+			echo 'deadcode failed to execute.' >&2; \
+			exit 1; \
+		fi; \
+		sed -E 's#^([^:]+):[0-9]+:[0-9]+: unreachable func: #\1:#' "$$raw" > "$$detected_unsorted"; \
+		LC_ALL=C sort -u "$$detected_unsorted" > "$$detected"; \
+		sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$$/d' "$(DEADCODE_ALLOWLIST)" > "$$allowed_unsorted"; \
+		LC_ALL=C sort -u "$$allowed_unsorted" > "$$allowed"; \
+		unexpected="$$(comm -13 "$$allowed" "$$detected")"; \
+		stale="$$(comm -23 "$$allowed" "$$detected")"; \
+		if [ -n "$$unexpected" ]; then \
+			echo 'Unexpected unreachable production functions:' >&2; \
+			printf '%s\n' "$$unexpected" >&2; \
+			exit 1; \
+		fi; \
+		if [ -n "$$stale" ]; then \
+			echo 'Stale deadcode allowlist entries:' >&2; \
+			printf '%s\n' "$$stale" >&2; \
+			exit 1; \
+		fi; \
+		echo 'No unexpected unreachable production functions.'
+
 # Run all linters (Go + frontend)
 lint: lint-go lint-frontend
 
@@ -579,7 +620,8 @@ help:
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make fmt-check     - Verify Go formatting without modifying files"
-	@echo "  make check-go      - Run Go formatting, tests, and lint/vet"
+	@echo "  make deadcode-check - Reject unreachable production functions outside the exact callback allowlist"
+	@echo "  make check-go      - Run Go formatting, tests, lint/vet, and deadcode"
 	@echo "  make check-frontend - Run frontend unit/type/i18n/lint/knip checks"
 	@echo "  make security-audit - Audit all npm dependencies at low severity and above"
 	@echo "  make check         - Run version, Go, frontend, and release-tool tests"

@@ -58,21 +58,6 @@ func NewAttachmentDownloader(attachmentsDir string) *AttachmentDownloader {
 	}
 }
 
-// ExtractAttachmentContent extracts the content of a specific attachment from raw email bytes
-func (d *AttachmentDownloader) ExtractAttachmentContent(raw []byte, targetFilename string) ([]byte, error) {
-	return d.ExtractAttachmentContentFromReader(bytes.NewReader(raw), targetFilename)
-}
-
-// ExtractAttachmentContentFromReader extracts one attachment without requiring
-// callers to keep the whole raw message in memory.
-func (d *AttachmentDownloader) ExtractAttachmentContentFromReader(raw io.Reader, targetFilename string) ([]byte, error) {
-	var buf bytes.Buffer
-	if _, err := d.extractAttachmentContentToWriter(raw, targetFilename, &buf, maxBufferedAttachmentBytes); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
 // ExtractAttachmentsContentFromRawReader extracts multiple attachments in a
 // single MIME traversal. It buffers only the requested attachment bodies.
 func (d *AttachmentDownloader) ExtractAttachmentsContentFromRawReader(raw io.Reader, filenames []string) ([]AttachmentContentResult, error) {
@@ -153,19 +138,6 @@ func (d *AttachmentDownloader) extractAttachmentContentToWriter(raw io.Reader, t
 	}
 
 	return 0, fmt.Errorf("attachment not found: %s", targetFilename)
-}
-
-// findAttachmentInMultipart searches for an attachment by filename in a multipart message
-func (d *AttachmentDownloader) findAttachmentInMultipart(mr gomessage.MultipartReader, targetFilename string) ([]byte, error) {
-	var buf bytes.Buffer
-	if _, err := d.findAttachmentInMultipartToWriterWithLimit(mr, targetFilename, &buf, maxBufferedAttachmentBytes); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-func (d *AttachmentDownloader) findAttachmentInMultipartToWriter(mr gomessage.MultipartReader, targetFilename string, dst io.Writer) (int64, error) {
-	return d.findAttachmentInMultipartToWriterWithLimit(mr, targetFilename, dst, 0)
 }
 
 func (d *AttachmentDownloader) findAttachmentInMultipartToWriterWithLimit(mr gomessage.MultipartReader, targetFilename string, dst io.Writer, maxBytes int64) (int64, error) {
@@ -293,21 +265,6 @@ func UniqueAttachmentPath(dir, filename string) (string, error) {
 			return "", err
 		}
 	}
-}
-
-// SaveAttachment saves attachment content to disk
-func (d *AttachmentDownloader) SaveAttachment(att *message.Attachment, content []byte, customPath string) (string, error) {
-	savePath, err := d.attachmentSavePath(att, customPath)
-	if err != nil {
-		return "", err
-	}
-
-	// Write content to file
-	if err := os.WriteFile(savePath, content, 0600); err != nil {
-		return "", fmt.Errorf("failed to write attachment: %w", err)
-	}
-
-	return savePath, nil
 }
 
 // SaveAttachmentFromRawReader extracts att from raw and streams it directly to
