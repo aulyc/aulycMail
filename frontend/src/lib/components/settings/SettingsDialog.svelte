@@ -851,14 +851,26 @@
 
 <style>
   :global([data-settings-keyboard-selected='true']) {
-    outline: 2px solid hsl(var(--primary));
-    outline-offset: -2px;
+    border-radius: 0.625rem;
+    outline: 2px solid hsl(var(--primary) / 0.7);
+    outline-offset: 3px;
   }
 
   /* An open Select already owns the visible blue ring. During pointerdown,
      suppress the Settings browse outline so the two indicators never stack. */
   :global([data-settings-keyboard-selected='true'][data-keyboard-select-trigger='true'][data-state='open']) {
     outline: none;
+  }
+
+  /* Document-style links use a compact selection marker instead of a large
+     rectangular ring spanning the row. */
+  :global([data-settings-focus-style='link'][data-settings-keyboard-selected='true']) {
+    background-color: hsl(var(--primary) / 0.1);
+    box-shadow: inset 3px 0 0 hsl(var(--primary));
+    outline: none;
+    text-decoration-line: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
   }
 
   :global([data-settings-footer-action][data-settings-keyboard-selected='true']) {

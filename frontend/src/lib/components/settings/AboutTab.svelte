@@ -3,7 +3,6 @@
   import type { app } from '../../../../wailsjs/go/models'
   import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime'
   import { _ } from '$lib/i18n'
-  import appLogo from '$/assets/images/logo-universal.png'
   import AboutInfoDialog from './AboutInfoDialog.svelte'
   import UpdateAction from './UpdateAction.svelte'
   import { getAboutInfoContent, type InfoKind } from './aboutInfoContent'
@@ -26,73 +25,102 @@
   }
 
   const infoContent = $derived(getAboutInfoContent(infoKind, $_))
+  const versionValue = $derived(
+    appInfo?.buildNumber && appInfo.buildNumber !== '0'
+      ? `${appInfo.version} · build ${appInfo.buildNumber}`
+      : (appInfo?.version ?? ''),
+  )
 </script>
 
-<div class="flex h-full flex-col items-center justify-center space-y-6 py-6">
+<div class="mx-auto w-full max-w-4xl pb-2">
   {#if loading}
-    <Icon icon="mdi:loading" class="w-8 h-8 animate-spin text-muted-foreground" />
+    <div class="flex min-h-72 items-center justify-center">
+      <Icon icon="mdi:loading" class="h-8 w-8 animate-spin text-muted-foreground" />
+    </div>
   {:else if appInfo}
-    <!-- Logo + App Name & Version -->
-    <div class="flex flex-col items-center space-y-2">
-      <img
-        src={appLogo}
-        alt={`${appInfo.name} Logo`}
-        class="h-24 w-24 rounded-[22%] shadow-sm ring-1 ring-border/60"
-        draggable="false"
-      />
-      <div class="text-center space-y-1">
-        <h2 class="text-2xl font-bold text-foreground">{appInfo.name}</h2>
-        <p class="text-sm text-muted-foreground">{$_('settingsAbout.version', { values: { version: appInfo.displayVersion } })}</p>
-      </div>
-    </div>
+    <article class="space-y-8" data-about-document>
+      <h2 class="text-2xl font-bold tracking-tight text-foreground">
+        {$_('settingsAbout.title', { values: { name: appInfo.name } })}
+      </h2>
 
-    <!-- Links -->
-    <div class="flex w-max flex-col items-stretch gap-2">
-      <UpdateAction />
-      <button
-        type="button"
-        onclick={() => openInfo('product')}
-        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-      >
-        <Icon icon="lucide:book-open-text" class="h-5 w-5 shrink-0" />
-        <span>{$_('settingsAbout.productDescription')}</span>
-      </button>
-      <button
-        type="button"
-        onclick={openWebsite}
-        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline"
-      >
-        <Icon icon="mdi:web" class="h-5 w-5 shrink-0" />
-        <span>{$_('settingsAbout.website')}</span>
-      </button>
-      <button
-        type="button"
-        onclick={() => openInfo('privacy')}
-        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-      >
-        <Icon icon="mdi:shield-account" class="h-5 w-5 shrink-0" />
-        <span>{$_('settingsAbout.privacyPolicy')}</span>
-      </button>
-      <button
-        type="button"
-        onclick={() => openInfo('terms')}
-        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-      >
-        <Icon icon="mdi:file-document" class="h-5 w-5 shrink-0" />
-        <span>{$_('settingsAbout.termsOfUse')}</span>
-      </button>
-      <button
-        type="button"
-        onclick={() => openInfo('acknowledgements')}
-        class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-      >
-        <Icon icon="lucide:heart-handshake" class="h-5 w-5 shrink-0" />
-        <span>{$_('settingsAbout.acknowledgementsLabel')}</span>
-      </button>
-    </div>
+      <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm" data-about-section="metadata">
+        <dt class="font-semibold text-foreground">{$_('settingsAbout.versionTitle')}</dt>
+        <dd class="text-muted-foreground">{versionValue}</dd>
+        <dt class="font-semibold text-foreground">{$_('settingsAbout.compatibilityTitle')}</dt>
+        <dd class="text-muted-foreground">{$_('settingsAbout.compatibilityValue')}</dd>
+        <dt class="font-semibold text-foreground">{$_('settingsAbout.systemRequirementTitle')}</dt>
+        <dd class="text-muted-foreground">{$_('settingsAbout.systemRequirementValue')}</dd>
+      </dl>
 
+      <section class="space-y-3" data-about-section="introduction">
+        <h3 class="text-base font-semibold text-foreground">{$_('settingsAbout.applicationIntroduction')}</h3>
+        <ol class="list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+          <li>{$_('settingsAbout.product.intro')}</li>
+          <li>{$_('settingsAbout.product.positionBody')}</li>
+          <li>{$_('settingsAbout.product.dataBody')}</li>
+        </ol>
+      </section>
+
+      <section class="space-y-2" data-about-section="website">
+        <h3 class="text-base font-semibold text-foreground">{$_('settingsAbout.website')}</h3>
+        <button
+          type="button"
+          data-settings-focus-style="link"
+          disabled={!appInfo.website}
+          onclick={openWebsite}
+          class="-mx-2 inline-flex min-h-7 w-fit items-center rounded-md px-2 text-left text-sm text-primary transition-colors hover:bg-primary/5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default disabled:text-muted-foreground disabled:no-underline"
+        >
+          <span>{appInfo.website || '—'}</span>
+        </button>
+      </section>
+
+      <section class="space-y-2" data-about-section="related-links">
+        <h3 class="text-base font-semibold text-foreground">{$_('settingsAbout.relatedLinks')}</h3>
+        <div class="flex flex-col items-start gap-0.5">
+          <UpdateAction />
+          <button
+            type="button"
+            data-settings-focus-style="link"
+            onclick={() => openInfo('product')}
+            class="-mx-2 inline-flex min-h-7 w-fit items-center rounded-md px-2 text-left text-sm text-primary transition-colors hover:bg-primary/5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            {$_('settingsAbout.productDescription')}
+          </button>
+          <button
+            type="button"
+            data-settings-focus-style="link"
+            onclick={() => openInfo('privacy')}
+            class="-mx-2 inline-flex min-h-7 w-fit items-center rounded-md px-2 text-left text-sm text-primary transition-colors hover:bg-primary/5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            {$_('settingsAbout.privacyPolicy')}
+          </button>
+          <button
+            type="button"
+            data-settings-focus-style="link"
+            onclick={() => openInfo('terms')}
+            class="-mx-2 inline-flex min-h-7 w-fit items-center rounded-md px-2 text-left text-sm text-primary transition-colors hover:bg-primary/5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            {$_('settingsAbout.termsOfUse')}
+          </button>
+          <button
+            type="button"
+            data-settings-focus-style="link"
+            onclick={() => openInfo('acknowledgements')}
+            class="-mx-2 inline-flex min-h-7 w-fit items-center rounded-md px-2 text-left text-sm text-primary transition-colors hover:bg-primary/5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+          >
+            {$_('settingsAbout.acknowledgementsLabel')}
+          </button>
+        </div>
+      </section>
+
+      <footer class="border-t border-border pt-4 text-xs text-muted-foreground" data-about-section="copyright">
+        {$_('settingsAbout.copyright')}
+      </footer>
+    </article>
   {:else}
-    <p class="text-muted-foreground">{$_('settingsAbout.failedToLoad')}</p>
+    <div class="flex min-h-72 items-center justify-center">
+      <p class="text-muted-foreground">{$_('settingsAbout.failedToLoad')}</p>
+    </div>
   {/if}
 </div>
 

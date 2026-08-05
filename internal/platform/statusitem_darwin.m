@@ -38,6 +38,22 @@ static NSMenuItem* aulycStatusItem(NSString* title, SEL action, id target, NSStr
     return item;
 }
 
+static NSImage* aulycStatusMenuIcon(NSString* systemName) {
+    if (@available(macOS 11.0, *)) {
+        NSImageSymbolConfiguration *configuration = [NSImageSymbolConfiguration configurationWithPointSize:14 weight:NSFontWeightRegular];
+        NSImage *image = [[NSImage imageWithSystemSymbolName:systemName accessibilityDescription:nil] imageWithSymbolConfiguration:configuration];
+        [image setTemplate:YES];
+        return image;
+    }
+    return nil;
+}
+
+static NSMenuItem* aulycStatusItemWithIcon(NSString* title, SEL action, id target, NSString* keyEquivalent, NSString* systemName) {
+    NSMenuItem *item = aulycStatusItem(title, action, target, keyEquivalent);
+    item.image = aulycStatusMenuIcon(systemName);
+    return item;
+}
+
 static NSImage* aulycFallbackStatusMailImage(void) {
     NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(20, 20)] autorelease];
     [image lockFocus];
@@ -119,11 +135,12 @@ void aulycSetStatusItemVisible(int visible, AulycStatusItemLabels labels) {
         }
 
         NSMenu *menu = [[[NSMenu alloc] init] autorelease];
-        [menu addItem:aulycStatusItem(open, @selector(onOpen:), gStatusItemTarget, @"")];
-        [menu addItem:aulycStatusItem(settings, @selector(onSettings:), gStatusItemTarget, @"")];
-        [menu addItem:aulycStatusItem(checkUpdate, @selector(onCheckUpdate:), gStatusItemTarget, @"")];
+        [menu addItem:aulycStatusItemWithIcon(open, @selector(onOpen:), gStatusItemTarget, @"", @"envelope.open")];
         [menu addItem:[NSMenuItem separatorItem]];
-        [menu addItem:aulycStatusItem(quit, @selector(onQuit:), gStatusItemTarget, @"q")];
+        [menu addItem:aulycStatusItemWithIcon(settings, @selector(onSettings:), gStatusItemTarget, @"", @"gearshape")];
+        [menu addItem:aulycStatusItemWithIcon(checkUpdate, @selector(onCheckUpdate:), gStatusItemTarget, @"", @"arrow.triangle.2.circlepath")];
+        [menu addItem:[NSMenuItem separatorItem]];
+        [menu addItem:aulycStatusItemWithIcon(quit, @selector(onQuit:), gStatusItemTarget, @"q", @"power")];
         gStatusItem.menu = menu;
 
         aulycApplyStatusItemAppearance();

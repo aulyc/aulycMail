@@ -433,12 +433,21 @@
     "updateAndRestart": "更新并重启"
   },
   "settingsAbout": {
+    "title": "关于 {name}",
     "version": "版本 {version}",
+    "versionTitle": "版本",
+    "compatibilityTitle": "适配",
+    "compatibilityValue": "Apple Silicon",
+    "systemRequirementTitle": "系统要求",
+    "systemRequirementValue": "macOS 11+",
+    "applicationIntroduction": "应用介绍",
     "website": "官方网站",
+    "relatedLinks": "相关链接",
     "productDescription": "产品说明",
     "privacyPolicy": "隐私政策",
     "termsOfUse": "使用条款",
     "acknowledgementsLabel": "致谢",
+    "copyright": "Copyright © 2026 aulyc. 保留所有权利。",
     "failedToLoad": "加载应用信息失败",
     "product": {
       "title": "产品说明",

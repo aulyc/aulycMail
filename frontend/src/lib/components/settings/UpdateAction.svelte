@@ -73,11 +73,11 @@
 {:else}
   <button
     type="button"
-    class="flex w-full items-center justify-start gap-2 text-left text-sm text-primary transition-colors hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default disabled:no-underline"
+    data-settings-focus-style="link"
+    class="-mx-2 inline-flex min-h-7 w-fit items-center gap-2 rounded-md px-2 text-left text-sm text-primary transition-colors hover:bg-primary/5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default disabled:no-underline"
     disabled={busy}
     onclick={activate}
   >
-    <Icon icon={busy ? 'mdi:loading' : 'lucide:refresh-cw'} class="h-5 w-5 shrink-0 {busy ? 'animate-spin' : ''}" />
     <span>{$_('settingsUpdate.softwareUpdate')}</span>
     {#if statusText}<span class="ml-1 text-xs no-underline {statusClass}">{statusText}</span>{/if}
   </button>

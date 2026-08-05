@@ -433,12 +433,21 @@
     "updateAndRestart": "Update and Restart"
   },
   "settingsAbout": {
+    "title": "About {name}",
     "version": "Version {version}",
+    "versionTitle": "Version",
+    "compatibilityTitle": "Compatibility",
+    "compatibilityValue": "Apple Silicon",
+    "systemRequirementTitle": "System Requirements",
+    "systemRequirementValue": "macOS 11+",
+    "applicationIntroduction": "Application Introduction",
     "website": "Website",
+    "relatedLinks": "Related Links",
     "productDescription": "Product Description",
     "privacyPolicy": "Privacy Policy",
     "termsOfUse": "Terms of Use",
     "acknowledgementsLabel": "Acknowledgements",
+    "copyright": "Copyright © 2026 aulyc. All rights reserved.",
     "failedToLoad": "Failed to load app information",
     "product": {
       "title": "Product Description",

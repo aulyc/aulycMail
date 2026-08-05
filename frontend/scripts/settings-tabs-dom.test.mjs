@@ -189,15 +189,29 @@ test('image settings disable global loading immediately and survive load and rem
 test('about tab opens the website and renders every information section', async () => {
   const appInfo = {
     name: 'aulycMail',
-    displayVersion: '0.6.0-test (42)',
+    version: '0.6.0-test',
+    buildNumber: '42',
+    displayVersion: '0.6.0-test (build 42)',
     website: 'https://example.test/aulycmail',
   }
   const { target } = await render(AboutTab, { appInfo })
-  assert.match(target.textContent, /aulycMail/)
-  assert.match(target.textContent, /0\.6\.0-test/)
-  buttonWithText(target, 'settingsAbout.website').click()
+  const document = target.querySelector('[data-about-document]')
+  assert.ok(document)
+  assert.match(document.textContent, /settingsAbout\.title/)
+  assert.match(document.querySelector('[data-about-section="metadata"]').textContent, /0\.6\.0-test · build 42/)
+  assert.match(document.querySelector('[data-about-section="metadata"]').textContent, /settingsAbout\.compatibilityValue/)
+  assert.match(document.querySelector('[data-about-section="metadata"]').textContent, /settingsAbout\.systemRequirementValue/)
+  assert.match(document.querySelector('[data-about-section="introduction"]').textContent, /settingsAbout\.product\.dataBody/)
+  assert.match(document.querySelector('[data-about-section="copyright"]').textContent, /settingsAbout\.copyright/)
+
+  const websiteButton = document.querySelector('[data-about-section="website"] button')
+  assert.equal(websiteButton.textContent.trim(), 'https://example.test/aulycmail')
+  assert.equal(websiteButton.dataset.settingsFocusStyle, 'link')
+  websiteButton.click()
   assert.deepEqual(runtime.openURL.mock.calls, [['https://example.test/aulycmail']])
 
+  const relatedLinks = document.querySelector('[data-about-section="related-links"]')
+  assert.equal(relatedLinks.querySelectorAll('[data-settings-focus-style="link"]').length, 5)
   const cases = [
     ['settingsAbout.productDescription', 'settingsAbout.product.featureBackup'],
     ['settingsAbout.privacyPolicy', 'settingsAbout.privacy.localBackups'],
@@ -222,9 +236,12 @@ test('about tab renders loading and failed states without opening an absent webs
   const failed = await render(AboutTab, { appInfo: null })
   assert.match(failed.target.textContent, /settingsAbout\.failedToLoad/)
   const noWebsite = await render(AboutTab, {
-    appInfo: { name: 'aulycMail', displayVersion: 'test', website: '' },
+    appInfo: { name: 'aulycMail', version: 'test', buildNumber: '0', displayVersion: 'test', website: '' },
   })
-  buttonWithText(noWebsite.target, 'settingsAbout.website').click()
+  const websiteButton = noWebsite.target.querySelector('[data-about-section="website"] button')
+  assert.equal(websiteButton.disabled, true)
+  assert.equal(websiteButton.textContent.trim(), '—')
+  websiteButton.click()
   assert.equal(runtime.openURL.mock.calls.length, 0)
 })
 

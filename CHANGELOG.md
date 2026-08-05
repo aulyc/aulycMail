@@ -4,6 +4,10 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Refined Settings keyboard focus indicators, redesigned the About page as a
+  document-style overview, and added grouped SF Symbol icons to the macOS menu
+  bar menu.
+
 ## [0.6.0] — 2026-08-05
 
 - Added a signed in-app update flow with GitHub-first and Gitee-fallback
