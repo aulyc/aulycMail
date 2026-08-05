@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-08-05
+
 - Added a signed in-app update flow with GitHub-first and Gitee-fallback
   discovery, full artifact trust verification, and explicit confirmation before
   download, installation, or restart.
