@@ -36,7 +36,7 @@
     data-settings-horizontal-arrows-only
     data-settings-arrow-up-target="activity-load-more"
     data-settings-arrow-down-target="missing-control"
-    data-settings-arrow-down-fallback="save"
+    data-settings-arrow-down-fallback="settings-close"
   >
     <button type="button" data-settings-horizontal-action="first">first explicit</button>
     <button type="button" data-settings-horizontal-action="second">second explicit</button>

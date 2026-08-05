@@ -1,6 +1,5 @@
 {
   "common": {
-    "save": "Save",
     "cancel": "Cancel",
     "close": "Close",
     "delete": "Delete",
@@ -222,7 +221,6 @@
     "removedStar": "Removed star",
     "markedAllAsRead": "Marked all as read",
     "markedAllAsUnread": "Marked all as unread",
-    "settingsSaved": "Settings saved",
     "failedToLoadSettings": "Failed to load settings.",
     "undone": "Undone: {description}",
     "failedToArchive": "Failed to archive.",
@@ -264,7 +262,7 @@
     "backup": "Backup",
     "accounts": "Accounts",
     "about": "About",
-    "unsavedChanges": "Unsaved changes",
+    "saving": "Saving…",
     "composerFormat": "Default message format",
     "composerFormatRich": "Rich text",
     "composerFormatPlain": "Plain text"

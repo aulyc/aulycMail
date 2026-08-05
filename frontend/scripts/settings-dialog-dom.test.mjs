@@ -170,7 +170,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-test('loads every draft value, navigates by keyboard, saves, and requests restart', async () => {
+test('loads every draft value, navigates by keyboard, autosaves, and requests restart', async () => {
   const { target } = await renderDialog()
   assert.equal(backend.GetAppInfo.mock.calls.length, 1)
   assert.equal(backend.GetBackupSettings.mock.calls.length, 1)
@@ -193,15 +193,14 @@ test('loads every draft value, navigates by keyboard, saves, and requests restar
 
   content.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
   await flushAsync()
-  assert.match(target.textContent, /settings\.unsavedChanges/)
-  const save = target.querySelector('[data-settings-footer-action="save"]')
-  assert.equal(save.disabled, false)
-  save.click()
-  await flushAsync()
-  await vi.waitFor(() => assert.ok(toast.add.mock.calls.length > 0))
+  await vi.waitFor(() => assert.equal(backend.SetNativeTitleBar.mock.calls.length, 1))
 
   assert.deepEqual(backend.SetNativeTitleBar.mock.calls.at(-1), [true])
-  assert.match(toast.add.mock.calls.at(-1)[0].message, /toast\.settingsSaved/)
+  assert.equal(target.querySelector('[data-settings-footer-actions]'), null)
+  const closeAction = target.querySelector('[data-settings-close]')
+  assert.ok(closeAction)
+  assert.equal(closeAction.closest('[role="tabpanel"]'), null)
+  assert.equal(toast.add.mock.calls.some(([entry]) => entry.message === 'toast.settingsSaved'), false)
   const restart = target.querySelector('[data-confirm-dialog]')
   assert.ok(restart)
   restart.querySelector('[data-confirm-action="confirm"]').click()
@@ -265,17 +264,16 @@ test('reports load and save failures and restores main scope when closed', async
   await unmount(mounted.pop())
   document.body.innerHTML = ''
   setBackendDefaults()
-  backend.SetReadReceiptResponsePolicy.mockRejectedValueOnce(new Error('write unavailable'))
+  backend.SetNativeTitleBar.mockRejectedValueOnce(new Error('write unavailable'))
   const onClose = vi.fn()
   rendered = await renderDialog({ onClose })
   rendered.target.querySelector('[data-settings-control-id="toggle-native-title"]').click()
   await flushAsync()
-  rendered.target.querySelector('[data-settings-footer-action="save"]').click()
-  await flushAsync()
-  assert.ok(toast.add.mock.calls.some(([entry]) => entry.message === 'toast.failedToSaveSettings'))
+  await vi.waitFor(() => assert.ok(toast.add.mock.calls.some(([entry]) => entry.message === 'toast.failedToSaveSettings')))
+  assert.ok(backend.GetThemeMode.mock.calls.length >= 2)
   assert.equal(rendered.target.querySelector('[data-confirm-dialog]'), null)
 
-  rendered.target.querySelector('[data-settings-footer-action="cancel"]').click()
+  rendered.target.querySelector('[data-settings-close]').click()
   await flushAsync()
   assert.equal(onClose.mock.calls.length, 1)
   assert.equal(keyboard.scope, 'main')
@@ -299,7 +297,7 @@ test('restores activity pagination selection and honors pointer-focus and root-d
 
   target.querySelector('[data-test-action="load-finished"]').click()
   await flushAsync()
-  assert.equal(target.querySelector('[data-settings-footer-action="close"]').dataset.settingsKeyboardSelected, 'true')
+  assert.equal(target.querySelector('[data-settings-close]').dataset.settingsKeyboardSelected, 'true')
   assert.equal(document.activeElement, content)
 
   const dialog = target.querySelector('[role="dialog"]')
@@ -310,7 +308,7 @@ test('restores activity pagination selection and honors pointer-focus and root-d
   dialog.dispatchEvent(secondaryPointer)
   assert.equal(secondaryPointer.defaultPrevented, false)
   const buttonPointer = new PointerEvent('pointerdown', { button: 0, bubbles: true, cancelable: true })
-  target.querySelector('[data-settings-footer-action="close"]').dispatchEvent(buttonPointer)
+  target.querySelector('[data-settings-close]').dispatchEvent(buttonPointer)
   assert.equal(buttonPointer.defaultPrevented, false)
 
   target.querySelector('[data-dialog-root-dismiss]').click()
@@ -319,29 +317,16 @@ test('restores activity pagination selection and honors pointer-focus and root-d
   assert.equal(target.querySelector('[role="dialog"]'), null)
 })
 
-test('moves among content, footer, explicit, adjacent, fallback, and outside horizontal targets', async () => {
+test('moves among content, close, explicit, adjacent, fallback, and outside horizontal targets', async () => {
   const { target } = await renderDialog()
   const navigation = target.querySelector('[data-settings-region="navigation"]')
   const content = target.querySelector('[data-settings-region="content"]')
   key(navigation, 'Tab')
   await flushAsync()
 
-  target.querySelector('[data-settings-control-id="toggle-native-title"]').click()
-  await flushAsync()
-  assert.equal(target.querySelectorAll('[data-settings-footer-action]:not(:disabled)').length, 2)
+  assert.equal(target.querySelector('[data-settings-footer-actions]'), null)
   key(content, 'End')
-  assert.equal(target.querySelector('[data-settings-footer-action="save"]').dataset.settingsKeyboardSelected, 'true')
-  const saveAction = target.querySelector('[data-settings-footer-action="save"]')
-  saveAction.focus()
-  await flushAsync()
-  const footerLeft = key(saveAction, 'ArrowLeft')
-  assert.equal(footerLeft.defaultPrevented, true)
-  const footerRight = key(target.querySelector('[data-settings-footer-action="cancel"]'), 'ArrowRight')
-  assert.equal(footerRight.defaultPrevented, true)
-  const footerUp = key(saveAction, 'ArrowUp')
-  assert.equal(footerUp.defaultPrevented, true)
-  const footerDown = key(saveAction, 'ArrowDown')
-  assert.equal(footerDown.defaultPrevented, true)
+  assert.equal(target.querySelector('[data-settings-close]').dataset.settingsKeyboardSelected, 'true')
 
   const firstGroup = target.querySelector('[data-settings-horizontal-context="synthetic-account"]')
   firstGroup.querySelector('[data-settings-horizontal-action="move-up"]').focus()
@@ -355,7 +340,7 @@ test('moves among content, footer, explicit, adjacent, fallback, and outside hor
   assert.equal(target.querySelector('[data-settings-control-id="activity-load-more"]').dataset.settingsKeyboardSelected, 'true')
   explicit.focus()
   key(content, 'ArrowDown')
-  assert.equal(target.querySelector('[data-settings-footer-action="save"]').dataset.settingsKeyboardSelected, 'true')
+  assert.equal(target.querySelector('[data-settings-close]').dataset.settingsKeyboardSelected, 'true')
 
   const outside = target.querySelector('[data-settings-horizontal-action="outside"]')
   outside.focus()

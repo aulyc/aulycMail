@@ -1,6 +1,5 @@
 {
   "common": {
-    "save": "保存",
     "cancel": "取消",
     "close": "关闭",
     "delete": "删除",
@@ -222,7 +221,6 @@
     "removedStar": "已移除星标",
     "markedAllAsRead": "已全部标记为已读",
     "markedAllAsUnread": "已全部标记为未读",
-    "settingsSaved": "设置已保存",
     "failedToLoadSettings": "加载设置失败。",
     "undone": "已撤销：{description}",
     "failedToArchive": "归档失败。",
@@ -264,7 +262,7 @@
     "backup": "备份",
     "accounts": "账户",
     "about": "关于",
-    "unsavedChanges": "有未保存的更改",
+    "saving": "正在保存…",
     "composerFormat": "默认撰写格式",
     "composerFormatRich": "富文本",
     "composerFormatPlain": "纯文本"

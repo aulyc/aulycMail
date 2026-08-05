@@ -173,8 +173,10 @@ Tests use synthetic messages, accounts, settings, credentials, and temporary
 directories. User mail, attachments, databases, settings, passwords, tokens,
 and Keychain data must never enter fixtures, artifacts, manifests, or logs.
 
-Settings editing follows `draft-only-until-Save`: UI drafts may change inside
-the dialog, but persisted and live behavior changes only after Save succeeds.
+Ordinary Settings preferences auto-save after each discrete change. Persisted
+and live behavior changes only after that save succeeds; failures reload
+backend-confirmed values. Account, credential, and other multi-field editors
+retain explicit Save/Cancel transactions.
 
 ## Application updater
 

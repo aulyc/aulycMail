@@ -4,6 +4,12 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Simplified Settings by auto-saving ordinary preferences, removing the bottom
+  Save/Cancel/Close bar, and keeping a fixed close control available throughout
+  the dialog while account and credential editors retain explicit transactions.
+- Kept the About title and copyright visible while only its middle document
+  content scrolls, and made auto-save failures restore backend-confirmed values.
+
 ## [0.7.2] — 2026-08-05
 
 - Removed the left inset focus marker from document-style links in Settings,

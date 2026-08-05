@@ -112,9 +112,10 @@ successful aggregate target unless diagnosing a failure.
   Keychain values, or credential fallbacks to build artifacts, fixtures,
   manifests, screenshots, or logs.
 - Use synthetic data and temporary databases in tests.
-- Settings UI remains `draft-only-until-Save`: editing controls must not mutate
-  persisted or live application behavior until Save succeeds, unless a new
-  requirement explicitly changes that contract.
+- Ordinary preference controls in Settings auto-save after each discrete change;
+  persisted and live behavior must update only after that save succeeds, and a
+  failed save must restore backend-confirmed values. Account, credential, and
+  other multi-field editors keep their own explicit Save/Cancel transaction.
 
 ## Logging and sensitive information
 

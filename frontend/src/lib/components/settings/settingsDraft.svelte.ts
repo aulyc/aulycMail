@@ -75,6 +75,12 @@ type Snapshot = {
   automaticUpdateChecks: boolean
 }
 
+type BackupSnapshot = {
+  directory: string
+  scope: BackupScope
+  selectedAccountIds: string[]
+}
+
 export class SettingsDraft {
   readReceiptResponsePolicy = $state('ask')
   markAsReadDelaySeconds = $state(1)
@@ -147,53 +153,68 @@ export class SettingsDraft {
   }
 
   async saveAll(): Promise<void> {
+    const snapshot = this.snapshot()
+    const requestedRunBackground = snapshot.runBackground
+    snapshot.runBackground = snapshot.menuBarIcon ? true : snapshot.runBackground
+    const previous = this.original ? JSON.parse(this.original) as Snapshot : null
+    const changed = <Key extends keyof Snapshot>(key: Key) => (
+      previous === null || previous[key] !== snapshot[key]
+    )
+    const backupSnapshot = this.backupSnapshot()
+    const backupChanged = this.originalBackup !== JSON.stringify(backupSnapshot)
     this.saving = true
     try {
-      const delayMs = this.markAsReadDelaySeconds < 0 ? -1 : Math.round(this.markAsReadDelaySeconds * 1000)
-      const effectiveRunBackground = this.menuBarIcon ? true : this.runBackground
-      await SetReadReceiptResponsePolicy(this.readReceiptResponsePolicy)
-      await SetMarkAsReadDelay(delayMs)
-      await SetMessageListDensity(this.messageListDensity)
-      await SetThemeMode(this.themeMode)
-      await SetRunBackground(effectiveRunBackground)
-      await SetStartHidden(this.startHidden)
-      await SetAutostart(this.autostart)
-      if (this.language) await SetLanguage(this.language)
-      await SetComposerFormat(this.composerFormat)
-      await SetNativeTitleBar(this.nativeTitleBar)
-      await SetAlwaysLoadImages(this.alwaysLoadImages)
-      await SetDarkMailContent(this.darkMailContent)
-      await SetAccentBarUnread(this.accentBarUnread)
-      await SetMenuBarIcon(this.menuBarIcon)
-      await SetDeveloperMode(this.developerMode)
-      await SetEnhancedKeyboardNavigation(this.enhancedKeyboardNavigation)
-      await SetAutomaticUpdateChecks(this.automaticUpdateChecks)
-      if (this.backupDirty) await this.saveBackup()
+      const delayMs = snapshot.markAsReadDelaySeconds < 0
+        ? -1
+        : Math.round(snapshot.markAsReadDelaySeconds * 1000)
+      if (changed('readReceiptResponsePolicy')) await SetReadReceiptResponsePolicy(snapshot.readReceiptResponsePolicy)
+      if (changed('markAsReadDelaySeconds')) await SetMarkAsReadDelay(delayMs)
+      if (changed('messageListDensity')) await SetMessageListDensity(snapshot.messageListDensity)
+      if (changed('themeMode')) await SetThemeMode(snapshot.themeMode)
+      if (changed('runBackground')) await SetRunBackground(snapshot.runBackground)
+      if (changed('startHidden')) await SetStartHidden(snapshot.startHidden)
+      if (changed('autostart')) await SetAutostart(snapshot.autostart)
+      if (changed('language') && snapshot.language) await SetLanguage(snapshot.language)
+      if (changed('composerFormat')) await SetComposerFormat(snapshot.composerFormat)
+      if (changed('nativeTitleBar')) await SetNativeTitleBar(snapshot.nativeTitleBar)
+      if (changed('alwaysLoadImages')) await SetAlwaysLoadImages(snapshot.alwaysLoadImages)
+      if (changed('darkMailContent')) await SetDarkMailContent(snapshot.darkMailContent)
+      if (changed('accentBarUnread')) await SetAccentBarUnread(snapshot.accentBarUnread)
+      if (changed('menuBarIcon')) await SetMenuBarIcon(snapshot.menuBarIcon)
+      if (changed('developerMode')) await SetDeveloperMode(snapshot.developerMode)
+      if (changed('enhancedKeyboardNavigation')) await SetEnhancedKeyboardNavigation(snapshot.enhancedKeyboardNavigation)
+      if (changed('automaticUpdateChecks')) await SetAutomaticUpdateChecks(snapshot.automaticUpdateChecks)
+      if (backupChanged) await this.persistBackupSnapshot(backupSnapshot)
 
-      this.runBackground = effectiveRunBackground
-      updateDensityStore(this.messageListDensity as MessageListDensity)
-      updateThemeStore(this.themeMode as ThemeMode)
-      if (this.language) updateLanguageStore(this.language)
-      updateComposerFormatStore(this.composerFormat as ComposerFormat)
-      updateAlwaysLoadImagesStore(this.alwaysLoadImages)
-      updateDarkMailContentStore(this.darkMailContent)
-      updateAccentBarUnreadStore(this.accentBarUnread)
-      updateDeveloperModeStore(this.developerMode)
-      updateEnhancedKeyboardNavigationStore(this.enhancedKeyboardNavigation)
-      this.capture()
+      if (
+        this.runBackground === requestedRunBackground
+        && this.menuBarIcon === snapshot.menuBarIcon
+      ) this.runBackground = snapshot.runBackground
+      if (changed('messageListDensity')) updateDensityStore(snapshot.messageListDensity as MessageListDensity)
+      if (changed('themeMode')) updateThemeStore(snapshot.themeMode as ThemeMode)
+      if (changed('language') && snapshot.language) updateLanguageStore(snapshot.language)
+      if (changed('composerFormat')) updateComposerFormatStore(snapshot.composerFormat as ComposerFormat)
+      if (changed('alwaysLoadImages')) updateAlwaysLoadImagesStore(snapshot.alwaysLoadImages)
+      if (changed('darkMailContent')) updateDarkMailContentStore(snapshot.darkMailContent)
+      if (changed('accentBarUnread')) updateAccentBarUnreadStore(snapshot.accentBarUnread)
+      if (changed('developerMode')) updateDeveloperModeStore(snapshot.developerMode)
+      if (changed('enhancedKeyboardNavigation')) updateEnhancedKeyboardNavigationStore(snapshot.enhancedKeyboardNavigation)
+      this.original = JSON.stringify(snapshot)
+      if (backupChanged) this.originalBackup = JSON.stringify(backupSnapshot)
     } finally {
       this.saving = false
     }
   }
 
   async saveBackup(): Promise<void> {
-    await SetBackupSettings({
-      directory: this.backupDirectory.trim(),
-      scope: this.backupScope,
-      selectedAccountIds: this.backupSelectedAccountIds,
-    })
-    if (this.backupDirectory.trim()) rememberBackupDirectory(this.backupDirectory.trim())
-    this.originalBackup = JSON.stringify(this.backupSnapshot())
+    const snapshot = this.backupSnapshot()
+    await this.persistBackupSnapshot(snapshot)
+    this.originalBackup = JSON.stringify(snapshot)
+  }
+
+  private async persistBackupSnapshot(snapshot: BackupSnapshot): Promise<void> {
+    await SetBackupSettings(snapshot)
+    if (snapshot.directory) rememberBackupDirectory(snapshot.directory)
   }
 
   private capture(): void {
@@ -201,7 +222,7 @@ export class SettingsDraft {
     this.originalBackup = JSON.stringify(this.backupSnapshot())
   }
 
-  private backupSnapshot() {
+  private backupSnapshot(): BackupSnapshot {
     return {
       directory: this.backupDirectory.trim(),
       scope: this.backupScope,

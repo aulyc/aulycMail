@@ -2,7 +2,6 @@
   import Icon from '@iconify/svelte'
   import { tick, untrack } from 'svelte'
   import * as Dialog from '$lib/components/ui/dialog'
-  import { Button } from '$lib/components/ui/button'
   import ConfirmDialog from '$lib/components/ui/confirm-dialog/ConfirmDialog.svelte'
   import { addToast } from '$lib/stores/toast'
   import { dialogGuardClose, dialogGuardOpen } from '$lib/stores/dialogGuard'
@@ -26,9 +25,7 @@
   import UpdateAction from './UpdateAction.svelte'
 
   type SettingsPage = 'general' | 'appearance' | 'mail' | 'accounts' | 'backup' | 'activity' | 'about'
-  type SettingsContentItem =
-    | { kind: 'control'; element: HTMLElement }
-    | { kind: 'footer'; element: HTMLElement }
+  type SettingsContentItem = { kind: 'control'; element: HTMLElement }
   interface NavigationItem { id: SettingsPage; icon: string; label: string }
   interface Props { open?: boolean; activePage?: SettingsPage; onClose?: () => void }
   let { open = $bindable(false), activePage = $bindable('general'), onClose }: Props = $props()
@@ -46,8 +43,11 @@
   let navigationRegionEl = $state<HTMLElement | null>(null)
   let contentRegionEl = $state<HTMLElement | null>(null)
   let contentPanelEl = $state<HTMLElement | null>(null)
-  let contentFooterEl = $state<HTMLElement | null>(null)
+  let closeButtonEl = $state<HTMLButtonElement | null>(null)
   let selectStateObserver: MutationObserver | null = null
+  let autoSaveBlocked = $state(false)
+  let closeInProgress = false
+  let autoSavePromise: Promise<void> | null = null
 
   const SETTINGS_CONTROL_SELECTOR = [
     'button:not(:disabled):not([aria-disabled="true"])',
@@ -70,14 +70,10 @@
     { id: 'activity', icon: 'lucide:history', label: $_('activityLog.title') },
     { id: 'about', icon: 'lucide:info', label: $_('settings.about') },
   ])
-  const usesSettingsDraft = $derived(
-    activePage === 'general' || activePage === 'appearance' || activePage === 'mail' || activePage === 'backup',
-  )
-  const showDraftActions = $derived(usesSettingsDraft || draft.dirty)
-
   $effect(() => {
     if (!open) return
     const sequence = ++loadSequence
+    autoSaveBlocked = false
     appInfoLoading = true
     draft.load().catch((error) => {
       if (sequence !== loadSequence) return
@@ -135,21 +131,66 @@
     clearSettingsKeyboardSelection()
   })
 
-  async function save() {
-    const nativeTitleBarChanged = draft.nativeTitleBar !== draft.originalNativeTitleBar
-    try {
-      await draft.saveAll()
-      scheduleSettingsControlSelection()
-      addToast({ type: 'success', message: $_('toast.settingsSaved') })
-      if (nativeTitleBarChanged) { draft.originalNativeTitleBar = draft.nativeTitleBar; showRestartDialog = true; return }
-    } catch (error) {
-      console.error('Failed to save settings:', error)
-      addToast({ type: 'error', message: $_('toast.failedToSaveSettings') })
+  $effect(() => {
+    if (!open || draft.loading || !draft.dirty || autoSaveBlocked) return
+    void queueAutoSave()
+  })
+
+  async function runAutoSaveLoop() {
+    while (open && !draft.loading && draft.dirty && !autoSaveBlocked) {
+      const savedNativeTitleBar = draft.nativeTitleBar
+      const nativeTitleBarChanged = savedNativeTitleBar !== draft.originalNativeTitleBar
+      try {
+        await draft.saveAll()
+        if (nativeTitleBarChanged) {
+          draft.originalNativeTitleBar = savedNativeTitleBar
+          showRestartDialog = true
+        }
+        scheduleSettingsControlSelection()
+      } catch (error) {
+        console.error('Failed to auto-save settings:', error)
+        addToast({ type: 'error', message: $_('toast.failedToSaveSettings') })
+        autoSaveBlocked = true
+        try {
+          await draft.load()
+          autoSaveBlocked = false
+        } catch (loadError) {
+          console.error('Failed to reload settings after auto-save error:', loadError)
+          addToast({ type: 'error', message: $_('toast.failedToLoadSettings') })
+        }
+      }
     }
   }
 
-  function close() { open = false; onClose?.() }
-  function handleOpenChange(value: boolean) { open = value; if (!value) onClose?.() }
+  function queueAutoSave(): Promise<void> {
+    if (!autoSavePromise) {
+      autoSavePromise = runAutoSaveLoop().finally(() => { autoSavePromise = null })
+    }
+    return autoSavePromise
+  }
+
+  async function close() {
+    if (closeInProgress) return
+    closeInProgress = true
+    try {
+      if (draft.dirty && !autoSaveBlocked) await queueAutoSave()
+      else if (autoSavePromise) await autoSavePromise
+      open = false
+      onClose?.()
+    } finally {
+      closeInProgress = false
+    }
+  }
+
+  function handleOpenChange(value: boolean) {
+    if (value) {
+      open = true
+      return
+    }
+    if (closeInProgress) return
+    open = true
+    void close()
+  }
   function openBackupActivityLog() { selectNavigationPage('activity', 'backup') }
   function restoreActivityLogPositionAfterLoad(hasMore: boolean) {
     void tick().then(() => requestAnimationFrame(() => {
@@ -164,10 +205,9 @@
         }
       }
 
-      const footerActions = getSettingsFooterActions()
-      const closeAction = footerActions.find((action) => (
-        action.dataset.settingsFooterAction === 'close'
-      )) ?? footerActions.at(-1)
+      const closeAction = getSettingsControls().find((control) => (
+        control.dataset.settingsControlId === 'settings-close'
+      ))
       if (!closeAction) return
       contentRegionEl?.focus({ preventScroll: true })
       selectSettingsControlForTarget(closeAction)
@@ -224,21 +264,12 @@
       const ordered = [...entries].sort((left, right) => left.order - right.order)
       slots.forEach((slot, index) => { controls[slot] = ordered[index].control })
     }
+    if (closeButtonEl && isAvailableSettingsControl(closeButtonEl)) controls.push(closeButtonEl)
     return controls
   }
 
-  function getSettingsFooterActions(): HTMLElement[] {
-    if (!contentFooterEl) return []
-    return Array.from(contentFooterEl.querySelectorAll<HTMLElement>(
-      '[data-settings-footer-action]:not(:disabled):not([aria-disabled="true"])',
-    )).filter(isAvailableSettingsControl)
-  }
-
   function getSettingsContentItems(): SettingsContentItem[] {
-    const controls = getSettingsControls().map((element): SettingsContentItem => ({ kind: 'control', element }))
-    const footerActions = getSettingsFooterActions()
-      .map((element): SettingsContentItem => ({ kind: 'footer', element }))
-    return [...controls, ...footerActions]
+    return getSettingsControls().map((element): SettingsContentItem => ({ kind: 'control', element }))
   }
 
   function getSettingsHorizontalGroupControls(
@@ -367,8 +398,8 @@
       ? group.dataset.settingsArrowUpFallback
       : group.dataset.settingsArrowDownFallback
     if (!fallbackActionID) return false
-    const fallbackAction = getSettingsFooterActions().find((action) => (
-      action.dataset.settingsFooterAction === fallbackActionID
+    const fallbackAction = getSettingsControls().find((control) => (
+      control.dataset.settingsControlId === fallbackActionID
     ))
     if (!fallbackAction) return false
     contentRegionEl?.focus({ preventScroll: true })
@@ -447,17 +478,11 @@
   function settingsControlForTarget(target: EventTarget | null): HTMLElement | null {
     if (!(target instanceof Element)) return null
     const control = target.closest<HTMLElement>(SETTINGS_CONTROL_SELECTOR)
-    return control && contentPanelEl?.contains(control) ? control : null
-  }
-
-  function settingsFooterActionForTarget(target: EventTarget | null): HTMLElement | null {
-    if (!(target instanceof Element)) return null
-    const action = target.closest<HTMLElement>('[data-settings-footer-action]')
-    return action && contentFooterEl?.contains(action) ? action : null
+    return control && (contentPanelEl?.contains(control) || control === closeButtonEl) ? control : null
   }
 
   function isNativeSettingsControlTarget(target: EventTarget | null): boolean {
-    return Boolean(settingsControlForTarget(target) || settingsFooterActionForTarget(target))
+    return Boolean(settingsControlForTarget(target))
   }
 
   function isSettingsSelectTrigger(control: HTMLElement): boolean {
@@ -480,19 +505,6 @@
       return
     }
 
-    const footerAction = settingsFooterActionForTarget(target)
-    if (!footerAction) return
-    const contentItems = getSettingsContentItems()
-    const footerItem = contentItems.find((item) => (
-      item.kind === 'footer' && item.element === footerAction
-    ))
-    if (!footerItem) return
-    const itemIndex = contentItems.indexOf(footerItem)
-    if (itemIndex >= 0) {
-      selectedSettingsControlIndex = itemIndex
-      if (showSelection) selectSettingsControl(itemIndex, false)
-      else clearSettingsKeyboardSelection()
-    }
   }
 
   function stopObservingSelectLifecycle() {
@@ -564,11 +576,6 @@
   function activateSelectedSettingsControl(activationKey: 'Enter' | ' ') {
     const selectedItem = getSettingsContentItems()[selectedSettingsControlIndex]
     if (!selectedItem) return
-    if (selectedItem.kind === 'footer') {
-      selectedItem.element.click()
-      return
-    }
-
     const control = selectedItem.element
     if (isSettingsSelectTrigger(control) || isSettingsMenuTrigger(control) || isInputElement(control)) {
       beginSettingsInput(control, true, activationKey)
@@ -642,6 +649,12 @@
       finishSettingsInput()
       return
     }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      void close()
+      return
+    }
     if (event.key === 'Tab' && settingsContentMode === 'browse') {
       event.preventDefault()
       event.stopPropagation()
@@ -685,37 +698,6 @@
         }
       } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         selectAdjacentHorizontalGroup(selectedItem.element, event.key === 'ArrowUp' ? -1 : 1)
-      }
-      return
-    }
-    if (
-      selectedItem?.kind === 'footer'
-      && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
-    ) {
-      event.preventDefault()
-      event.stopPropagation()
-      const settingsContentItems = getSettingsContentItems()
-      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-        const controlItems = settingsContentItems.filter((item) => item.kind === 'control')
-        const targetControl = event.key === 'ArrowUp' ? controlItems.at(-1) : controlItems[0]
-        if (targetControl) {
-          contentRegionEl?.focus({ preventScroll: true })
-          selectSettingsControl(settingsContentItems.indexOf(targetControl))
-        }
-        return
-      }
-
-      const footerItems = settingsContentItems.filter((item) => item.kind === 'footer')
-      const currentFooterIndex = footerItems.indexOf(selectedItem)
-      const directionKey = event.key === 'ArrowLeft' ? 'ArrowUp' : 'ArrowDown'
-      const nextFooterIndex = nextRovingIndex(
-        directionKey,
-        currentFooterIndex,
-        footerItems.length,
-        true,
-      )
-      if (nextFooterIndex >= 0) {
-        selectSettingsControl(settingsContentItems.indexOf(footerItems[nextFooterIndex]))
       }
       return
     }
@@ -805,7 +787,7 @@
         tabindex="0"
         data-settings-region="content"
         data-region-active={getEnhancedKeyboardNavigation() && settingsRegion === 'content'}
-        class="keyboard-region flex min-h-0 min-w-0 flex-col bg-background outline-none"
+        class="keyboard-region relative flex min-h-0 min-w-0 flex-col bg-background outline-none"
         onfocusin={handleContentFocusIn}
         onmousedown={handleContentMouseDown}
       >
@@ -814,7 +796,7 @@
           id={`settings-panel-${activePage}`}
           role="tabpanel"
           aria-labelledby={`settings-tab-${activePage}`}
-          class="min-h-0 flex-1 px-7 py-6 scrollbar-thin {activePage === 'activity' ? 'overflow-hidden' : 'overflow-y-auto'}"
+          class="relative min-h-0 flex-1 px-7 py-6 scrollbar-thin {activePage === 'activity' || activePage === 'about' ? 'overflow-hidden' : 'overflow-y-auto'}"
         >
           {#if activePage === 'about'}<AboutTab {appInfo} loading={appInfoLoading} />
           {:else if draft.loading}
@@ -826,22 +808,24 @@
           {:else if activePage === 'backup'}<BackupSettingsPage {draft} onOpenActivityLog={openBackupActivityLog} />
           {:else}<ActivityLogPage initialType={activityInitialType} onLoadMoreFinished={restoreActivityLogPositionAfterLoad} />{/if}
         </div>
-        <footer
-          bind:this={contentFooterEl}
-          data-settings-footer-actions
-          class="flex h-16 shrink-0 items-center justify-between border-t border-border bg-background/95 px-7"
+        {#if draft.saving}
+          <div data-settings-autosave-status aria-live="polite" class="pointer-events-none absolute right-14 top-5 flex h-7 items-center gap-1.5 rounded-md bg-background/90 px-2 text-xs text-muted-foreground">
+            <Icon icon="mdi:loading" class="h-3.5 w-3.5 animate-spin" />
+            <span>{$_('settings.saving')}</span>
+          </div>
+        {/if}
+        <button
+          bind:this={closeButtonEl}
+          type="button"
+          data-settings-close
+          data-settings-control-id="settings-close"
+          aria-label={$_('common.close')}
+          title={$_('common.close')}
+          class="absolute right-5 top-5 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          onclick={() => void close()}
         >
-          {#if showDraftActions}
-            <span class="text-xs text-muted-foreground">{draft.dirty ? $_('settings.unsavedChanges') : ''}</span>
-            <div class="flex items-center gap-2">
-              <Button data-settings-footer-action="cancel" variant="ghost" onclick={close} disabled={draft.saving}>{$_('common.cancel')}</Button>
-              <Button data-settings-footer-action="save" variant="outline" onclick={save} disabled={draft.saving || draft.loading || !draft.dirty}>{#if draft.saving}<Icon icon="mdi:loading" class="mr-2 h-4 w-4 animate-spin" />{/if}{$_('common.save')}</Button>
-            </div>
-          {:else}
-            <span></span>
-            <Button data-settings-footer-action="close" onclick={close}>{$_('common.close')}</Button>
-          {/if}
-        </footer>
+          <Icon icon="mdi:close" class="h-4 w-4" />
+        </button>
       </div>
     </div>
   </Dialog.Content>
@@ -873,18 +857,9 @@
     text-underline-offset: 3px;
   }
 
-  :global([data-settings-footer-action][data-settings-keyboard-selected='true']) {
-    outline-offset: 2px;
-  }
-
   :global([data-settings-contrast-selection][data-settings-keyboard-selected='true']) {
     outline-offset: 2px;
     box-shadow: 0 0 0 2px hsl(var(--background));
   }
 
-  :global([data-settings-footer-action='save'][data-settings-keyboard-selected='true']) {
-    border-color: hsl(var(--primary));
-    background-color: hsl(var(--primary));
-    color: hsl(var(--primary-foreground));
-  }
 </style>

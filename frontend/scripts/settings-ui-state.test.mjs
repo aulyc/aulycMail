@@ -386,6 +386,41 @@ test('settings draft save persists all values, enforces menu-bar background mode
   assert.equal(getEnhancedKeyboardNavigation(), false)
 })
 
+test('settings draft keeps newer edits dirty while an earlier autosave is in flight', async () => {
+  backend.GetReadReceiptResponsePolicy.mockResolvedValue('ask')
+  backend.GetMarkAsReadDelay.mockResolvedValue(1000)
+  backend.GetMessageListDensity.mockResolvedValue('standard')
+  backend.GetThemeMode.mockResolvedValue('pop-dark')
+  backend.GetRunBackground.mockResolvedValue(false)
+  backend.GetStartHidden.mockResolvedValue(false)
+  backend.GetAutostart.mockResolvedValue(false)
+  backend.GetLanguage.mockResolvedValue('en')
+  backend.GetComposerFormat.mockResolvedValue('rich')
+  backend.GetNativeTitleBar.mockResolvedValue(false)
+  backend.GetAlwaysLoadImages.mockResolvedValue(false)
+  backend.GetDarkMailContent.mockResolvedValue(false)
+  backend.GetAccentBarUnread.mockResolvedValue(false)
+  backend.GetMenuBarIcon.mockResolvedValue(false)
+  backend.GetDeveloperMode.mockResolvedValue(false)
+  backend.GetEnhancedKeyboardNavigation.mockResolvedValue(true)
+  backend.GetAutomaticUpdateChecks.mockResolvedValue(true)
+  backend.GetBackupSettings.mockResolvedValue({ directory: '', scope: 'all', selectedAccountIds: [] })
+
+  const draft = new SettingsDraft()
+  await draft.load()
+  let finishThemeSave
+  backend.SetThemeMode.mockImplementationOnce(() => new Promise((resolve) => { finishThemeSave = resolve }))
+
+  draft.themeMode = 'light-blue'
+  const saving = draft.saveAll()
+  await vi.waitFor(() => assert.equal(backend.SetThemeMode.mock.calls.length, 1))
+  draft.themeMode = 'pop-dark'
+  finishThemeSave()
+  await saving
+
+  assert.equal(draft.dirty, true)
+})
+
 test('settings draft leaves saving state clean when persistence fails', async () => {
   const draft = new SettingsDraft()
   backend.SetReadReceiptResponsePolicy.mockRejectedValue(new Error('write failed'))

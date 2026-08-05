@@ -177,11 +177,11 @@
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "755cecb68845369a7374e9ff34227e58b3186a854191659ab0fa829e8b3b42ae"
+      "sha256": "add997b853fde3af6e725ceff9793bdeaf414aa4adb7f3dfa9d4909a878aa600"
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "sha256": "fa5f021a60395cd44d053d5add48e26253dd104e2ed3304dac07a411c23b6173"
+      "sha256": "0c1550be924458bf2e13a97ebf3e009a888f83cf6232a1e11ef3f59d849648e9"
     },
     {
       "path": "docs/VERSIONING.md",
@@ -273,7 +273,7 @@
     },
     {
       "path": "docs/DUAL_MIRROR_RELEASE.md",
-      "sha256": "3c1f8e2b0b90813d9dc089a76692f9dda06fd18d2901de99c76951e1b4564861"
+      "sha256": "6b02de85d749f39de9c026200b8d3ba99de592e9a3c86db7bfd162de16bc96ed"
     },
     {
       "path": "tools/dual-mirror-release.sh",
