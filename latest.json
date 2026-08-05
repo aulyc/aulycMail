@@ -5,19 +5,19 @@
     "downloads": [
       {
         "source": "github",
-        "url": "https://github.com/aulyc/aulycMail/releases/download/0.7.2/aulycMail-0.7.2-build.43.dmg"
+        "url": "https://github.com/aulyc/aulycMail/releases/download/0.7.3/aulycMail-0.7.3-build.44.dmg"
       },
       {
         "source": "gitee",
-        "url": "https://gitee.com/aulyc/aulycMail/releases/download/0.7.2/aulycMail-0.7.2-build.43.dmg"
+        "url": "https://gitee.com/aulyc/aulycMail/releases/download/0.7.3/aulycMail-0.7.3-build.44.dmg"
       }
     ],
-    "file": "aulycMail-0.7.2-build.43.dmg",
-    "sha256": "477c37f5c610550c4e5d1ad7afc7ee791742a3461d2210877479ccf630477264"
+    "file": "aulycMail-0.7.3-build.44.dmg",
+    "sha256": "791825c4a12f5cba0b393094c70c72d0c40d82a8b4d2e3c9d04a29d17b3eec3d"
   },
-  "buildNumber": 43,
+  "buildNumber": 44,
   "bundleIdentifier": "com.aulyc.aulycmail",
-  "commit": "8f95659d266d73524df8b3da9ec26d692b9fce4c",
+  "commit": "f8e408672c363c3289449eefc0bc485ec50e0657",
   "minimumSystemVersion": "11.0",
   "pluginIdentifier": null,
   "policy": "aulyc-dual-mirror-v1",
@@ -25,21 +25,21 @@
     "downloads": [
       {
         "source": "github",
-        "url": "https://raw.githubusercontent.com/aulyc/aulycMail/release-channel/updates/0.7.2/aulycMail-0.7.2-build.43.manifest.json"
+        "url": "https://raw.githubusercontent.com/aulyc/aulycMail/release-channel/updates/0.7.3/aulycMail-0.7.3-build.44.manifest.json"
       },
       {
         "source": "gitee",
-        "url": "https://gitee.com/aulyc/aulycMail/raw/main/updates/0.7.2/aulycMail-0.7.2-build.43.manifest.json"
+        "url": "https://gitee.com/aulyc/aulycMail/raw/main/updates/0.7.3/aulycMail-0.7.3-build.44.manifest.json"
       }
     ],
-    "file": "aulycMail-0.7.2-build.43.manifest.json",
-    "sha256": "3906c5b23545488285ecf5a72ac6b54496e6b069c40375451cb556f7a0de349e"
+    "file": "aulycMail-0.7.3-build.44.manifest.json",
+    "sha256": "7a80751caea62b7c4a9ccae002442f5c84f7762d170abe2752d2e384a24339b0"
   },
   "releaseChannel": "formal",
-  "releasePageURL": "https://github.com/aulyc/aulycMail/releases/tag/0.7.2",
+  "releasePageURL": "https://github.com/aulyc/aulycMail/releases/tag/0.7.3",
   "releaseProfile": "macos-arm64-app",
   "schemaVersion": 2,
-  "tag": "0.7.2",
+  "tag": "0.7.3",
   "teamIdentifier": "M9M7M2ARFD",
-  "version": "0.7.2"
+  "version": "0.7.3"
 }
