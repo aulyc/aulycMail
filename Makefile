@@ -5,7 +5,7 @@
 #   make dev      - Run in development mode
 #   make help     - Show all available targets
 
-.PHONY: all build build-app dev dev-race generate clean test deadcode-check lint lint-go lint-frontend \
+.PHONY: all build build-app dev dev-race generate clean test coverage-go deadcode-check lint lint-go lint-frontend \
         fmt fmt-check check-go check-frontend security-audit check ci release-candidate isolated-release-artifact \
         frontend-deps frontend-update normalize-wails-bindings remove-obsolete-build-output prepare-wails-build-assets install uninstall \
         dmg release-dmg test-release-dmg install-dmg install-release-dmg install-test-release-dmg install-darwin \
@@ -84,6 +84,8 @@ GO_PACKAGES := $(shell find . \
 	-path './frontend/dist' -prune -o \
 	-name '*.go' -print | xargs -n1 dirname | sort -u | sed 's,^\./,./,')
 
+GO_COVERAGE_PROFILE := .cache/coverage/go.out
+GO_COVERAGE_MIN_PERCENT := 77.5
 DEADCODE_VERSION := v0.38.0
 DEADCODE_ALLOWLIST := tools/deadcode-allowlist.txt
 DEADCODE_OUTPUT_DIR := .cache/deadcode
@@ -281,7 +283,13 @@ version-check:
 
 # Test the version parser and synchronization behavior.
 version-test:
-	@node --test tools/*.test.mjs
+	@node --experimental-test-coverage --test \
+		--test-coverage-include='tools/**/*.mjs' \
+		--test-coverage-exclude='tools/*.test.mjs' \
+		--test-coverage-lines=85 \
+		--test-coverage-branches=85 \
+		--test-coverage-functions=85 \
+		tools/*.test.mjs
 
 # Non-mutating Go formatting gate.
 fmt-check:
@@ -302,7 +310,7 @@ fmt-check:
 # Go-only quality gate. golangci-lint degrades explicitly to go vet; deadcode
 # remains fail-closed because it covers production functions reachable only
 # from tests, which the default golangci-lint package graph treats as used.
-check-go: fmt-check test lint-go deadcode-check
+check-go: fmt-check coverage-go lint-go deadcode-check
 
 # Frontend-only quality gate.
 check-frontend:
@@ -444,6 +452,30 @@ release-tag: release-check
 test:
 	@echo "Running tests..."
 	$(DARWIN_LINK_WARN_ENV) go test $(GO_PACKAGES)
+
+# Run the complete Go suite with cross-package instrumentation and fail when
+# weighted statement coverage drops below the checked-in baseline.
+coverage-go:
+	@mkdir -p "$(dir $(GO_COVERAGE_PROFILE))"
+	@cover_packages="$$(printf '%s\n' $(GO_PACKAGES) | sed -e 's#^\.$$#$(MODULE)#' -e 's#^\./#$(MODULE)/#' | paste -sd, -)"; \
+		if [ -z "$$cover_packages" ]; then \
+			echo 'Failed to resolve Go coverage packages.'; \
+			exit 1; \
+		fi; \
+		if ! $(DARWIN_LINK_WARN_ENV) go test -covermode=atomic -coverpkg="$$cover_packages" -coverprofile="$(GO_COVERAGE_PROFILE)" $(GO_PACKAGES); then \
+			echo 'Go coverage test suite failed.'; \
+			exit 1; \
+		fi; \
+		coverage="$$(go tool cover -func="$(GO_COVERAGE_PROFILE)" | awk '/^total:/ { gsub("%", "", $$3); print $$3 }')"; \
+		if [ -z "$$coverage" ]; then \
+			echo 'Failed to calculate Go statement coverage.'; \
+			exit 1; \
+		fi; \
+		echo "Go statement coverage: $$coverage% (minimum $(GO_COVERAGE_MIN_PERCENT)%)"; \
+		awk -v actual="$$coverage" -v minimum="$(GO_COVERAGE_MIN_PERCENT)" 'BEGIN { if (actual + 0 < minimum + 0) exit 1 }' || { \
+			echo "Go statement coverage $$coverage% is below $(GO_COVERAGE_MIN_PERCENT)%."; \
+			exit 1; \
+		}
 
 # Find production functions unreachable from the application entry point. The
 # exact allowlist contains Objective-C/C callbacks that enter Go outside its
@@ -620,8 +652,9 @@ help:
 	@echo ""
 	@echo "Code Quality:"
 	@echo "  make fmt-check     - Verify Go formatting without modifying files"
+	@echo "  make coverage-go   - Run Go tests with cross-package coverage and enforce the baseline"
 	@echo "  make deadcode-check - Reject unreachable production functions outside the exact callback allowlist"
-	@echo "  make check-go      - Run Go formatting, tests, lint/vet, and deadcode"
+	@echo "  make check-go      - Run Go formatting, coverage tests, lint/vet, and deadcode"
 	@echo "  make check-frontend - Run frontend unit/type/i18n/lint/knip checks"
 	@echo "  make security-audit - Audit all npm dependencies at low severity and above"
 	@echo "  make check         - Run version, Go, frontend, and release-tool tests"

@@ -1,12 +1,9 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { test } from 'vitest'
 import {
   normalizeExternalOpenFiles,
   toExternalSmtpAttachment,
 } from '../src/lib/externalFileCompose.ts'
-import { readFile } from 'node:fs/promises'
-
-const appPath = new URL('../src/App.svelte', import.meta.url)
 
 test('normalizes and deduplicates native file-open payloads', () => {
   assert.deepEqual(normalizeExternalOpenFiles({
@@ -30,13 +27,4 @@ test('maps a backend file read to a regular SMTP attachment', () => {
     content_id: '',
     inline: false,
   })
-})
-
-test('does not replace a composer opened while external attachments are loading', async () => {
-  const app = await readFile(appPath, 'utf8')
-
-  assert.match(
-    app,
-    /if \(showComposer\) \{\s*pendingExternalFileBatches\.unshift\(paths\)\s*externalFileComposeBusy = false/,
-  )
 })

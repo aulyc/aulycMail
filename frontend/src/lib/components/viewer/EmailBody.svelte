@@ -34,8 +34,9 @@
   let iframeReady = $state(false)
 
   // Inline attachment state
+  type InlineAttachmentState = 'idle' | 'loading' | 'complete' | 'error'
   let inlineAttachments = $state<Record<string, string>>({})
-  let lastSentMessageId = $state<string | null>(null)
+  let inlineAttachmentState = $state<InlineAttachmentState>('idle')
 
   // Link tooltip state
   let tooltipVisible = $state(false)
@@ -63,6 +64,7 @@
 
   // Loading placeholder SVG
   const loadingPlaceholder = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80' viewBox='0 0 120 80'%3E%3Crect fill='%23f3f4f6' width='120' height='80' rx='4'/%3E%3Cg transform='translate(60,40)'%3E%3Ccircle cx='0' cy='0' r='12' fill='none' stroke='%239ca3af' stroke-width='2' stroke-dasharray='20 10'%3E%3CanimateTransform attributeName='transform' type='rotate' from='0' to='360' dur='1s' repeatCount='indefinite'/%3E%3C/circle%3E%3C/g%3E%3Ctext x='60' y='65' text-anchor='middle' fill='%239ca3af' font-size='9' font-family='sans-serif'%3ELoading...%3C/text%3E%3C/svg%3E`
+  const unavailablePlaceholder = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='80' viewBox='0 0 120 80'%3E%3Crect fill='%23f3f4f6' width='120' height='80' rx='4'/%3E%3Cpath d='M45 28h30v22H45zM48 47l8-9 6 6 5-5 5 8z' fill='none' stroke='%239ca3af' stroke-width='2'/%3E%3Ctext x='60' y='65' text-anchor='middle' fill='%239ca3af' font-size='8' font-family='sans-serif'%3EImage unavailable%3C/text%3E%3C/svg%3E`
 
   // Regex pattern for CSS url() with remote http(s) URLs.
   // Handles all quote styles: raw ' or ", decimal &#39;/&#34;, hex &#x27;/&#x22;, named &apos;/&quot;
@@ -72,6 +74,7 @@
   const MAX_IFRAME_URL_LENGTH = 4096
   const MAX_IFRAME_TEXT_LENGTH = 10000
   const MAX_IFRAME_COORDINATE = 100000
+  const INLINE_ATTACHMENT_TIMEOUT_MS = 5000
 
   type IframeMessage =
     | { type: 'iframe-height'; height: number }
@@ -189,17 +192,48 @@
     }
   }
 
-  function processCidReferences(html: string): string {
+  function escapeHTMLAttribute(value: string): string {
+    return value
+      .replaceAll('&', '&amp;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+  }
+
+  function processCidReferences(
+    html: string,
+    images: Record<string, string>,
+    state: InlineAttachmentState
+  ): string {
     if (!html) return html
     return html.replace(
       /src=["']cid:([^"']+)["']/gi,
-      (match, contentId) => `src="${loadingPlaceholder}" data-cid="${contentId}"`
+      (_match, contentId: string) => {
+        const dataURL = Object.prototype.hasOwnProperty.call(images, contentId)
+          ? images[contentId]
+          : ''
+        if (dataURL?.startsWith('data:')) {
+          return `src="${escapeHTMLAttribute(dataURL)}"`
+        }
+
+        const escapedContentId = escapeHTMLAttribute(contentId)
+        if (state === 'complete' || state === 'error') {
+          return `src="${unavailablePlaceholder}" data-inline-placeholder="unavailable" data-cid="${escapedContentId}"`
+        }
+        return `src="${loadingPlaceholder}" data-inline-placeholder="loading" data-cid="${escapedContentId}"`
+      }
     )
   }
 
-  function processHtml(html: string, blockImages: boolean): string {
+  function processHtml(
+    html: string,
+    blockImages: boolean,
+    inlineImages: Record<string, string>,
+    inlineState: InlineAttachmentState
+  ): string {
     if (!html) return ''
-    let processed = processCidReferences(html)
+    let processed = processCidReferences(html, inlineImages, inlineState)
     if (blockImages) {
       // Block <img> tags with remote sources
       processed = processed.replace(
@@ -221,8 +255,13 @@
     return processed
   }
 
-  function buildIframeContent(html: string, applyDarken: boolean): string {
-    const processedHtml = processHtml(html, imagesBlocked)
+  function buildIframeContent(
+    html: string,
+    applyDarken: boolean,
+    inlineImages: Record<string, string>,
+    inlineState: InlineAttachmentState
+  ): string {
+    const processedHtml = processHtml(html, imagesBlocked, inlineImages, inlineState)
     const imgSrc = imagesBlocked ? "'self' data:" : '* data:'
     const enhancedKeyboardNavigation = getEnhancedKeyboardNavigation()
 
@@ -270,30 +309,6 @@
             selection.addRange(range);
           }
           return;
-        }
-        if (e.data?.type === 'inline-images' && e.data.images) {
-          var images = e.data.images;
-          var replaced = 0;
-          Object.keys(images).forEach(function(cid) {
-            // querySelectorAll (not querySelector): a body can legitimately
-            // reference the same cid: from multiple <img> tags — e.g. the
-            // composer emits cid:c1 twice when the user pastes the same
-            // image twice and the dedup collapses both into one inline
-            // attachment. Single-querySelector would leave every <img>
-            // except the first stuck on the loading placeholder.
-            var imgs = document.querySelectorAll('img[data-cid="' + cid + '"]');
-            imgs.forEach(function(img) {
-              img.src = images[cid];
-              img.removeAttribute('data-cid');
-              replaced++;
-            });
-          });
-          if (replaced > 0) {
-            attachImageHandlers();
-            setTimeout(sendHeight, 50);
-            setTimeout(sendHeight, 150);
-            setTimeout(sendHeight, 300);
-          }
         }
       });
 
@@ -421,6 +436,7 @@
     html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; /* Chrome/Safari/WebKit */ }
     body { padding: 16px; }
     img { max-width: 100%; height: auto; }
+    img[data-inline-placeholder] { width: 120px !important; height: 80px !important; object-fit: contain; }
     /* Ensure empty paragraphs (blank lines) render with visible height */
     p:empty { min-height: 1em; }
     p:has(> br:only-child) { min-height: 1em; }
@@ -537,18 +553,6 @@ ${processedHtml}
     }
   }
 
-  function sendInlineImagesToIframe(images: Record<string, string>) {
-    if (iframeElement?.contentWindow && Object.keys(images).length > 0) {
-      // Use spread operator to create plain object from Svelte 5 $state proxy
-      // This is needed because postMessage uses structured clone which can't handle proxies
-      // srcdoc iframes have an opaque origin, so targetOrigin must remain '*'.
-      iframeElement.contentWindow.postMessage({
-        type: 'inline-images',
-        images: { ...images }
-      }, '*')
-    }
-  }
-
   function loadImages() {
     imagesBlocked = false
     onImagesLoaded?.()
@@ -593,9 +597,6 @@ ${processedHtml}
     const hasImages = hasRemoteImages
 
     // Reset state (was in separate effect — merged to avoid race)
-    iframeReady = false
-    lastSentMessageId = null
-    inlineAttachments = {}
     imagesBlocked = true
 
     if (!hasImages) return
@@ -617,6 +618,8 @@ ${processedHtml}
     const hasCid = html ? /src=["']cid:([^"']+)["']/i.test(html) : false
 
     if (!id || !hasCid) {
+      inlineAttachments = {}
+      inlineAttachmentState = 'idle'
       return
     }
 
@@ -624,55 +627,71 @@ ${processedHtml}
     const cached = getCached(id)
     if (cached && Object.keys(cached).length > 0) {
       inlineAttachments = cached
+      inlineAttachmentState = 'complete'
       return
     }
 
+    let active = true
+    inlineAttachments = {}
+    inlineAttachmentState = 'loading'
+    const timeoutID = window.setTimeout(() => {
+      if (!active || id !== messageId) return
+      active = false
+      inlineAttachments = {}
+      inlineAttachmentState = 'error'
+    }, INLINE_ATTACHMENT_TIMEOUT_MS)
+
     GetInlineAttachments(id)
       .then((result: Record<string, string>) => {
+        if (!active || id !== messageId) return
+        active = false
+        window.clearTimeout(timeoutID)
         const data = result || {}
         inlineAttachments = data
+        inlineAttachmentState = 'complete'
         if (Object.keys(data).length > 0) {
           setCache(id, data)
         }
       })
       .catch((err: Error) => {
+        if (!active || id !== messageId) return
+        active = false
+        window.clearTimeout(timeoutID)
+        inlineAttachments = {}
+        inlineAttachmentState = 'error'
         console.error('[EmailBody] Fetch error:', err)
       })
+
+    return () => {
+      active = false
+      window.clearTimeout(timeoutID)
+    }
   })
 
-  // Build iframe content
+  // Rebuild srcdoc with resolved data URLs. This intentionally avoids the
+  // previous single-shot cross-frame postMessage race that could leave the
+  // animated CID placeholder visible forever.
   $effect(() => {
+    void messageId // rebuild even when two messages have identical HTML
     const html = bodyHtml
     void imagesBlocked // dependency only
+    const images = inlineAttachments
+    const inlineState = inlineAttachmentState
     void getThemeMode() // rebuild when theme changes so dark-mail invert re-derives
     void getEnhancedKeyboardNavigation()
     const applyDarken = darken
 
     if (iframeElement && html) {
-      const content = buildIframeContent(html, applyDarken)
+      const content = buildIframeContent(html, applyDarken, images, inlineState)
       iframeReady = false
       iframeElement.style.opacity = '0'
       iframeElement.srcdoc = content
-      lastSentMessageId = null
     }
   })
 
   function handleIframeLoad() {
     iframeReady = true
   }
-
-  // Send inline images when ready
-  $effect(() => {
-    const ready = iframeReady
-    const images = inlineAttachments
-    const id = messageId
-    const alreadySent = lastSentMessageId === id
-
-    if (ready && Object.keys(images).length > 0 && !alreadySent) {
-      sendInlineImagesToIframe(images)
-      lastSentMessageId = id
-    }
-  })
 
   // Message listener
   $effect(() => {

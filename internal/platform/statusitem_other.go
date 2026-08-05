@@ -4,7 +4,7 @@ package platform
 
 // StatusItemLabels holds localized strings for the macOS menu bar status item.
 type StatusItemLabels struct {
-	Open, Settings, Quit string
+	Open, Settings, CheckUpdate, Quit string
 }
 
 // SetStatusItemHandler is a no-op outside macOS.

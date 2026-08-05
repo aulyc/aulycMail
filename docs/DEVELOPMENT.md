@@ -52,7 +52,7 @@ runs `golangci-lint run` without a fallback.
 - `app/` exposes the narrow Go API consumed by Wails and coordinates domain
   stores and services.
 - `internal/` owns SQLite persistence, migrations, mail protocols, sync,
-  credentials, logging, and macOS integration.
+  credentials, logging, macOS integration, and the release-manifest updater.
 - `frontend/src/` owns Svelte presentation and interaction state. It calls Go
   only through `frontend/wailsjs/` bindings or Wails events.
 - `tools/` owns reproducible version, release, package, and artifact validation.
@@ -80,9 +80,10 @@ Support or Keychain storage.
 
 ```text
 make fmt-check       Non-mutating gofmt verification
+make coverage-go     Cross-package Go tests + 77.5% weighted statement coverage floor
 make deadcode-check  Pinned production reachability gate + exact native-callback allowlist
-make check-go        fmt-check + Go tests + lint/vet + deadcode-check
-make check-frontend  unit tests + svelte-check + i18n + ESLint + knip
+make check-go        fmt-check + coverage-go + lint/vet + deadcode-check
+make check-frontend  unit/render tests + full frontend coverage floor + svelte-check + i18n + ESLint + knip
 make security-audit  npm audit for all production and development dependencies
 make check           version checks/tests + check-go + check-frontend
 make ci              clean npm ci + security audit + make check + production build
@@ -95,6 +96,26 @@ off build-affecting changes. `make ci` is platform-neutral as a command entry,
 but its production build requires the supported macOS Apple Silicon host. It
 recreates `frontend/node_modules` from `package-lock.json` and runs
 `npm run security:audit` immediately after that clean install.
+
+`make coverage-go` writes its ignored profile to `.cache/coverage/go.out` and
+instruments every repository Go package, so calls crossing `app/` and
+`internal/` boundaries count toward the same weighted result. The 77.5% floor is
+the checked-in no-regression baseline, not a claim that the backend is fully
+covered; raise it as high-risk mail paths gain tests.
+
+Frontend unit and render tests run through Vitest and the real Vite/Svelte
+pipeline. V8 coverage includes every `frontend/src/**/*.ts` and
+`frontend/src/**/*.svelte` source file, including files that no test imports;
+untested files therefore contribute zero instead of disappearing from the
+report. Type declarations are excluded. The checked-in full-inventory floors
+are 91.5% statements, 78.75% branches, 94% functions, and 93.25% lines, with the
+JSON summary written to `.cache/coverage/frontend/coverage-summary.json`.
+These are no-regression baselines rather than a claim that the UI is fully
+covered. Happy DOM tests exercise real Svelte client mounting, focus, clicks,
+keyboard activation, composition events, and async UI outcomes for the app
+shell, composer, message list, and conversation viewer. Source-contract tests
+remain useful for broad structural regressions, while actual macOS WebKit
+runtime behavior still requires an installed-app smoke test.
 
 No CI provider is configured in this repository. The `backup` Git remote is a
 private offsite source/tag backup, not a CI provider. After a CI platform is
@@ -155,9 +176,32 @@ and Keychain data must never enter fixtures, artifacts, manifests, or logs.
 Settings editing follows `draft-only-until-Save`: UI drafts may change inside
 the dialog, but persisted and live behavior changes only after Save succeeds.
 
+## Application updater
+
+`internal/updater` owns manifest parsing, semantic-version comparison,
+GitHub-first/Gitee fallback, throttling, downloads, release-provenance checks,
+macOS trust verification, staging, and the isolated replacement helper.
+`app/update.go` exposes only shared status, manual check, and confirmed install
+operations to Wails. `frontend/src/lib/stores/update.svelte.ts` is the single UI
+state source used by About and the Settings sidebar; native menu actions enter
+the same backend service.
+
+Update traffic is independent of IMAP/SMTP account connections. A mail-server
+TLS failure must not leave update UI in a loading state. Every check reaches
+`upToDate`, `available`, or `failed`; every install either reaches the isolated
+replacement helper or preserves the current App and reports failure.
+
+Local development builds may check manifests, but in-place installation is
+intentionally limited to `/Applications/aulycMail.app`. Unit tests use
+synthetic manifests and local HTTP servers; they must not download or install a
+real release. A real installed-runtime update smoke test requires an explicitly
+authorized formal release and installation operation.
+
 ## Release-tool development
 
 Release tools are covered by `make version-test` and therefore by `make check`.
 Tests create disposable Git repositories and annotated fixture tags under the
 system temporary directory; they never create tags in the real repository.
+The aggregate release-tool coverage floor is 85% for lines, branches, and
+functions.
 Run `bash -n tools/*.sh` after changing shell release or packaging scripts.

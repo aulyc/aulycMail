@@ -14,7 +14,6 @@ import (
 	"aulyc.local/aulycmail/internal/message"
 	"aulyc.local/aulycmail/internal/smtp"
 	goImap "github.com/emersion/go-imap/v2"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // DraftResult represents the result of saving a draft
@@ -427,10 +426,10 @@ func (ops *draftOps) toComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
 
 // cancelDraftSync signals any in-flight syncDraftToIMAP goroutine for the given
 // draft to stop. The goroutine cleans up any orphaned IMAP APPEND on its own.
-func (a *App) cancelDraftSync(draftID string) {
-	a.syncMu.Lock()
-	cancel, hasCancel := a.draftSyncContexts[draftID]
-	a.syncMu.Unlock()
+func (b *DraftBridge) cancelDraftSync(draftID string) {
+	b.mu.Lock()
+	cancel, hasCancel := b.syncContexts[draftID]
+	b.mu.Unlock()
 
 	if !hasCancel {
 		return
@@ -444,11 +443,11 @@ func (a *App) cancelDraftSync(draftID string) {
 // cancelDraftSyncAndWait closes the race where discard can run after an
 // APPEND existence check but before the sync records its new UID. Waiting for
 // the cancelled goroutine lets discard re-read and delete the final UID.
-func (a *App) cancelDraftSyncAndWait(draftID string) error {
-	a.syncMu.Lock()
-	cancel, hasCancel := a.draftSyncContexts[draftID]
-	done := a.draftSyncDone[draftID]
-	a.syncMu.Unlock()
+func (b *DraftBridge) cancelDraftSyncAndWait(draftID string) error {
+	b.mu.Lock()
+	cancel, hasCancel := b.syncContexts[draftID]
+	done := b.syncDone[draftID]
+	b.mu.Unlock()
 
 	if !hasCancel {
 		return nil
@@ -470,7 +469,7 @@ func (a *App) cancelDraftSyncAndWait(draftID string) error {
 
 // SaveDraft saves or updates a draft email to the local database and syncs to IMAP.
 // If existingDraftID is provided and exists, updates that draft; otherwise creates a new one.
-func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraftID string) (*DraftResult, error) {
+func (b *DraftBridge) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraftID string) (*DraftResult, error) {
 	log := logging.WithComponent("app")
 
 	log.Debug().
@@ -483,7 +482,7 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 
 	// Try to load existing draft if either a draft ID or Drafts message ID is provided.
 	if existingDraftID != "" {
-		existing, err := a.draftOps.resolveDraftReference(existingDraftID)
+		existing, err := b.ops.resolveDraftReference(existingDraftID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve existing draft: %w", err)
 		}
@@ -493,43 +492,43 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 		}
 	}
 
-	body, err := a.draftOps.prepareDraftBody(msg)
+	body, err := b.ops.prepareDraftBody(msg)
 	if err != nil {
 		return nil, err
 	}
 
-	localDraft, err = a.draftOps.saveDraftToDB(accountID, localDraft, msg, body)
+	localDraft, err = b.ops.saveDraftToDB(accountID, localDraft, msg, body)
 	if err != nil {
 		return nil, err
 	}
-	if err := a.messageStore.MarkComposeDraft(localDraft.SourceMessageID, localDraft.ReplyType, localDraft.ID); err != nil {
+	if err := b.app.messageStore.MarkComposeDraft(localDraft.SourceMessageID, localDraft.ReplyType, localDraft.ID); err != nil {
 		log.Warn().Err(err).Str("draftID", localDraft.ID).Msg("Failed to mark source message as having compose draft")
 	}
-	a.emitSourceMessageUpdated(localDraft.SourceMessageID)
+	b.app.emitSourceMessageUpdated(localDraft.SourceMessageID)
 
 	// Cancel any previous in-flight sync for this draft before starting a new one
-	a.cancelDraftSync(localDraft.ID)
+	b.cancelDraftSync(localDraft.ID)
 
 	// Sync to IMAP in background with cancellation support
-	ctx, cancel := context.WithCancel(a.ctx)
+	ctx, cancel := context.WithCancel(b.app.ctx)
 	done := make(chan struct{})
-	a.syncMu.Lock()
-	a.draftSyncContexts[localDraft.ID] = cancel
-	a.draftSyncDone[localDraft.ID] = done
-	a.syncMu.Unlock()
+	b.mu.Lock()
+	b.syncContexts[localDraft.ID] = cancel
+	b.syncDone[localDraft.ID] = done
+	b.mu.Unlock()
 
 	go func() {
 		defer recoverPanic("app.draft", "sync draft to IMAP")
 		defer close(done)
 		defer func() {
-			a.syncMu.Lock()
-			if cur, exists := a.draftSyncDone[localDraft.ID]; exists && cur == done {
-				delete(a.draftSyncContexts, localDraft.ID)
-				delete(a.draftSyncDone, localDraft.ID)
+			b.mu.Lock()
+			if cur, exists := b.syncDone[localDraft.ID]; exists && cur == done {
+				delete(b.syncContexts, localDraft.ID)
+				delete(b.syncDone, localDraft.ID)
 			}
-			a.syncMu.Unlock()
+			b.mu.Unlock()
 		}()
-		a.syncDraftToIMAP(ctx, localDraft, msg)
+		b.syncDraftToIMAP(ctx, localDraft, msg)
 	}()
 
 	log.Info().Str("draftID", localDraft.ID).Msg("Draft saved locally, syncing to IMAP")
@@ -537,11 +536,11 @@ func (a *App) SaveDraft(accountID string, msg smtp.ComposeMessage, existingDraft
 }
 
 // syncDraftToIMAP syncs a draft to the IMAP server
-func (a *App) syncDraftToIMAP(ctx context.Context, localDraft *draft.Draft, msg smtp.ComposeMessage) {
+func (b *DraftBridge) syncDraftToIMAP(ctx context.Context, localDraft *draft.Draft, msg smtp.ComposeMessage) {
 	log := logging.WithComponent("app")
 
 	emitStatus := func(status draft.SyncStatus, imapUID uint32, syncError string) {
-		wailsRuntime.EventsEmit(a.ctx, "draft:syncStatusChanged", map[string]interface{}{
+		b.app.emitEvent("draft:syncStatusChanged", map[string]interface{}{
 			"draftId":    localDraft.ID,
 			"syncStatus": status,
 			"imapUid":    imapUID,
@@ -549,7 +548,7 @@ func (a *App) syncDraftToIMAP(ctx context.Context, localDraft *draft.Draft, msg 
 		})
 	}
 
-	draftsFolder := a.draftOps.syncToIMAP(ctx, localDraft, msg, emitStatus)
+	draftsFolder := b.ops.syncToIMAP(ctx, localDraft, msg, emitStatus)
 	if draftsFolder == nil {
 		return
 	}
@@ -560,18 +559,18 @@ func (a *App) syncDraftToIMAP(ctx context.Context, localDraft *draft.Draft, msg 
 		log.Debug().Str("draftID", localDraft.ID).Msg("Draft sync cancelled, skipping folder sync")
 		return
 	}
-	if err := a.SyncFolder(localDraft.AccountID, draftsFolder.ID); err != nil {
+	if err := b.app.SyncFolder(localDraft.AccountID, draftsFolder.ID); err != nil {
 		log.Warn().Err(err).Str("folderID", draftsFolder.ID).Msg("Failed to sync Drafts folder after draft save")
 		return
 	}
 	log.Debug().Str("folderID", draftsFolder.ID).Msg("Synced Drafts folder after draft save")
 }
 
-// SyncPendingDrafts syncs any pending drafts for an account
-func (a *App) SyncPendingDrafts(accountID string) error {
+// syncPendingDrafts syncs any pending drafts for an account.
+func (b *DraftBridge) syncPendingDrafts(accountID string) error {
 	log := logging.WithComponent("app")
 
-	pending, err := a.draftStore.ListPendingSync(accountID)
+	pending, err := b.app.draftStore.ListPendingSync(accountID)
 	if err != nil {
 		return fmt.Errorf("failed to list pending drafts: %w", err)
 	}
@@ -583,19 +582,19 @@ func (a *App) SyncPendingDrafts(accountID string) error {
 	log.Info().Int("count", len(pending)).Str("accountID", accountID).Msg("Syncing pending drafts")
 
 	for _, d := range pending {
-		msg := a.draftToComposeMessage(d)
-		a.syncDraftToIMAP(a.ctx, d, *msg)
+		msg := b.draftToComposeMessage(d)
+		b.syncDraftToIMAP(b.app.ctx, d, *msg)
 	}
 
 	return nil
 }
 
 // syncAllPendingDrafts syncs pending drafts for all accounts
-func (a *App) syncAllPendingDrafts() {
+func (b *DraftBridge) syncAllPendingDrafts() {
 	defer recoverPanic("app.draft", "sync pending drafts")
 	log := logging.WithComponent("app")
 
-	accounts, err := a.accountStore.List()
+	accounts, err := b.app.accountStore.List()
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to list accounts for draft sync")
 		return
@@ -605,26 +604,26 @@ func (a *App) syncAllPendingDrafts() {
 		if !acc.Enabled {
 			continue
 		}
-		if err := a.SyncPendingDrafts(acc.ID); err != nil {
+		if err := b.syncPendingDrafts(acc.ID); err != nil {
 			log.Warn().Err(err).Str("accountID", acc.ID).Msg("Failed to sync pending drafts")
 		}
 	}
 }
 
 // draftToComposeMessage converts a draft to a ComposeMessage.
-func (a *App) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
-	return a.draftOps.toComposeMessage(d)
+func (b *DraftBridge) draftToComposeMessage(d *draft.Draft) *smtp.ComposeMessage {
+	return b.ops.toComposeMessage(d)
 }
 
 // DeleteDraft accepts either a draft ID or a Drafts message ID. Explicit
 // discard waits for any in-flight auto-save and confirms remote deletion before
 // removing local state, so the composer never reports success while a server
 // draft remains behind.
-func (a *App) DeleteDraft(draftID string) error {
+func (b *DraftBridge) DeleteDraft(draftID string) error {
 	log := logging.WithComponent("app")
 
 	// Normalize list/viewer message IDs to the canonical local draft ID.
-	d, err := a.draftOps.resolveDraftReference(draftID)
+	d, err := b.ops.resolveDraftReference(draftID)
 	if err != nil {
 		return fmt.Errorf("failed to resolve draft: %w", err)
 	}
@@ -634,14 +633,14 @@ func (a *App) DeleteDraft(draftID string) error {
 
 	// Cancel and join any in-flight sync under the canonical ID. This closes the
 	// post-APPEND race where discard could otherwise miss the newest remote UID.
-	if err := a.cancelDraftSyncAndWait(d.ID); err != nil {
+	if err := b.cancelDraftSyncAndWait(d.ID); err != nil {
 		return err
 	}
-	d = a.draftOps.latestDraft(d)
+	d = b.ops.latestDraft(d)
 
 	// Explicit discard is success-sensitive: keep local state and return an
 	// error if the server draft could not be removed.
-	draftsFolder, err := a.draftOps.getSpecialFolder(d.AccountID, folder.TypeDrafts)
+	draftsFolder, err := b.ops.getSpecialFolder(d.AccountID, folder.TypeDrafts)
 	if err != nil {
 		return fmt.Errorf("failed to get Drafts folder: %w", err)
 	}
@@ -649,36 +648,36 @@ func (a *App) DeleteDraft(draftID string) error {
 		if draftsFolder == nil {
 			return fmt.Errorf("Drafts folder not found for synced draft")
 		}
-		if err := a.draftOps.deleteDraftFromIMAP(a.ctx, d, draftsFolder); err != nil {
+		if err := b.ops.deleteDraftFromIMAP(b.app.ctx, d, draftsFolder); err != nil {
 			return err
 		}
 	}
 
-	draftsFolder, deletedDraft, err := a.draftOps.deleteDraftLocalCore(d)
+	draftsFolder, deletedDraft, err := b.ops.deleteDraftLocalCore(d)
 	if err != nil {
 		return err
 	}
-	if err := a.messageStore.ClearComposeDraft(deletedDraft.SourceMessageID, deletedDraft.ID); err != nil {
+	if err := b.app.messageStore.ClearComposeDraft(deletedDraft.SourceMessageID, deletedDraft.ID); err != nil {
 		log.Warn().Err(err).Str("draftID", deletedDraft.ID).Msg("Failed to clear source message draft marker")
 	}
-	a.emitSourceMessageUpdated(deletedDraft.SourceMessageID)
+	b.app.emitSourceMessageUpdated(deletedDraft.SourceMessageID)
 
 	if draftsFolder != nil {
 		nextTotal := draftsFolder.TotalCount
 		if draftHasRemoteCopy(deletedDraft) && nextTotal > 0 {
 			nextTotal--
 		}
-		if err := a.folderStore.UpdateCounts(draftsFolder.ID, nextTotal, draftsFolder.UnreadCount); err != nil {
+		if err := b.app.folderStore.UpdateCounts(draftsFolder.ID, nextTotal, draftsFolder.UnreadCount); err != nil {
 			log.Warn().Err(err).Str("folderID", draftsFolder.ID).Msg("Failed to update Drafts count after local delete")
 		}
 
 		// Notify frontend immediately after confirmed remote deletion and local
 		// cleanup so the Drafts list and total-count badge stay in sync.
-		wailsRuntime.EventsEmit(a.ctx, "messages:updated", map[string]interface{}{
+		b.app.emitEvent("messages:updated", map[string]interface{}{
 			"accountId": deletedDraft.AccountID,
 			"folderId":  draftsFolder.ID,
 		})
-		wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+		b.app.emitEvent("folder:synced", map[string]interface{}{
 			"accountId": deletedDraft.AccountID,
 			"folderId":  draftsFolder.ID,
 		})
@@ -688,7 +687,7 @@ func (a *App) DeleteDraft(draftID string) error {
 		folderSnapshot := *draftsFolder
 		go func() {
 			defer recoverPanic("app.draft", "sync Drafts after discard")
-			if err := a.SyncFolder(deletedDraft.AccountID, folderSnapshot.ID); err != nil {
+			if err := b.app.SyncFolder(deletedDraft.AccountID, folderSnapshot.ID); err != nil {
 				log.Warn().Err(err).Str("folderID", folderSnapshot.ID).Msg("Failed to sync Drafts folder after draft delete")
 			}
 		}()
@@ -700,22 +699,22 @@ func (a *App) DeleteDraft(draftID string) error {
 
 // GetDraft returns a draft by ID as a ComposeMessage (for editing in composer)
 // The ID can be either a draft ID or a message ID (from the Drafts folder)
-func (a *App) GetDraft(id string) (*smtp.ComposeMessage, error) {
+func (b *DraftBridge) GetDraft(id string) (*smtp.ComposeMessage, error) {
 	log := logging.WithComponent("app")
 
 	// Resolve either a canonical draft ID or a Drafts message ID.
-	d, err := a.draftOps.resolveDraftReference(id)
+	d, err := b.ops.resolveDraftReference(id)
 	if err != nil {
 		return nil, err
 	}
 	if d != nil {
 		log.Debug().Str("referenceID", id).Str("draftID", d.ID).Msg("Resolved local draft")
-		return a.draftToComposeMessage(d), nil
+		return b.draftToComposeMessage(d), nil
 	}
 
 	// Not found as draft ID - try as message ID
 	// Get the message to find its IMAP UID and folder
-	msg, err := a.messageStore.Get(id)
+	msg, err := b.app.messageStore.Get(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message: %w", err)
 	}
@@ -726,11 +725,11 @@ func (a *App) GetDraft(id string) (*smtp.ComposeMessage, error) {
 	// No draft found - this might be a draft that was created outside aulycMail.
 	// (e.g., from webmail). Build a ComposeMessage from the message itself.
 	log.Debug().Str("messageID", id).Msg("No local draft found, building from message")
-	return a.messageToComposeMessage(msg), nil
+	return b.messageToComposeMessage(msg), nil
 }
 
 // messageToComposeMessage converts a message (from Drafts folder) to a ComposeMessage
-func (a *App) messageToComposeMessage(msg *message.Message) *smtp.ComposeMessage {
+func (b *DraftBridge) messageToComposeMessage(msg *message.Message) *smtp.ComposeMessage {
 	return &smtp.ComposeMessage{
 		To:        parseAddressList(msg.ToList),
 		Cc:        parseAddressList(msg.CcList),

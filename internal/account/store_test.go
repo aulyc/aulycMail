@@ -521,3 +521,79 @@ func TestStoreDelete(t *testing.T) {
 		t.Errorf("Get() after Delete() error = %v, want ErrAccountNotFound", err)
 	}
 }
+
+func TestStoreSharedMailboxesMappingsAndEnabledState(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db)
+
+	parentConfig := validAccountConfig()
+	parentConfig.Name = "Parent"
+	parentConfig.Email = "parent@example.com"
+	parent, err := store.Create(parentConfig)
+	if err != nil {
+		t.Fatalf("Create(parent) error = %v", err)
+	}
+
+	for _, item := range []struct {
+		name  string
+		email string
+	}{
+		{name: "Shared Z", email: "z@example.com"},
+		{name: "Shared A", email: "a@example.com"},
+	} {
+		cfg := validAccountConfig()
+		cfg.Name = item.name
+		cfg.Email = item.email
+		cfg.Username = item.email
+		cfg.SharedMailboxParentID = parent.ID
+		if _, err := store.Create(cfg); err != nil {
+			t.Fatalf("Create(%s) error = %v", item.name, err)
+		}
+	}
+
+	shared, err := store.ListBySharedMailboxParent(parent.ID)
+	if err != nil {
+		t.Fatalf("ListBySharedMailboxParent() error = %v", err)
+	}
+	if len(shared) != 2 || shared[0].Name != "Shared A" || shared[1].Name != "Shared Z" {
+		t.Fatalf("shared mailboxes = %#v, want name-sorted A then Z", shared)
+	}
+	for _, account := range shared {
+		if account.SharedMailboxParentID != parent.ID {
+			t.Fatalf("shared parent = %q, want %q", account.SharedMailboxParentID, parent.ID)
+		}
+	}
+	if none, err := store.ListBySharedMailboxParent("missing"); err != nil || len(none) != 0 {
+		t.Fatalf("missing parent result = %#v, %v; want empty", none, err)
+	}
+
+	child := shared[0]
+	if err := store.UpdateFolderMappings(child.ID, "Sent Items", "Drafts", "Deleted", "Junk", "Archive", "All", "Flagged"); err != nil {
+		t.Fatalf("UpdateFolderMappings() error = %v", err)
+	}
+	updated, err := store.Get(child.ID)
+	if err != nil {
+		t.Fatalf("Get(mapped child) error = %v", err)
+	}
+	if got := []string{
+		updated.SentFolderPath, updated.DraftsFolderPath, updated.TrashFolderPath,
+		updated.SpamFolderPath, updated.ArchiveFolderPath, updated.AllMailFolderPath,
+		updated.StarredFolderPath,
+	}; !reflect.DeepEqual(got, []string{"Sent Items", "Drafts", "Deleted", "Junk", "Archive", "All", "Flagged"}) {
+		t.Fatalf("folder mappings = %v", got)
+	}
+
+	if err := store.SetEnabled(child.ID, false); err != nil {
+		t.Fatalf("SetEnabled(false) error = %v", err)
+	}
+	disabled, err := store.Get(child.ID)
+	if err != nil {
+		t.Fatalf("Get(disabled child) error = %v", err)
+	}
+	if disabled.Enabled {
+		t.Fatal("SetEnabled(false) did not persist")
+	}
+	if err := store.SetEnabled("missing", true); !errors.Is(err, ErrAccountNotFound) {
+		t.Fatalf("SetEnabled(missing) error = %v, want ErrAccountNotFound", err)
+	}
+}

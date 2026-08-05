@@ -23,6 +23,7 @@
   import BackupSettingsPage from './backup/BackupSettingsPage.svelte'
   import ActivityLogPage from './activity/ActivityLogPage.svelte'
   import AboutTab from './AboutTab.svelte'
+  import UpdateAction from './UpdateAction.svelte'
 
   type SettingsPage = 'general' | 'appearance' | 'mail' | 'accounts' | 'backup' | 'activity' | 'about'
   type SettingsContentItem =
@@ -791,8 +792,9 @@
             {/each}
           </div>
         </nav>
-        <div class="mt-auto px-2 pt-4 text-center text-xs text-muted-foreground">
-          {$_('settingsAbout.version', { values: { version: appInfo?.version ?? '—' } })}
+        <div class="mt-auto px-1 pt-4 text-center text-xs text-muted-foreground">
+          <UpdateAction compact />
+          <div class="mt-1">{$_('settingsAbout.version', { values: { version: appInfo?.version ?? '—' } })}</div>
         </div>
       </aside>
 
@@ -851,6 +853,12 @@
   :global([data-settings-keyboard-selected='true']) {
     outline: 2px solid hsl(var(--primary));
     outline-offset: -2px;
+  }
+
+  /* An open Select already owns the visible blue ring. During pointerdown,
+     suppress the Settings browse outline so the two indicators never stack. */
+  :global([data-settings-keyboard-selected='true'][data-keyboard-select-trigger='true'][data-state='open']) {
+    outline: none;
   }
 
   :global([data-settings-footer-action][data-settings-keyboard-selected='true']) {

@@ -54,7 +54,7 @@ func TestFetchMessageBodyRecoversNonSelectableMessageFromConfiguredBackup(t *tes
 		t.Fatalf("attachment metadata was not recovered: %#v", attachments)
 	}
 	attachmentPath := filepath.Join(t.TempDir(), "notes.txt")
-	savedPath, err := testApp.DownloadAttachment(attachments[0].ID, attachmentPath)
+	savedPath, err := testApp.downloadAttachment(attachments[0].ID, attachmentPath)
 	if err != nil {
 		t.Fatalf("DownloadAttachment: %v", err)
 	}

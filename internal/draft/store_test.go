@@ -198,3 +198,36 @@ func TestSyncStatusUpdate(t *testing.T) {
 		t.Errorf("FolderID = %q, want %q", got.FolderID, folderID)
 	}
 }
+
+func TestDeleteByAccountKeepsOtherAccountsDrafts(t *testing.T) {
+	db := openTestDB(t)
+	firstAccountID := insertTestAccount(t, db)
+	const secondAccountID = "test-account-2"
+	if _, err := db.Exec(`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
+		VALUES (?, 'Second', 'second@example.com', 'imap.example.com', 'smtp.example.com', 'second')`, secondAccountID); err != nil {
+		t.Fatalf("insert second account: %v", err)
+	}
+	store := NewStore(db)
+
+	for _, item := range []*Draft{
+		{AccountID: firstAccountID, Subject: "remove one"},
+		{AccountID: firstAccountID, Subject: "remove two"},
+		{AccountID: secondAccountID, Subject: "keep"},
+	} {
+		if err := store.Create(item); err != nil {
+			t.Fatalf("Create(%q) error = %v", item.Subject, err)
+		}
+	}
+
+	if err := store.DeleteByAccount(firstAccountID); err != nil {
+		t.Fatalf("DeleteByAccount() error = %v", err)
+	}
+	removed, err := store.ListByAccount(firstAccountID)
+	if err != nil || len(removed) != 0 {
+		t.Fatalf("removed account drafts = %#v, %v", removed, err)
+	}
+	kept, err := store.ListByAccount(secondAccountID)
+	if err != nil || len(kept) != 1 || kept[0].Subject != "keep" {
+		t.Fatalf("second account drafts = %#v, %v; want keep", kept, err)
+	}
+}

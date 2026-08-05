@@ -2,9 +2,9 @@
   import { Dialog as DialogPrimitive } from 'bits-ui'
   import { cn } from '$lib/utils'
   import { Button } from '$lib/components/ui/button'
-  // @ts-ignore - wailsjs path
-  import { BrowserOpenURL } from '../../../wailsjs/runtime/runtime'
   import { _ } from '$lib/i18n'
+  import AboutInfoDialog from './settings/AboutInfoDialog.svelte'
+  import { getAboutInfoContent, type PolicyInfoKind } from './settings/aboutInfoContent'
 
   interface Props {
     open: boolean
@@ -14,16 +14,14 @@
   let { open = $bindable(false), onAccept }: Props = $props()
 
   let agreed = $state(false)
+  let infoOpen = $state(false)
+  let infoKind = $state<PolicyInfoKind>('privacy')
 
-  const PRIVACY_URL = 'https://aulyc.com/aulycmail/privacy'
-  const TERMS_URL = 'https://aulyc.com/aulycmail/terms'
+  const infoContent = $derived(getAboutInfoContent(infoKind, $_))
 
-  function openPrivacyPolicy() {
-    BrowserOpenURL(PRIVACY_URL)
-  }
-
-  function openTermsOfService() {
-    BrowserOpenURL(TERMS_URL)
+  function openInfo(kind: PolicyInfoKind) {
+    infoKind = kind
+    infoOpen = true
   }
 
   function handleAccept() {
@@ -70,7 +68,7 @@
         <div class="flex flex-col gap-2">
           <button
             type="button"
-            onclick={openPrivacyPolicy}
+            onclick={() => openInfo('privacy')}
             class="text-sm text-primary hover:underline text-left flex items-center gap-2"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -82,7 +80,7 @@
           </button>
           <button
             type="button"
-            onclick={openTermsOfService}
+            onclick={() => openInfo('terms')}
             class="text-sm text-primary hover:underline text-left flex items-center gap-2"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -117,3 +115,10 @@
     </DialogPrimitive.Content>
   </DialogPrimitive.Portal>
 </DialogPrimitive.Root>
+
+<AboutInfoDialog
+  bind:open={infoOpen}
+  title={infoContent.title}
+  intro={infoContent.intro}
+  sections={infoContent.sections}
+/>

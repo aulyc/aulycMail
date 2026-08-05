@@ -3,7 +3,7 @@
   "schemaVersion": 1,
   "projectId": "aulycmail",
   "applicability": "applicable",
-  "coreVersion": "3.0.0",
+  "coreVersion": "3.1.0",
   "artifacts": [
     {
       "id": "aulycmail-macos-app",
@@ -21,7 +21,7 @@
   "releasePolicies": [
     {
       "id": "aulyc-dual-mirror-v1",
-      "version": "1.2.0"
+      "version": "1.7.0"
     }
   ],
   "ruleBindings": [
@@ -93,6 +93,10 @@
       "evidence": ["AGENTS.md#command-mapping", "Makefile", "tools/release-operation-separation.test.mjs"]
     },
     {
+      "ruleId": "REL-017",
+      "evidence": ["AGENTS.md#dual-mirror-release-policy", "docs/DUAL_MIRROR_RELEASE.md"]
+    },
+    {
       "ruleId": "DMR-001",
       "evidence": ["docs/DUAL_MIRROR_RELEASE.md"]
     },
@@ -123,6 +127,18 @@
     {
       "ruleId": "DMR-008",
       "evidence": ["AGENTS.md#command-mapping", "docs/DUAL_MIRROR_RELEASE.md"]
+    },
+    {
+      "ruleId": "DMR-009",
+      "evidence": ["AGENTS.md#dual-mirror-release-policy", "docs/DUAL_MIRROR_RELEASE.md"]
+    },
+    {
+      "ruleId": "DMR-010",
+      "evidence": ["docs/DUAL_MIRROR_RELEASE.md"]
+    },
+    {
+      "ruleId": "DMR-011",
+      "evidence": ["AGENTS.md#dual-mirror-release-policy", "docs/DUAL_MIRROR_RELEASE.md", "internal/updater/manifest.go"]
     },
     {
       "ruleId": "MAC-001",
@@ -161,11 +177,11 @@
   "trackedFiles": [
     {
       "path": "AGENTS.md",
-      "sha256": "47afa6195dcf18a6d3be23104d44a9f3ab72baaf23f76847b226464e3ae26ef7"
+      "sha256": "755cecb68845369a7374e9ff34227e58b3186a854191659ab0fa829e8b3b42ae"
     },
     {
       "path": "docs/DEVELOPMENT.md",
-      "sha256": "39bd16284fb590f228e898acfe78289d1d4d174043cc3d16aed10dd523fcdaf3"
+      "sha256": "fa5f021a60395cd44d053d5add48e26253dd104e2ed3304dac07a411c23b6173"
     },
     {
       "path": "docs/VERSIONING.md",
@@ -177,11 +193,11 @@
     },
     {
       "path": "Makefile",
-      "sha256": "4ead049704ada9a5537f5bebc983f78fcb10a53559550d3208c4b50783c083ea"
+      "sha256": "6a9bae386d450b29ee7a5cf43ab796c147b56398bceba3a14eb282fe4d598d39"
     },
     {
       "path": ".golangci.yml",
-      "sha256": "e9dae3427b82cf5cece9ad302c9830621a5ca4d1f24f8f7387129402eaeea155"
+      "sha256": "cb64bf657cf3b79c8e95750080980c7ffc2f7bf4160ab7eeedbd69d1a055b0e9"
     },
     {
       "path": "tools/version-bump.mjs",
@@ -201,7 +217,7 @@
     },
     {
       "path": "tools/release-backup.mjs",
-      "sha256": "d5c9b6abd191d47b430c4495c4b0665ff57891972791045d60b3dbd887d8ae29"
+      "sha256": "47233485f002a5f6d8b46d79c920485e5ffebc83b3d721c240edd56e3fc9fb48"
     },
     {
       "path": "tools/package_macos_app.sh",
@@ -257,11 +273,15 @@
     },
     {
       "path": "docs/DUAL_MIRROR_RELEASE.md",
-      "sha256": "799fecdf6bbb9566f53ea4e6b612bfaf02a1d67f5dc0efc96958311fc6778900"
+      "sha256": "3c1f8e2b0b90813d9dc089a76692f9dda06fd18d2901de99c76951e1b4564861"
     },
     {
       "path": "tools/dual-mirror-release.sh",
       "sha256": "7751f053d5dd7c7de9d226e2121ec4a8cd63fa94ebf1715f69b1cb833fd08ca4"
+    },
+    {
+      "path": "internal/updater/manifest.go",
+      "sha256": "666e457fc6fb5b42226ce39abe05528077b6bf0d3ae6f570e22bcb42ac5fe17d"
     }
   ],
   "releaseSignals": {
@@ -281,6 +301,7 @@
       "wails.json",
       "tools/version-bump.mjs",
       "tools/dual-mirror-release.sh",
+      "internal/updater/manifest.go",
       "tools/release-prepare.mjs",
       "tools/release-identity.mjs",
       "tools/release-worktree.mjs",
@@ -309,6 +330,7 @@
       "tools/verify_legal_resources.sh",
       "tools/verify_macos_app.sh",
       "tools/verify-macos-app.test.mjs",
+      "internal/updater/manifest.go",
       "LICENSE",
       "AERION_MODIFICATIONS.md",
       "LICENSES/Aerion-Apache-2.0.txt",

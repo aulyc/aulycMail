@@ -191,6 +191,81 @@ func TestAcceptPermanentlyScopesTrustToHost(t *testing.T) {
 	}
 }
 
+func TestTrustedCertificateListingAndRemovalNormalizesInputs(t *testing.T) {
+	store := openTestStore(t)
+	now := time.Now().UTC()
+	first := &CertificateInfo{
+		Fingerprint: " AA11 ",
+		Subject:     "first",
+		Issuer:      "issuer",
+		NotBefore:   now.Add(-time.Hour).Format(time.RFC3339),
+		NotAfter:    now.Add(time.Hour).Format(time.RFC3339),
+	}
+	second := &CertificateInfo{
+		Fingerprint: "BB22",
+		Subject:     "second",
+		Issuer:      "issuer",
+		NotBefore:   now.Add(-time.Hour).Format(time.RFC3339),
+		NotAfter:    now.Add(time.Hour).Format(time.RFC3339),
+	}
+	if err := store.AcceptPermanently(" IMAP.EXAMPLE.COM ", first); err != nil {
+		t.Fatalf("AcceptPermanently(first) error = %v", err)
+	}
+	if err := store.AcceptPermanently("smtp.example.com", second); err != nil {
+		t.Fatalf("AcceptPermanently(second) error = %v", err)
+	}
+	if err := store.AcceptSession("imap.example.com", "AA11"); err != nil {
+		t.Fatalf("AcceptSession() error = %v", err)
+	}
+
+	certs, err := store.GetByHosts([]string{" IMAP.EXAMPLE.COM ", "imap.example.com", "", "missing.example.com"})
+	if err != nil {
+		t.Fatalf("GetByHosts() error = %v", err)
+	}
+	if len(certs) != 1 || certs[0].Host != "imap.example.com" || certs[0].Fingerprint != "aa11" || certs[0].Subject != "first" {
+		t.Fatalf("GetByHosts() = %#v", certs)
+	}
+	if empty, err := store.GetByHosts(nil); err != nil || len(empty) != 0 {
+		t.Fatalf("GetByHosts(nil) = %#v, %v", empty, err)
+	}
+	if empty, err := store.GetByHosts([]string{" ", ""}); err != nil || len(empty) != 0 {
+		t.Fatalf("GetByHosts(blank) = %#v, %v", empty, err)
+	}
+
+	if err := store.Remove(" AA11 "); err != nil {
+		t.Fatalf("Remove() error = %v", err)
+	}
+	if store.IsTrusted("imap.example.com", "aa11") {
+		t.Fatal("certificate remained trusted after removing persistent and session entries")
+	}
+	remaining, err := store.GetByHosts([]string{"imap.example.com", "smtp.example.com"})
+	if err != nil || len(remaining) != 1 || remaining[0].Fingerprint != "bb22" {
+		t.Fatalf("remaining certificates = %#v, %v", remaining, err)
+	}
+}
+
+func TestCertificateStoreRejectsIncompleteTrustInputs(t *testing.T) {
+	store := openTestStore(t)
+	valid := &CertificateInfo{Fingerprint: "aa11"}
+	for _, test := range []struct {
+		name string
+		err  error
+	}{
+		{name: "permanent blank host", err: store.AcceptPermanently(" ", valid)},
+		{name: "permanent nil info", err: store.AcceptPermanently("imap.example.com", nil)},
+		{name: "permanent blank fingerprint", err: store.AcceptPermanently("imap.example.com", &CertificateInfo{})},
+		{name: "session blank host", err: store.AcceptSession("", "aa11")},
+		{name: "session blank fingerprint", err: store.AcceptSession("imap.example.com", " ")},
+	} {
+		if test.err == nil {
+			t.Fatalf("%s error = nil, want validation error", test.name)
+		}
+	}
+	if store.IsTrusted("", "aa11") || store.IsTrusted("imap.example.com", "") {
+		t.Fatal("blank host or fingerprint was trusted")
+	}
+}
+
 func TestBuildTLSConfigTrustedCertificateRequiresMatchingHost(t *testing.T) {
 	store := openTestStore(t)
 	der := generateTestCert(t)

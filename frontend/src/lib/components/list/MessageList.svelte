@@ -952,7 +952,7 @@
         // Restore scroll position
         if (listContainerRef) {
           requestAnimationFrame(() => {
-            listContainerRef!.scrollTop = scrollTop
+            if (listContainerRef) listContainerRef.scrollTop = scrollTop
           })
         }
 
@@ -970,7 +970,7 @@
       // Restore scroll position
       if (listContainerRef) {
         requestAnimationFrame(() => {
-          listContainerRef!.scrollTop = scrollTop
+          if (listContainerRef) listContainerRef.scrollTop = scrollTop
         })
       }
 

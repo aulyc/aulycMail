@@ -51,10 +51,10 @@ func (a *App) GetInlineAttachments(messageID string) (map[string]string, error) 
 	return result, nil
 }
 
-// DownloadAttachment downloads an attachment and saves it to disk
+// downloadAttachment downloads an attachment and saves it to disk.
 // If savePath is empty, saves to the default attachments directory
 // Returns the path where the file was saved
-func (a *App) DownloadAttachment(attachmentID, savePath string) (string, error) {
+func (a *App) downloadAttachment(attachmentID, savePath string) (string, error) {
 	log := logging.WithComponent("app")
 
 	log.Debug().Str("attachmentID", attachmentID).Str("savePath", savePath).Msg("DownloadAttachment called")
@@ -125,7 +125,7 @@ func (a *App) DownloadAttachment(attachmentID, savePath string) (string, error) 
 // OpenAttachment downloads (if needed) and opens an attachment with the default application
 func (a *App) OpenAttachment(attachmentID string) error {
 	// Download if not already downloaded
-	localPath, err := a.DownloadAttachment(attachmentID, "")
+	localPath, err := a.downloadAttachment(attachmentID, "")
 	if err != nil {
 		return err
 	}
@@ -161,11 +161,11 @@ func (a *App) SaveAttachmentAs(attachmentID string) (string, error) {
 	}
 	defaultDir := filepath.Join(homeDir, "Downloads")
 
-	savePath, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
-		DefaultDirectory: defaultDir,
-		DefaultFilename:  email.DefaultAttachmentFilename(att.Filename),
-		Title:            "Save Attachment",
-	})
+	savePath, err := a.chooseAttachmentSavePath(
+		defaultDir,
+		email.DefaultAttachmentFilename(att.Filename),
+		"Save Attachment",
+	)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to show save dialog")
 		return "", fmt.Errorf("failed to show save dialog: %w", err)
@@ -180,7 +180,7 @@ func (a *App) SaveAttachmentAs(attachmentID string) (string, error) {
 	}
 
 	// Download and save to the selected path
-	resultPath, err := a.DownloadAttachment(attachmentID, savePath)
+	resultPath, err := a.downloadAttachment(attachmentID, savePath)
 	if err != nil {
 		log.Error().Err(err).Str("savePath", savePath).Msg("Failed to download attachment")
 		return "", err
@@ -192,6 +192,9 @@ func (a *App) SaveAttachmentAs(attachmentID string) (string, error) {
 
 // openFile opens a file with the system default application
 func (a *App) openFile(path string) error {
+	if a.openSystemPath != nil {
+		return a.openSystemPath(path, false)
+	}
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
@@ -242,6 +245,9 @@ func (a *App) OpenFolder(path string) error {
 		return err
 	}
 
+	if a.openSystemPath != nil {
+		return a.openSystemPath(path, true)
+	}
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
@@ -270,10 +276,7 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 	}
 	defaultDir := filepath.Join(homeDir, "Downloads")
 
-	saveDir, err := wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
-		DefaultDirectory: defaultDir,
-		Title:            "Save All Attachments",
-	})
+	saveDir, err := a.chooseAttachmentDirectory(defaultDir, "Save All Attachments")
 	if err != nil {
 		return "", fmt.Errorf("failed to show folder dialog: %w", err)
 	}
@@ -315,6 +318,27 @@ func (a *App) SaveAllAttachments(messageID string) (string, error) {
 
 	log.Info().Int("count", savedCount).Str("folder", saveDir).Msg("Saved all attachments")
 	return saveDir, nil
+}
+
+func (a *App) chooseAttachmentSavePath(defaultDirectory, defaultFilename, title string) (string, error) {
+	if a.saveFileDialog != nil {
+		return a.saveFileDialog(defaultDirectory, defaultFilename, title)
+	}
+	return wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+		DefaultDirectory: defaultDirectory,
+		DefaultFilename:  defaultFilename,
+		Title:            title,
+	})
+}
+
+func (a *App) chooseAttachmentDirectory(defaultDirectory, title string) (string, error) {
+	if a.openDirectoryDialog != nil {
+		return a.openDirectoryDialog(defaultDirectory, title)
+	}
+	return wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
+		DefaultDirectory: defaultDirectory,
+		Title:            title,
+	})
 }
 
 func (a *App) withStreamedRawMessage(msg *message.Message, use func(io.Reader) error) error {

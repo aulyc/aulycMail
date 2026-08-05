@@ -104,15 +104,21 @@
   async function moveUp(index: number, accountId: string) {
     if (index <= 0) return
     const ids = accountStore.accounts.map(a => a.account.id)
-    ;[ids[index - 1], ids[index]] = [ids[index], ids[index - 1]]
+    const currentIndex = ids.indexOf(accountId)
+    const previousIndex = ids.indexOf(regularAccounts[index - 1].account.id)
+    if (currentIndex < 0 || previousIndex < 0) return
+    ;[ids[previousIndex], ids[currentIndex]] = [ids[currentIndex], ids[previousIndex]]
     await accountStore.reorderAccounts(ids)
     onAccountOrderChanged?.(accountId, 'move-up')
   }
 
   async function moveDown(index: number, accountId: string) {
-    if (index >= accountStore.accounts.length - 1) return
+    if (index >= regularAccounts.length - 1) return
     const ids = accountStore.accounts.map(a => a.account.id)
-    ;[ids[index], ids[index + 1]] = [ids[index + 1], ids[index]]
+    const currentIndex = ids.indexOf(accountId)
+    const nextIndex = ids.indexOf(regularAccounts[index + 1].account.id)
+    if (currentIndex < 0 || nextIndex < 0) return
+    ;[ids[currentIndex], ids[nextIndex]] = [ids[nextIndex], ids[currentIndex]]
     await accountStore.reorderAccounts(ids)
     onAccountOrderChanged?.(accountId, 'move-down')
   }
@@ -184,7 +190,7 @@
                 variant="ghost"
                 class="h-7 w-7"
                 onclick={() => moveDown(index, acc.id)}
-                disabled={index === accountStore.accounts.length - 1}
+                disabled={index === regularAccounts.length - 1}
                 title={$_('settingsAccounts.moveDown')}
               >
                 <Icon icon="mdi:chevron-down" class="w-4 h-4" />

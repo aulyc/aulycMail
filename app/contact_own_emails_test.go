@@ -3,10 +3,13 @@ package app
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	"aulyc.local/aulycmail/internal/account"
 	"aulyc.local/aulycmail/internal/contact"
 	"aulyc.local/aulycmail/internal/database"
+	"aulyc.local/aulycmail/internal/folder"
+	"aulyc.local/aulycmail/internal/message"
 )
 
 func newContactOwnEmailsTestApp(t *testing.T) (*App, *account.Account, *account.AccountConfig) {
@@ -42,6 +45,8 @@ func newContactOwnEmailsTestApp(t *testing.T) (*App, *account.Account, *account.
 		accountStore: accountStore,
 		contactStore: contactStore,
 	}
+	a.initSyncBridge()
+	a.initDraftBridge()
 	a.updateDBConnectionPool()
 	return a, created, cfg
 }
@@ -174,4 +179,77 @@ func TestRefreshContactOwnEmailsKeepsLastKnownSetOnQueryError(t *testing.T) {
 		t.Fatalf("collect protected owner after refresh error: %v", err)
 	}
 	assertContactMissing(t, a.contactStore, "owner@example.com")
+}
+
+func TestRefreshContactsCollectsObservableRolesAndRelatedMessages(t *testing.T) {
+	a, created, _ := newContactOwnEmailsTestApp(t)
+	a.folderStore = folder.NewStore(a.db)
+	a.messageStore = message.NewStore(a.db)
+	folders := map[folder.Type]*folder.Folder{}
+	for _, folderType := range []folder.Type{folder.TypeInbox, folder.TypeSent, folder.TypeDrafts, folder.TypeSpam, folder.TypeTrash} {
+		item := &folder.Folder{
+			ID: "contacts-" + string(folderType), AccountID: created.ID,
+			Name: string(folderType), Path: string(folderType), Type: folderType,
+		}
+		if err := a.folderStore.Create(item); err != nil {
+			t.Fatalf("create %s folder: %v", folderType, err)
+		}
+		folders[folderType] = item
+	}
+
+	now := time.Now().UTC()
+	messages := []*message.Message{
+		{
+			ID: "received-contact", AccountID: created.ID, FolderID: folders[folder.TypeInbox].ID, UID: 1,
+			MessageID: "received-contact@example.com", Subject: "Received",
+			FromName: "Sender", FromEmail: "sender@example.com", Date: now,
+		},
+		{
+			ID: "sent-contact", AccountID: created.ID, FolderID: folders[folder.TypeSent].ID, UID: 2,
+			MessageID: "sent-contact@example.com", Subject: "Sent", FromEmail: created.Email, Date: now,
+			ToList:  `[{"name":"Recipient","email":"recipient@example.com"}]`,
+			CcList:  `[{"name":"Copy","email":"copy@example.com"}]`,
+			BccList: `[{"name":"Blind","email":"blind@example.com"},{"name":"Empty","email":""}]`,
+		},
+		{
+			ID: "sent-malformed", AccountID: created.ID, FolderID: folders[folder.TypeSent].ID, UID: 3,
+			MessageID: "sent-malformed@example.com", Subject: "Malformed", FromEmail: created.Email,
+			ToList: `{broken`, Date: now,
+		},
+	}
+	for index, folderType := range []folder.Type{folder.TypeDrafts, folder.TypeSpam, folder.TypeTrash} {
+		messages = append(messages, &message.Message{
+			ID: "skipped-contact-" + string(folderType), AccountID: created.ID,
+			FolderID: folders[folderType].ID, UID: uint32(index + 10),
+			MessageID: "skipped-" + string(folderType) + "@example.com",
+			Subject:   "Skipped", FromEmail: "skip@example.com", Date: now,
+		})
+	}
+	if err := a.messageStore.UpsertBatch(messages); err != nil {
+		t.Fatalf("seed contact messages: %v", err)
+	}
+
+	scanned, err := a.RefreshContactsFromMail()
+	if err != nil || scanned != len(messages) {
+		t.Fatalf("RefreshContactsFromMail = (%d, %v), want %d", scanned, err, len(messages))
+	}
+	for _, email := range []string{"sender@example.com", "recipient@example.com", "copy@example.com", "blind@example.com"} {
+		assertContactPresent(t, a.contactStore, email)
+	}
+	assertContactMissing(t, a.contactStore, "skip@example.com")
+
+	results, err := a.SearchContacts("example.com", 2)
+	if err != nil || len(results) != 2 {
+		t.Fatalf("SearchContacts = (%#v, %v)", results, err)
+	}
+	related, err := a.GetContactMessages("sender@example.com", 10)
+	if err != nil || len(related) != 1 || related[0].ID != "received-contact" {
+		t.Fatalf("GetContactMessages = (%#v, %v)", related, err)
+	}
+	if empty, err := (&App{}).GetContactMessages("sender@example.com", 10); err != nil || len(empty) != 0 {
+		t.Fatalf("unavailable GetContactMessages = (%#v, %v)", empty, err)
+	}
+	if _, err := (&App{}).RefreshContactsFromMail(); err == nil {
+		t.Fatal("RefreshContactsFromMail without stores unexpectedly succeeded")
+	}
 }

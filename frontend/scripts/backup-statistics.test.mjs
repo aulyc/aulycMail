@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { test } from 'vitest'
 import { backupProgressPercent, backupStatistics } from '../src/lib/backup/backupStatistics.ts'
 
 test('presents backup counters as coverage and mutually exclusive outcomes', () => {

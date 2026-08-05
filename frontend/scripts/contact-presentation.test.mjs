@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { test } from 'vitest'
 import { shouldShowContactEmail } from '../src/lib/contacts/utils/contactPresentation.ts'
 
 test('hides an email subtitle when the display name is the same address', () => {

@@ -19,7 +19,6 @@ const (
 	KeyMessageListDensity         = "message_list_density"
 	KeyMessageListSortOrder       = "message_list_sort_order"
 	KeyThemeMode                  = "theme_mode"
-	KeyShowTitleBar               = "show_title_bar"
 	KeyTermsAccepted              = "terms_accepted"
 	KeyRunBackground              = "run_background"
 	KeyStartHidden                = "start_hidden"
@@ -33,6 +32,7 @@ const (
 	KeyMenuBarIcon                = "menu_bar_icon"
 	KeyDeveloperMode              = "developer_mode"
 	KeyEnhancedKeyboardNavigation = "enhanced_keyboard_navigation"
+	KeyAutomaticUpdateChecks      = "automatic_update_checks"
 	KeyLastSeenVersion            = "last_seen_version" // for "What's new in this version" launch dialog
 	KeyBackupDirectory            = "backup_directory"
 	KeyBackupScope                = "backup_scope"
@@ -304,6 +304,29 @@ func (s *Store) SetEnhancedKeyboardNavigation(enabled bool) error {
 	return s.Set(KeyEnhancedKeyboardNavigation, v)
 }
 
+// GetAutomaticUpdateChecks returns whether background update checks are enabled.
+// The setting defaults to enabled; downloading and installation always require
+// an explicit user action.
+func (s *Store) GetAutomaticUpdateChecks() (bool, error) {
+	value, err := s.Get(KeyAutomaticUpdateChecks)
+	if err != nil {
+		return true, err
+	}
+	if value == "" {
+		return true, nil
+	}
+	return value == "true", nil
+}
+
+// SetAutomaticUpdateChecks persists the background update-check preference.
+func (s *Store) SetAutomaticUpdateChecks(enabled bool) error {
+	value := "false"
+	if enabled {
+		value = "true"
+	}
+	return s.Set(KeyAutomaticUpdateChecks, value)
+}
+
 // GetMessageListSortOrder returns the current message list sort order
 func (s *Store) GetMessageListSortOrder() (string, error) {
 	value, err := s.Get(KeyMessageListSortOrder)
@@ -350,27 +373,6 @@ func (s *Store) SetThemeMode(mode string) error {
 	default:
 		return fmt.Errorf("invalid theme mode: %s (must be 'system', 'light', 'light-blue', 'light-orange', 'light-balanced', 'adwaita-light', 'breeze-light', 'dark', 'dark-gray', 'dark-balanced', 'adwaita-dark', 'breeze-dark', 'catppuccin-latte', 'catppuccin-frappe', 'catppuccin-macchiato', 'catppuccin-mocha', 'dracula', 'source-light', 'source-dark', 'source-soft-dark', 'tokyo-night', 'nord-light', 'nord-dark', 'pop-light', 'pop-dark', 'vs-code-light', 'vs-code-dark', 'yaru-light', or 'yaru-dark')", mode)
 	}
-}
-
-// GetShowTitleBar returns whether the title bar should be shown
-func (s *Store) GetShowTitleBar() (bool, error) {
-	value, err := s.Get(KeyShowTitleBar)
-	if err != nil {
-		return true, err // Default to true (shown)
-	}
-	if value == "" {
-		return true, nil // Default to true (shown)
-	}
-	return value == "true", nil
-}
-
-// SetShowTitleBar sets whether the title bar should be shown
-func (s *Store) SetShowTitleBar(show bool) error {
-	value := "false"
-	if show {
-		value = "true"
-	}
-	return s.Set(KeyShowTitleBar, value)
 }
 
 // GetTermsAccepted returns whether the user has accepted the terms of service

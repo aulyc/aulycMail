@@ -407,6 +407,74 @@ func TestPurgeOwnEmailDeletesEmptyManualRecord(t *testing.T) {
 	}
 }
 
+func TestLegacyContactLifecycleKeepsManualShellUntilRecordDelete(t *testing.T) {
+	db := openTestDB(t)
+	store := NewStore(db.DB)
+
+	if err := store.Create(" Manual@Example.com ", " Manual Name "); err != nil {
+		t.Fatalf("Create() error = %v", err)
+	}
+	manual, err := store.GetRecordByEmail("manual@example.com")
+	if err != nil || manual == nil {
+		t.Fatalf("GetRecordByEmail() = %#v, %v", manual, err)
+	}
+	if err := store.UpdateRecordName(manual.ID, " Renamed Manual "); err != nil {
+		t.Fatalf("UpdateRecordName() error = %v", err)
+	}
+	renamed, err := store.GetRecord(manual.ID)
+	if err != nil || renamed == nil || renamed.Fn != "Renamed Manual" {
+		t.Fatalf("renamed record = %#v, %v", renamed, err)
+	}
+	if err := store.UpdateRecordName("", "ignored"); err != nil {
+		t.Fatalf("UpdateRecordName(empty) error = %v", err)
+	}
+
+	recipients := []struct{ Email, Name string }{
+		{Email: "sent@example.com", Name: "Sent Recipient"},
+		{Email: "", Name: "Invalid Recipient"},
+	}
+	if err := store.AddFromSentMail(recipients); err != nil {
+		t.Fatalf("AddFromSentMail() error = %v", err)
+	}
+
+	contacts, err := store.List(1)
+	if err != nil || len(contacts) != 1 || contacts[0].Email != "sent@example.com" {
+		t.Fatalf("List(1) = %#v, %v; want most-used sent recipient", contacts, err)
+	}
+	if count, err := store.Count(); err != nil || count != 2 {
+		t.Fatalf("Count() = %d, %v; want 2", count, err)
+	}
+	if count, err := store.CountRecords(RecordFilter{Source: "local"}); err != nil || count != 2 {
+		t.Fatalf("CountRecords() = %d, %v; want 2", count, err)
+	}
+
+	if err := store.Delete("sent@example.com"); err != nil {
+		t.Fatalf("Delete(collected) error = %v", err)
+	}
+	if count, err := store.CountRecords(RecordFilter{Source: "local"}); err != nil || count != 1 {
+		t.Fatalf("records after collected delete = %d, %v; want 1", count, err)
+	}
+	if err := store.Delete("manual@example.com"); err != nil {
+		t.Fatalf("Delete(manual) error = %v", err)
+	}
+	if count, err := store.Count(); err != nil || count != 0 {
+		t.Fatalf("email count after deletes = %d, %v; want 0", count, err)
+	}
+	if kept, err := store.GetRecord(manual.ID); err != nil || kept == nil {
+		t.Fatalf("manual shell = %#v, %v; want preserved", kept, err)
+	}
+
+	if err := store.DeleteRecord(manual.ID); err != nil {
+		t.Fatalf("DeleteRecord() error = %v", err)
+	}
+	if err := store.DeleteRecord(""); err != nil {
+		t.Fatalf("DeleteRecord(empty) error = %v", err)
+	}
+	if count, err := store.CountRecords(RecordFilter{Source: "local"}); err != nil || count != 0 {
+		t.Fatalf("records after DeleteRecord = %d, %v; want 0", count, err)
+	}
+}
+
 func TestUpdateName(t *testing.T) {
 	db := openTestDB(t)
 	store := NewStore(db.DB)

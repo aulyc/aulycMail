@@ -30,6 +30,7 @@ import (
 	"aulyc.local/aulycmail/internal/settings"
 	"aulyc.local/aulycmail/internal/sync"
 	"aulyc.local/aulycmail/internal/undo"
+	"aulyc.local/aulycmail/internal/updater"
 	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -164,14 +165,47 @@ type App struct {
 	// Embedded Contacts bridge. Go's method promotion makes Contacts_* methods
 	// Wails-bindable while keeping contacts logic outside the host App.
 	*contactpane.ContactsBridge
+	// BackupBridge applies the same promoted-method boundary to backup
+	// orchestration, keeping that surface out of App's direct method set.
+	*BackupBridge
+	// SyncBridge and DraftBridge own their respective Wails surfaces and
+	// process-local orchestration state.
+	*SyncBridge
+	*DraftBridge
 
 	ctx context.Context
+
+	// eventsEmit owns delivery across the Wails boundary. Production uses the
+	// Wails runtime emitter; keeping the transport injectable lets orchestration
+	// tests exercise complete local/IMAP state transitions without starting a
+	// desktop webview.
+	eventsEmit func(context.Context, string, ...interface{})
+
+	// Native file operations remain behind narrow hooks so attachment workflows
+	// can be exercised without opening Finder or a modal Wails dialog in tests.
+	// Nil hooks preserve the production Wails/macOS implementations.
+	saveFileDialog         func(defaultDirectory, defaultFilename, title string) (string, error)
+	openDirectoryDialog    func(defaultDirectory, title string) (string, error)
+	openMultipleFileDialog func(title string) ([]string, error)
+	openSystemPath         func(path string, reveal bool) error
+	showWindowAction       func()
+	hideWindowAction       func()
+	unminimiseWindowAction func()
+	nativeShowWindowAction func()
+	quitAction             func()
+	notifyStartupAction    func()
+	newThemeMonitor        func() platform.ThemeMonitor
+
+	// Preflight owns a credential-store factory seam so tests can validate the
+	// complete database/path initialization flow without touching the host
+	// Keychain. Production continues to use credentials.NewStore.
+	newCredentialStore func(*database.DB, string) (*credentials.Store, error)
 
 	// ready is the backend-up signal the frontend polls before mounting the
 	// main app. False until Startup completes. The boot splash in
 	// index.html stays visible while ready is false; flipping it true is
 	// what lets main.ts proceed to mount(App). See IsReady().
-	ready bool
+	ready atomic.Bool
 
 	// Paths
 	paths *platform.Paths
@@ -190,6 +224,7 @@ type App struct {
 	settingsStore       *settings.Store
 	appStateStore       *appstate.Store
 	imageAllowlistStore *settings.ImageAllowlistStore
+	updateService       *updater.Service
 
 	// IMAP
 	imapPool   *imap.Pool
@@ -205,9 +240,6 @@ type App struct {
 
 	// Certificate trust store (TOFU)
 	certStore *certificate.Store
-
-	// Shared draft operations
-	draftOps draftOps
 
 	// Shared compose operations
 	composeOps composeOps
@@ -225,17 +257,6 @@ type App struct {
 	// Full-text search indexer
 	ftsIndexer *message.FTSIndexer
 
-	// Sync management - tracks active syncs per account for cancel-and-restart
-	syncContexts    map[string]context.CancelFunc // keyed by "accountID:folderID"
-	syncLastRequest map[string]time.Time          // last sync request time for debounce
-	syncCancelled   bool                          // set by CancelAllSyncs to stop SyncAllComplete loop
-	wakeSyncing     bool                          // guards syncAfterWake against concurrent calls
-	syncMu          goSync.Mutex                  // protects sync maps
-
-	// Draft IMAP sync goroutine tracking — cancel in-flight syncDraftToIMAP
-	draftSyncContexts map[string]context.CancelFunc // keyed by draft ID
-	draftSyncDone     map[string]chan struct{}      // closed when goroutine exits
-
 	// Sleep/wake detection for auto-sync on wake
 	sleepWakeMonitor platform.SleepWakeMonitor
 
@@ -243,7 +264,8 @@ type App struct {
 	networkMonitor platform.NetworkMonitor
 
 	// System theme detection (XDG Settings Portal on Linux)
-	themeMonitor platform.ThemeMonitor
+	themeMonitorMu goSync.RWMutex
+	themeMonitor   platform.ThemeMonitor
 
 	// Desktop notifications with click handling
 	notifierMu       goSync.RWMutex
@@ -259,20 +281,34 @@ type App struct {
 	// Autostart manager
 	autostartMgr platform.AutostartManager
 
-	// Window hidden state (background mode)
-	windowHidden bool
+	// Lifecycle state may be read by Wails, native callbacks, and background
+	// activation goroutines concurrently.
+	windowHidden atomic.Bool
+	shuttingDown atomic.Bool
 }
 
 // NewApp creates a new App application struct
 func NewApp(debugModeFn func() bool) *App {
 	application := &App{
-		debugMode: debugModeFn,
+		debugMode:  debugModeFn,
+		eventsEmit: wailsRuntime.EventsEmit,
 	}
+	application.initBackupBridge()
+	application.initSyncBridge()
+	application.initDraftBridge()
 	application.externalFileOpen = newExternalFileOpenBatcher(
 		externalFileOpenDebounce,
 		application.emitExternalOpenFiles,
 	)
 	return application
+}
+
+func (a *App) emitEvent(eventName string, data ...interface{}) {
+	emit := a.eventsEmit
+	if emit == nil {
+		emit = wailsRuntime.EventsEmit
+	}
+	emit(a.ctx, eventName, data...)
 }
 
 // StartupDialogInfo holds the user-facing dialog content for a startup
@@ -287,7 +323,7 @@ type StartupDialogInfo struct {
 }
 
 // StartupDialogInfoFor returns the user-facing dialog content for a startup
-// error returned by App.Preflight. Known sentinel types get a tailored
+// error returned by Preflight. Known sentinel types get a tailored
 // message + action URL; everything else falls back to a generic message.
 //
 // URLs in the returned Text are rendered as clickable links by dialog
@@ -321,7 +357,14 @@ func StartupDialogInfoFor(err error) StartupDialogInfo {
 	}
 }
 
-// Preflight performs the early-startup steps that must succeed BEFORE the
+// Preflight performs the early-startup steps that must succeed before Wails
+// binds App methods and shows its window. It is a package function rather than
+// an App method so it cannot become an IPC endpoint.
+func Preflight(application *App) error {
+	return application.preflight()
+}
+
+// preflight performs the early-startup steps that must succeed BEFORE the
 // Wails window is shown: logging init, platform paths, directory creation,
 // database open + migration, and credential store init.
 // Returns an error on any failure; main.go is responsible for
@@ -333,7 +376,7 @@ func StartupDialogInfoFor(err error) StartupDialogInfo {
 // would briefly flash a half-rendered app window before the error dialog
 // appears. Preflight runs in main.go before wails.Run so the user only
 // ever sees the error dialog.
-func (a *App) Preflight() error {
+func (a *App) preflight() error {
 	logLevel := "fatal"
 	if a.debugMode != nil && a.debugMode() {
 		logLevel = "debug"
@@ -371,7 +414,12 @@ func (a *App) Preflight() error {
 	}
 	log.Info().Msg("Database migrations complete")
 
-	credStore, err := credentials.NewStore(db.DB, paths.Data)
+	var credStore *credentials.Store
+	if a.newCredentialStore != nil {
+		credStore, err = a.newCredentialStore(db, paths.Data)
+	} else {
+		credStore, err = credentials.NewStore(db.DB, paths.Data)
+	}
 	if err != nil {
 		return fmt.Errorf("init credential store: %w", err)
 	}
@@ -380,11 +428,11 @@ func (a *App) Preflight() error {
 	return nil
 }
 
-// shuttingDown tracks if shutdown has been initiated to prevent multiple triggers
-var shuttingDown bool
-
 // Startup is called when the app starts
 func (a *App) Startup(ctx context.Context) {
+	a.initBackupBridge()
+	a.initSyncBridge()
+	a.initDraftBridge()
 	a.ctx = ctx
 
 	// Set single-instance onShow callback immediately — must happen before any
@@ -396,7 +444,7 @@ func (a *App) Startup(ctx context.Context) {
 				a.handleExternalMailto(data)
 				return
 			}
-			a.ShowWindow()
+			a.showWindow()
 		})
 	}
 
@@ -404,11 +452,14 @@ func (a *App) Startup(ctx context.Context) {
 	// (Dock-icon click or Cmd+Tab) while it's hidden. Hiding uses orderOut,
 	// which AppKit won't restore on a Dock click by itself.
 	platform.SetActivationHandler(func() {
-		if a.windowHidden {
-			a.ShowWindow()
+		if a.windowHidden.Load() {
+			a.showWindow()
 		}
 		if notifier := a.currentNotifier(); notifier != nil {
 			notifier.RefreshSettings()
+		}
+		if a.updateService != nil {
+			go a.updateService.CheckIfDue(a.ctx)
 		}
 	})
 	platform.StartActivationObserver()
@@ -433,6 +484,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.settingsStore = settings.NewStore(db)
 	a.appStateStore = appstate.NewStore(db.DB)
 	a.imageAllowlistStore = settings.NewImageAllowlistStore(db)
+	a.initUpdater()
 
 	// Replace the default macOS menu with a minimal App + Edit menu. Done after
 	// the settings store exists, since menuLabels() reads the language setting.
@@ -445,16 +497,24 @@ func (a *App) Startup(ctx context.Context) {
 			wailsRuntime.EventsEmit(a.ctx, "menu:openBackupViewer")
 		case "about":
 			wailsRuntime.EventsEmit(a.ctx, "menu:openAbout")
+		case "checkUpdate":
+			a.showWindow()
+			wailsRuntime.EventsEmit(a.ctx, "menu:openAbout")
+			go a.checkForUpdatesFromMenu()
 		}
 	})
 	platform.InstallAppMenu(a.menuLabels())
 	platform.SetStatusItemHandler(func(action string) {
 		switch action {
 		case "show":
-			a.ShowWindow()
+			a.showWindow()
 		case "settings":
-			a.ShowWindow()
+			a.showWindow()
 			wailsRuntime.EventsEmit(a.ctx, "menu:openSettings")
+		case "checkUpdate":
+			a.showWindow()
+			wailsRuntime.EventsEmit(a.ctx, "menu:openAbout")
+			go a.checkForUpdatesFromMenu()
 		}
 	})
 
@@ -469,7 +529,7 @@ func (a *App) Startup(ctx context.Context) {
 	a.imapPool = imap.NewPool(poolConfig, a.getIMAPCredentials)
 
 	// Initialize shared draft operations
-	a.draftOps = draftOps{
+	a.DraftBridge.ops = draftOps{
 		accountStore: a.accountStore,
 		folderStore:  a.folderStore,
 		messageStore: a.messageStore,
@@ -513,7 +573,7 @@ func (a *App) Startup(ctx context.Context) {
 		certStore:    a.certStore,
 		contactStore: a.contactStore,
 		messageStore: a.messageStore,
-		draftOps:     &a.draftOps,
+		draftOps:     &a.DraftBridge.ops,
 	}
 
 	// Initialize network connectivity monitor (event-driven, zero polling).
@@ -534,12 +594,6 @@ func (a *App) Startup(ctx context.Context) {
 	// Initialize FTS indexer for full-text search
 	a.ftsIndexer = message.NewFTSIndexer(db.DB)
 
-	// Initialize sync context tracking for cancel-and-restart
-	a.syncContexts = make(map[string]context.CancelFunc)
-	a.syncLastRequest = make(map[string]time.Time)
-	a.draftSyncContexts = make(map[string]context.CancelFunc)
-	a.draftSyncDone = make(map[string]chan struct{})
-
 	// IMPORTANT: backend-ready signal. The frontend's main.ts waits for the
 	// "app:ready" event (with IsReady() as a one-shot fallback) and will NOT
 	// mount the main app until that event fires. If you remove, reorder, or
@@ -556,8 +610,11 @@ func (a *App) Startup(ctx context.Context) {
 	// We do NOT poll IsReady from the frontend because Wails' IPC bridge is
 	// unnecessary for high-rate polling. Use the event for the normal case and
 	// IsReady for the "event fired before listener registered" race.
-	a.ready = true
+	a.ready.Store(true)
 	wailsRuntime.EventsEmit(a.ctx, "app:ready")
+	if a.updateService != nil {
+		a.updateService.Start(ctx)
+	}
 
 	// Initialize desktop notifications with click handling
 	a.initNotifications(ctx)
@@ -622,12 +679,12 @@ func (a *App) Startup(ctx context.Context) {
 // IPC bridge. The frontend should use EventsOn('app:ready', ...) for the
 // normal path; IsReady() is a one-shot check only.
 func (a *App) IsReady() bool {
-	return a.ready
+	return a.ready.Load()
 }
 
 // BeforeClose is called when the window is about to close (e.g., OS close signal)
 func (a *App) BeforeClose(ctx context.Context) bool {
-	if shuttingDown {
+	if a.shuttingDown.Load() {
 		return false
 	}
 
@@ -638,8 +695,12 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 	if runBg && !platform.RealQuitRequested() {
 		log := logging.WithComponent("app")
 		log.Info().Msg("Window close requested, hiding to background")
-		wailsRuntime.WindowHide(a.ctx)
-		a.windowHidden = true
+		if a.hideWindowAction != nil {
+			a.hideWindowAction()
+		} else {
+			wailsRuntime.WindowHide(a.ctx)
+		}
+		a.windowHidden.Store(true)
 		return true
 	}
 
@@ -647,13 +708,19 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 	log := logging.WithComponent("app")
 	log.Info().Msg("Window close requested, shutting down")
 
-	shuttingDown = true
+	if !a.shuttingDown.CompareAndSwap(false, true) {
+		return false
+	}
 
 	// Quit immediately (deferred to a goroutine so this close callback can
 	// return first; no artificial delay, so it's as snappy as any other app).
 	go func() {
 		defer recoverPanic("app", "shutdown")
-		wailsRuntime.Quit(a.ctx)
+		if a.quitAction != nil {
+			a.quitAction()
+		} else {
+			wailsRuntime.Quit(a.ctx)
+		}
 	}()
 
 	// Prevent immediate close
@@ -664,7 +731,11 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 // Called from the frontend after WindowShow() so KDE/Plasma sees the placeholder
 // → real window handoff cleanly (avoiding the taskbar-icon flash from #154).
 func (a *App) NotifyStartupComplete() {
-	platform.NotifyStartupComplete()
+	if a.notifyStartupAction != nil {
+		a.notifyStartupAction()
+	} else {
+		platform.NotifyStartupComplete()
+	}
 	if a.externalFileOpen != nil {
 		a.externalFileOpen.SetReady()
 	}
@@ -672,31 +743,42 @@ func (a *App) NotifyStartupComplete() {
 
 // ShowWindow brings the window to the foreground from hidden/minimized state.
 // Used by single-instance activation, notification clicks, etc.
-func (a *App) ShowWindow() {
+func (a *App) showWindow() {
 	log := logging.WithComponent("app")
 	log.Info().Msg("Showing window")
 
-	wailsRuntime.WindowUnminimise(a.ctx)
-	wailsRuntime.WindowShow(a.ctx)
-	a.windowHidden = false
+	if a.unminimiseWindowAction != nil {
+		a.unminimiseWindowAction()
+	} else {
+		wailsRuntime.WindowUnminimise(a.ctx)
+	}
+	if a.nativeShowWindowAction != nil {
+		a.nativeShowWindowAction()
+	} else {
+		wailsRuntime.WindowShow(a.ctx)
+	}
+	a.windowHidden.Store(false)
 
 	// Emit event so frontend can also attempt to focus
-	wailsRuntime.EventsEmit(a.ctx, "window:show")
+	a.emitEvent("window:show")
 }
 
 // QuitApp forces a real quit, bypassing background mode.
 // Used by frontend or future tray menu to actually exit.
 func (a *App) QuitApp() {
-	if shuttingDown {
+	if !a.shuttingDown.CompareAndSwap(false, true) {
 		return
 	}
-	shuttingDown = true
 
 	log := logging.WithComponent("app")
 	log.Info().Msg("Quit requested")
 	go func() {
 		defer recoverPanic("app", "shutdown")
-		wailsRuntime.Quit(a.ctx)
+		if a.quitAction != nil {
+			a.quitAction()
+		} else {
+			wailsRuntime.Quit(a.ctx)
+		}
 	}()
 }
 
@@ -711,6 +793,9 @@ func (a *App) Shutdown(ctx context.Context) {
 	log := logging.WithComponent("app")
 	if a.externalFileOpen != nil {
 		a.externalFileOpen.Stop()
+	}
+	if a.updateService != nil {
+		a.updateService.Stop()
 	}
 
 	// Stop email sync scheduler
@@ -738,8 +823,8 @@ func (a *App) Shutdown(ctx context.Context) {
 	}
 
 	// Stop theme monitor
-	if a.themeMonitor != nil {
-		_ = a.themeMonitor.Stop()
+	if monitor := a.currentThemeMonitor(); monitor != nil {
+		_ = monitor.Stop()
 		log.Info().Msg("Theme monitor stopped")
 	}
 
@@ -825,13 +910,13 @@ func (a *App) menuLabels() platform.MenuLabels {
 	}
 	if zh {
 		return platform.MenuLabels{
-			Settings: "设置", BackupViewer: "备份查看器", About: "关于", Quit: "退出",
+			Settings: "设置", BackupViewer: "备份查看器", CheckUpdate: "检查更新…", About: "关于", Quit: "退出",
 			Edit: "编辑", Undo: "撤销", Redo: "重做",
 			Cut: "剪切", Copy: "复制", Paste: "粘贴", Delete: "删除",
 		}
 	}
 	return platform.MenuLabels{
-		Settings: "Settings", BackupViewer: "Backup Viewer", About: "About", Quit: "Quit",
+		Settings: "Settings", BackupViewer: "Backup Viewer", CheckUpdate: "Check for Updates…", About: "About", Quit: "Quit",
 		Edit: "Edit", Undo: "Undo", Redo: "Redo",
 		Cut: "Cut", Copy: "Copy", Paste: "Paste", Delete: "Delete",
 	}
@@ -845,11 +930,11 @@ func (a *App) statusItemLabels() platform.StatusItemLabels {
 	}
 	if zh {
 		return platform.StatusItemLabels{
-			Open: "打开 aulycMail", Settings: "设置", Quit: "退出",
+			Open: "打开 aulycMail", Settings: "设置", CheckUpdate: "检查更新…", Quit: "退出",
 		}
 	}
 	return platform.StatusItemLabels{
-		Open: "Open aulycMail", Settings: "Settings", Quit: "Quit",
+		Open: "Open aulycMail", Settings: "Settings", CheckUpdate: "Check for Updates…", Quit: "Quit",
 	}
 }
 

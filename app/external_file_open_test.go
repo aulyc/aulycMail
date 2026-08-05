@@ -73,3 +73,34 @@ func TestExternalFileOpenBatcherRejectsNonFiles(t *testing.T) {
 		t.Fatalf("missing file error = %v, want os.ErrNotExist", err)
 	}
 }
+
+func TestHandleFileOpenGuardsAndForwardsRegularFiles(t *testing.T) {
+	HandleFileOpen(nil, "ignored")
+	HandleFileOpen(&App{}, "ignored")
+
+	dir := t.TempDir()
+	filePath := filepath.Join(dir, "message.eml")
+	if err := os.WriteFile(filePath, []byte("synthetic message"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	emitted := make(chan []string, 1)
+	batcher := newExternalFileOpenBatcher(time.Millisecond, func(paths []string) {
+		emitted <- paths
+	})
+	batcher.SetReady()
+	t.Cleanup(batcher.Stop)
+
+	a := &App{externalFileOpen: batcher}
+	HandleFileOpen(a, dir)
+	HandleFileOpen(a, filePath)
+	select {
+	case paths := <-emitted:
+		if len(paths) != 1 || paths[0] != filePath {
+			t.Fatalf("emitted paths = %v", paths)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("timed out waiting for forwarded file")
+	}
+
+	a.emitExternalOpenFiles(nil)
+}

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { test } from 'vitest'
 import { discardDraftBeforeClose } from '../src/lib/components/composer/composerDiscard.ts'
 
 test('discard closes only after the draft deletion succeeds', async () => {

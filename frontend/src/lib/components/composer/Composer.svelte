@@ -92,6 +92,25 @@
     createInlineImageCID,
     MAX_INLINE_IMAGE_SIZE,
   } from './composerInlineImages'
+  import {
+    buildComposeMessage,
+    restoreBlockedRemoteImages,
+    toSmtpAddress,
+  } from './composerMessage'
+  import {
+    clampMentionSelection,
+    createMentionSearchController,
+    moveMentionPointerSelection,
+    selectMentionIndex,
+    type MentionInputMode,
+    type MentionSelectionState,
+  } from './composerMentionController'
+  import { createDraftSaveController } from './composerDraftController'
+  import {
+    registerInlineImage,
+    replaceInlineImageSourcesWithCids,
+  } from './composerInlinePipeline'
+  import { getComposerSendBlocker } from './composerSendController'
   import * as Select from '$lib/components/ui/select'
   import { addToast } from '$lib/stores/toast'
   import { getIsDarkActive } from '$lib/stores/theme.svelte'
@@ -210,8 +229,6 @@
   let syncStatus = $state<DraftSyncStatus>('pending') // IMAP sync status
   let unsubscribeDraftSync: (() => void) | null = null
   let lastSavedAt = $state<Date | null>(null)
-  let saveTimeoutId: ReturnType<typeof setTimeout> | null = null
-  let lastContent = ''  // Track content changes to avoid unnecessary saves
 
   // Computed draft status indicator
   let draftStatusMeta = $derived(getDraftStatusMeta(saveStatus, syncStatus, !!lastSavedAt))
@@ -238,19 +255,46 @@
   let mentionWindowStart = $state(0)
   let mentionTop = $state(12)
   let mentionLeft = $state(12)
-  let mentionSearchTimer: ReturnType<typeof setTimeout> | null = null
-  let mentionSearchSeq = 0
   let dismissedMentionKey = $state('')
-  let lastMentionPointerX = -1
-  let lastMentionPointerY = -1
   let composerTextComposing = $state(false)
   const visibleMentionSuggestions = $derived(mentionSuggestions.slice(mentionWindowStart, mentionWindowStart + MENTION_VISIBLE_ROWS))
 
+  let mentionSelectionState: MentionSelectionState = {
+    selectedIndex: 0,
+    windowStart: 0,
+    keyboardMode: false,
+    pointerX: -1,
+    pointerY: -1,
+  }
+
+  function applyMentionSelectionState(next: MentionSelectionState) {
+    mentionSelectionState = next
+    mentionSelectedIndex = next.selectedIndex
+    mentionWindowStart = next.windowStart
+    mentionKeyboardMode = next.keyboardMode
+  }
+
+  const mentionSearchController = createMentionSearchController<contact.Contact>({
+    delayMs: 150,
+    search: (query) => api.searchContacts(query.trim(), MENTION_SUGGESTION_LIMIT),
+    onResults: (query, results) => {
+      if (!mentionActive || mentionQuery !== query) return
+      mentionSuggestions = filteredMentionResults(results, query.trim())
+      setMentionSelectedIndex(mentionSuggestions.length > 0 ? 0 : -1)
+    },
+    onError: (err) => {
+      console.error('Failed to search contacts for mention:', err)
+      mentionSuggestions = []
+      setMentionSelectedIndex(-1)
+    },
+  })
+
   $effect(() => {
-    const maxStart = Math.max(0, mentionSuggestions.length - MENTION_VISIBLE_ROWS)
-    if (mentionWindowStart > maxStart) {
-      mentionWindowStart = maxStart
-    }
+    applyMentionSelectionState(clampMentionSelection(
+      mentionSelectionState,
+      mentionSuggestions.length,
+      MENTION_VISIBLE_ROWS,
+    ))
   })
 
   // Confirmation dialogs state
@@ -301,31 +345,26 @@
 
   const plainTextMentionSegments = $derived(getPlainTextMentionSegments(plainTextContent, plainMentionLabels))
 
-  function setMentionSelectedIndex(index: number, inputMode: 'keyboard' | 'mouse' | 'program' = 'program') {
-    if (mentionSuggestions.length === 0) {
-      mentionSelectedIndex = -1
-      mentionWindowStart = 0
-      return
-    }
-
-    if (inputMode === 'keyboard') mentionKeyboardMode = true
-    if (inputMode === 'mouse') mentionKeyboardMode = false
-    const nextIndex = Math.min(Math.max(index, 0), mentionSuggestions.length - 1)
-    let nextWindowStart = mentionWindowStart
-    if (nextIndex < mentionWindowStart) {
-      nextWindowStart = nextIndex
-    } else if (nextIndex >= mentionWindowStart + MENTION_VISIBLE_ROWS) {
-      nextWindowStart = nextIndex - MENTION_VISIBLE_ROWS + 1
-    }
-    mentionWindowStart = nextWindowStart
-    mentionSelectedIndex = nextIndex
+  function setMentionSelectedIndex(index: number, inputMode: MentionInputMode = 'program') {
+    applyMentionSelectionState(selectMentionIndex(
+      mentionSelectionState,
+      mentionSuggestions.length,
+      index,
+      inputMode,
+      MENTION_VISIBLE_ROWS,
+    ))
   }
 
   function handleMentionPointerMove(e: PointerEvent, index: number) {
-    if (e.clientX === lastMentionPointerX && e.clientY === lastMentionPointerY) return
-    lastMentionPointerX = e.clientX
-    lastMentionPointerY = e.clientY
-    setMentionSelectedIndex(index, 'mouse')
+    const result = moveMentionPointerSelection(
+      mentionSelectionState,
+      mentionSuggestions.length,
+      index,
+      e.clientX,
+      e.clientY,
+      MENTION_VISIBLE_ROWS,
+    )
+    if (result.changed) applyMentionSelectionState(result.state)
   }
 
   function closeMentionSuggestions() {
@@ -335,41 +374,18 @@
     mentionKeyboardMode = false
     mentionWindowStart = 0
     mentionQuery = ''
-    if (mentionSearchTimer) {
-      clearTimeout(mentionSearchTimer)
-      mentionSearchTimer = null
-    }
+    mentionSearchController.cancel()
   }
 
   function scheduleMentionSearch(query: string) {
-    if (mentionSearchTimer) {
-      clearTimeout(mentionSearchTimer)
-    }
-
     const normalizedQuery = query.trim()
     if (!normalizedQuery) {
+      mentionSearchController.cancel()
       mentionSuggestions = []
-      mentionSelectedIndex = -1
-      mentionWindowStart = 0
+      setMentionSelectedIndex(-1)
       return
     }
-
-    const seq = ++mentionSearchSeq
-    mentionSearchTimer = setTimeout(async () => {
-      try {
-        const results = await api.searchContacts(normalizedQuery, MENTION_SUGGESTION_LIMIT)
-        if (seq !== mentionSearchSeq || !mentionActive || mentionQuery !== query) return
-        mentionSuggestions = filteredMentionResults(results, normalizedQuery)
-        setMentionSelectedIndex(mentionSuggestions.length > 0 ? 0 : -1)
-      } catch (err) {
-        if (seq === mentionSearchSeq) {
-          console.error('Failed to search contacts for mention:', err)
-          mentionSuggestions = []
-          mentionSelectedIndex = -1
-          mentionWindowStart = 0
-        }
-      }
-    }, 150)
+    mentionSearchController.schedule(query)
   }
 
   function setMentionPosition(left: number, top: number) {
@@ -672,6 +688,12 @@
     })
   }
 
+  function addInlineImage(candidate: InlineImage): { image: InlineImage, added: boolean } {
+    const result = registerInlineImage(inlineImages, candidate)
+    inlineImages = result.images
+    return { image: result.image, added: result.added }
+  }
+
   // Collect any images in the editor DOM that aren't tracked in inlineImages.
   // WebKitGTK doesn't expose pasted screenshots via clipboardData, so TipTap's
   // default handler inserts them with a webkit-fake-url:// src. This function
@@ -701,7 +723,7 @@
           fallbackPrefix: 'pasted-image',
         })
         if (!inlineImage) continue
-        inlineImages = [...inlineImages, inlineImage]
+        addInlineImage(inlineImage)
         continue
       }
 
@@ -720,12 +742,6 @@
         // (e.g. user pasted the same screenshot twice), reuse that cid —
         // the viewer is what handles same-cid resolution (see
         // EmailBody.svelte querySelectorAll fix).
-        const dup = inlineImages.find(i => i.dataUrl === dataUrl)
-        if (dup) {
-          result = result.replaceAll(src, dup.dataUrl)
-          continue
-        }
-
         const cid = generateCID()
         const inlineImage = createInlineImageFromDataUrl({
           cid,
@@ -734,8 +750,8 @@
           fallbackPrefix: 'pasted-image',
         })
         if (!inlineImage) continue
-        inlineImages = [...inlineImages, inlineImage]
-        result = result.replaceAll(src, dataUrl)
+        const registered = addInlineImage(inlineImage)
+        result = result.replaceAll(src, registered.image.dataUrl)
       } catch {
         continue
       }
@@ -746,14 +762,7 @@
 
   // Convert HTML with data URLs to use CID references for inline images
   function convertDataUrlsToCid(html: string): string {
-    let result = html
-
-    // For each inline image, replace its data URL with cid: reference
-    for (const img of inlineImages) {
-      result = result.replaceAll(img.dataUrl, `cid:${img.cid}`)
-    }
-
-    return result
+    return replaceInlineImageSourcesWithCids(html, inlineImages)
   }
 
   // Build message object from current composer state
@@ -777,55 +786,21 @@
       textContent = editor?.getText() || ''
     }
 
-    // Restore blocked remote images for sending — replace placeholder with original URL
-    htmlContent = htmlContent.replace(
-      /<img([^>]*)\sdata-original-src="([^"]+)"([^>]*)>/gi,
-      (match, _before, originalSrc, _after) => {
-        return match
-          .replace(/src="[^"]*"/, `src="${originalSrc}"`)
-          .replace(/\s*data-original-src="[^"]*"/, '')
-      }
-    )
-
-    // Convert ComposerAttachment to smtp.Attachment format (regular attachments)
-    // Use content_base64 (string) instead of content (number[]) to avoid
-    // pathologically slow JSON serialization of large byte arrays through Wails RPC.
-    const smtpAttachments: smtp.Attachment[] = attachments.map(att => new smtp.Attachment({
-      filename: att.filename,
-      content_type: att.contentType,
-      content_base64: att.data,
-      content_id: '',
-      inline: false,
-    }))
-
-    // Add inline images as inline attachments with Content-ID
-    for (const img of inlineImages) {
-      smtpAttachments.push(new smtp.Attachment({
-        filename: img.filename,
-        content_type: img.contentType,
-        content_base64: img.data,
-        content_id: img.cid,
-        inline: true,
-      }))
-    }
-
-    return new smtp.ComposeMessage({
-      from: new smtp.Address({
-        name: selectedIdentity?.name || '',
-        address: selectedIdentity?.email || '',
-      }),
+    return buildComposeMessage({
+      identity: selectedIdentity,
       to: toRecipients,
       cc: ccRecipients,
       bcc: bccRecipients,
-      subject: subject,
-      html_body: htmlContent,
-      text_body: textContent,
-      attachments: smtpAttachments,
-      in_reply_to: inReplyTo,
+      subject,
+      htmlBody: restoreBlockedRemoteImages(htmlContent),
+      textBody: textContent,
+      attachments,
+      inlineImages,
+      inReplyTo,
       references: references,
-      source_message_id: sourceMessageId,
-      reply_type: replyType,
-      request_read_receipt: requestReadReceipt,
+      sourceMessageId,
+      replyType,
+      requestReadReceipt,
     })
   }
 
@@ -844,75 +819,31 @@
     })
   }
 
-  // Schedule a draft save (debounced)
-  // Note: All expensive operations (hasContent, getContentHash) are inside the timeout
-  // to avoid lag on every keystroke
-  function scheduleDraftSave() {
-    // Clear any pending save
-    if (saveTimeoutId) {
-      clearTimeout(saveTimeoutId)
-    }
-
-    // Reset indicator immediately when content changes (makes it disappear on input)
-    if (saveStatus === 'saved') {
-      saveStatus = 'idle'
-    }
-
-    saveTimeoutId = setTimeout(async () => {
-      // Only save if there's content
-      if (!hasContent()) {
-        return
-      }
-
-      // Check if content actually changed
-      const currentHash = getContentHash()
-      if (currentHash === lastContent) {
-        return
-      }
-
-      await saveDraft()
-    }, DRAFT_SAVE_DELAY)
-  }
-
-  // Guard to prevent concurrent save requests (which cause orphaned drafts)
-  let isSaving = false
-  let discarding = false
-  let savingComplete: Promise<void> = Promise.resolve()
-
-  // Actually save the draft
-  async function saveDraft() {
-    if (discarding) return
-    if (!hasContent()) return
-
-    // If a save is already in flight, skip — next edit will trigger a fresh save
-    if (isSaving) return
-
-    // Check again for content changes before saving
-    const currentHash = getContentHash()
-    if (currentHash === lastContent && currentDraftId) {
-      return  // No changes since last save
-    }
-
-    let resolveSaving: () => void
-    savingComplete = new Promise<void>(resolve => { resolveSaving = resolve })
-
-    isSaving = true
-    saveStatus = 'saving'
-    try {
+  const draftSaveController = createDraftSaveController({
+    delayMs: DRAFT_SAVE_DELAY,
+    hasContent,
+    getContentHash,
+    hasPersistedDraft: () => !!currentDraftId,
+    getStatus: () => saveStatus,
+    setStatus: (status) => { saveStatus = status },
+    save: async () => {
       const message = buildMessage()
       const result = await api.saveDraft(activeAccountId, message, currentDraftId || '')
       currentDraftId = result.id
-      lastContent = currentHash
-      saveStatus = 'saved'
       syncStatus = result.syncStatus as DraftSyncStatus
       lastSavedAt = new Date()
-    } catch (err) {
+    },
+    onError: (err) => {
       console.error('Failed to save draft:', err)
-      saveStatus = 'error'
-    } finally {
-      isSaving = false
-      resolveSaving!()
-    }
+    },
+  })
+
+  function scheduleDraftSave() {
+    draftSaveController.schedule()
+  }
+
+  async function saveDraft() {
+    await draftSaveController.saveNow()
   }
 
   // Load blocked remote images in the composer editor
@@ -1029,7 +960,7 @@
     if (initialMessage) {
       initializeFromMessage()
       // Store initial content hash so we don't immediately save
-      lastContent = getContentHash()
+      draftSaveController.seed(getContentHash())
     }
 
     // Append signature for the selected identity (after editor is ready)
@@ -1154,7 +1085,7 @@
       if (currentDraftId) {
         const oldDraftId = currentDraftId
         currentDraftId = null
-        lastContent = ''
+        draftSaveController.seed('')
         api.deleteDraft(oldDraftId).catch(err => {
           console.error('Failed to delete old account draft:', err)
         })
@@ -1173,21 +1104,10 @@
     // Unsubscribe from draft sync events
     unsubscribeDraftSync?.()
     unsubscribeDraftSync = null
-    // Clear any pending save timeout
-    if (saveTimeoutId) {
-      clearTimeout(saveTimeoutId)
-    }
+    mentionSearchController.destroy()
+    draftSaveController.destroy()
     editor?.destroy()
   })
-
-  // Helper to ensure proper smtp.Address object (handles both 'address' and 'email' field names)
-  function toSmtpAddress(addr: any): smtp.Address {
-    if (!addr) return new smtp.Address({ name: '', address: '' })
-    return new smtp.Address({
-      name: addr.name || '',
-      address: addr.address || addr.email || ''
-    })
-  }
 
   // Initialize composer fields from the pre-built message (from backend)
   function initializeFromMessage() {
@@ -1284,44 +1204,28 @@
 
   }
 
-  // Pre-send validation - returns true if we should proceed, false if waiting for confirmation
-  function validateBeforeSend(): boolean {
-    // Check for missing attachment
-    if (attachments.length === 0 && bodyMentionsAttachment()) {
-      showMissingAttachmentDialog = true
-      return false
-    }
-
-    // Check for empty subject
-    if (!subject.trim()) {
-      showEmptySubjectDialog = true
-      return false
-    }
-
-    return true
-  }
-
   async function handleSend() {
-    if (toRecipients.length === 0) {
-      addToast({
-        type: 'error',
-        message: $_('composer.noRecipients'),
-      })
-      return
-    }
-
     const selectedIdentity = identities.find(i => i.id === selectedIdentityId)
-    if (!selectedIdentity) {
-      addToast({
-        type: 'error',
-        message: $_('composer.selectSenderIdentity'),
-      })
-      return
-    }
-
-    // Run validations that may show confirmation dialogs
-    if (!validateBeforeSend()) {
-      return
+    const blocker = getComposerSendBlocker({
+      recipientCount: toRecipients.length,
+      hasIdentity: !!selectedIdentity,
+      attachmentCount: attachments.length,
+      mentionsAttachment: bodyMentionsAttachment(),
+      subject,
+    })
+    switch (blocker) {
+      case 'no-recipients':
+        addToast({ type: 'error', message: $_('composer.noRecipients') })
+        return
+      case 'missing-identity':
+        addToast({ type: 'error', message: $_('composer.selectSenderIdentity') })
+        return
+      case 'missing-attachment':
+        showMissingAttachmentDialog = true
+        return
+      case 'empty-subject':
+        showEmptySubjectDialog = true
+        return
     }
 
     await doSend()
@@ -1329,14 +1233,8 @@
 
   // Actually send the message (called directly or after confirmation)
   async function doSend() {
-    // Cancel any pending draft save
-    if (saveTimeoutId) {
-      clearTimeout(saveTimeoutId)
-      saveTimeoutId = null
-    }
-
-    // Wait for any in-flight draft save to complete before sending
-    await savingComplete
+    draftSaveController.cancelPending()
+    await draftSaveController.waitForIdle()
 
     sending = true
 
@@ -1384,11 +1282,7 @@
   }
 
   function handleClose() {
-    // Cancel any pending draft save
-    if (saveTimeoutId) {
-      clearTimeout(saveTimeoutId)
-      saveTimeoutId = null
-    }
+    draftSaveController.cancelPending()
 
     // Always show confirmation dialog (even for empty content, since a draft may have been saved)
     showCloseConfirm = true
@@ -1396,12 +1290,8 @@
 
   // Discard: Delete draft from local DB and IMAP, then close
   async function handleDiscardAndClose() {
-    discarding = true
-    if (saveTimeoutId) {
-      clearTimeout(saveTimeoutId)
-      saveTimeoutId = null
-    }
-    await savingComplete
+    draftSaveController.setDiscarding(true)
+    await draftSaveController.waitForIdle()
     closeLoading = 'discard'
     try {
       await discardDraftBeforeClose(currentDraftId, api.deleteDraft, () => {
@@ -1411,7 +1301,7 @@
       })
     } catch (err) {
       console.error('Failed to delete draft:', err)
-      discarding = false
+      draftSaveController.setDiscarding(false)
       addToast({
         type: 'error',
         message: $_('composer.failedToDiscardDraft'),
@@ -1601,13 +1491,6 @@
       // attachment instead of leaving the second cid orphaned. The editor
       // still gets a second <img> with the same dataUrl src — the viewer
       // side is what handles same-cid resolution (see EmailBody.svelte).
-      const existing = inlineImages.find(i => i.dataUrl === dataUrl)
-      if (existing) {
-        editor?.chain().focus().setImage({ src: existing.dataUrl, alt: existing.filename }).run()
-        scheduleDraftSave()
-        return
-      }
-
       const cid = generateCID()
       const inlineImage = createInlineImageFromDataUrl({
         cid,
@@ -1619,11 +1502,11 @@
         console.error('Invalid data URL format')
         return
       }
-      inlineImages = [...inlineImages, inlineImage]
+      const registered = addInlineImage(inlineImage)
 
       // Insert the image into the editor with the data URL (for display)
       // When sending, we'll convert data URLs to cid: references
-      editor?.chain().focus().setImage({ src: dataUrl, alt: inlineImage.filename }).run()
+      editor?.chain().focus().setImage({ src: registered.image.dataUrl, alt: registered.image.filename }).run()
 
       scheduleDraftSave()
     } catch (err) {
@@ -1668,21 +1551,15 @@
 
           // Dedup by content; mirrors handleInlineImageFile. Same image
           // dropped twice ⇒ one inline attachment (no orphan cid in MIME).
-          const existing = inlineImages.find(i => i.dataUrl === dataUrl)
-          if (existing) {
-            editor?.chain().focus().setImage({ src: existing.dataUrl, alt: existing.filename }).run()
-            continue
-          }
-
           const cid = generateCID()
-          inlineImages = [...inlineImages, createInlineImageFromAttachment({
+          const registered = addInlineImage(createInlineImageFromAttachment({
             cid,
             dataUrl,
             contentType: att.contentType,
             data: att.data,
             filename: att.filename,
-          })]
-          editor?.chain().focus().setImage({ src: dataUrl, alt: att.filename }).run()
+          }))
+          editor?.chain().focus().setImage({ src: registered.image.dataUrl, alt: registered.image.filename }).run()
           continue
         }
         // Add as regular attachment

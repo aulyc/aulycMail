@@ -38,8 +38,8 @@ func (a *App) GetFolderTree(accountID string) ([]*folder.FolderTree, error) {
 	return folder.BuildTree(folders), nil
 }
 
-// SyncFolders synchronizes the folder list with the IMAP server
-func (a *App) SyncFolders(accountID string) error {
+// syncFolders synchronizes the folder list with the IMAP server.
+func (a *App) syncFolders(accountID string) error {
 	return a.coordinateAccountSync(accountID, syncengine.TriggerManual, func() error {
 		return a.syncFoldersDirect(accountID)
 	})
@@ -74,7 +74,7 @@ func (a *App) GetAccountFoldersForMapping(accountID string) ([]*folder.Folder, e
 	// If no folders, trigger sync first
 	if len(folders) == 0 {
 		log.Info().Str("accountID", accountID).Msg("No folders found, triggering sync")
-		if err := a.SyncFolders(accountID); err != nil {
+		if err := a.syncFolders(accountID); err != nil {
 			return nil, fmt.Errorf("failed to sync folders: %w", err)
 		}
 		folders, err = a.folderStore.ListSelectable(accountID)
@@ -105,33 +105,10 @@ func (a *App) GetAutoDetectedFolders(accountID string) (map[string]string, error
 	return result, nil
 }
 
-// GetSpecialFolder returns the folder for a special type, checking account mappings first.
+// getSpecialFolder returns the folder for a special type, checking account mappings first.
 // If no mapping is set, falls back to auto-detected folder type.
-func (a *App) GetSpecialFolder(accountID string, folderType folder.Type) (*folder.Folder, error) {
-	// Get account to check mappings
-	acc, err := a.accountStore.Get(accountID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get account: %w", err)
-	}
-	if acc == nil {
-		return nil, fmt.Errorf("account not found: %s", accountID)
-	}
-
-	// Check if account has a manual mapping
-	mappedPath := acc.GetFolderMapping(string(folderType))
-	if mappedPath != "" {
-		f, err := a.folderStore.GetByPath(accountID, mappedPath)
-		if err != nil {
-			return nil, err
-		}
-		if f != nil && f.IsSelectable() {
-			return f, nil
-		}
-		// Mapped folder not found, fall through to auto-detect
-	}
-
-	// Fall back to auto-detected type
-	return a.folderStore.GetByType(accountID, folderType)
+func (a *App) getSpecialFolder(accountID string, folderType folder.Type) (*folder.Folder, error) {
+	return resolveSpecialFolder(a.accountStore, a.folderStore, accountID, folderType)
 }
 
 // SubscribeFolder subscribes to an IMAP folder for automatic sync.
@@ -144,6 +121,9 @@ func (a *App) SubscribeFolder(accountID, folderID string) error {
 	}
 	if f == nil {
 		return fmt.Errorf("folder not found: %s", folderID)
+	}
+	if f.AccountID != accountID {
+		return fmt.Errorf("folder %s does not belong to account %s", folderID, accountID)
 	}
 	if err := f.RequireSelectable(); err != nil {
 		return err
@@ -179,6 +159,9 @@ func (a *App) UnsubscribeFolder(accountID, folderID string) error {
 	}
 	if f == nil {
 		return fmt.Errorf("folder not found: %s", folderID)
+	}
+	if f.AccountID != accountID {
+		return fmt.Errorf("folder %s does not belong to account %s", folderID, accountID)
 	}
 	if err := f.RequireSelectable(); err != nil {
 		return err

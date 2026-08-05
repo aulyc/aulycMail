@@ -266,20 +266,6 @@ func TestSetGetBoolSettings(t *testing.T) {
 		defVal bool
 	}{
 		{
-			name:   "ShowTitleBar_true",
-			set:    (*Store).SetShowTitleBar,
-			get:    (*Store).GetShowTitleBar,
-			value:  true,
-			defVal: true,
-		},
-		{
-			name:   "ShowTitleBar_false",
-			set:    (*Store).SetShowTitleBar,
-			get:    (*Store).GetShowTitleBar,
-			value:  false,
-			defVal: true,
-		},
-		{
 			name:   "TermsAccepted_true",
 			set:    (*Store).SetTermsAccepted,
 			get:    (*Store).GetTermsAccepted,
@@ -480,5 +466,18 @@ func TestGenericSetGet(t *testing.T) {
 	}
 	if got != "" {
 		t.Errorf("got %q, want empty string", got)
+	}
+}
+
+func TestLastSeenVersionRoundTrip(t *testing.T) {
+	store := NewStore(openTestDB(t))
+	if got, err := store.GetLastSeenVersion(); err != nil || got != "" {
+		t.Fatalf("initial GetLastSeenVersion() = %q, %v", got, err)
+	}
+	if err := store.SetLastSeenVersion("0.6.0-beta.23"); err != nil {
+		t.Fatalf("SetLastSeenVersion() error = %v", err)
+	}
+	if got, err := store.GetLastSeenVersion(); err != nil || got != "0.6.0-beta.23" {
+		t.Fatalf("GetLastSeenVersion() = %q, %v", got, err)
 	}
 }

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import { test } from 'vitest'
 import { getComposerDarkFilterTargetIndexes } from '../src/lib/components/composer/composerDarkFilter.ts'
 
 test('forward dark filter excludes typing area, signature, and forward header', () => {

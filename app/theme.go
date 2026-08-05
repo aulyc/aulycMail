@@ -5,7 +5,6 @@ import (
 
 	"aulyc.local/aulycmail/internal/logging"
 	"aulyc.local/aulycmail/internal/platform"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // initThemeMonitor initializes the system theme monitor for portal-based theme detection.
@@ -14,29 +13,35 @@ import (
 func (a *App) initThemeMonitor(ctx context.Context) {
 	log := logging.WithComponent("app.theme")
 
-	a.themeMonitor = platform.NewThemeMonitor()
+	var monitor platform.ThemeMonitor
+	if a.newThemeMonitor != nil {
+		monitor = a.newThemeMonitor()
+	} else {
+		monitor = platform.NewThemeMonitor()
+	}
 
-	if err := a.themeMonitor.Start(ctx); err != nil {
+	if err := monitor.Start(ctx); err != nil {
 		log.Debug().Err(err).Msg("System theme monitor not available, frontend will use matchMedia fallback")
-		a.themeMonitor = nil
+		a.setThemeMonitor(nil)
 		return
 	}
+	a.setThemeMonitor(monitor)
 
 	// Emit initial theme value so the frontend can use it immediately
-	initialTheme := a.themeMonitor.GetTheme()
+	initialTheme := monitor.GetTheme()
 	if initialTheme != platform.SystemThemeNoPreference {
-		wailsRuntime.EventsEmit(ctx, "theme:system-preference", string(initialTheme))
+		a.emitEvent("theme:system-preference", string(initialTheme))
 	}
 
-	go a.processThemeEvents(ctx)
+	go a.processThemeEvents(ctx, monitor)
 
 	log.Info().Msg("System theme monitor initialized")
 }
 
 // processThemeEvents listens for system theme changes and emits events to the frontend
-func (a *App) processThemeEvents(ctx context.Context) {
+func (a *App) processThemeEvents(ctx context.Context, monitor platform.ThemeMonitor) {
 	defer recoverPanic("app.theme", "process theme events")
-	if a.themeMonitor == nil {
+	if monitor == nil {
 		return
 	}
 
@@ -44,11 +49,11 @@ func (a *App) processThemeEvents(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case theme, ok := <-a.themeMonitor.Events():
+		case theme, ok := <-monitor.Events():
 			if !ok {
 				return
 			}
-			wailsRuntime.EventsEmit(a.ctx, "theme:system-preference", string(theme))
+			a.emitEvent("theme:system-preference", string(theme))
 		}
 	}
 }
@@ -56,8 +61,21 @@ func (a *App) processThemeEvents(ctx context.Context) {
 // GetSystemTheme returns the current system theme preference detected via
 // the XDG Settings Portal on Linux. Returns "light", "dark", or "" if not available.
 func (a *App) GetSystemTheme() string {
-	if a.themeMonitor == nil {
+	monitor := a.currentThemeMonitor()
+	if monitor == nil {
 		return ""
 	}
-	return string(a.themeMonitor.GetTheme())
+	return string(monitor.GetTheme())
+}
+
+func (a *App) setThemeMonitor(monitor platform.ThemeMonitor) {
+	a.themeMonitorMu.Lock()
+	a.themeMonitor = monitor
+	a.themeMonitorMu.Unlock()
+}
+
+func (a *App) currentThemeMonitor() platform.ThemeMonitor {
+	a.themeMonitorMu.RLock()
+	defer a.themeMonitorMu.RUnlock()
+	return a.themeMonitor
 }

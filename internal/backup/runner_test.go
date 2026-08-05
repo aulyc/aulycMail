@@ -3,9 +3,11 @@ package backup
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"aulyc.local/aulycmail/internal/database"
@@ -211,6 +213,240 @@ func TestRunClassifiesUnindexedNonSelectableMessagesWithoutStreaming(t *testing.
 	}
 	if len(report.Failures) != 0 {
 		t.Fatalf("non-selectable row was reported as a failure: %#v", report.Failures)
+	}
+}
+
+func TestRunExportsRawMessagesReportsFailuresAndResumesIncrementally(t *testing.T) {
+	db, err := database.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("database.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := db.Migrate(); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	if _, err := db.Exec(
+		`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		"acct", "Test", "test@example.com", "imap.example.com", "smtp.example.com", "test@example.com",
+	); err != nil {
+		t.Fatalf("seed account: %v", err)
+	}
+	for _, f := range []struct {
+		id, name, path string
+	}{
+		{id: "archive", name: "Archive", path: "Archive"},
+		{id: "inbox", name: "Inbox", path: "INBOX"},
+	} {
+		if _, err := db.Exec(
+			`INSERT INTO folders (id, account_id, name, path, folder_type, uid_validity, selectable)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			f.id, "acct", f.name, f.path, "folder", 77, 1,
+		); err != nil {
+			t.Fatalf("seed folder %s: %v", f.id, err)
+		}
+	}
+	for _, m := range []struct {
+		id, folderID, subject string
+		uid                   int
+		hasAttachments        bool
+	}{
+		{id: "batch-failure", folderID: "archive", uid: 4, subject: "Batch failure"},
+		{id: "exported", folderID: "inbox", uid: 1, subject: "Exported subject", hasAttachments: true},
+		{id: "missing", folderID: "inbox", uid: 2, subject: "Missing subject"},
+		{id: "single-failure", folderID: "inbox", uid: 3, subject: "Single failure"},
+	} {
+		if _, err := db.Exec(
+			`INSERT INTO messages (
+				id, account_id, folder_id, uid, message_id, subject, from_name, from_email,
+				date, size, has_attachments
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			m.id, "acct", m.folderID, m.uid, m.id+"@example.com", m.subject,
+			"Sender", "sender@example.com", "2026-07-15T00:00:00Z", 123, m.hasAttachments,
+		); err != nil {
+			t.Fatalf("seed message %s: %v", m.id, err)
+		}
+	}
+
+	rawByUID := map[uint32]string{
+		1: "From: Sender <sender@example.com>\r\nTo: Test <test@example.com>\r\nSubject: Exported subject\r\nMessage-ID: <exported@example.com>\r\nDate: Wed, 15 Jul 2026 00:00:00 +0000\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nneedle backup body\r\n",
+		2: "From: Sender <sender@example.com>\r\nTo: Test <test@example.com>\r\nSubject: Recovered missing\r\n\r\nmissing recovered\r\n",
+		3: "From: Sender <sender@example.com>\r\nTo: Test <test@example.com>\r\nSubject: Recovered failure\r\n\r\nfailure recovered\r\n",
+		4: "From: Sender <sender@example.com>\r\nTo: Test <test@example.com>\r\nSubject: Recovered batch\r\n\r\nbatch recovered\r\n",
+	}
+	directory := t.TempDir()
+	firstPass := true
+	var chunks [][]uint32
+	var progress []Progress
+	stream := func(_ context.Context, _ string, folderID string, uids []uint32, handle mailSync.RawMessageStreamHandler) (map[uint32]*mailSync.RawMessageStreamResult, map[uint32]error, error) {
+		chunks = append(chunks, append([]uint32(nil), uids...))
+		if firstPass && folderID == "archive" {
+			return nil, nil, errors.New("mailbox offline")
+		}
+		results := make(map[uint32]*mailSync.RawMessageStreamResult)
+		failures := make(map[uint32]error)
+		for _, uid := range uids {
+			if firstPass {
+				switch uid {
+				case 2:
+					// No result is the server-missing case the runner must classify.
+					continue
+				case 3:
+					failures[uid] = errors.New("corrupt raw message")
+					continue
+				}
+			}
+			written, err := handle(uid, strings.NewReader(rawByUID[uid]))
+			if err != nil {
+				failures[uid] = err
+				continue
+			}
+			results[uid] = &mailSync.RawMessageStreamResult{BytesWritten: written, ReportedSize: int64(len(rawByUID[uid]))}
+		}
+		return results, failures, nil
+	}
+
+	result, err := Run(context.Background(), db, RunOptions{
+		Directory:         directory,
+		StartedAt:         "2026-07-15T00:00:00Z",
+		AccountIDs:        []string{"acct"},
+		RawFetchBatchSize: 2,
+		StreamRawMessages: stream,
+		EmitProgress:      func(p Progress) { progress = append(progress, p) },
+	})
+	if err != nil {
+		t.Fatalf("Run first pass: %v", err)
+	}
+	if result.Mode != "full" || result.Total != 4 || result.Exported != 1 || result.Skipped != 0 || result.Missing != 1 || result.Unavailable != 0 || result.Failed != 2 {
+		t.Fatalf("unexpected first result: %#v", result)
+	}
+	if len(chunks) != 3 || len(chunks[0]) != 1 || len(chunks[1]) != 2 || len(chunks[2]) != 1 {
+		t.Fatalf("unexpected stream chunks: %#v", chunks)
+	}
+	if len(progress) < 2 || progress[0].Message != "开始备份" {
+		t.Fatalf("unexpected progress: %#v", progress)
+	}
+	lastProgress := progress[len(progress)-1]
+	if lastProgress.Current != 4 || lastProgress.Exported != 1 || lastProgress.Missing != 1 || lastProgress.Failed != 2 {
+		t.Fatalf("unexpected final progress: %#v", lastProgress)
+	}
+
+	idx, found, err := LoadIndex(directory)
+	if err != nil || !found {
+		t.Fatalf("LoadIndex after export: found=%v err=%v", found, err)
+	}
+	exportedKey := "acct:inbox:77:1"
+	exportedEntry, ok := idx.Messages[exportedKey]
+	if !ok || exportedEntry.HasAttachments == nil || !*exportedEntry.HasAttachments {
+		t.Fatalf("missing exported index entry: %#v", exportedEntry)
+	}
+	emlPath, err := IndexedFilePath(directory, exportedEntry.EMLPath)
+	if err != nil {
+		t.Fatalf("IndexedFilePath: %v", err)
+	}
+	eml, err := os.ReadFile(emlPath)
+	if err != nil {
+		t.Fatalf("read exported EML: %v", err)
+	}
+	if string(eml) != rawByUID[1] {
+		t.Fatalf("exported EML differs:\n%s", eml)
+	}
+
+	viewer, err := OpenViewerIndex(directory)
+	if err != nil {
+		t.Fatalf("OpenViewerIndex: %v", err)
+	}
+	page, err := viewer.SearchMessages("test@example.com", "needle", 0, 10)
+	if closeErr := viewer.Close(); closeErr != nil {
+		t.Fatalf("close viewer index: %v", closeErr)
+	}
+	if err != nil {
+		t.Fatalf("SearchMessages: %v", err)
+	}
+	if page.Total != 1 || len(page.Messages) != 1 || page.Messages[0].Subject != "Exported subject" {
+		t.Fatalf("unexpected viewer search page: %#v", page)
+	}
+
+	reportBytes, err := os.ReadFile(result.ReportPath)
+	if err != nil {
+		t.Fatalf("read first report: %v", err)
+	}
+	var report Report
+	if err := json.Unmarshal(reportBytes, &report); err != nil {
+		t.Fatalf("decode first report: %v", err)
+	}
+	if len(report.MissingMessages) != 1 || report.MissingMessages[0].UID != 2 || len(report.Failures) != 2 {
+		t.Fatalf("unexpected first report: %#v", report)
+	}
+
+	firstPass = false
+	chunks = nil
+	result, err = Run(context.Background(), db, RunOptions{
+		Directory:         directory,
+		StartedAt:         "2026-07-16T00:00:00Z",
+		AccountIDs:        []string{"acct"},
+		RawFetchBatchSize: 2,
+		StreamRawMessages: stream,
+	})
+	if err != nil {
+		t.Fatalf("Run incremental pass: %v", err)
+	}
+	if result.Mode != "incremental" || result.Total != 4 || result.Exported != 3 || result.Skipped != 1 || result.Missing != 0 || result.Failed != 0 {
+		t.Fatalf("unexpected incremental result: %#v", result)
+	}
+	idx, found, err = LoadIndex(directory)
+	if err != nil || !found || len(idx.Messages) != 4 {
+		t.Fatalf("incremental index: found=%v messages=%d err=%v", found, len(idx.Messages), err)
+	}
+}
+
+func TestRunValidatesStreamerAndHonorsCancellation(t *testing.T) {
+	directory := t.TempDir()
+	db, err := database.Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatalf("database.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	if err := db.Migrate(); err != nil {
+		t.Fatalf("Migrate: %v", err)
+	}
+
+	if _, err := Run(context.Background(), db, RunOptions{Directory: directory}); err == nil || !strings.Contains(err.Error(), "streamer is not configured") {
+		t.Fatalf("missing streamer error = %v", err)
+	}
+
+	if _, err := db.Exec(
+		`INSERT INTO accounts (id, name, email, imap_host, smtp_host, username)
+		 VALUES ('acct', 'Test', 'test@example.com', 'imap.example.com', 'smtp.example.com', 'test@example.com')`,
+	); err != nil {
+		t.Fatalf("seed account: %v", err)
+	}
+	if _, err := db.Exec(
+		`INSERT INTO folders (id, account_id, name, path, folder_type, uid_validity, selectable)
+		 VALUES ('inbox', 'acct', 'Inbox', 'INBOX', 'inbox', 1, 1)`,
+	); err != nil {
+		t.Fatalf("seed folder: %v", err)
+	}
+	if _, err := db.Exec(
+		`INSERT INTO messages (id, account_id, folder_id, uid, subject, date)
+		 VALUES ('message', 'acct', 'inbox', 1, 'Subject', '2026-07-15T00:00:00Z')`,
+	); err != nil {
+		t.Fatalf("seed message: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err = Run(ctx, db, RunOptions{
+		Directory:  directory,
+		AccountIDs: []string{"acct"},
+		StreamRawMessages: func(context.Context, string, string, []uint32, mailSync.RawMessageStreamHandler) (map[uint32]*mailSync.RawMessageStreamResult, map[uint32]error, error) {
+			t.Fatal("streamer must not run after cancellation")
+			return nil, nil, nil
+		},
+	})
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("Run cancellation error = %v, want context.Canceled", err)
 	}
 }
 

@@ -61,6 +61,15 @@ func (e *Engine) parseMessageBodyInternal(ctx context.Context, raw []byte, messa
 		if isContextDone(err) {
 			return nil, err
 		}
+		// go-message can reject an unknown transfer encoding while reading the
+		// top-level entity, before parseSinglePartBody gets a chance to inspect
+		// the header. Do not fall back to exposing the raw message as body text.
+		if gomessage.IsUnknownEncoding(err) {
+			result.UnsafeContent = true
+			result.BodyText = "This message uses non-standard encoding and cannot be displayed safely."
+			e.log.Warn().Err(err).Int("rawLen", len(raw)).Msg("Unknown top-level encoding, marking unsafe")
+			return result, nil
+		}
 		e.log.Debug().Err(err).Int("rawLen", len(raw)).Msg("Failed to parse message, trying as plain text")
 		result.BodyText = string(raw)
 		return result, nil

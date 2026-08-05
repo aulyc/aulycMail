@@ -28,10 +28,21 @@ const (
 	backupRawFetchBatchSize = 10
 )
 
-var (
-	errEmailBackupAlreadyRunning = errors.New("email backup is already running")
-	emailBackupJob               backupRunTracker
-)
+var errEmailBackupAlreadyRunning = errors.New("email backup is already running")
+
+// BackupBridge is the Wails-bound backup surface embedded by App. Keeping the
+// methods on a focused bridge makes the backup lifecycle independently
+// testable and prevents App's direct method set from continuing to grow.
+type BackupBridge struct {
+	app *App
+	job backupRunTracker
+}
+
+func (a *App) initBackupBridge() {
+	if a.BackupBridge == nil {
+		a.BackupBridge = &BackupBridge{app: a}
+	}
+}
 
 // BackupSettings is the persisted backup preference exposed to the frontend.
 type BackupSettings struct {
@@ -71,7 +82,7 @@ type BackupRunResult struct {
 	ReportPath  string `json:"reportPath,omitempty"`
 }
 
-// BackupProgress is emitted as backup:progress while RunEmailBackup executes.
+// BackupProgress is emitted as backup:progress while StartEmailBackup executes.
 type BackupProgress struct {
 	Phase        string `json:"phase"`
 	AccountEmail string `json:"accountEmail,omitempty"`
@@ -151,12 +162,12 @@ func (t *backupRunTracker) snapshot() BackupRunState {
 }
 
 // GetBackupSettings returns the persisted backup settings.
-func (a *App) GetBackupSettings() (*BackupSettings, error) {
-	directory, err := a.settingsStore.Get(settings.KeyBackupDirectory)
+func (b *BackupBridge) GetBackupSettings() (*BackupSettings, error) {
+	directory, err := b.app.settingsStore.Get(settings.KeyBackupDirectory)
 	if err != nil {
 		return nil, err
 	}
-	scope, err := a.settingsStore.Get(settings.KeyBackupScope)
+	scope, err := b.app.settingsStore.Get(settings.KeyBackupScope)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +175,7 @@ func (a *App) GetBackupSettings() (*BackupSettings, error) {
 		scope = backupScopeAll
 	}
 
-	rawIDs, err := a.settingsStore.Get(settings.KeyBackupSelectedAccountIDs)
+	rawIDs, err := b.app.settingsStore.Get(settings.KeyBackupSelectedAccountIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +192,7 @@ func (a *App) GetBackupSettings() (*BackupSettings, error) {
 }
 
 // SetBackupSettings persists backup settings without starting a backup run.
-func (a *App) SetBackupSettings(cfg BackupSettings) error {
+func (b *BackupBridge) SetBackupSettings(cfg BackupSettings) error {
 	scope := normalizeBackupScope(cfg.Scope)
 	directory := strings.TrimSpace(cfg.Directory)
 	if directory != "" {
@@ -198,18 +209,18 @@ func (a *App) SetBackupSettings(cfg BackupSettings) error {
 		return fmt.Errorf("failed to encode selected accounts: %w", err)
 	}
 
-	if err := a.settingsStore.Set(settings.KeyBackupDirectory, directory); err != nil {
+	if err := b.app.settingsStore.Set(settings.KeyBackupDirectory, directory); err != nil {
 		return err
 	}
-	if err := a.settingsStore.Set(settings.KeyBackupScope, scope); err != nil {
+	if err := b.app.settingsStore.Set(settings.KeyBackupScope, scope); err != nil {
 		return err
 	}
-	return a.settingsStore.Set(settings.KeyBackupSelectedAccountIDs, string(selectedJSON))
+	return b.app.settingsStore.Set(settings.KeyBackupSelectedAccountIDs, string(selectedJSON))
 }
 
 // ChooseBackupDirectory opens a native directory picker for the backup target.
-func (a *App) ChooseBackupDirectory() (string, error) {
-	current, _ := a.settingsStore.Get(settings.KeyBackupDirectory)
+func (b *BackupBridge) ChooseBackupDirectory() (string, error) {
+	current, _ := b.app.settingsStore.Get(settings.KeyBackupDirectory)
 	defaultDir := current
 	if defaultDir == "" {
 		if home, err := os.UserHomeDir(); err == nil {
@@ -217,10 +228,16 @@ func (a *App) ChooseBackupDirectory() (string, error) {
 		}
 	}
 
-	dir, err := wailsRuntime.OpenDirectoryDialog(a.ctx, wailsRuntime.OpenDialogOptions{
-		DefaultDirectory: defaultDir,
-		Title:            "选择备份目录",
-	})
+	var dir string
+	var err error
+	if b.app.openDirectoryDialog != nil {
+		dir, err = b.app.openDirectoryDialog(defaultDir, "选择备份目录")
+	} else {
+		dir, err = wailsRuntime.OpenDirectoryDialog(b.app.ctx, wailsRuntime.OpenDialogOptions{
+			DefaultDirectory: defaultDir,
+			Title:            "选择备份目录",
+		})
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to choose backup directory: %w", err)
 	}
@@ -231,8 +248,8 @@ func (a *App) ChooseBackupDirectory() (string, error) {
 }
 
 // OpenBackupDirectory opens the configured backup directory in the file manager.
-func (a *App) OpenBackupDirectory(path string) error {
-	saved, err := a.settingsStore.Get(settings.KeyBackupDirectory)
+func (b *BackupBridge) OpenBackupDirectory(path string) error {
+	saved, err := b.app.settingsStore.Get(settings.KeyBackupDirectory)
 	if err != nil {
 		return err
 	}
@@ -255,6 +272,9 @@ func (a *App) OpenBackupDirectory(path string) error {
 		return errors.New("path is not the configured backup directory")
 	}
 
+	if b.app.openSystemPath != nil {
+		return b.app.openSystemPath(cleanPath, false)
+	}
 	if stdruntime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported platform: %s", stdruntime.GOOS)
 	}
@@ -262,10 +282,10 @@ func (a *App) OpenBackupDirectory(path string) error {
 }
 
 // GetBackupStatus returns whether the target directory will run as full or incremental.
-func (a *App) GetBackupStatus(directory string) (*BackupStatus, error) {
+func (b *BackupBridge) GetBackupStatus(directory string) (*BackupStatus, error) {
 	directory = strings.TrimSpace(directory)
 	if directory == "" {
-		directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
+		directory, _ = b.app.settingsStore.Get(settings.KeyBackupDirectory)
 	}
 	if directory == "" {
 		return &BackupStatus{Mode: "full"}, nil
@@ -299,25 +319,25 @@ func (a *App) GetBackupStatus(directory string) (*BackupStatus, error) {
 }
 
 // GetBackupRunState returns the current in-process backup run state.
-func (a *App) GetBackupRunState() BackupRunState {
-	return emailBackupJob.snapshot()
+func (b *BackupBridge) GetBackupRunState() BackupRunState {
+	return b.job.snapshot()
 }
 
 // StartEmailBackup starts a background backup and returns immediately. Progress
 // and completion are emitted through backup:progress and recoverable via
 // GetBackupRunState.
-func (a *App) StartEmailBackup(options BackupRunOptions) (BackupRunState, error) {
+func (b *BackupBridge) StartEmailBackup(options BackupRunOptions) (BackupRunState, error) {
 	startedAt := time.Now().UTC().Format(time.RFC3339)
-	if !emailBackupJob.start(startedAt) {
-		return emailBackupJob.snapshot(), errEmailBackupAlreadyRunning
+	if !b.job.start(startedAt) {
+		return b.job.snapshot(), errEmailBackupAlreadyRunning
 	}
-	a.emitBackupProgress(BackupProgress{Phase: "running", Current: 0, Total: 0, Message: "开始备份"})
+	b.emitBackupProgress(BackupProgress{Phase: "running", Current: 0, Total: 0, Message: "开始备份"})
 
 	go func() {
 		defer recoverPanic("app.backup", "email backup")
 		defer func() {
 			if r := recover(); r != nil {
-				a.finishBackupProgress(BackupProgress{
+				b.finishBackupProgress(BackupProgress{
 					Phase:   "error",
 					Message: "backup worker crashed",
 				})
@@ -325,67 +345,32 @@ func (a *App) StartEmailBackup(options BackupRunOptions) (BackupRunState, error)
 			}
 		}()
 
-		result, err := a.runEmailBackup(options, startedAt)
+		result, err := b.runEmailBackup(options, startedAt)
 		if err != nil {
-			a.finishBackupProgress(BackupProgress{
+			b.finishBackupProgress(BackupProgress{
 				Phase:   "error",
 				Message: err.Error(),
 			})
 			return
 		}
-		a.finishBackupProgress(backupDoneProgress(result))
+		b.finishBackupProgress(backupDoneProgress(result))
 	}()
 
-	return emailBackupJob.snapshot(), nil
+	return b.job.snapshot(), nil
 }
 
-// RunEmailBackup exports selected accounts to standard .eml files. Existing
-// entries in .aulycmail-backup/index.json are skipped, so rerunning against the
-// same directory is incremental. A different directory without an index starts
-// as a full backup.
-func (a *App) RunEmailBackup(options BackupRunOptions) (result *BackupRunResult, err error) {
-	startedAt := time.Now().UTC().Format(time.RFC3339)
-	if !emailBackupJob.start(startedAt) {
-		return nil, errEmailBackupAlreadyRunning
-	}
-	a.emitBackupProgress(BackupProgress{Phase: "running", Current: 0, Total: 0, Message: "开始备份"})
-	defer func() {
-		if recovered := recover(); recovered != nil {
-			a.finishBackupProgress(BackupProgress{
-				Phase:   "error",
-				Message: "backup worker crashed",
-			})
-			panic(recovered)
-		}
-		if err == nil {
-			return
-		}
-		a.finishBackupProgress(BackupProgress{
-			Phase:   "error",
-			Message: err.Error(),
-		})
-	}()
-
-	result, err = a.runEmailBackup(options, startedAt)
-	if err != nil {
-		return nil, err
-	}
-	a.finishBackupProgress(backupDoneProgress(result))
-	return result, nil
-}
-
-func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (result *BackupRunResult, err error) {
+func (b *BackupBridge) runEmailBackup(options BackupRunOptions, startedAt string) (result *BackupRunResult, err error) {
 	activityMode := ""
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			a.recordBackupActivity(options, nil, fmt.Errorf("backup worker panic: %v", recovered), activityMode)
+			b.recordBackupActivity(options, nil, fmt.Errorf("backup worker panic: %v", recovered), activityMode)
 			panic(recovered)
 		}
-		a.recordBackupActivity(options, result, err, activityMode)
+		b.recordBackupActivity(options, result, err, activityMode)
 	}()
 
 	if strings.TrimSpace(options.Directory) == "" {
-		options.Directory, _ = a.settingsStore.Get(settings.KeyBackupDirectory)
+		options.Directory, _ = b.app.settingsStore.Get(settings.KeyBackupDirectory)
 	}
 	directory, err := mailBackup.NormalizeTargetDirectory(options.Directory)
 	if err != nil {
@@ -403,7 +388,7 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (result
 		options.Scope = backupScopeAll
 	}
 
-	accounts, err := a.resolveBackupAccounts(options.Scope, options.SelectedAccountIDs)
+	accounts, err := b.resolveBackupAccounts(options.Scope, options.SelectedAccountIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -412,14 +397,14 @@ func (a *App) runEmailBackup(options BackupRunOptions, startedAt string) (result
 		accountIDs = append(accountIDs, acc.ID)
 	}
 
-	internalResult, err := mailBackup.Run(a.ctx, a.db, mailBackup.RunOptions{
+	internalResult, err := mailBackup.Run(b.app.ctx, b.app.db, mailBackup.RunOptions{
 		Directory:         directory,
 		StartedAt:         startedAt,
 		AccountIDs:        accountIDs,
 		RawFetchBatchSize: backupRawFetchBatchSize,
-		StreamRawMessages: a.syncEngine.StreamRawMessages,
+		StreamRawMessages: b.app.syncEngine.StreamRawMessages,
 		EmitProgress: func(progress mailBackup.Progress) {
-			a.emitBackupProgress(backupProgressFromInternal(progress))
+			b.emitBackupProgress(backupProgressFromInternal(progress))
 		},
 	})
 	if err != nil {
@@ -464,7 +449,7 @@ func backupActivitySummary(result *BackupRunResult, status string) string {
 		mode, result.Total, backedUp, notBackedUp, result.Exported, result.Skipped, result.Missing, result.Unavailable, result.Failed)
 }
 
-func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunResult, runErr error, activityMode string) {
+func (b *BackupBridge) recordBackupActivity(options BackupRunOptions, result *BackupRunResult, runErr error, activityMode string) {
 	status := backupActivityStatus(result, runErr)
 	scope := normalizeBackupScope(options.Scope)
 	directory := strings.TrimSpace(options.Directory)
@@ -479,7 +464,7 @@ func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunRe
 		unavailable = result.Unavailable
 		failed = result.Failed
 		completed = added + skipped
-	} else if progress := emailBackupJob.snapshot().Progress; progress != nil {
+	} else if progress := b.job.snapshot().Progress; progress != nil {
 		total = progress.Total
 		added = progress.Exported
 		skipped = progress.Skipped
@@ -526,20 +511,20 @@ func (a *App) recordBackupActivity(options BackupRunOptions, result *BackupRunRe
 			"scope":       scope,
 		},
 	}
-	if err := a.appendActivityLog(entry); err != nil {
+	if err := b.app.appendActivityLog(entry); err != nil {
 		log := logging.WithComponent("app.backup")
 		log.Warn().Err(err).Msg("Failed to persist backup activity log")
 	}
 }
 
-func (a *App) emitBackupProgress(progress BackupProgress) {
-	emailBackupJob.update(progress)
-	wailsRuntime.EventsEmit(a.ctx, "backup:progress", progress)
+func (b *BackupBridge) emitBackupProgress(progress BackupProgress) {
+	b.job.update(progress)
+	b.app.emitEvent("backup:progress", progress)
 }
 
-func (a *App) finishBackupProgress(progress BackupProgress) {
-	emailBackupJob.finish(progress)
-	wailsRuntime.EventsEmit(a.ctx, "backup:progress", progress)
+func (b *BackupBridge) finishBackupProgress(progress BackupProgress) {
+	b.job.finish(progress)
+	b.app.emitEvent("backup:progress", progress)
 }
 
 func backupDoneProgress(result *BackupRunResult) BackupProgress {
@@ -592,8 +577,8 @@ func backupRunResultFromInternal(result *mailBackup.RunResult) *BackupRunResult 
 	}
 }
 
-func (a *App) resolveBackupAccounts(scope string, selectedIDs []string) ([]*account.Account, error) {
-	all, err := a.accountStore.List()
+func (b *BackupBridge) resolveBackupAccounts(scope string, selectedIDs []string) ([]*account.Account, error) {
+	all, err := b.app.accountStore.List()
 	if err != nil {
 		return nil, err
 	}

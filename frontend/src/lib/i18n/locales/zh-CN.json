@@ -289,6 +289,9 @@
     "runInBackground": "后台运行",
     "menuBarIcon": "菜单栏图标",
     "autostartOnLogin": "登录时自动启动",
+    "automaticUpdateChecks": "自动检查更新",
+    "automaticUpdateChecksDescription": "启动后及每天自动检查正式版本；下载、安装和重启仍需您确认。",
+    "automaticUpdateChecksHelp": "了解自动更新检查",
     "enhancedKeyboardNavigation": "启用增强键盘操作",
     "enhancedKeyboardNavigationDescription": "使用 Tab 切换橙色标记的大区域，按 Shift-F10 打开当前区域操作。关闭后停用 aulycMail 快捷键，但仍可使用 Command-F 搜索。",
     "enhancedKeyboardNavigationHelp": "查看增强键盘操作说明",
@@ -412,6 +415,22 @@
     "buildIndexFailed": "建立全文索引失败",
     "chooseDirectoryFailed": "选择备份目录失败",
     "openDirectoryFailed": "打开备份目录失败"
+  },
+  "settingsUpdate": {
+    "softwareUpdate": "软件更新",
+    "checkNow": "检查更新",
+    "checking": "正在检查更新…",
+    "upToDate": "已经是最新版本",
+    "available": "发现新版本 {version}",
+    "downloading": "正在下载 {progress}%",
+    "verifying": "正在验证更新…",
+    "installing": "正在安装并准备重启…",
+    "failed": "检查失败，点击重试",
+    "checkFailed": "检查更新失败，请稍后重试",
+    "installFailed": "更新安装失败，当前版本未被替换",
+    "confirmTitle": "安装软件更新？",
+    "confirmDescription": "将下载并严格验证 aulycMail {version}，验证通过后替换当前应用并自动重启。",
+    "updateAndRestart": "更新并重启"
   },
   "settingsAbout": {
     "version": "版本 {version}",

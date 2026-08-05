@@ -30,6 +30,10 @@ export function CancelFolderSync(arg1, arg2) {
   return window['go']['app']['App']['CancelFolderSync'](arg1, arg2);
 }
 
+export function CheckForUpdates() {
+  return window['go']['app']['App']['CheckForUpdates']();
+}
+
 export function ChooseBackupDirectory() {
   return window['go']['app']['App']['ChooseBackupDirectory']();
 }
@@ -90,10 +94,6 @@ export function DeletePermanently(arg1) {
   return window['go']['app']['App']['DeletePermanently'](arg1);
 }
 
-export function DownloadAttachment(arg1, arg2) {
-  return window['go']['app']['App']['DownloadAttachment'](arg1, arg2);
-}
-
 export function EmptyTrash(arg1, arg2) {
   return window['go']['app']['App']['EmptyTrash'](arg1, arg2);
 }
@@ -104,10 +104,6 @@ export function FetchMessageBody(arg1) {
 
 export function FetchServerMessage(arg1, arg2, arg3) {
   return window['go']['app']['App']['FetchServerMessage'](arg1, arg2, arg3);
-}
-
-export function FindLocalMessageIDs(arg1, arg2, arg3) {
-  return window['go']['app']['App']['FindLocalMessageIDs'](arg1, arg2, arg3);
 }
 
 export function ForceSyncFolder(arg1, arg2) {
@@ -152,6 +148,10 @@ export function GetAttachments(arg1) {
 
 export function GetAutoDetectedFolders(arg1) {
   return window['go']['app']['App']['GetAutoDetectedFolders'](arg1);
+}
+
+export function GetAutomaticUpdateChecks() {
+  return window['go']['app']['App']['GetAutomaticUpdateChecks']();
 }
 
 export function GetAutostart() {
@@ -290,14 +290,6 @@ export function GetSearchCountUnifiedInbox(arg1, arg2) {
   return window['go']['app']['App']['GetSearchCountUnifiedInbox'](arg1, arg2);
 }
 
-export function GetShowTitleBar() {
-  return window['go']['app']['App']['GetShowTitleBar']();
-}
-
-export function GetSpecialFolder(arg1, arg2) {
-  return window['go']['app']['App']['GetSpecialFolder'](arg1, arg2);
-}
-
 export function GetStartHidden() {
   return window['go']['app']['App']['GetStartHidden']();
 }
@@ -334,12 +326,20 @@ export function GetUnifiedInboxCount(arg1) {
   return window['go']['app']['App']['GetUnifiedInboxCount'](arg1);
 }
 
+export function GetUpdateStatus() {
+  return window['go']['app']['App']['GetUpdateStatus']();
+}
+
 export function IMAPSearchFolder(arg1, arg2, arg3, arg4) {
   return window['go']['app']['App']['IMAPSearchFolder'](arg1, arg2, arg3, arg4);
 }
 
 export function IgnoreReadReceipt(arg1, arg2) {
   return window['go']['app']['App']['IgnoreReadReceipt'](arg1, arg2);
+}
+
+export function InstallAvailableUpdate() {
+  return window['go']['app']['App']['InstallAvailableUpdate']();
 }
 
 export function IsFTSIndexing() {
@@ -386,10 +386,6 @@ export function MarkAsUnread(arg1) {
   return window['go']['app']['App']['MarkAsUnread'](arg1);
 }
 
-export function MoveMessagesToFolder(arg1, arg2) {
-  return window['go']['app']['App']['MoveMessagesToFolder'](arg1, arg2);
-}
-
 export function MoveToFolder(arg1, arg2) {
   return window['go']['app']['App']['MoveToFolder'](arg1, arg2);
 }
@@ -426,10 +422,6 @@ export function PickAttachmentFiles() {
   return window['go']['app']['App']['PickAttachmentFiles']();
 }
 
-export function Preflight() {
-  return window['go']['app']['App']['Preflight']();
-}
-
 export function PrepareReply(arg1, arg2) {
   return window['go']['app']['App']['PrepareReply'](arg1, arg2);
 }
@@ -464,10 +456,6 @@ export function RemoveTrustedCertificate(arg1) {
 
 export function ReorderAccounts(arg1) {
   return window['go']['app']['App']['ReorderAccounts'](arg1);
-}
-
-export function RunEmailBackup(arg1) {
-  return window['go']['app']['App']['RunEmailBackup'](arg1);
 }
 
 export function SaveAllAttachments(arg1) {
@@ -524,6 +512,10 @@ export function SetAccentBarUnread(arg1) {
 
 export function SetAlwaysLoadImages(arg1) {
   return window['go']['app']['App']['SetAlwaysLoadImages'](arg1);
+}
+
+export function SetAutomaticUpdateChecks(arg1) {
+  return window['go']['app']['App']['SetAutomaticUpdateChecks'](arg1);
 }
 
 export function SetAutostart(arg1) {
@@ -586,10 +578,6 @@ export function SetRunBackground(arg1) {
   return window['go']['app']['App']['SetRunBackground'](arg1);
 }
 
-export function SetShowTitleBar(arg1) {
-  return window['go']['app']['App']['SetShowTitleBar'](arg1);
-}
-
 export function SetStartHidden(arg1) {
   return window['go']['app']['App']['SetStartHidden'](arg1);
 }
@@ -600,10 +588,6 @@ export function SetTermsAccepted(arg1) {
 
 export function SetThemeMode(arg1) {
   return window['go']['app']['App']['SetThemeMode'](arg1);
-}
-
-export function ShowWindow() {
-  return window['go']['app']['App']['ShowWindow']();
 }
 
 export function Star(arg1) {
@@ -632,14 +616,6 @@ export function SyncAllComplete() {
 
 export function SyncFolder(arg1, arg2) {
   return window['go']['app']['App']['SyncFolder'](arg1, arg2);
-}
-
-export function SyncFolders(arg1) {
-  return window['go']['app']['App']['SyncFolders'](arg1);
-}
-
-export function SyncPendingDrafts(arg1) {
-  return window['go']['app']['App']['SyncPendingDrafts'](arg1);
 }
 
 export function TestAccountConnection(arg1) {

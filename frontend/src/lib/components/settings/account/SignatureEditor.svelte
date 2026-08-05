@@ -762,9 +762,11 @@
       oninput={handleRawHtmlInput}
       spellcheck="false"
     ></textarea>
-  {:else}
-    <div bind:this={editorElement} class="min-h-[100px]"></div>
   {/if}
+  <!-- Keep TipTap's mount node alive while raw HTML is shown. Removing it
+       detaches ProseMirror permanently, so switching back would leave a blank
+       editor even though the Editor instance still exists. -->
+  <div bind:this={editorElement} class="min-h-[100px]" class:hidden={rawHtmlMode}></div>
 </div>
 
 <style>

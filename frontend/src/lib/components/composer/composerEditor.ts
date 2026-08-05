@@ -144,7 +144,10 @@ const ContactMention = Node.create({
 
   parseHTML() {
     return [
-      { tag: 'span[data-contact-mention]' },
+      // This must outrank TextStyle's generic <span> parser; otherwise a
+      // saved draft reloads the visible @label as plain styled text and loses
+      // the atomic mention semantics used by cursor navigation.
+      { tag: 'span[data-contact-mention]', priority: 1000 },
     ]
   },
 

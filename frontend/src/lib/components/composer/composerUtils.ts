@@ -126,9 +126,20 @@ export function stripParagraphStyles(html: string): string {
     .replace(/^<div style="line-height:[^"]*">([\s\S]*)<\/div>$/, '$1')
     // Convert standalone <br> back to empty paragraphs for TipTap
     .replace(/<br\s*\/?>\s*(?=<p|<br|$)/g, '<p></p>')
-    // Strip inline margin:0 from paragraphs
-    .replace(/<p([^>]*) style="margin:\s*0;?"([^>]*)>/g, '<p$1$2>')
-    .replace(/<p style="margin:\s*0;?">/g, '<p>')
+    // Strip only the injected margin:0 declaration while preserving any
+    // pre-existing inline styles on the paragraph.
+    .replace(/<p([^>]*)>/gi, (tag, attributes: string) => {
+      const nextAttributes = attributes.replace(/\sstyle="([^"]*)"/i, (styleAttribute, style: string) => {
+        const declarations = style
+          .split(';')
+          .map(declaration => declaration.trim())
+          .filter(Boolean)
+        const filtered = declarations.filter(declaration => !/^margin\s*:\s*0(?:px)?$/i.test(declaration))
+        if (filtered.length === declarations.length) return styleAttribute
+        return filtered.length > 0 ? ` style="${filtered.join(';')}"` : ''
+      })
+      return `<p${nextAttributes}>`
+    })
 }
 
 /**

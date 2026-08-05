@@ -153,8 +153,8 @@ func (m *ComposeMessage) ToRFC822() ([]byte, error) {
 
 	// Choose message structure based on content
 	switch {
-	case hasAttachments && (hasHTML || hasText):
-		// multipart/mixed with multipart/alternative or just text
+	case hasAttachments:
+		// multipart/mixed preserving every attachment alongside any available body
 		if err := writeMultipartMixed(&buf, m, regularAttachments, inlineAttachments); err != nil {
 			return nil, err
 		}
@@ -344,6 +344,16 @@ func writeMultipartMixed(w *bytes.Buffer, m *ComposeMessage, attachments, inline
 	for _, att := range attachments {
 		if err := writeAttachment(mpWriter, att); err != nil {
 			return err
+		}
+	}
+	// Inline attachments normally belong to multipart/related HTML. Without an
+	// HTML body there is no related container, but the attachment must still be
+	// preserved instead of silently disappearing from text-only or bodyless mail.
+	if !hasHTML {
+		for _, att := range inlineAttachments {
+			if err := writeInlineAttachment(mpWriter, att); err != nil {
+				return err
+			}
 		}
 	}
 

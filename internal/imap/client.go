@@ -783,10 +783,21 @@ func (c *Client) AppendMessageFromReader(mailbox string, flags []imap.Flag, date
 	// Write the message data
 	written, err := io.Copy(appendCmd, r)
 	if err != nil {
+		// An IMAP literal declares its byte count before transmission. Once the
+		// reader fails, sending any command terminator or LOGOUT bytes can make
+		// the server consume those bytes as message content. The wire state is
+		// unrecoverable, so close the socket immediately and let the pool replace
+		// this client.
+		_ = c.client.Close()
+		// Release the command encoder only after the socket is closed. At that
+		// point its terminator cannot be mistaken for literal content.
 		_ = appendCmd.Close()
 		return 0, fmt.Errorf("failed to write message data: %w", err)
 	}
 	if written != size {
+		// Do not call AppendCommand.Close here: it would finish an incomplete
+		// literal and may persist a truncated message on permissive servers.
+		_ = c.client.Close()
 		_ = appendCmd.Close()
 		return 0, fmt.Errorf("append size mismatch: wrote %d bytes, expected %d", written, size)
 	}

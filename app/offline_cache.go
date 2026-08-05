@@ -18,6 +18,7 @@ type OfflineBodyCacheClearResult struct {
 // ClearOfflineBodyCache clears cached message bodies and parsed attachments for
 // one account while keeping the local message index/envelope rows intact.
 func (a *App) ClearOfflineBodyCache(accountID string) (*OfflineBodyCacheClearResult, error) {
+	a.initSyncBridge()
 	log := logging.WithComponent("app.offline_cache")
 	accountID = strings.TrimSpace(accountID)
 	if accountID == "" {
@@ -39,15 +40,15 @@ func (a *App) ClearOfflineBodyCache(accountID string) (*OfflineBodyCacheClearRes
 		a.syncScheduler.CancelSync(accountID)
 	}
 	cancelledFolderSyncs := 0
-	a.syncMu.Lock()
-	for syncKey, cancel := range a.syncContexts {
+	a.SyncBridge.mu.Lock()
+	for syncKey, cancel := range a.SyncBridge.contexts {
 		if strings.HasPrefix(syncKey, accountID+":") {
 			cancel()
-			delete(a.syncContexts, syncKey)
+			delete(a.SyncBridge.contexts, syncKey)
 			cancelledFolderSyncs++
 		}
 	}
-	a.syncMu.Unlock()
+	a.SyncBridge.mu.Unlock()
 	if cancelledFolderSyncs > 0 {
 		time.Sleep(100 * time.Millisecond)
 	}

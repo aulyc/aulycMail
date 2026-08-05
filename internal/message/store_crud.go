@@ -36,7 +36,7 @@ const upsertMessageQuery = `
 // Get returns a full message by ID
 func (s *Store) Get(id string) (*Message, error) {
 	query := `
-		SELECT id, account_id, folder_id, uid, message_id, in_reply_to, thread_id,
+		SELECT id, account_id, folder_id, uid, message_id, in_reply_to, references_list, thread_id,
 		       subject, from_name, from_email, to_list, cc_list, bcc_list, reply_to, date,
 		       snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
 		       size, has_attachments, body_text, body_html, body_fetched,
@@ -47,12 +47,12 @@ func (s *Store) Get(id string) (*Message, error) {
 	`
 
 	m := &Message{}
-	var messageID, inReplyTo, threadID, toList, ccList, bccList, replyTo, snippet, bodyText, bodyHTML, readReceiptTo sql.NullString
+	var messageID, inReplyTo, references, threadID, toList, ccList, bccList, replyTo, snippet, bodyText, bodyHTML, readReceiptTo sql.NullString
 	var dateStr, receivedAtStr sql.NullString
 	var uidI64 int64
 
 	err := s.db.QueryRow(query, id).Scan(
-		&m.ID, &m.AccountID, &m.FolderID, &uidI64, &messageID, &inReplyTo, &threadID,
+		&m.ID, &m.AccountID, &m.FolderID, &uidI64, &messageID, &inReplyTo, &references, &threadID,
 		&m.Subject, &m.FromName, &m.FromEmail, &toList, &ccList, &bccList, &replyTo, &dateStr,
 		&snippet, &m.IsRead, &m.IsStarred, &m.IsAnswered, &m.IsForwarded, &m.IsDraft, &m.IsDeleted,
 		&m.Size, &m.HasAttachments, &bodyText, &bodyHTML, &m.BodyFetched,
@@ -72,6 +72,9 @@ func (s *Store) Get(id string) (*Message, error) {
 	}
 	if inReplyTo.Valid {
 		m.InReplyTo = inReplyTo.String
+	}
+	if references.Valid {
+		m.References = references.String
 	}
 	if threadID.Valid {
 		m.ThreadID = threadID.String
@@ -113,7 +116,7 @@ func (s *Store) Get(id string) (*Message, error) {
 // GetByUID returns a message by folder ID and UID
 func (s *Store) GetByUID(folderID string, uid uint32) (*Message, error) {
 	query := `
-		SELECT id, account_id, folder_id, uid, message_id, in_reply_to, thread_id,
+		SELECT id, account_id, folder_id, uid, message_id, in_reply_to, references_list, thread_id,
 		       subject, from_name, from_email, to_list, cc_list, bcc_list, reply_to, date,
 		       snippet, is_read, is_starred, is_answered, is_forwarded, is_draft, is_deleted,
 		       size, has_attachments, body_text, body_html, body_fetched,
@@ -124,12 +127,12 @@ func (s *Store) GetByUID(folderID string, uid uint32) (*Message, error) {
 	`
 
 	m := &Message{}
-	var messageID, inReplyTo, threadID, toList, ccList, bccList, replyTo, snippet, bodyText, bodyHTML, readReceiptTo sql.NullString
+	var messageID, inReplyTo, references, threadID, toList, ccList, bccList, replyTo, snippet, bodyText, bodyHTML, readReceiptTo sql.NullString
 	var dateStr, receivedAtStr sql.NullString
 	var uidI64 int64
 
 	err := s.db.QueryRow(query, folderID, uid).Scan(
-		&m.ID, &m.AccountID, &m.FolderID, &uidI64, &messageID, &inReplyTo, &threadID,
+		&m.ID, &m.AccountID, &m.FolderID, &uidI64, &messageID, &inReplyTo, &references, &threadID,
 		&m.Subject, &m.FromName, &m.FromEmail, &toList, &ccList, &bccList, &replyTo, &dateStr,
 		&snippet, &m.IsRead, &m.IsStarred, &m.IsAnswered, &m.IsForwarded, &m.IsDraft, &m.IsDeleted,
 		&m.Size, &m.HasAttachments, &bodyText, &bodyHTML, &m.BodyFetched,
@@ -150,6 +153,9 @@ func (s *Store) GetByUID(folderID string, uid uint32) (*Message, error) {
 	}
 	if inReplyTo.Valid {
 		m.InReplyTo = inReplyTo.String
+	}
+	if references.Valid {
+		m.References = references.String
 	}
 	if threadID.Valid {
 		m.ThreadID = threadID.String

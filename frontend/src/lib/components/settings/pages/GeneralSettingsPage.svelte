@@ -45,6 +45,13 @@
       <BoolSelect bind:checked={draft.autostart} class={SETTINGS_SELECT_WIDTH_CLASS} />
     </SettingsRow>
     <SettingsRow
+      label={$_('settingsGeneral.automaticUpdateChecks')}
+      help={$_('settingsGeneral.automaticUpdateChecksDescription')}
+      helpLabel={$_('settingsGeneral.automaticUpdateChecksHelp')}
+    >
+      <BoolSelect bind:checked={draft.automaticUpdateChecks} class={SETTINGS_SELECT_WIDTH_CLASS} />
+    </SettingsRow>
+    <SettingsRow
       label={$_('settingsGeneral.enhancedKeyboardNavigation')}
       help={$_('settingsGeneral.enhancedKeyboardNavigationDescription')}
       helpLabel={$_('settingsGeneral.enhancedKeyboardNavigationHelp')}

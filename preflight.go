@@ -19,7 +19,7 @@ import (
 // with `-tags bindings` and executes it once to emit TS bindings; that pass
 // must not touch the user's real DB).
 func runPreflight(application *app.App) {
-	err := application.Preflight()
+	err := app.Preflight(application)
 	if err == nil {
 		return
 	}

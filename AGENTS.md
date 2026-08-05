@@ -176,16 +176,28 @@ successful aggregate target unless diagnosing a failure.
 
 ### Dual-mirror release policy
 
-- Explicit policy: `aulyc-dual-mirror-v1` `1.2.0`; the Release Profile remains
+- Explicit policy: `aulyc-dual-mirror-v1` `1.7.0`; the Release Profile remains
   `macos-arm64-app`.
-- Private source authority: `aulyc/aulycMail`; public release mirrors:
-  `aulyc/aulycMail-releases` on GitHub and Gitee.
+- Public source authority and GitHub distribution repository:
+  `aulyc/aulycMail`; the public Gitee distribution mirror uses the same
+  `aulyc/aulycMail` owner/repository identity. Gitee never receives source Git
+  pushes. The `macos-compact` / `dual-manifest` channel publishes only the
+  verified DMG as each Release attachment. GitHub `latest.json` uses the
+  dedicated `release-channel` branch so publication never advances the source
+  `main` branch; versioned provenance is stored under `updates/<version>/` on
+  both update branches, while checksum sidecars remain local verification
+  evidence.
 - Project adapter: `bash tools/dual-mirror-release.sh
   <prepare|preflight|publish|verify> ...`; full contract:
   `docs/DUAL_MIRROR_RELEASE.md`.
-- Updater: `N/A`. Any future updater must implement fixed GitHub-first/Gitee
-  fallback and identical version/build/Commit/Bundle ID/arm64/SHA-256/
-  provenance/trust verification.
+- Updater: `internal/updater` plus the narrow `app/update.go` Wails bridge.
+  Automatic checks are preference-controlled and throttled; manual checks
+  always remain available. The updater accepts `dual-mirror-latest:2` with raw
+  versioned-provenance URLs, retains read-only Schema v1 compatibility, and
+  uses fixed GitHub-first/Gitee fallback with identical version/build/Commit/
+  Bundle ID/arm64/SHA-256/provenance/Developer ID/notarization/Gatekeeper
+  verification before it may stage an in-place replacement. Download,
+  installation, and restart require explicit user confirmation.
 - Only an explicitly authorized `publish` may write remote state. Missing
   mirrors, one-sided failure or conflicts must fail/record partial state;
   never push source to Gitee or overwrite an old release.

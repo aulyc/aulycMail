@@ -28,18 +28,16 @@ func (a *App) Undo() (string, error) {
 	return cmd.Description(), nil
 }
 
-// ============================================================================
-// UndoContext Implementation - Required for undo.Command operations
-// ============================================================================
-
-// FindLocalMessageIDs implements undo.UndoContext
-// Finds current local DB message IDs by RFC822 Message-ID header and folder
-func (a *App) FindLocalMessageIDs(accountID, folderID string, rfc822MessageIDs []string) ([]string, error) {
-	return a.messageStore.GetIDsByMessageIDs(accountID, folderID, rfc822MessageIDs)
+// undoContextAdapter keeps undo's narrow interface off the Wails-bound App
+// method set while still delegating to the normal local/IMAP move pipeline.
+type undoContextAdapter struct {
+	app *App
 }
 
-// MoveMessagesToFolder implements undo.UndoContext
-// Delegates to the standard MoveToFolder pipeline (IMAP + local DB + events)
-func (a *App) MoveMessagesToFolder(messageIDs []string, destFolderID string) error {
-	return a.MoveToFolder(messageIDs, destFolderID)
+func (c undoContextAdapter) FindLocalMessageIDs(accountID, folderID string, rfc822MessageIDs []string) ([]string, error) {
+	return c.app.messageStore.GetIDsByMessageIDs(accountID, folderID, rfc822MessageIDs)
+}
+
+func (c undoContextAdapter) MoveMessagesToFolder(messageIDs []string, destFolderID string) error {
+	return c.app.MoveToFolder(messageIDs, destFolderID)
 }

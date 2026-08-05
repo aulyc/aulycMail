@@ -6,6 +6,7 @@ extern void goStatusItemAction(char* action);
 typedef struct {
     const char* open;
     const char* settings;
+    const char* checkUpdate;
     const char* quit;
 } AulycStatusItemLabels;
 
@@ -15,6 +16,7 @@ typedef struct {
 @implementation AulycStatusItemTarget
 - (void)onOpen:(id)sender     { (void)sender; goStatusItemAction("show"); }
 - (void)onSettings:(id)sender { (void)sender; goStatusItemAction("settings"); }
+- (void)onCheckUpdate:(id)sender { (void)sender; goStatusItemAction("checkUpdate"); }
 - (void)onQuit:(id)sender     { (void)sender; [NSApp terminate:nil]; }
 @end
 
@@ -96,6 +98,7 @@ static void aulycApplyStatusItemAppearance(void) {
 void aulycSetStatusItemVisible(int visible, AulycStatusItemLabels labels) {
     NSString* open = aulycStatusStr(labels.open);
     NSString* settings = aulycStatusStr(labels.settings);
+    NSString* checkUpdate = aulycStatusStr(labels.checkUpdate);
     NSString* quit = aulycStatusStr(labels.quit);
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -118,6 +121,7 @@ void aulycSetStatusItemVisible(int visible, AulycStatusItemLabels labels) {
         NSMenu *menu = [[[NSMenu alloc] init] autorelease];
         [menu addItem:aulycStatusItem(open, @selector(onOpen:), gStatusItemTarget, @"")];
         [menu addItem:aulycStatusItem(settings, @selector(onSettings:), gStatusItemTarget, @"")];
+        [menu addItem:aulycStatusItem(checkUpdate, @selector(onCheckUpdate:), gStatusItemTarget, @"")];
         [menu addItem:[NSMenuItem separatorItem]];
         [menu addItem:aulycStatusItem(quit, @selector(onQuit:), gStatusItemTarget, @"q")];
         gStatusItem.menu = menu;

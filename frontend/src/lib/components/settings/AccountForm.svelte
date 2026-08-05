@@ -608,6 +608,7 @@
   function handleCertDecline() {
     showCertDialog = false
     pendingCertificate = null
+    showTestConnDialog = true
     testResult = { success: false, message: $_('account.certificateDeclined') }
   }
 

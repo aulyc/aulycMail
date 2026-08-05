@@ -289,6 +289,9 @@
     "runInBackground": "Run in background",
     "menuBarIcon": "Menu bar icon",
     "autostartOnLogin": "Autostart on login",
+    "automaticUpdateChecks": "Automatically check for updates",
+    "automaticUpdateChecksDescription": "Check for formal releases after launch and daily. Download, installation, and restart still require your confirmation.",
+    "automaticUpdateChecksHelp": "About automatic update checks",
     "enhancedKeyboardNavigation": "Enhanced keyboard navigation",
     "enhancedKeyboardNavigationDescription": "Use Tab to switch the orange-marked regions and Shift-F10 for current-region actions. Turning this off disables aulycMail shortcuts; Command-F search remains available.",
     "enhancedKeyboardNavigationHelp": "Show enhanced keyboard navigation help",
@@ -412,6 +415,22 @@
     "buildIndexFailed": "Failed to build full-text index",
     "chooseDirectoryFailed": "Failed to choose backup directory",
     "openDirectoryFailed": "Failed to open backup directory"
+  },
+  "settingsUpdate": {
+    "softwareUpdate": "Software Update",
+    "checkNow": "Check for Updates",
+    "checking": "Checking for updates…",
+    "upToDate": "Up to date",
+    "available": "Version {version} is available",
+    "downloading": "Downloading {progress}%",
+    "verifying": "Verifying update…",
+    "installing": "Installing and preparing to restart…",
+    "failed": "Check failed; click to retry",
+    "checkFailed": "Unable to check for updates. Please try again later.",
+    "installFailed": "Update installation failed. The current version was not replaced.",
+    "confirmTitle": "Install Software Update?",
+    "confirmDescription": "aulycMail {version} will be downloaded and strictly verified. After verification, the current app will be replaced and restarted.",
+    "updateAndRestart": "Update and Restart"
   },
   "settingsAbout": {
     "version": "Version {version}",

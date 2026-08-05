@@ -69,7 +69,7 @@ export function createMainWindowApi(): ComposerApi {
     },
 
     searchContacts: async (query: string, limit: number) => {
-      return SearchContacts(query, limit) || []
+      return await SearchContacts(query, limit) || []
     },
 
     getIdentities: async (accountId: string) => {

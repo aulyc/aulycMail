@@ -4,7 +4,7 @@ package platform
 
 // MenuLabels holds the localized strings for the custom application menu.
 type MenuLabels struct {
-	Settings, BackupViewer, About, Quit, Edit, Undo, Redo, Cut, Copy, Paste, Delete string
+	Settings, BackupViewer, CheckUpdate, About, Quit, Edit, Undo, Redo, Cut, Copy, Paste, Delete string
 }
 
 // SetMenuHandler is a no-op outside macOS (the custom NSMenu is macOS-only).

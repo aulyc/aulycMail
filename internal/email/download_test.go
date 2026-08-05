@@ -3,6 +3,7 @@ package email
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -295,4 +296,113 @@ func TestCopyAttachmentContentRejectsOverLimit(t *testing.T) {
 	if buf.String() != "abc" {
 		t.Fatalf("buffer = %q, want abc", buf.String())
 	}
+	if got, want := tooLarge.Error(), "attachment content exceeds in-memory limit of 3 bytes"; got != want {
+		t.Fatalf("error text = %q, want %q", got, want)
+	}
+}
+
+func TestExtractAttachmentContentToWriterSupportsSinglePart(t *testing.T) {
+	downloader := NewAttachmentDownloader(t.TempDir())
+	singlePart := strings.Join([]string{
+		"Content-Type: text/plain; name=\"single.txt\"",
+		"Content-Disposition: attachment; filename=\"single.txt\"",
+		"Content-Transfer-Encoding: base64",
+		"",
+		"c2luZ2xl",
+		"",
+	}, "\r\n")
+	var single bytes.Buffer
+	written, err := downloader.ExtractAttachmentContentToWriter(strings.NewReader(singlePart), "single.txt", &single)
+	if err != nil || written != 6 || single.String() != "single" {
+		t.Fatalf("single-part extraction = %d, %q, %v; want 6, single", written, single.String(), err)
+	}
+	if _, err := downloader.ExtractAttachmentContentToWriter(strings.NewReader(singlePart), "missing.txt", io.Discard); err == nil {
+		t.Fatal("single-part missing attachment error = nil")
+	}
+}
+
+func TestBatchAttachmentExtractionReportsPerTargetFailures(t *testing.T) {
+	downloader := NewAttachmentDownloader(t.TempDir())
+	raw := testAttachmentMessage()
+	results, err := downloader.ExtractAttachmentsContentFromRawReader(strings.NewReader(raw), []string{
+		"one.txt", "one.txt", "", "missing.txt",
+	})
+	if err != nil {
+		t.Fatalf("ExtractAttachmentsContentFromRawReader(): %v", err)
+	}
+	if len(results) != 4 || string(results[0].Content) != "one" || results[0].Err != nil {
+		t.Fatalf("first result = %#v, want decoded one", results[0])
+	}
+	for _, index := range []int{1, 2, 3} {
+		if results[index].Err == nil {
+			t.Fatalf("result[%d] error = nil", index)
+		}
+	}
+
+	dir := t.TempDir()
+	saveResults, err := downloader.SaveAttachmentsFromRawReader(strings.NewReader(raw), []AttachmentSaveTarget{
+		{},
+		{Attachment: &message.Attachment{MessageID: "msg", Filename: "../"}},
+		{Attachment: &message.Attachment{MessageID: "msg", Filename: "missing.txt"}, CustomPath: filepath.Join(dir, "missing.txt")},
+	})
+	if err != nil {
+		t.Fatalf("SaveAttachmentsFromRawReader(): %v", err)
+	}
+	if len(saveResults) != 3 {
+		t.Fatalf("save results len = %d, want 3", len(saveResults))
+	}
+	for index, result := range saveResults {
+		if result.Err == nil {
+			t.Fatalf("save result[%d] error = nil", index)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "missing.txt")); !os.IsNotExist(err) {
+		t.Fatalf("missing attachment path exists or stat failed unexpectedly: %v", err)
+	}
+}
+
+func TestAttachmentFilenameFallbackAndFailedWriteCleanup(t *testing.T) {
+	if got := DefaultAttachmentFilename("../../invoice.pdf"); got != "invoice.pdf" {
+		t.Fatalf("DefaultAttachmentFilename(traversal) = %q, want invoice.pdf", got)
+	}
+	if got := DefaultAttachmentFilename("../"); got != "attachment.bin" {
+		t.Fatalf("DefaultAttachmentFilename(unsafe) = %q, want attachment.bin", got)
+	}
+
+	path := filepath.Join(t.TempDir(), "partial.bin")
+	written, err := writeAttachmentToPath(path, func(dst io.Writer) (int64, error) {
+		n, writeErr := io.WriteString(dst, "partial")
+		if writeErr != nil {
+			return int64(n), writeErr
+		}
+		return int64(n), errors.New("synthetic extraction failure")
+	})
+	if err == nil || written != int64(len("partial")) {
+		t.Fatalf("writeAttachmentToPath() = %d, %v", written, err)
+	}
+	if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+		t.Fatalf("partial file was not removed: %v", statErr)
+	}
+}
+
+func testAttachmentMessage() string {
+	return strings.Join([]string{
+		"From: sender@example.com",
+		"To: user@example.com",
+		"Subject: attachment",
+		"Content-Type: multipart/mixed; boundary=abc",
+		"",
+		"--abc",
+		"Content-Type: text/plain",
+		"",
+		"hello",
+		"--abc",
+		"Content-Type: text/plain; name=\"one.txt\"",
+		"Content-Disposition: attachment; filename=\"one.txt\"",
+		"Content-Transfer-Encoding: base64",
+		"",
+		"b25l",
+		"--abc--",
+		"",
+	}, "\r\n")
 }

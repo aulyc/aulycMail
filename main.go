@@ -9,6 +9,7 @@ import (
 
 	"aulyc.local/aulycmail/app"
 	"aulyc.local/aulycmail/internal/platform"
+	"aulyc.local/aulycmail/internal/updater"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -20,8 +21,9 @@ var assets embed.FS
 
 // Command-line flags
 var (
-	debugMode   = flag.Bool("debug", false, "Enable debug logging")
-	versionFlag = flag.Bool("version", false, "Show version and exit")
+	debugMode       = flag.Bool("debug", false, "Enable debug logging")
+	versionFlag     = flag.Bool("version", false, "Show version and exit")
+	applyUpdatePlan = flag.String("apply-update-plan", "", "Internal update helper plan")
 )
 
 // DebugMode returns whether debug logging is enabled
@@ -32,6 +34,13 @@ func DebugMode() bool {
 
 func main() {
 	flag.Parse()
+	if *applyUpdatePlan != "" {
+		if err := updater.RunApplyPlan(*applyUpdatePlan); err != nil {
+			fmt.Fprintln(os.Stderr, "Update installation failed:", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	if *versionFlag {
 		fmt.Println(app.VersionLabel())

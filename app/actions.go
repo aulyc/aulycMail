@@ -13,7 +13,6 @@ import (
 	"aulyc.local/aulycmail/internal/message"
 	"aulyc.local/aulycmail/internal/undo"
 	goImap "github.com/emersion/go-imap/v2"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // withIMAPRetry wraps an IMAP operation with stale-connection retry.
@@ -144,7 +143,7 @@ func (a *App) setReadStatus(messageIDs []string, isRead bool) error {
 	}
 
 	// Emit event for UI update with flag state
-	wailsRuntime.EventsEmit(a.ctx, "messages:readChanged", map[string]interface{}{
+	a.emitEvent("messages:readChanged", map[string]interface{}{
 		"messageIds": messageIDs,
 		"isRead":     isRead,
 	})
@@ -171,7 +170,7 @@ func (a *App) setReadStatus(messageIDs []string, isRead bool) error {
 			folderCounts[folderID] = unreadCount
 		}
 		if len(folderCounts) > 0 {
-			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
+			a.emitEvent("folders:countsChanged", folderCounts)
 		}
 		a.refreshUnreadBadges()
 	}()
@@ -381,7 +380,7 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 		return fmt.Errorf("failed to move messages locally: %w", err)
 	}
 
-	wailsRuntime.EventsEmit(a.ctx, "messages:moved", map[string]interface{}{
+	a.emitEvent("messages:moved", map[string]interface{}{
 		"messageIds":   messageIDs,
 		"destFolderId": destFolderID,
 	})
@@ -431,7 +430,7 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 		}
 
 		if len(folderCounts) > 0 {
-			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
+			a.emitEvent("folders:countsChanged", folderCounts)
 		}
 		a.refreshUnreadBadges()
 	}()
@@ -458,9 +457,9 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 		if len(messages) > 0 {
 			accountID := messages[0].AccountID
 			syncKey := accountID + ":" + destFolderID
-			a.syncMu.Lock()
-			delete(a.syncLastRequest, syncKey)
-			a.syncMu.Unlock()
+			a.SyncBridge.mu.Lock()
+			delete(a.SyncBridge.lastRequest, syncKey)
+			a.SyncBridge.mu.Unlock()
 
 			if err := a.SyncFolder(accountID, destFolderID); err != nil && err != context.Canceled {
 				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to sync destination folder after move")
@@ -487,7 +486,7 @@ func (a *App) MoveToFolder(messageIDs []string, destFolderID string) error {
 		}
 
 		cmd := undo.NewMoveCommand(
-			a,
+			undoContextAdapter{app: a},
 			msgs[0].AccountID,
 			rfc822IDs,
 			sourceFolderID,
@@ -701,9 +700,9 @@ func (a *App) CopyToFolder(messageIDs []string, destFolderID string) error {
 		if len(messages) > 0 {
 			accountID := messages[0].AccountID
 			syncKey := accountID + ":" + destFolderID
-			a.syncMu.Lock()
-			delete(a.syncLastRequest, syncKey)
-			a.syncMu.Unlock()
+			a.SyncBridge.mu.Lock()
+			delete(a.SyncBridge.lastRequest, syncKey)
+			a.SyncBridge.mu.Unlock()
 
 			if err := a.SyncFolder(accountID, destFolderID); err != nil && err != context.Canceled {
 				log.Warn().Err(err).Str("destFolderID", destFolderID).Msg("Failed to sync destination folder after copy")
@@ -895,7 +894,7 @@ func (a *App) Archive(messageIDs []string) error {
 		return fmt.Errorf("failed to get message")
 	}
 
-	archiveFolder, err := a.GetSpecialFolder(messages[0].AccountID, folder.TypeArchive)
+	archiveFolder, err := a.getSpecialFolder(messages[0].AccountID, folder.TypeArchive)
 	if err != nil {
 		return fmt.Errorf("failed to get archive folder: %w", err)
 	}
@@ -929,7 +928,7 @@ func (a *App) Trash(messageIDs []string) (bool, error) {
 
 	accountID := messages[0].AccountID
 
-	trashFolder, err := a.GetSpecialFolder(accountID, folder.TypeTrash)
+	trashFolder, err := a.getSpecialFolder(accountID, folder.TypeTrash)
 	if err != nil {
 		return false, fmt.Errorf("failed to get trash folder: %w", err)
 	}
@@ -1036,7 +1035,7 @@ func (a *App) gmailRemoveLabel(messages []*message.Message) error {
 		return fmt.Errorf("failed to delete messages locally: %w", err)
 	}
 
-	wailsRuntime.EventsEmit(a.ctx, "messages:deleted", ids)
+	a.emitEvent("messages:deleted", ids)
 
 	// Update folder counts
 	go func() {
@@ -1063,7 +1062,7 @@ func (a *App) gmailRemoveLabel(messages []*message.Message) error {
 			folderCounts[folderID] = unreadCount
 		}
 		if len(folderCounts) > 0 {
-			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
+			a.emitEvent("folders:countsChanged", folderCounts)
 		}
 		a.refreshUnreadBadges()
 	}()
@@ -1141,7 +1140,7 @@ func (a *App) MarkAsSpam(messageIDs []string) (bool, error) {
 
 	accountID := messages[0].AccountID
 
-	spamFolder, err := a.GetSpecialFolder(accountID, folder.TypeSpam)
+	spamFolder, err := a.getSpecialFolder(accountID, folder.TypeSpam)
 	if err != nil {
 		return false, fmt.Errorf("failed to get spam folder: %w", err)
 	}
@@ -1189,6 +1188,14 @@ func (a *App) MarkAsNotSpam(messageIDs []string) error {
 
 // EmptyTrash permanently deletes all messages in a trash folder
 func (a *App) EmptyTrash(accountID, folderID string) error {
+	trashFolder, err := a.requireSelectableFolder(folderID)
+	if err != nil {
+		return err
+	}
+	if trashFolder.AccountID != accountID {
+		return fmt.Errorf("folder %s does not belong to account %s", folderID, accountID)
+	}
+
 	ids, err := a.messageStore.GetAllIDsByFolder(folderID)
 	if err != nil {
 		return fmt.Errorf("failed to get messages in trash: %w", err)
@@ -1229,7 +1236,7 @@ func (a *App) DeletePermanently(messageIDs []string) error {
 		return fmt.Errorf("failed to delete messages locally: %w", err)
 	}
 
-	wailsRuntime.EventsEmit(a.ctx, "messages:deleted", messageIDs)
+	a.emitEvent("messages:deleted", messageIDs)
 
 	// Update folder unread counts
 	go func() {
@@ -1257,7 +1264,7 @@ func (a *App) DeletePermanently(messageIDs []string) error {
 			folderCounts[folderID] = unreadCount
 		}
 		if len(folderCounts) > 0 {
-			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", folderCounts)
+			a.emitEvent("folders:countsChanged", folderCounts)
 		}
 		a.refreshUnreadBadges()
 	}()
@@ -1346,91 +1353,106 @@ func (a *App) deleteMessagesFromIMAP(messages []*message.Message, folderID strin
 // construction (partition slices are uniform-account by definition).
 // ============================================================================
 
-// partitionByAccount groups message IDs by their owning account. Invalid
-// IDs (no matching row in the store) are silently dropped — matching the
-// behavior of every other call site that consumes GetByIDs results.
-func (a *App) partitionByAccount(messageIDs []string) (map[string][]string, error) {
+type accountPartition struct {
+	accountID  string
+	messageIDs []string
+}
+
+// partitionByAccount groups message IDs by their owning account in first
+// selection order. Invalid IDs are silently dropped, matching the behavior of
+// other GetByIDs consumers; duplicate IDs are processed only once.
+func (a *App) partitionByAccount(messageIDs []string) ([]accountPartition, error) {
 	msgs, err := a.messageStore.GetByIDs(messageIDs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get messages: %w", err)
 	}
-	byAccount := make(map[string][]string)
+	messageByID := make(map[string]*message.Message, len(msgs))
 	for _, m := range msgs {
-		byAccount[m.AccountID] = append(byAccount[m.AccountID], m.ID)
+		messageByID[m.ID] = m
 	}
-	return byAccount, nil
+
+	partitions := make([]accountPartition, 0)
+	partitionIndex := make(map[string]int)
+	seenMessage := make(map[string]struct{}, len(messageIDs))
+	for _, messageID := range messageIDs {
+		if _, seen := seenMessage[messageID]; seen {
+			continue
+		}
+		seenMessage[messageID] = struct{}{}
+		msg := messageByID[messageID]
+		if msg == nil {
+			continue
+		}
+		index, ok := partitionIndex[msg.AccountID]
+		if !ok {
+			index = len(partitions)
+			partitionIndex[msg.AccountID] = index
+			partitions = append(partitions, accountPartition{accountID: msg.AccountID})
+		}
+		partitions[index].messageIDs = append(partitions[index].messageIDs, messageID)
+	}
+	return partitions, nil
+}
+
+func runAccountPartitionAction(partitions []accountPartition, action func([]string) error) error {
+	var firstErr error
+	for _, partition := range partitions {
+		if err := action(partition.messageIDs); err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("account %s: %w", partition.accountID, err)
+		}
+	}
+	return firstErr
+}
+
+func runAccountPartitionBoolAction(partitions []accountPartition, action func([]string) (bool, error)) (bool, error) {
+	var anyTrue bool
+	var firstErr error
+	for _, partition := range partitions {
+		value, err := action(partition.messageIDs)
+		anyTrue = anyTrue || value
+		if err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("account %s: %w", partition.accountID, err)
+		}
+	}
+	return anyTrue, firstErr
 }
 
 // trashCrossAccount fan-outs Trash() per account partition. Aggregates the
 // (bool, error) returns: anyMoved is OR'd across partitions, firstErr wins.
 func (a *App) trashCrossAccount(messageIDs []string) (bool, error) {
-	byAccount, err := a.partitionByAccount(messageIDs)
+	partitions, err := a.partitionByAccount(messageIDs)
 	if err != nil {
 		return false, err
 	}
-	var anyMoved bool
-	var firstErr error
-	for _, ids := range byAccount {
-		moved, err := a.Trash(ids)
-		if moved {
-			anyMoved = true
-		}
-		if err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return anyMoved, firstErr
+	return runAccountPartitionBoolAction(partitions, a.Trash)
 }
 
 // archiveCrossAccount fan-outs Archive() per account partition. Aggregates
 // first error encountered.
 func (a *App) archiveCrossAccount(messageIDs []string) error {
-	byAccount, err := a.partitionByAccount(messageIDs)
+	partitions, err := a.partitionByAccount(messageIDs)
 	if err != nil {
 		return err
 	}
-	var firstErr error
-	for _, ids := range byAccount {
-		if err := a.Archive(ids); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
+	return runAccountPartitionAction(partitions, a.Archive)
 }
 
 // markAsSpamCrossAccount fan-outs MarkAsSpam() per account partition.
 func (a *App) markAsSpamCrossAccount(messageIDs []string) (bool, error) {
-	byAccount, err := a.partitionByAccount(messageIDs)
+	partitions, err := a.partitionByAccount(messageIDs)
 	if err != nil {
 		return false, err
 	}
-	var anyMoved bool
-	var firstErr error
-	for _, ids := range byAccount {
-		moved, err := a.MarkAsSpam(ids)
-		if moved {
-			anyMoved = true
-		}
-		if err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return anyMoved, firstErr
+	return runAccountPartitionBoolAction(partitions, a.MarkAsSpam)
 }
 
 // markAsNotSpamCrossAccount fan-outs MarkAsNotSpam() per account partition.
 func (a *App) markAsNotSpamCrossAccount(messageIDs []string) error {
-	byAccount, err := a.partitionByAccount(messageIDs)
+	partitions, err := a.partitionByAccount(messageIDs)
 	if err != nil {
 		return err
 	}
-	var firstErr error
-	for _, ids := range byAccount {
-		if err := a.MarkAsNotSpam(ids); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
+	return runAccountPartitionAction(partitions, a.MarkAsNotSpam)
 }
 
 // moveToFolderCrossAccount fan-outs MoveToFolder() per source-account
@@ -1446,31 +1468,23 @@ func (a *App) markAsNotSpamCrossAccount(messageIDs []string) error {
 // Each partition's outcome is independent — a Gmail partition's failure
 // doesn't block an IMAP partition's success.
 func (a *App) moveToFolderCrossAccount(messageIDs []string, destFolderID string) error {
-	byAccount, err := a.partitionByAccount(messageIDs)
+	partitions, err := a.partitionByAccount(messageIDs)
 	if err != nil {
 		return err
 	}
-	var firstErr error
-	for _, ids := range byAccount {
-		if err := a.MoveToFolder(ids, destFolderID); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
+	return runAccountPartitionAction(partitions, func(ids []string) error {
+		return a.MoveToFolder(ids, destFolderID)
+	})
 }
 
 // copyToFolderCrossAccount fan-outs CopyToFolder() per source-account
 // partition. Mirrors moveToFolderCrossAccount but Copy keeps originals.
 func (a *App) copyToFolderCrossAccount(messageIDs []string, destFolderID string) error {
-	byAccount, err := a.partitionByAccount(messageIDs)
+	partitions, err := a.partitionByAccount(messageIDs)
 	if err != nil {
 		return err
 	}
-	var firstErr error
-	for _, ids := range byAccount {
-		if err := a.CopyToFolder(ids, destFolderID); err != nil && firstErr == nil {
-			firstErr = err
-		}
-	}
-	return firstErr
+	return runAccountPartitionAction(partitions, func(ids []string) error {
+		return a.CopyToFolder(ids, destFolderID)
+	})
 }

@@ -5,12 +5,12 @@
   import { _ } from '$lib/i18n'
   import appLogo from '$/assets/images/logo-universal.png'
   import AboutInfoDialog from './AboutInfoDialog.svelte'
+  import UpdateAction from './UpdateAction.svelte'
+  import { getAboutInfoContent, type InfoKind } from './aboutInfoContent'
 
   interface Props { appInfo: app.AppInfo | null; loading?: boolean }
   let { appInfo, loading = false }: Props = $props()
 
-  type InfoKind = 'product' | 'privacy' | 'terms' | 'acknowledgements'
-  interface InfoSection { title: string; body?: string; items?: string[] }
   let infoOpen = $state(false)
   let infoKind = $state<InfoKind>('product')
 
@@ -25,49 +25,7 @@
     infoOpen = true
   }
 
-  const infoContent = $derived.by((): { title: string; intro: string; sections: InfoSection[] } => {
-    if (infoKind === 'product') return {
-      title: $_('settingsAbout.product.title'),
-      intro: $_('settingsAbout.product.intro'),
-      sections: [
-        { title: $_('settingsAbout.product.positionTitle'), body: $_('settingsAbout.product.positionBody') },
-        { title: $_('settingsAbout.product.featuresTitle'), items: [$_('settingsAbout.product.featureAccounts'), $_('settingsAbout.product.featureMail'), $_('settingsAbout.product.featureSearch'), $_('settingsAbout.product.featureContacts'), $_('settingsAbout.product.featurePrivacy'), $_('settingsAbout.product.featureBackup')] },
-        { title: $_('settingsAbout.product.dataTitle'), body: $_('settingsAbout.product.dataBody') },
-      ],
-    }
-    if (infoKind === 'privacy') return {
-      title: $_('settingsAbout.privacy.title'),
-      intro: $_('settingsAbout.privacy.intro'),
-      sections: [
-        { title: $_('settingsAbout.privacy.noCollectionTitle'), items: [$_('settingsAbout.privacy.noCollectionPersonal'), $_('settingsAbout.privacy.noCollectionMail'), $_('settingsAbout.privacy.noCollectionTracking'), $_('settingsAbout.privacy.noCollectionAds'), $_('settingsAbout.privacy.noCollectionSale')] },
-        { title: $_('settingsAbout.privacy.localTitle'), items: [$_('settingsAbout.privacy.localMail'), $_('settingsAbout.privacy.localAccount'), $_('settingsAbout.privacy.localContacts'), $_('settingsAbout.privacy.localSettings'), $_('settingsAbout.privacy.localLogs'), $_('settingsAbout.privacy.localBackups')] },
-        { title: $_('settingsAbout.privacy.securityTitle'), body: $_('settingsAbout.privacy.securityBody') },
-        { title: $_('settingsAbout.privacy.retentionTitle'), body: $_('settingsAbout.privacy.retentionBody') },
-        { title: $_('settingsAbout.privacy.contactTitle'), body: $_('settingsAbout.privacy.contactBody') },
-      ],
-    }
-    if (infoKind === 'terms') return {
-      title: $_('settingsAbout.terms.title'),
-      intro: $_('settingsAbout.terms.intro'),
-      sections: [
-        { title: $_('settingsAbout.terms.descriptionTitle'), body: $_('settingsAbout.terms.descriptionBody') },
-        { title: $_('settingsAbout.terms.responsibilitiesTitle'), items: [$_('settingsAbout.terms.responsibilityCredentials'), $_('settingsAbout.terms.responsibilityDevice'), $_('settingsAbout.terms.responsibilityLaw'), $_('settingsAbout.terms.responsibilityProvider'), $_('settingsAbout.terms.responsibilityBackup')] },
-        { title: $_('settingsAbout.terms.useTitle'), body: $_('settingsAbout.terms.useBody') },
-        { title: $_('settingsAbout.terms.disclaimerTitle'), body: $_('settingsAbout.terms.disclaimerBody') },
-        { title: $_('settingsAbout.terms.thirdPartyTitle'), body: $_('settingsAbout.terms.thirdPartyBody') },
-        { title: $_('settingsAbout.terms.contactTitle'), body: $_('settingsAbout.terms.contactBody') },
-      ],
-    }
-    return {
-      title: $_('settingsAbout.acknowledgements.title'),
-      intro: $_('settingsAbout.acknowledgements.intro'),
-      sections: [
-        { title: $_('settingsAbout.acknowledgements.technologyTitle'), items: [$_('settingsAbout.acknowledgements.technologyDesktop'), $_('settingsAbout.acknowledgements.technologyEditor'), $_('settingsAbout.acknowledgements.technologyInterface'), $_('settingsAbout.acknowledgements.technologyData')] },
-        { title: $_('settingsAbout.acknowledgements.communityTitle'), body: $_('settingsAbout.acknowledgements.communityBody') },
-        { title: $_('settingsAbout.acknowledgements.licenseTitle'), body: $_('settingsAbout.acknowledgements.licenseBody') },
-      ],
-    }
-  })
+  const infoContent = $derived(getAboutInfoContent(infoKind, $_))
 </script>
 
 <div class="flex h-full flex-col items-center justify-center space-y-6 py-6">
@@ -90,6 +48,7 @@
 
     <!-- Links -->
     <div class="flex w-max flex-col items-stretch gap-2">
+      <UpdateAction />
       <button
         type="button"
         onclick={() => openInfo('product')}

@@ -525,6 +525,135 @@ type fetchedSize struct {
 	reported int64
 }
 
+// bodyFetchProgress is shared with the heartbeat logger while a body-fetch
+// loop updates its counters. Atomic counters keep long-running sync telemetry
+// race-free without putting the single-writer processing path behind a mutex.
+type bodyFetchProgress struct {
+	fetched atomic.Int64
+	failed  atomic.Int64
+}
+
+type bodyProcessingResult struct {
+	requestedIDs []string
+	bodyUpdates  []message.BodyUpdate
+	attachments  []*message.Attachment
+	sizes        map[string]fetchedSize
+	fetchedCount int
+}
+
+func (p *bodyFetchProgress) addFetched(delta int) {
+	p.fetched.Add(int64(delta))
+}
+
+func (p *bodyFetchProgress) addFailed(delta int) {
+	p.failed.Add(int64(delta))
+}
+
+func (p *bodyFetchProgress) snapshot() (fetched, failed int64) {
+	return p.fetched.Load(), p.failed.Load()
+}
+
+func (p *bodyFetchProgress) fetchedCount() int {
+	return int(p.fetched.Load())
+}
+
+func (p *bodyFetchProgress) failedCount() int {
+	return int(p.failed.Load())
+}
+
+type bodyFetchBatchPlan struct {
+	messageIDs   []string
+	oversizedIDs []string
+	bytes        int64
+	maxMessages  int
+	maxBytes     int64
+}
+
+func planBodyFetchBatch(candidates []message.MessageWithSize, totalWithoutBody int) bodyFetchBatchPlan {
+	plan := bodyFetchBatchPlan{
+		maxMessages: bodyBatchMaxMessages,
+		maxBytes:    int64(bodyBatchMaxBytes),
+	}
+	if totalWithoutBody > 1000 {
+		plan.maxMessages = 25
+		plan.maxBytes = 256 * 1024
+	}
+
+	for _, candidate := range candidates {
+		messageSize := int64(candidate.Size)
+		if messageSize <= 0 {
+			messageSize = 10 * 1024
+		}
+		if messageSize > maxBackgroundRawBodyBytes {
+			plan.oversizedIDs = append(plan.oversizedIDs, candidate.ID)
+			continue
+		}
+
+		wouldExceedBytes := plan.bytes+messageSize > plan.maxBytes && len(plan.messageIDs) >= bodyBatchMinMessages
+		wouldExceedCount := len(plan.messageIDs) >= plan.maxMessages
+		if wouldExceedBytes || wouldExceedCount {
+			break
+		}
+
+		plan.messageIDs = append(plan.messageIDs, candidate.ID)
+		plan.bytes += messageSize
+	}
+
+	return plan
+}
+
+type bodyFetchConnectionPool interface {
+	GetConnection(context.Context, string) (*imapPkg.PooledConnection, error)
+	Discard(*imapPkg.PooledConnection)
+	Release(*imapPkg.PooledConnection)
+}
+
+type bodyFetchMailboxSelector func(context.Context, *imapPkg.PooledConnection, string) error
+
+func recoverBodyFetchConnection(
+	ctx context.Context,
+	pool bodyFetchConnectionPool,
+	failed *imapPkg.PooledConnection,
+	accountID string,
+	mailboxPath string,
+	selectMailbox bodyFetchMailboxSelector,
+) (*imapPkg.PooledConnection, error) {
+	pool.Discard(failed)
+
+	conn, err := pool.GetConnection(ctx, accountID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get new connection after error: %w", err)
+	}
+	if err := selectMailbox(ctx, conn, mailboxPath); err != nil {
+		pool.Release(conn)
+		return nil, fmt.Errorf("failed to select mailbox on new connection: %w", err)
+	}
+	return conn, nil
+}
+
+func (e *Engine) applyBodyProcessingResult(result bodyProcessingResult, progress *bodyFetchProgress, accountID, folderID string, total int) {
+	e.markUnresolvedAsFailed(result.requestedIDs, result.bodyUpdates, result.sizes)
+
+	if len(result.bodyUpdates) == 0 {
+		e.log.Warn().Int("fetchedCount", result.fetchedCount).Msg("No body updates in result")
+	} else if err := e.messageStore.UpdateBodiesBatch(result.bodyUpdates); err != nil {
+		e.log.Warn().Err(err).Msg("Failed to batch update bodies")
+		progress.addFailed(result.fetchedCount)
+	} else {
+		progress.addFetched(result.fetchedCount)
+		e.log.Debug().Int("fetched", progress.fetchedCount()).Int("total", total).Msg("DB update successful")
+	}
+
+	if len(result.attachments) > 0 {
+		if err := e.attachmentStore.CreateBatch(result.attachments); err != nil {
+			e.log.Warn().Err(err).Msg("Failed to batch create attachments")
+		}
+	}
+
+	e.log.Debug().Int("fetched", progress.fetchedCount()).Int("total", total).Msg("Emitting progress")
+	e.emitProgress(accountID, folderID, progress.fetchedCount(), total, "bodies")
+}
+
 func skippedBodySizesByMessageID(uidToMessageID map[uint32]string, skipped map[uint32]bodyFetchSkipped) map[string]fetchedSize {
 	if len(skipped) == 0 {
 		return nil
@@ -679,30 +808,15 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 	// Tracking for error recovery and progress
 	failedBatches := 0      // consecutive batch failures
 	connectionFailures := 0 // total connection recovery attempts
-	fetched := 0
-	failed := 0
+	var progress bodyFetchProgress
 
 	// Note: parse-failure tracking is persisted in messages.body_failed (v39).
 	// Once a fetch returns nothing usable for a message, MarkBodyFailed flags
 	// it and GetMessagesWithoutBodyAndSize excludes it from future queries —
 	// so no in-memory dedup is needed and the cap survives across sessions.
 
-	// Processing result from goroutine - contains parsed data ready for DB.
-	// requestedIDs is every message the batch asked the server for, so we can
-	// tell which IDs came back unresolved (parsed empty AND not encrypted, or
-	// not returned at all) and persist their failure via MarkBodyFailed.
-	// sizes maps messageID → (received bytes, IMAP-reported size) so
-	// markUnresolvedAsFailed can defer flagging when the FETCH looks truncated.
-	type processingResult struct {
-		requestedIDs []string
-		bodyUpdates  []message.BodyUpdate
-		attachments  []*message.Attachment
-		sizes        map[string]fetchedSize
-		fetchedCount int
-	}
-
 	// Channel and pending state for pipelined processing
-	var pendingResultChan chan processingResult
+	var pendingResultChan chan bodyProcessingResult
 
 	// Start heartbeat logging for long operations - shows sync is alive during long fetches
 	heartbeatCtx, cancelHeartbeat := context.WithCancel(ctx)
@@ -714,10 +828,11 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 		for {
 			select {
 			case <-ticker.C:
+				fetched, failed := progress.snapshot()
 				e.log.Info().
-					Int("fetched", fetched).
+					Int64("fetched", fetched).
 					Int("total", totalWithoutBody).
-					Int("failed", failed).
+					Int64("failed", failed).
 					Str("folder", f.Path).
 					Msg("Body fetch in progress (heartbeat)")
 			case <-heartbeatCtx.Done():
@@ -738,36 +853,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 				Int("fetchedCount", result.fetchedCount).
 				Msg("Received result from processing goroutine")
 
-			// Persist parse failures via messages.body_failed so we never
-			// re-fetch these from IMAP again. A message is "resolved" if its
-			// parsed body is non-empty OR it's encrypted (encrypted bodies are
-			// intentionally empty until decrypted at view time). Everything
-			// else — including IDs the server didn't return — gets flagged.
-			e.markUnresolvedAsFailed(result.requestedIDs, result.bodyUpdates, result.sizes)
-
-			// Apply database updates - MUST complete before querying next batch
-			if len(result.bodyUpdates) > 0 {
-				e.log.Debug().Int("count", len(result.bodyUpdates)).Msg("Applying batch DB update")
-				if err := e.messageStore.UpdateBodiesBatch(result.bodyUpdates); err != nil {
-					e.log.Warn().Err(err).Msg("Failed to batch update bodies")
-					failed += result.fetchedCount
-				} else {
-					fetched += result.fetchedCount
-					e.log.Debug().Int("fetched", fetched).Int("total", totalWithoutBody).Msg("DB update successful")
-				}
-			} else {
-				e.log.Warn().Int("fetchedCount", result.fetchedCount).Msg("No body updates in result - bodies may be lost!")
-			}
-			if len(result.attachments) > 0 {
-				if err := e.attachmentStore.CreateBatch(result.attachments); err != nil {
-					e.log.Warn().Err(err).Msg("Failed to batch create attachments")
-					// Attachments failed but bodies were saved, don't count as failed
-				}
-			}
-
-			// Emit progress after DB update completes
-			e.log.Debug().Int("fetched", fetched).Int("total", totalWithoutBody).Msg("Emitting progress")
-			e.emitProgress(accountID, folderID, fetched, totalWithoutBody, "bodies")
+			e.applyBodyProcessingResult(result, &progress, accountID, folderID, totalWithoutBody)
 			pendingResultChan = nil
 		}
 
@@ -788,8 +874,8 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 
 		e.log.Debug().
 			Int("candidates", len(candidates)).
-			Int("fetched", fetched).
-			Int("failed", failed).
+			Int("fetched", progress.fetchedCount()).
+			Int("failed", progress.failedCount()).
 			Msg("Queried candidates for next batch")
 
 		if len(candidates) == 0 {
@@ -801,64 +887,33 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 		// (enforced by GetMessagesWithoutBodyAndSize since v39), so the
 		// in-memory filter that used to live here is gone.
 
-		// Adaptive batch sizing: use smaller batches for large mailboxes
-		// This provides faster recovery if one batch fails and more frequent progress updates
-		batchMaxMessages := bodyBatchMaxMessages
-		batchMaxBytes := int64(bodyBatchMaxBytes)
-
+		batchPlan := planBodyFetchBatch(candidates, totalWithoutBody)
 		if totalWithoutBody > 1000 {
-			batchMaxMessages = 25
-			batchMaxBytes = 256 * 1024 // 256KB
 			// Log only once (when we first enter the large mailbox mode)
-			if fetched == 0 && failed == 0 {
+			if progress.fetchedCount() == 0 && progress.failedCount() == 0 {
 				e.log.Info().
 					Int("totalMessages", totalWithoutBody).
-					Int("batchMaxMessages", batchMaxMessages).
-					Int64("batchMaxBytes", batchMaxBytes).
+					Int("batchMaxMessages", batchPlan.maxMessages).
+					Int64("batchMaxBytes", batchPlan.maxBytes).
 					Msg("Using smaller batches for large mailbox")
 			}
 		}
 
-		// Build batch using hybrid byte + count limits
-		var batchIDs []string
-		var batchBytes int64
-		var oversizedIDs []string
-
-		for _, msg := range candidates {
-			msgSize := int64(msg.Size)
-			if msgSize <= 0 {
-				msgSize = 10 * 1024 // Assume 10KB for messages with unknown size
-			}
-			if msgSize > maxBackgroundRawBodyBytes {
-				oversizedIDs = append(oversizedIDs, msg.ID)
-				continue
-			}
-
-			// Check if adding this message would exceed limits
-			wouldExceedBytes := batchBytes+msgSize > batchMaxBytes && len(batchIDs) >= bodyBatchMinMessages
-			wouldExceedCount := len(batchIDs) >= batchMaxMessages
-
-			if wouldExceedBytes || wouldExceedCount {
-				break // Batch is full
-			}
-
-			batchIDs = append(batchIDs, msg.ID)
-			batchBytes += msgSize
-		}
-		if len(oversizedIDs) > 0 {
+		batchIDs := batchPlan.messageIDs
+		if len(batchPlan.oversizedIDs) > 0 {
 			e.log.Warn().
-				Int("count", len(oversizedIDs)).
+				Int("count", len(batchPlan.oversizedIDs)).
 				Int64("maxBytes", maxBackgroundRawBodyBytes).
 				Msg("Skipping oversized message bodies during background sync")
-			if err := e.messageStore.MarkBodyFailed(oversizedIDs); err != nil {
-				e.log.Warn().Err(err).Int("count", len(oversizedIDs)).Msg("Failed to mark oversized bodies as skipped")
+			if err := e.messageStore.MarkBodyFailed(batchPlan.oversizedIDs); err != nil {
+				e.log.Warn().Err(err).Int("count", len(batchPlan.oversizedIDs)).Msg("Failed to mark oversized bodies as skipped")
 			} else {
-				failed += len(oversizedIDs)
+				progress.addFailed(len(batchPlan.oversizedIDs))
 			}
 		}
 
 		if len(batchIDs) == 0 {
-			if len(oversizedIDs) > 0 {
+			if len(batchPlan.oversizedIDs) > 0 {
 				continue
 			}
 			e.log.Warn().Msg("No messages selected for batch")
@@ -867,7 +922,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 
 		e.log.Debug().
 			Int("batchSize", len(batchIDs)).
-			Int64("batchBytes", batchBytes).
+			Int64("batchBytes", batchPlan.bytes).
 			Msg("Processing batch")
 
 		// Get UIDs for all messages in batch (single DB query)
@@ -931,19 +986,12 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 					Int("attempt", connectionFailures).
 					Msg("Body fetch connection is unusable, attempting recovery")
 
-				// Discard dead connection and get a new one
-				e.pool.Discard(conn)
-
-				conn, err = e.pool.GetConnection(ctx, accountID)
+				conn, err = recoverBodyFetchConnection(ctx, e.pool, conn, accountID, f.Path, func(ctx context.Context, conn *imapPkg.PooledConnection, mailboxPath string) error {
+					_, selectErr := conn.Client().SelectMailbox(ctx, mailboxPath)
+					return selectErr
+				})
 				if err != nil {
-					return fmt.Errorf("failed to get new connection after error: %w", err)
-				}
-
-				// Re-select mailbox on new connection
-				_, err = conn.Client().SelectMailbox(ctx, f.Path)
-				if err != nil {
-					e.pool.Release(conn)
-					return fmt.Errorf("failed to select mailbox on new connection: %w", err)
+					return err
 				}
 
 				e.log.Debug().Msg("Connection recovered successfully, retrying batch")
@@ -973,20 +1021,20 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 			// falls through to the "no signal" branch of shouldChargeFailure
 			// and gets charged. Pass nil to keep the call sites uniform.
 			e.markUnresolvedAsFailed(batchIDs, nil, nil)
-			failed += len(uidToMessageID)
+			progress.addFailed(len(uidToMessageID))
 			continue
 		}
 		if len(bodies) == 0 {
 			e.log.Warn().Int("requested", len(uidToMessageID)).Int("skipped", len(skipped)).Msg("IMAP returned only skipped bodies for batch")
 			e.markUnresolvedAsFailed(batchIDs, nil, skippedBodySizesByMessageID(uidToMessageID, skipped))
-			failed += len(uidToMessageID)
+			progress.addFailed(len(uidToMessageID))
 			continue
 		}
 
 		// Step 5: Launch goroutine to build body updates
 		// DB update will happen in step 2 of the NEXT iteration
 		// Attachments were already extracted during parsing - no re-parse needed!
-		resultChan := make(chan processingResult, 1)
+		resultChan := make(chan bodyProcessingResult, 1)
 		currentBodies := bodies // capture for goroutine
 		currentSkipped := skipped
 		currentUIDToMessageID := uidToMessageID
@@ -1025,7 +1073,7 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 				Dur("elapsed", time.Since(startTime)).
 				Msg("Built body updates and attachments for batch")
 
-			resultChan <- processingResult{
+			resultChan <- bodyProcessingResult{
 				requestedIDs: batchIDs,
 				bodyUpdates:  bodyUpdates,
 				attachments:  allAttachments,
@@ -1042,40 +1090,22 @@ func (e *Engine) FetchBodiesInBackground(ctx context.Context, accountID, folderI
 	if pendingResultChan != nil {
 		result := <-pendingResultChan
 
-		// Persist parse failures for the final batch via the same path as
-		// every other batch — see markUnresolvedAsFailed.
-		e.markUnresolvedAsFailed(result.requestedIDs, result.bodyUpdates, result.sizes)
-
-		if len(result.bodyUpdates) > 0 {
-			if err := e.messageStore.UpdateBodiesBatch(result.bodyUpdates); err != nil {
-				e.log.Warn().Err(err).Msg("Failed to batch update bodies (final)")
-				failed += result.fetchedCount
-			} else {
-				fetched += result.fetchedCount
-			}
-		}
-		if len(result.attachments) > 0 {
-			if err := e.attachmentStore.CreateBatch(result.attachments); err != nil {
-				e.log.Warn().Err(err).Msg("Failed to batch create attachments (final)")
-			}
-		}
-
-		e.emitProgress(accountID, folderID, fetched, totalWithoutBody, "bodies")
+		e.applyBodyProcessingResult(result, &progress, accountID, folderID, totalWithoutBody)
 	}
 
 	// Release connection when done
 	e.pool.Release(conn)
 
 	// Log summary
-	if failed > 0 {
+	if progress.failedCount() > 0 {
 		e.log.Info().
-			Int("fetched", fetched).
-			Int("failed", failed).
+			Int("fetched", progress.fetchedCount()).
+			Int("failed", progress.failedCount()).
 			Int("total", totalWithoutBody).
 			Msg("Body fetch complete with failures (hybrid batch mode)")
 	} else {
 		e.log.Info().
-			Int("fetched", fetched).
+			Int("fetched", progress.fetchedCount()).
 			Int("total", totalWithoutBody).
 			Msg("Body fetch complete (hybrid batch mode)")
 	}

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"aulyc.local/aulycmail/internal/logging"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -145,8 +144,8 @@ func (a *App) emitExternalOpenFiles(paths []string) {
 	if len(paths) == 0 {
 		return
 	}
-	a.ShowWindow()
-	wailsRuntime.EventsEmit(a.ctx, externalFileOpenEvent, map[string]interface{}{
+	a.showWindow()
+	a.emitEvent(externalFileOpenEvent, map[string]interface{}{
 		"paths": paths,
 	})
 }

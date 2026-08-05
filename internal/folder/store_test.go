@@ -346,3 +346,52 @@ func TestUpsert(t *testing.T) {
 		t.Errorf("got %d folders, want 1", len(folders))
 	}
 }
+
+func TestStoreCountSubscriptionAndAccountCleanup(t *testing.T) {
+	db := openTestDB(t)
+	createTestAccount(t, db, "acc1")
+	createTestAccount(t, db, "acc2")
+	store := NewStore(db)
+
+	first := &Folder{AccountID: "acc1", Name: "Projects", Path: "Projects", Type: TypeFolder}
+	second := &Folder{AccountID: "acc1", Name: "Receipts", Path: "Receipts", Type: TypeFolder}
+	other := &Folder{AccountID: "acc2", Name: "INBOX", Path: "INBOX", Type: TypeInbox}
+	for _, item := range []*Folder{first, second, other} {
+		if err := store.Create(item); err != nil {
+			t.Fatalf("Create(%s) error = %v", item.Path, err)
+		}
+	}
+
+	if err := store.UpdateCounts(first.ID, 12, 5); err != nil {
+		t.Fatalf("UpdateCounts() error = %v", err)
+	}
+	if err := store.UpdateSubscribed(first.ID, true); err != nil {
+		t.Fatalf("UpdateSubscribed(true) error = %v", err)
+	}
+	got, err := store.Get(first.ID)
+	if err != nil {
+		t.Fatalf("Get(updated folder) error = %v", err)
+	}
+	if got.TotalCount != 12 || got.UnreadCount != 5 || !got.Subscribed {
+		t.Fatalf("updated folder = %+v, want counts 12/5 and subscribed", got)
+	}
+	if err := store.UpdateSubscribed(first.ID, false); err != nil {
+		t.Fatalf("UpdateSubscribed(false) error = %v", err)
+	}
+	got, err = store.Get(first.ID)
+	if err != nil || got.Subscribed {
+		t.Fatalf("folder after unsubscribe = %+v, %v", got, err)
+	}
+
+	if err := store.DeleteByAccount("acc1"); err != nil {
+		t.Fatalf("DeleteByAccount() error = %v", err)
+	}
+	remaining, err := store.List("acc1")
+	if err != nil || len(remaining) != 0 {
+		t.Fatalf("acc1 folders after delete = %#v, %v", remaining, err)
+	}
+	otherAfter, err := store.Get(other.ID)
+	if err != nil || otherAfter == nil {
+		t.Fatalf("other account folder = %#v, %v; want preserved", otherAfter, err)
+	}
+}

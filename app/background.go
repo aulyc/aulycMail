@@ -14,7 +14,6 @@ import (
 	"aulyc.local/aulycmail/internal/notification"
 	"aulyc.local/aulycmail/internal/platform"
 	"aulyc.local/aulycmail/internal/sync"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // ============================================================================
@@ -47,14 +46,14 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 			}
 			a.recordSyncActivity(accountID, folderID, result, status, err)
 			if status == activitylog.StatusCancelled && folderID != "" {
-				wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+				a.emitEvent("folder:synced", map[string]interface{}{
 					"accountId": accountID,
 					"folderId":  folderID,
 				})
 				return
 			}
 			if folderID != "" {
-				wailsRuntime.EventsEmit(a.ctx, "folder:syncError", map[string]interface{}{
+				a.emitEvent("folder:syncError", map[string]interface{}{
 					"accountId": accountID,
 					"folderId":  folderID,
 					"error":     err.Error(),
@@ -63,7 +62,7 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 			return
 		}
 		a.recordSyncActivity(accountID, folderID, result, activitylog.StatusSuccess, nil)
-		wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+		a.emitEvent("folder:synced", map[string]interface{}{
 			"accountId": accountID,
 			"folderId":  folderID,
 		})
@@ -71,14 +70,14 @@ func (a *App) initBackgroundSync(ctx context.Context) {
 		// scheduled sync (the manual SyncFolder path emits this at
 		// app/sync.go:110; the scheduler path was missing it).
 		if folderObj, ferr := a.folderStore.Get(folderID); ferr == nil && folderObj != nil {
-			wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", map[string]int{
+			a.emitEvent("folders:countsChanged", map[string]int{
 				folderID: folderObj.UnreadCount,
 			})
 		}
 		a.refreshUnreadBadges()
 	})
 	a.syncScheduler.SetAccountSyncFinishedCallback(func(accountID string, succeeded bool) {
-		wailsRuntime.EventsEmit(a.ctx, "sync:accountFinished", map[string]interface{}{
+		a.emitEvent("sync:accountFinished", map[string]interface{}{
 			"accountId": accountID,
 			"succeeded": succeeded,
 		})
@@ -189,7 +188,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 		a.recordSyncActivity(event.AccountID, folderID, messageResult, status, err)
 		// Emit folder:synced to clear syncing state even on error
 		if folderID != "" {
-			wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+			a.emitEvent("folder:synced", map[string]interface{}{
 				"accountId": event.AccountID,
 				"folderId":  folderID,
 			})
@@ -211,44 +210,44 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 		}
 		bodyFetch := sync.BodyFetchOptionsFromAccount(accForBody)
 		if !bodyFetch.Enabled {
-			wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+			a.emitEvent("folder:synced", map[string]interface{}{
 				"accountId": event.AccountID,
 				"folderId":  folderID,
 			})
 			a.recordSyncActivity(event.AccountID, folderID, messageResult, activitylog.StatusSuccess, nil)
 		} else {
 			// Register IDLE sync context so manual sync can cancel it
-			a.syncMu.Lock()
+			a.SyncBridge.mu.Lock()
 			// Double-check no sync started while we were processing
-			if _, exists := a.syncContexts[syncKey]; exists {
-				a.syncMu.Unlock()
+			if _, exists := a.SyncBridge.contexts[syncKey]; exists {
+				a.SyncBridge.mu.Unlock()
 				log.Debug().Str("syncKey", syncKey).Msg("Skipping IDLE body fetch - sync started during processing")
 				return
 			}
 			ctx, cancel := context.WithCancel(a.ctx)
-			a.syncContexts[syncKey] = cancel
-			a.syncMu.Unlock()
+			a.SyncBridge.contexts[syncKey] = cancel
+			a.SyncBridge.mu.Unlock()
 
 			go func(syncCtx context.Context, syncDays int, fID string, key string, result sync.MessageSyncResult) {
 				var folderSynced bool // Track whether folder:synced was emitted (to avoid duplicate messages:updated)
 
 				// Cleanup context on completion
 				defer func() {
-					a.syncMu.Lock()
-					delete(a.syncContexts, key)
-					a.syncMu.Unlock()
+					a.SyncBridge.mu.Lock()
+					delete(a.SyncBridge.contexts, key)
+					a.SyncBridge.mu.Unlock()
 
 					// Only emit messages:updated if folder:synced wasn't already emitted
 					// (both trigger identical reloads in MessageList and ConversationViewer)
 					if !folderSynced {
-						wailsRuntime.EventsEmit(a.ctx, "messages:updated", map[string]interface{}{
+						a.emitEvent("messages:updated", map[string]interface{}{
 							"accountId": event.AccountID,
 							"folderId":  fID,
 						})
 					}
 					// Emit folder counts changed so sidebar unread badge updates
 					if updatedFolder, err := a.folderStore.Get(fID); err == nil && updatedFolder != nil {
-						wailsRuntime.EventsEmit(a.ctx, "folders:countsChanged", map[string]int{
+						a.emitEvent("folders:countsChanged", map[string]int{
 							fID: updatedFolder.UnreadCount,
 						})
 					}
@@ -260,7 +259,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 					if r := recover(); r != nil {
 						log.Error().Interface("panic", r).Str("folder", fID).Msg("IDLE body fetch goroutine panicked")
 						a.recordSyncActivity(event.AccountID, fID, result, activitylog.StatusPartial, fmt.Errorf("body fetch panic: %v", r))
-						wailsRuntime.EventsEmit(a.ctx, "folder:syncError", map[string]interface{}{
+						a.emitEvent("folder:syncError", map[string]interface{}{
 							"accountId": event.AccountID,
 							"folderId":  fID,
 							"error":     fmt.Sprintf("body fetch panic: %v", r),
@@ -274,7 +273,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 						// Cancelled - not an error, emit synced
 						log.Debug().Str("folder", fID).Msg("IDLE body fetch cancelled")
 						folderSynced = true
-						wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+						a.emitEvent("folder:synced", map[string]interface{}{
 							"accountId": event.AccountID,
 							"folderId":  fID,
 						})
@@ -282,7 +281,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 					} else {
 						// Actual error - emit error event
 						log.Error().Err(bodyErr).Str("folder", fID).Msg("Background body fetch failed after IDLE sync")
-						wailsRuntime.EventsEmit(a.ctx, "folder:syncError", map[string]interface{}{
+						a.emitEvent("folder:syncError", map[string]interface{}{
 							"accountId": event.AccountID,
 							"folderId":  fID,
 							"error":     bodyErr.Error(),
@@ -292,7 +291,7 @@ func (a *App) handleIdleNewMail(event imap.MailEvent) {
 				} else {
 					// Success
 					folderSynced = true
-					wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+					a.emitEvent("folder:synced", map[string]interface{}{
 						"accountId": event.AccountID,
 						"folderId":  fID,
 					})
@@ -394,14 +393,14 @@ func (a *App) initNotifications(ctx context.Context) {
 
 	// Set click handler for mail notifications.
 	notifier.SetClickHandler(func(data notification.NotificationData) {
-		a.ShowWindow()
+		a.showWindow()
 
 		log.Info().
 			Str("accountId", data.AccountID).
 			Str("folderId", data.FolderID).
 			Str("threadId", data.ThreadID).
 			Msg("Notification clicked, navigating to message")
-		wailsRuntime.EventsEmit(a.ctx, "notification:clicked", map[string]interface{}{
+		a.emitEvent("notification:clicked", map[string]interface{}{
 			"accountId": data.AccountID,
 			"folderId":  data.FolderID,
 			"threadId":  data.ThreadID,
@@ -473,11 +472,14 @@ func (a *App) processNetworkEvents(ctx context.Context) {
 
 			if event.Connected {
 				log.Info().Msg("Network connectivity restored — starting full sync")
-				wailsRuntime.EventsEmit(a.ctx, "network:online", nil)
+				a.emitEvent("network:online", nil)
 				a.syncAfterWake()
+				if a.updateService != nil {
+					go a.updateService.CheckIfDue(ctx)
+				}
 			} else {
 				log.Info().Msg("Network connectivity lost — stopping IDLE and clearing pool")
-				wailsRuntime.EventsEmit(a.ctx, "network:offline", nil)
+				a.emitEvent("network:offline", nil)
 
 				if a.idleManager != nil {
 					a.idleManager.Stop()
@@ -588,7 +590,7 @@ func (a *App) handleSystemWake() {
 		return
 	}
 
-	wailsRuntime.EventsEmit(a.ctx, "network:online", nil)
+	a.emitEvent("network:online", nil)
 
 	log.Info().Msg("Network available — syncing all accounts after wake")
 	a.syncAfterWake()
@@ -605,14 +607,14 @@ func (a *App) syncAfterWake() {
 	// Guard: only one syncAfterWake can run at a time.
 	// Both handleSystemWake and processNetworkEvents may call this for the
 	// same wake event — the first caller runs, the second returns immediately.
-	a.syncMu.Lock()
-	if a.wakeSyncing {
-		a.syncMu.Unlock()
+	a.SyncBridge.mu.Lock()
+	if a.SyncBridge.wakeSyncing {
+		a.SyncBridge.mu.Unlock()
 		log.Debug().Msg("syncAfterWake already in progress, skipping")
 		return
 	}
-	a.wakeSyncing = true
-	a.syncMu.Unlock()
+	a.SyncBridge.wakeSyncing = true
+	a.SyncBridge.mu.Unlock()
 
 	// Cooldown: skip sync if any inbox was synced within the last 2 minutes.
 	// This prevents excessive syncs when the network flaps.
@@ -640,9 +642,9 @@ func (a *App) syncAfterWake() {
 	if skipSync {
 		// Still restart IDLE even though we're skipping the sync
 		a.restartIDLE()
-		a.syncMu.Lock()
-		a.wakeSyncing = false
-		a.syncMu.Unlock()
+		a.SyncBridge.mu.Lock()
+		a.SyncBridge.wakeSyncing = false
+		a.SyncBridge.mu.Unlock()
 		return
 	}
 
@@ -678,9 +680,9 @@ func (a *App) syncAfterWake() {
 	go func() {
 		defer recoverPanic("app.wake", "post-wake sync")
 		defer func() {
-			a.syncMu.Lock()
-			a.wakeSyncing = false
-			a.syncMu.Unlock()
+			a.SyncBridge.mu.Lock()
+			a.SyncBridge.wakeSyncing = false
+			a.SyncBridge.mu.Unlock()
 		}()
 
 		if err := a.syncAllComplete(sync.TriggerWake); err != nil {

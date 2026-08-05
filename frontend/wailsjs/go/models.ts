@@ -437,34 +437,6 @@ export namespace app {
 	        this.selectedAccountIds = source["selectedAccountIds"];
 	    }
 	}
-	export class BackupRunResult {
-	    directory: string;
-	    mode: string;
-	    total: number;
-	    exported: number;
-	    skipped: number;
-	    missing: number;
-	    unavailable: number;
-	    failed: number;
-	    reportPath?: string;
-
-	    static createFrom(source: any = {}) {
-	        return new BackupRunResult(source);
-	    }
-
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.directory = source["directory"];
-	        this.mode = source["mode"];
-	        this.total = source["total"];
-	        this.exported = source["exported"];
-	        this.skipped = source["skipped"];
-	        this.missing = source["missing"];
-	        this.unavailable = source["unavailable"];
-	        this.failed = source["failed"];
-	        this.reportPath = source["reportPath"];
-	    }
-	}
 	export class BackupRunState {
 	    running: boolean;
 	    startedAt?: string;
@@ -1994,6 +1966,43 @@ export namespace sync {
 		    }
 		    return a;
 		}
+	}
+
+}
+
+export namespace updater {
+
+	export class Status {
+	    state: string;
+	    currentVersion: string;
+	    currentBuildNumber: number;
+	    latestVersion?: string;
+	    latestBuildNumber?: number;
+	    releasePageURL?: string;
+	    source?: string;
+	    progress?: number;
+	    message?: string;
+	    canInstall: boolean;
+	    checkedAt?: string;
+
+	    static createFrom(source: any = {}) {
+	        return new Status(source);
+	    }
+
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.state = source["state"];
+	        this.currentVersion = source["currentVersion"];
+	        this.currentBuildNumber = source["currentBuildNumber"];
+	        this.latestVersion = source["latestVersion"];
+	        this.latestBuildNumber = source["latestBuildNumber"];
+	        this.releasePageURL = source["releasePageURL"];
+	        this.source = source["source"];
+	        this.progress = source["progress"];
+	        this.message = source["message"];
+	        this.canInstall = source["canInstall"];
+	        this.checkedAt = source["checkedAt"];
+	    }
 	}
 
 }

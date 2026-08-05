@@ -102,6 +102,23 @@ func (a *App) SetEnhancedKeyboardNavigation(enabled bool) error {
 	return a.settingsStore.SetEnhancedKeyboardNavigation(enabled)
 }
 
+// GetAutomaticUpdateChecks returns whether automatic update checks are enabled.
+func (a *App) GetAutomaticUpdateChecks() (bool, error) {
+	return a.settingsStore.GetAutomaticUpdateChecks()
+}
+
+// SetAutomaticUpdateChecks enables or disables background update checks.
+// Manual checks remain available regardless of this preference.
+func (a *App) SetAutomaticUpdateChecks(enabled bool) error {
+	if err := a.settingsStore.SetAutomaticUpdateChecks(enabled); err != nil {
+		return err
+	}
+	if enabled && a.updateService != nil {
+		go a.updateService.CheckIfDue(a.ctx)
+	}
+	return nil
+}
+
 // GetMessageListSortOrder returns the message list sort order setting
 func (a *App) GetMessageListSortOrder() (string, error) {
 	return a.settingsStore.GetMessageListSortOrder()
@@ -122,16 +139,6 @@ func (a *App) GetThemeMode() (string, error) {
 // Valid values: "system", "light", "light-blue", "light-orange", "dark", "dark-gray", "dark-balanced"
 func (a *App) SetThemeMode(mode string) error {
 	return a.settingsStore.SetThemeMode(mode)
-}
-
-// GetShowTitleBar returns whether the title bar should be shown
-func (a *App) GetShowTitleBar() (bool, error) {
-	return a.settingsStore.GetShowTitleBar()
-}
-
-// SetShowTitleBar sets whether the title bar should be shown
-func (a *App) SetShowTitleBar(show bool) error {
-	return a.settingsStore.SetShowTitleBar(show)
 }
 
 // GetTermsAccepted returns whether the user has accepted the terms of service
@@ -355,7 +362,7 @@ func (a *App) SendReadReceipt(accountID, messageID string) error {
 	smtpConfig.Password = password
 
 	// Create SMTP client and connect
-	client := smtp.NewClient(smtpConfig)
+	client := a.composeOps.createSMTPClient(smtpConfig)
 	if err := client.Connect(); err != nil {
 		return fmt.Errorf("failed to connect to SMTP: %w", err)
 	}

@@ -116,7 +116,7 @@ function optionValue(args, name, fallback = undefined) {
   return args[index + 1]
 }
 
-function main(argv) {
+export function main(argv) {
   const [command, ...args] = argv
   const root = path.resolve(optionValue(args, '--root', DEFAULT_ROOT))
   const remote = optionValue(args, '--remote', DEFAULT_BACKUP_REMOTE)

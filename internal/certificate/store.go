@@ -147,6 +147,7 @@ func (s *Store) GetByHosts(hosts []string) ([]*CertificateInfo, error) {
 
 // Remove deletes a trusted certificate from the database by fingerprint
 func (s *Store) Remove(fingerprint string) error {
+	fingerprint = normalizeFingerprint(fingerprint)
 	_, err := s.db.Exec("DELETE FROM trusted_certificates WHERE fingerprint = ?", fingerprint)
 	if err != nil {
 		return err
@@ -154,7 +155,6 @@ func (s *Store) Remove(fingerprint string) error {
 
 	// Also remove from session
 	s.mu.Lock()
-	fingerprint = normalizeFingerprint(fingerprint)
 	for key := range s.session {
 		if strings.HasSuffix(key, "\x00"+fingerprint) {
 			delete(s.session, key)

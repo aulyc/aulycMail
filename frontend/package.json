@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "security:audit": "npm audit --audit-level=low",
-    "test:unit": "node --test scripts/*.test.mjs",
+    "test:unit": "vitest run --coverage",
     "i18n:check": "node scripts/check-i18n-keys.cjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -53,10 +53,12 @@
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tailwindcss/typography": "^0.5.16",
     "@tsconfig/svelte": "^5.0.4",
+    "@vitest/coverage-v8": "^4.1.10",
     "autoprefixer": "^10.4.20",
     "eslint": "^10.3.0",
     "eslint-plugin-svelte": "^3.17.1",
     "globals": "^17.6.0",
+    "happy-dom": "^20.11.1",
     "knip": "^6.14.2",
     "postcss": "^8.5.19",
     "svelte": "^5.56.5",
@@ -65,6 +67,7 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^6.4.3"
+    "vite": "^6.4.3",
+    "vitest": "^4.1.10"
   }
 }

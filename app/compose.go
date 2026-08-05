@@ -14,7 +14,6 @@ import (
 	"aulyc.local/aulycmail/internal/account"
 	"aulyc.local/aulycmail/internal/certificate"
 	"aulyc.local/aulycmail/internal/contact"
-	"aulyc.local/aulycmail/internal/credentials"
 	"aulyc.local/aulycmail/internal/draft"
 	"aulyc.local/aulycmail/internal/email"
 	"aulyc.local/aulycmail/internal/folder"
@@ -36,15 +35,37 @@ type ComposerAttachment struct {
 	Data        string `json:"data"` // Base64 encoded
 }
 
+type composeCredentialStore interface {
+	GetPassword(accountID string) (string, error)
+	GetSMTPPassword(accountID string) (string, error)
+}
+
+type composeSMTPClient interface {
+	Connect() error
+	Login() error
+	SendMail(from string, to []string, msg []byte) error
+	Close() error
+}
+
+type composeSMTPClientFactory func(config smtp.ClientConfig) composeSMTPClient
+
 // composeOps holds shared dependencies for compose-related operations.
 type composeOps struct {
-	accountStore *account.Store
-	folderStore  *folder.Store
-	credStore    *credentials.Store
-	certStore    *certificate.Store
-	contactStore *contact.Store
-	messageStore *message.Store
-	draftOps     *draftOps // for draft cleanup on send
+	accountStore  *account.Store
+	folderStore   *folder.Store
+	credStore     composeCredentialStore
+	certStore     *certificate.Store
+	contactStore  *contact.Store
+	messageStore  *message.Store
+	draftOps      *draftOps // for draft cleanup on send
+	newSMTPClient composeSMTPClientFactory
+}
+
+func (ops *composeOps) createSMTPClient(config smtp.ClientConfig) composeSMTPClient {
+	if ops.newSMTPClient != nil {
+		return ops.newSMTPClient(config)
+	}
+	return smtp.NewClient(config)
 }
 
 // getIMAPCredentials returns IMAP credentials for an account.
@@ -74,31 +95,22 @@ func (ops *composeOps) getIMAPCredentials(accountID string) (*imap.ClientConfig,
 	return &config, nil
 }
 
-// getSpecialFolder resolves a special folder for an account, checking the
-// user's explicit mapping first, then falling back to auto-detected type.
-// Mirrors App.GetSpecialFolder (app/folder.go) for use within composeOps.
+// getSpecialFolder uses the shared resolver so compose and other App paths
+// apply identical mapping, selectability, fallback, and error semantics.
 func (ops *composeOps) getSpecialFolder(accountID string, folderType folder.Type) (*folder.Folder, error) {
-	acc, err := ops.accountStore.Get(accountID)
-	if err != nil || acc == nil {
-		return ops.folderStore.GetByType(accountID, folderType)
-	}
-	mappedPath := acc.GetFolderMapping(string(folderType))
-	if mappedPath != "" {
-		f, err := ops.folderStore.GetByPath(accountID, mappedPath)
-		if err == nil && f != nil {
-			return f, nil
-		}
-	}
-	return ops.folderStore.GetByType(accountID, folderType)
+	return resolveSpecialFolder(ops.accountStore, ops.folderStore, accountID, folderType)
 }
 
 // saveToSentFolder appends the sent message to the Sent folder via IMAP.
 func (ops *composeOps) saveToSentFolder(accountID string, acc *account.Account, rawMsg []byte) error {
 	log := logging.WithComponent("composeOps")
 
-	// Resolve the Sent folder using the same logic as App.GetSpecialFolder
+	// Resolve the Sent folder through the shared special-folder contract.
 	sentFolder, err := ops.getSpecialFolder(accountID, folder.TypeSent)
-	if err != nil || sentFolder == nil {
+	if err != nil {
+		return fmt.Errorf("failed to resolve Sent folder: %w", err)
+	}
+	if sentFolder == nil {
 		return fmt.Errorf("no Sent folder configured or detected")
 	}
 	sentPath := sentFolder.Path
@@ -213,7 +225,7 @@ func (ops *composeOps) sendMessage(ctx context.Context, accountID string, msg sm
 		smtpConfig.Password = password
 	}
 
-	client := smtp.NewClient(smtpConfig)
+	client := ops.createSMTPClient(smtpConfig)
 
 	if err := client.Connect(); err != nil {
 		return nil, fmt.Errorf("failed to connect to SMTP server: %w", err)
@@ -298,12 +310,18 @@ func readFileAsAttachment(filePath string) (*ComposerAttachment, error) {
 }
 
 // pickAttachmentFiles opens a file picker dialog and returns the selected files as attachments.
-func pickAttachmentFiles(ctx context.Context) ([]ComposerAttachment, error) {
+func pickAttachmentFiles(ctx context.Context, openDialog func(title string) ([]string, error)) ([]ComposerAttachment, error) {
 	log := logging.WithComponent("compose")
 
-	files, err := wailsRuntime.OpenMultipleFilesDialog(ctx, wailsRuntime.OpenDialogOptions{
-		Title: "Select Attachments",
-	})
+	var files []string
+	var err error
+	if openDialog != nil {
+		files, err = openDialog("Select Attachments")
+	} else {
+		files, err = wailsRuntime.OpenMultipleFilesDialog(ctx, wailsRuntime.OpenDialogOptions{
+			Title: "Select Attachments",
+		})
+	}
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to show file picker dialog")
 		return nil, fmt.Errorf("failed to show file picker: %w", err)
@@ -358,7 +376,7 @@ func (a *App) emitSourceMessageUpdated(sourceMessageID string) {
 	if err != nil || msg == nil {
 		return
 	}
-	wailsRuntime.EventsEmit(a.ctx, "messages:updated", map[string]interface{}{
+	a.emitEvent("messages:updated", map[string]interface{}{
 		"accountId": msg.AccountID,
 		"folderId":  msg.FolderID,
 	})
@@ -376,8 +394,12 @@ func (a *App) handleExternalMailto(rawURL string) {
 		return
 	}
 
-	a.ShowWindow()
-	wailsRuntime.EventsEmit(a.ctx, "mailto:external", mailtoData)
+	if a.showWindowAction != nil {
+		a.showWindowAction()
+	} else {
+		a.showWindow()
+	}
+	a.emitEvent("mailto:external", mailtoData)
 }
 
 // syncSentFolder syncs the Sent folder for an account after sending a message
@@ -385,7 +407,7 @@ func (a *App) syncSentFolder(accountID string) error {
 	defer recoverPanic("app.compose", "sync sent folder")
 	log := logging.WithComponent("app")
 
-	sentFolder, err := a.GetSpecialFolder(accountID, folder.TypeSent)
+	sentFolder, err := a.getSpecialFolder(accountID, folder.TypeSent)
 	if err != nil || sentFolder == nil {
 		log.Warn().Str("accountID", accountID).Msg("Could not find Sent folder for sync")
 		return nil
@@ -409,13 +431,13 @@ func (a *App) syncSentFolder(accountID string) error {
 	}
 
 	// Emit synced event
-	wailsRuntime.EventsEmit(a.ctx, "folder:synced", map[string]interface{}{
+	a.emitEvent("folder:synced", map[string]interface{}{
 		"accountId": accountID,
 		"folderId":  sentFolder.ID,
 	})
 
 	// Notify conversation viewer that sent folder synced (for cross-folder thread refresh)
-	wailsRuntime.EventsEmit(a.ctx, "sent:synced", map[string]interface{}{
+	a.emitEvent("sent:synced", map[string]interface{}{
 		"accountId": accountID,
 	})
 
@@ -703,7 +725,7 @@ func parseDataURL(dataURL string) (contentType, base64Data string) {
 
 // PickAttachmentFiles opens a file picker dialog and returns the selected files as attachments
 func (a *App) PickAttachmentFiles() ([]ComposerAttachment, error) {
-	return pickAttachmentFiles(a.ctx)
+	return pickAttachmentFiles(a.ctx, a.openMultipleFileDialog)
 }
 
 // ReadFileAsAttachment reads a file and creates a ComposerAttachment

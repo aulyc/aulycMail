@@ -11,6 +11,7 @@ package platform
 typedef struct {
 	const char* settings;
 	const char* backupViewer;
+	const char* checkUpdate;
 	const char* about;
 	const char* quit;
 	const char* edit;
@@ -28,7 +29,8 @@ import "C"
 import "unsafe"
 
 // menuHandler is invoked when a custom App-menu item is chosen. Set via
-// SetMenuHandler. Receives an action key ("settings"/"backupViewer"/"about").
+// SetMenuHandler. Receives an action key
+// ("settings"/"backupViewer"/"checkUpdate"/"about").
 var menuHandler func(action string)
 
 //export goMenuAction
@@ -45,7 +47,7 @@ func goMenuAction(action *C.char) {
 
 // MenuLabels holds the localized strings for the custom application menu.
 type MenuLabels struct {
-	Settings, BackupViewer, About, Quit, Edit, Undo, Redo, Cut, Copy, Paste, Delete string
+	Settings, BackupViewer, CheckUpdate, About, Quit, Edit, Undo, Redo, Cut, Copy, Paste, Delete string
 }
 
 // SetMenuHandler registers the function called when a custom App-menu item is
@@ -63,6 +65,7 @@ func SetMenuHandler(fn func(action string)) { menuHandler = fn }
 func InstallAppMenu(l MenuLabels) {
 	cs := C.CString(l.Settings)
 	cb := C.CString(l.BackupViewer)
+	cupt := C.CString(l.CheckUpdate)
 	ca := C.CString(l.About)
 	cq := C.CString(l.Quit)
 	ce := C.CString(l.Edit)
@@ -74,6 +77,7 @@ func InstallAppMenu(l MenuLabels) {
 	cd := C.CString(l.Delete)
 	defer C.free(unsafe.Pointer(cs))
 	defer C.free(unsafe.Pointer(cb))
+	defer C.free(unsafe.Pointer(cupt))
 	defer C.free(unsafe.Pointer(ca))
 	defer C.free(unsafe.Pointer(cq))
 	defer C.free(unsafe.Pointer(ce))
@@ -87,6 +91,7 @@ func InstallAppMenu(l MenuLabels) {
 	C.installAppMenu(C.AulycMenuLabels{
 		settings:     cs,
 		backupViewer: cb,
+		checkUpdate:  cupt,
 		about:        ca,
 		quit:         cq,
 		edit:         ce,

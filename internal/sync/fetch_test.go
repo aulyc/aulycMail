@@ -1,10 +1,16 @@
 package sync
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
+	"sync"
 	"testing"
+
+	imapPkg "aulyc.local/aulycmail/internal/imap"
+	"aulyc.local/aulycmail/internal/message"
 )
 
 func TestValidateFetchedMessageIdentityAcceptsMatchingMessageID(t *testing.T) {
@@ -153,4 +159,217 @@ func TestSkippedBodySizesEmptyCanDeferTruncatedFetch(t *testing.T) {
 	if shouldChargeFailure(size.received, size.reported) {
 		t.Fatal("empty body with a large reported-size shortfall should be deferred")
 	}
+}
+
+func TestBodyFetchProgressSupportsConcurrentHeartbeats(t *testing.T) {
+	var progress bodyFetchProgress
+
+	const workers = 8
+	const incrementsPerWorker = 1_000
+	var writers sync.WaitGroup
+	writers.Add(workers)
+	for range workers {
+		go func() {
+			defer writers.Done()
+			for range incrementsPerWorker {
+				progress.addFetched(1)
+				progress.addFailed(1)
+				_, _ = progress.snapshot()
+			}
+		}()
+	}
+	writers.Wait()
+
+	fetched, failed := progress.snapshot()
+	want := int64(workers * incrementsPerWorker)
+	if fetched != want || failed != want {
+		t.Fatalf("progress snapshot = (%d, %d), want (%d, %d)", fetched, failed, want, want)
+	}
+}
+
+func TestMessageIdentityHelpersNormalizeAndClassifyWrappedErrors(t *testing.T) {
+	if got := normalizeRFCMessageID("  <message@example.com>  "); got != "message@example.com" {
+		t.Fatalf("normalizeRFCMessageID = %q, want message@example.com", got)
+	}
+	mismatch := MessageIdentityMismatchError{UID: 7, Expected: "expected", Actual: "actual"}
+	wrapped := fmt.Errorf("fetch failed: %w", mismatch)
+	if !IsMessageIdentityMismatchError(wrapped) {
+		t.Fatal("wrapped identity mismatch should be detected")
+	}
+	if IsMessageIdentityMismatchError(errors.New("unrelated")) {
+		t.Fatal("unrelated error should not be classified as an identity mismatch")
+	}
+	if !strings.Contains(mismatch.Error(), "UID 7") || !strings.Contains(mismatch.Error(), "expected") {
+		t.Fatalf("identity mismatch error omitted useful context: %q", mismatch.Error())
+	}
+}
+
+func TestValidateFetchedMessageIdentityReportsMalformedMessage(t *testing.T) {
+	err := validateFetchedMessageIdentityFromReader(9, "expected@example.com", strings.NewReader("not an RFC822 message"))
+	if err == nil || !strings.Contains(err.Error(), "failed to parse message identity for UID 9") {
+		t.Fatalf("malformed message error = %v, want identity parse failure", err)
+	}
+}
+
+func TestRawMessageProgressReaderMarksOnlySuccessfulReads(t *testing.T) {
+	marks := 0
+	reader := rawMessageProgressReader{
+		reader: strings.NewReader("abcdef"),
+		mark:   func() { marks++ },
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if string(data) != "abcdef" || marks != 1 {
+		t.Fatalf("read = %q, marks = %d, want abcdef/1", string(data), marks)
+	}
+
+	withoutCallback, err := io.ReadAll(rawMessageProgressReader{reader: strings.NewReader("ok")})
+	if err != nil || string(withoutCallback) != "ok" {
+		t.Fatalf("reader without callback = (%q, %v)", string(withoutCallback), err)
+	}
+}
+
+func TestSkippedBodySizesIgnoresUnmappedUIDsAndEmptyInput(t *testing.T) {
+	if got := skippedBodySizesByMessageID(nil, nil); got != nil {
+		t.Fatalf("empty skipped bodies = %#v, want nil", got)
+	}
+	got := skippedBodySizesByMessageID(
+		map[uint32]string{1: "known"},
+		map[uint32]bodyFetchSkipped{
+			1: {Reason: bodyFetchSkipEmpty, ReportedSize: 10, ReceivedBytes: 2},
+			2: {Reason: bodyFetchSkipEmpty, ReportedSize: 20, ReceivedBytes: 3},
+		},
+	)
+	if len(got) != 1 || got["known"].reported != 10 || got["known"].received != 2 {
+		t.Fatalf("mapped skipped body sizes = %#v", got)
+	}
+}
+
+func TestFetchBodiesInBackgroundHonorsCancelledContextBeforeDependencies(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := (&Engine{}).FetchBodiesInBackground(ctx, "account", "folder", 30)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("FetchBodiesInBackground error = %v, want context.Canceled", err)
+	}
+}
+
+func TestPlanBodyFetchBatchAppliesCountByteAndOversizeRules(t *testing.T) {
+	oversized := maxBackgroundRawBodyBytes + 1
+	tests := []struct {
+		name          string
+		total         int
+		candidates    []message.MessageWithSize
+		wantIDs       []string
+		wantOversized []string
+		wantBytes     int64
+	}{
+		{
+			name: "unknown sizes use the planning estimate",
+			candidates: []message.MessageWithSize{
+				{ID: "unknown", Size: 0},
+				{ID: "known", Size: 2 * 1024},
+			},
+			wantIDs:   []string{"unknown", "known"},
+			wantBytes: 12 * 1024,
+		},
+		{
+			name: "oversized messages are returned separately",
+			candidates: []message.MessageWithSize{
+				{ID: "oversized", Size: oversized},
+				{ID: "normal", Size: 1024},
+			},
+			wantIDs:       []string{"normal"},
+			wantOversized: []string{"oversized"},
+			wantBytes:     1024,
+		},
+		{
+			name:  "large mailboxes use the reduced count limit",
+			total: 1001,
+			candidates: func() []message.MessageWithSize {
+				items := make([]message.MessageWithSize, 30)
+				for i := range items {
+					items[i] = message.MessageWithSize{ID: fmt.Sprintf("message-%02d", i), Size: 1024}
+				}
+				return items
+			}(),
+			wantIDs: func() []string {
+				ids := make([]string, 25)
+				for i := range ids {
+					ids[i] = fmt.Sprintf("message-%02d", i)
+				}
+				return ids
+			}(),
+			wantBytes: 25 * 1024,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plan := planBodyFetchBatch(test.candidates, test.total)
+			if fmt.Sprint(plan.messageIDs) != fmt.Sprint(test.wantIDs) ||
+				fmt.Sprint(plan.oversizedIDs) != fmt.Sprint(test.wantOversized) ||
+				plan.bytes != test.wantBytes {
+				t.Fatalf("plan = %#v, want ids=%v oversized=%v bytes=%d", plan, test.wantIDs, test.wantOversized, test.wantBytes)
+			}
+		})
+	}
+}
+
+type fakeBodyFetchConnectionPool struct {
+	getErr       error
+	getCalls     int
+	discardCalls int
+	releaseCalls int
+}
+
+func (p *fakeBodyFetchConnectionPool) GetConnection(context.Context, string) (*imapPkg.PooledConnection, error) {
+	p.getCalls++
+	return nil, p.getErr
+}
+
+func (p *fakeBodyFetchConnectionPool) Discard(*imapPkg.PooledConnection) {
+	p.discardCalls++
+}
+
+func (p *fakeBodyFetchConnectionPool) Release(*imapPkg.PooledConnection) {
+	p.releaseCalls++
+}
+
+func TestRecoverBodyFetchConnectionOwnsDiscardAcquireSelectAndFailureCleanup(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		pool := &fakeBodyFetchConnectionPool{}
+		selectedPath := ""
+		conn, err := recoverBodyFetchConnection(context.Background(), pool, nil, "account", "INBOX", func(_ context.Context, _ *imapPkg.PooledConnection, path string) error {
+			selectedPath = path
+			return nil
+		})
+		if err != nil || conn != nil || pool.discardCalls != 1 || pool.getCalls != 1 || pool.releaseCalls != 0 || selectedPath != "INBOX" {
+			t.Fatalf("recovery = (%#v, %v), pool=%+v selected=%q", conn, err, pool, selectedPath)
+		}
+	})
+
+	t.Run("acquire failure", func(t *testing.T) {
+		pool := &fakeBodyFetchConnectionPool{getErr: errors.New("offline")}
+		_, err := recoverBodyFetchConnection(context.Background(), pool, nil, "account", "INBOX", func(context.Context, *imapPkg.PooledConnection, string) error {
+			t.Fatal("selector called after acquire failure")
+			return nil
+		})
+		if err == nil || !strings.Contains(err.Error(), "failed to get new connection") || pool.releaseCalls != 0 {
+			t.Fatalf("acquire failure = %v, pool=%+v", err, pool)
+		}
+	})
+
+	t.Run("select failure releases replacement", func(t *testing.T) {
+		pool := &fakeBodyFetchConnectionPool{}
+		_, err := recoverBodyFetchConnection(context.Background(), pool, nil, "account", "INBOX", func(context.Context, *imapPkg.PooledConnection, string) error {
+			return errors.New("select failed")
+		})
+		if err == nil || !strings.Contains(err.Error(), "failed to select mailbox") || pool.releaseCalls != 1 {
+			t.Fatalf("select failure = %v, pool=%+v", err, pool)
+		}
+	})
 }

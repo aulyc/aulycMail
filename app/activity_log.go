@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"aulyc.local/aulycmail/internal/activitylog"
-	wailsRuntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 var errActivityLogStoreUnavailable = errors.New("activity log store is not initialized")
@@ -54,6 +53,6 @@ func (a *App) appendActivityLog(entry activitylog.Entry) error {
 	if err := a.activityLogStore.Append(&entry); err != nil {
 		return err
 	}
-	wailsRuntime.EventsEmit(a.ctx, "activity-log:created", entry)
+	a.emitEvent("activity-log:created", entry)
 	return nil
 }

@@ -1259,7 +1259,13 @@
                   aria-label={`${isExpanded ? $_('viewer.collapseMessage') : $_('viewer.expandMessage')}: ${msg.fromName || msg.fromEmail}`}
                   data-keyboard-action-context={msg.fromName || msg.fromEmail}
                   onclick={() => toggleMessage(msg.id)}
-                  onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleMessage(msg.id) }}
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      toggleMessage(msg.id)
+                    }
+                  }}
                   onfocus={() => focusedMessageId = msg.id}
                   role="button"
                   tabindex="0"
