@@ -421,7 +421,7 @@ release-check: release-preflight
 release-tag-check:
 	@node tools/release-identity.mjs verify-tag --root "$(CURDIR)" --tag "$(VERSION)"
 
-# Fail before release metadata changes if the private backup remote cannot be
+# Fail before release metadata changes if the registered source remote cannot be
 # reached or the formal release is not running from the configured branch.
 release-backup-preflight:
 	@python3 "$(CENTRAL_FORMAL_GIT)" preflight --path "$(CURDIR)"
@@ -638,7 +638,7 @@ help:
 	@echo "  make release-formal-install - Complete a formal release, then install its exact DMG"
 	@echo "  make release-check - Require golangci-lint v2.12.2, run gates, and build the candidate"
 	@echo "  make release-tag  - Create the annotated no-v tag after release checks pass"
-	@echo "  make release-backup-preflight - Verify the private backup remote before formal release"
+	@echo "  make release-backup-preflight - Verify the registered source remote before formal release"
 	@echo "  make release-backup-push - Atomically push and verify the formal release commit/tag"
 	@echo "  make test-release-dmg - Build an ad-hoc test DMG from an isolated exact tag"
 	@echo "  make release-dmg  - Build a formal notarized DMG from an isolated exact tag"

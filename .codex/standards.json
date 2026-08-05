@@ -185,15 +185,15 @@
     },
     {
       "path": "docs/VERSIONING.md",
-      "sha256": "75d36be3b1b8f65e370e0dc4e6da156bcd3d2c92d1fc14595c9d80608cf319ae"
+      "sha256": "5ff4523046948093ba7093761013f5e2a31bef8fbe5d61175d8b9b1ccc066f9e"
     },
     {
       "path": "docs/RELEASE.md",
-      "sha256": "ac036685a80c30b2e3a425cbbe0a35669d710eb6dec9b58d8dff2a16f77d38ea"
+      "sha256": "b4969bbaca82cb6dbd1f98df8f2dd6167ba9d98c1423dda1feeda6628ec99dbd"
     },
     {
       "path": "Makefile",
-      "sha256": "6a9bae386d450b29ee7a5cf43ab796c147b56398bceba3a14eb282fe4d598d39"
+      "sha256": "03fba918c80d1d9b99825e5ae1f6026cf42aaa1178e1c297ed62e1dd258e34e0"
     },
     {
       "path": ".golangci.yml",

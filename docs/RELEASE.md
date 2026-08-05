@@ -21,7 +21,7 @@ must not run in ordinary pull-request CI.
 Both release channels perform the same identity steps:
 
 1. Refuse uncommitted functional changes. Formal releases additionally verify
-   that private remote `backup` is reachable and the caller is on `main` before
+   that registered remote `backup` is reachable and the caller is on `main` before
    changing release metadata.
 2. Select version/build and update only allowed release metadata.
 3. Create `chore: release <version>` and require a clean worktree.
@@ -80,7 +80,7 @@ Prerequisites:
 - the Developer ID Application certificate is available in Keychain;
 - `notarytool` credentials exist under the `aulyc-notary` Keychain profile.
 - official `golangci-lint` v2.12.2 is available on `PATH`.
-- Git remote `backup` points to the private `aulyc/aulycMail` repository and is
+- Git remote `backup` points to the public `aulyc/aulycMail` repository and is
   reachable from the release machine; the formal release runs from `main`.
 
 ```bash
@@ -97,7 +97,7 @@ assessment, and manifest verification must all pass.
 Credentials remain in Keychain and are not written to logs or release provenance.
 Only after those artifact checks succeed does the
 formal flow use the central GitHub gate to push `main` and the annotated tag to
-the private backup repository. The push is atomic and never forced; a
+the registered public source repository. The push is atomic and never forced; a
 conflicting remote ref stops the release instead of overwriting remote history.
 
 ## Formal GitHub source publication
@@ -106,8 +106,9 @@ The central registry binds this project to `aulyc/aulycMail`, Git remote
 `backup`, and formal branch `main`. `make release-formal` runs the central
 preflight before release metadata changes. After the formal DMG and contained
 App are verified, the same flow passes the real `.manifest.json` provenance file to the
-central `push` phase, atomically publishes the branch and annotated tag, reads
-both refs back, and writes `sourceRepository`, `sourceBranch`,
+central `push` phase, atomically publishes the branch and annotated tag to the
+public GitHub source repository, reads both refs back, and writes
+`sourceRepository`, `sourceBranch`,
 `sourceRemoteCommit`, `sourceRemoteTagCommit`, and
 `sourceRemoteVerifiedAt` from that remote evidence. A missing or invalid `gh`
 login, URL mismatch, non-atomic push, or ref mismatch stops the release.
