@@ -4,6 +4,12 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.7.2] — 2026-08-05
+
+- Removed the left inset focus marker from document-style links in Settings,
+  preventing rounded controls such as Software Update from showing a blue
+  crescent while preserving clear keyboard selection feedback.
+
 ## [0.7.1] — 2026-08-05
 
 - Fixed in-app update installation by resolving the containing App bundle
