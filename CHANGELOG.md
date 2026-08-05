@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.7.3] — 2026-08-05
+
 - Simplified Settings by auto-saving ordinary preferences, removing the bottom
   Save/Cancel/Close bar, and keeping a fixed close control available throughout
   the dialog while account and credential editors retain explicit transactions.
