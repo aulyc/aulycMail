@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-08-05
+
 - Fixed in-app update installation by resolving the containing App bundle
   correctly, running the replacement helper from the signed installed bundle,
   and requiring a readiness handshake before the current app exits.
