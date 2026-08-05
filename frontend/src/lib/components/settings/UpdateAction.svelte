@@ -21,7 +21,9 @@
       case 'downloading': return $_('settingsUpdate.downloading', { values: { progress: status.progress ?? 0 } })
       case 'verifying': return $_('settingsUpdate.verifying')
       case 'installing': return $_('settingsUpdate.installing')
-      case 'failed': return $_('settingsUpdate.failed')
+      case 'failed': return status.failureOperation === 'install'
+        ? $_('settingsUpdate.installFailedRetry')
+        : $_('settingsUpdate.failed')
       default: return compact ? $_('settingsUpdate.checkNow') : ''
     }
   })

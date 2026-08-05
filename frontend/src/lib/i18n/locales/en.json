@@ -426,6 +426,7 @@
     "verifying": "Verifying update…",
     "installing": "Installing and preparing to restart…",
     "failed": "Check failed; click to retry",
+    "installFailedRetry": "Update failed; click to retry",
     "checkFailed": "Unable to check for updates. Please try again later.",
     "installFailed": "Update installation failed. The current version was not replaced.",
     "confirmTitle": "Install Software Update?",

@@ -212,7 +212,7 @@ func TestInstallPublishesProgressAndHandlesFailure(t *testing.T) {
 	service.installer = failing
 	service.status.State, service.status.CanInstall = StateAvailable, true
 	status, err = service.Install(context.Background())
-	if err == nil || status.State != StateFailed {
+	if err == nil || status.State != StateFailed || status.FailureOperation != FailureOperationInstall {
 		t.Fatalf("failing Install() = %#v, %v", status, err)
 	}
 
@@ -284,7 +284,118 @@ func TestRedirectBuildAndFailureHelpers(t *testing.T) {
 	store := &memorySettings{values: map[string]string{}, automatic: true}
 	service := NewService(Config{CurrentVersion: "invalid", CurrentBuild: 1, Store: store, ManifestSources: []ManifestSource{{Source: "github", URL: "://bad"}}})
 	status, err := service.Check(context.Background())
-	if err == nil || status.State != StateFailed {
+	if err == nil || status.State != StateFailed || status.FailureOperation != FailureOperationCheck {
 		t.Fatalf("invalid source check = %#v, %v", status, err)
+	}
+}
+
+func TestApplyHelperUsesTheSignedExecutableInsideTheInstalledBundle(t *testing.T) {
+	target := "/Applications/aulycMail.app"
+	executable := filepath.Join(target, "Contents", "MacOS", "aulycMail")
+	if err := validateUpdateHelperExecutable(executable, target); err != nil {
+		t.Fatalf("signed in-bundle executable rejected: %v", err)
+	}
+	if err := validateUpdateHelperExecutable(filepath.Join(t.TempDir(), "aulycMail-update-helper"), target); err == nil {
+		t.Fatal("standalone copied executable was accepted as an update helper")
+	}
+
+	staged := "/Applications/.aulycMail-update-test.app"
+	var helperRoot string
+	err := launchApplyHelperWithExecutable(executable, target, staged, 42, func(actualExecutable, planPath, readyPath string) error {
+		if actualExecutable != executable {
+			t.Fatalf("helper executable = %q, want %q", actualExecutable, executable)
+		}
+		helperRoot = filepath.Dir(planPath)
+		if readyPath != filepath.Join(helperRoot, applyHelperReadyFilename) {
+			t.Fatalf("ready path = %q", readyPath)
+		}
+		data, readErr := os.ReadFile(planPath)
+		if readErr != nil {
+			return readErr
+		}
+		var plan ApplyPlan
+		if decodeErr := json.Unmarshal(data, &plan); decodeErr != nil {
+			return decodeErr
+		}
+		if plan.TargetApp != target || plan.StagedApp != staged || plan.ParentPID != 42 {
+			t.Fatalf("unexpected apply plan: %#v", plan)
+		}
+		return nil
+	})
+	if helperRoot != "" {
+		defer os.RemoveAll(helperRoot)
+	}
+	if err != nil {
+		t.Fatalf("launchApplyHelperWithExecutable() error = %v", err)
+	}
+}
+
+func TestApplyHelperLaunchFailureCleansItsPrivatePlan(t *testing.T) {
+	var helperRoot string
+	err := launchApplyHelperWithExecutable(
+		"/Applications/aulycMail.app/Contents/MacOS/aulycMail",
+		"/Applications/aulycMail.app",
+		"/Applications/.aulycMail-update-test.app",
+		42,
+		func(_ string, planPath, _ string) error {
+			helperRoot = filepath.Dir(planPath)
+			return context.Canceled
+		},
+	)
+	if err == nil {
+		t.Fatal("helper launch failure was ignored")
+	}
+	if _, statErr := os.Stat(helperRoot); !os.IsNotExist(statErr) {
+		t.Fatalf("failed helper plan was not removed: %v", statErr)
+	}
+}
+
+func TestApplyHelperReadinessHandshakeAcceptsOnlyItsOwnedMarker(t *testing.T) {
+	root := t.TempDir()
+	readyPath := filepath.Join(root, applyHelperReadyFilename)
+	ready, err := applyHelperIsReady(readyPath)
+	if err != nil || ready {
+		t.Fatalf("missing readiness marker = %v, %v", ready, err)
+	}
+	if err := signalApplyHelperReady(readyPath); err != nil {
+		t.Fatalf("signalApplyHelperReady() error = %v", err)
+	}
+	ready, err = applyHelperIsReady(readyPath)
+	if err != nil || !ready {
+		t.Fatalf("valid readiness marker = %v, %v", ready, err)
+	}
+	if err := signalApplyHelperReady(readyPath); err == nil {
+		t.Fatal("existing readiness marker was overwritten")
+	}
+	if err := os.WriteFile(readyPath, []byte("unexpected"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := applyHelperIsReady(readyPath); err == nil {
+		t.Fatal("malformed readiness marker was accepted")
+	}
+}
+
+func TestStartApplyHelperWaitsForReadinessAndReportsEarlyExit(t *testing.T) {
+	root := t.TempDir()
+	planPath := filepath.Join(root, "apply-plan.json")
+	readyPath := filepath.Join(root, applyHelperReadyFilename)
+	helperPath := filepath.Join(root, "ready-helper")
+	helper := "#!/bin/sh\nprintf 'ready\\n' > \"$(dirname \"$2\")/" + applyHelperReadyFilename + "\"\nsleep 0.1\n"
+	if err := os.WriteFile(helperPath, []byte(helper), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := startApplyHelper(helperPath, planPath, readyPath); err != nil {
+		t.Fatalf("ready helper failed: %v", err)
+	}
+
+	earlyExitPath := filepath.Join(root, "early-exit-helper")
+	if err := os.WriteFile(earlyExitPath, []byte("#!/bin/sh\nexit 7\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(readyPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := startApplyHelper(earlyExitPath, planPath, readyPath); err == nil {
+		t.Fatal("helper exit before readiness was accepted")
 	}
 }

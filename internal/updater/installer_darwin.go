@@ -285,11 +285,15 @@ func installedApplicationPath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve running application: %w", err)
 	}
-	appPath := filepath.Clean(filepath.Join(filepath.Dir(resolved), "..", "..", ".."))
+	appPath := applicationBundlePath(resolved)
 	if appPath != "/Applications/aulycMail.app" {
 		return "", fmt.Errorf("automatic installation requires aulycMail.app in /Applications")
 	}
 	return appPath, nil
+}
+
+func applicationBundlePath(executable string) string {
+	return filepath.Clean(filepath.Join(filepath.Dir(executable), "..", ".."))
 }
 
 func runCommand(ctx context.Context, name string, args ...string) (string, error) {

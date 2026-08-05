@@ -12,6 +12,15 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	applyHelperReadyFilename = "helper-ready"
+	applyHelperReadyTimeout  = 5 * time.Second
+)
+
+var applyHelperReadyContent = []byte("ready\n")
+
+type applyHelperStarter func(executable, planPath, readyPath string) error
+
 type ApplyPlan struct {
 	TargetApp string `json:"targetApp"`
 	StagedApp string `json:"stagedApp"`
@@ -24,6 +33,28 @@ func launchApplyHelper(targetApp, stagedApp string) error {
 	if err != nil {
 		return fmt.Errorf("locate update helper: %w", err)
 	}
+	executable, err = filepath.EvalSymlinks(executable)
+	if err != nil {
+		return fmt.Errorf("resolve update helper: %w", err)
+	}
+	if err := validateUpdateHelperExecutable(executable, targetApp); err != nil {
+		return err
+	}
+	return launchApplyHelperWithExecutable(executable, targetApp, stagedApp, os.Getpid(), startApplyHelper)
+}
+
+func validateUpdateHelperExecutable(executable, targetApp string) error {
+	expected := filepath.Join(targetApp, "Contents", "MacOS", "aulycMail")
+	if filepath.Clean(executable) != expected {
+		return fmt.Errorf("update helper must use the signed executable inside the installed application")
+	}
+	return nil
+}
+
+func launchApplyHelperWithExecutable(executable, targetApp, stagedApp string, parentPID int, start applyHelperStarter) error {
+	if start == nil {
+		return fmt.Errorf("update helper launcher is unavailable")
+	}
 	helperRoot, err := os.MkdirTemp("", "aulycmail-update-helper-")
 	if err != nil {
 		return fmt.Errorf("create update helper: %w", err)
@@ -34,15 +65,11 @@ func launchApplyHelper(targetApp, stagedApp string) error {
 			_ = os.RemoveAll(helperRoot)
 		}
 	}()
-	helperPath := filepath.Join(helperRoot, "aulycMail-update-helper")
-	if err := copyExecutable(executable, helperPath); err != nil {
-		return err
-	}
 	plan := ApplyPlan{
 		TargetApp: targetApp,
 		StagedApp: stagedApp,
 		BackupApp: filepath.Join(filepath.Dir(targetApp), ".aulycMail-backup-"+uuid.NewString()+".app"),
-		ParentPID: os.Getpid(),
+		ParentPID: parentPID,
 	}
 	planPath := filepath.Join(helperRoot, "apply-plan.json")
 	planData, err := json.Marshal(plan)
@@ -52,38 +79,88 @@ func launchApplyHelper(targetApp, stagedApp string) error {
 	if err := os.WriteFile(planPath, planData, 0o600); err != nil {
 		return fmt.Errorf("write update plan: %w", err)
 	}
-	command := exec.Command(helperPath, "--apply-update-plan", planPath)
-	command.Stdin, command.Stdout, command.Stderr = nil, nil, nil
-	if err := command.Start(); err != nil {
-		return fmt.Errorf("launch update helper: %w", err)
-	}
-	if err := command.Process.Release(); err != nil {
-		return fmt.Errorf("release update helper: %w", err)
+	readyPath := filepath.Join(helperRoot, applyHelperReadyFilename)
+	if err := start(executable, planPath, readyPath); err != nil {
+		return err
 	}
 	cleanup = false
 	return nil
 }
 
-func copyExecutable(source, destination string) error {
-	input, err := os.Open(source)
+func startApplyHelper(executable, planPath, readyPath string) error {
+	command := exec.Command(executable, "--apply-update-plan", planPath)
+	command.Stdin, command.Stdout, command.Stderr = nil, nil, nil
+	if err := command.Start(); err != nil {
+		return fmt.Errorf("launch update helper: %w", err)
+	}
+	finished := make(chan error, 1)
+	go func() { finished <- command.Wait() }()
+
+	timer := time.NewTimer(applyHelperReadyTimeout)
+	defer timer.Stop()
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		ready, err := applyHelperIsReady(readyPath)
+		if err != nil {
+			_ = command.Process.Kill()
+			<-finished
+			return err
+		}
+		if ready {
+			return nil
+		}
+		select {
+		case err := <-finished:
+			if err == nil {
+				return fmt.Errorf("update helper exited before signaling readiness")
+			}
+			return fmt.Errorf("update helper exited before signaling readiness: %w", err)
+		case <-timer.C:
+			_ = command.Process.Kill()
+			<-finished
+			return fmt.Errorf("update helper did not become ready")
+		case <-ticker.C:
+		}
+	}
+}
+
+func applyHelperIsReady(readyPath string) (bool, error) {
+	info, err := os.Lstat(readyPath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
 	if err != nil {
-		return fmt.Errorf("open update helper source: %w", err)
+		return false, fmt.Errorf("inspect update helper readiness: %w", err)
 	}
-	defer input.Close()
-	output, err := os.OpenFile(destination, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o700)
+	if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+		return false, fmt.Errorf("update helper readiness marker is invalid")
+	}
+	data, err := os.ReadFile(readyPath)
 	if err != nil {
-		return fmt.Errorf("create update helper: %w", err)
+		return false, fmt.Errorf("read update helper readiness: %w", err)
 	}
-	if _, err := output.ReadFrom(input); err != nil {
-		_ = output.Close()
-		return fmt.Errorf("copy update helper: %w", err)
+	if !bytes.Equal(data, applyHelperReadyContent) {
+		return false, fmt.Errorf("update helper readiness marker is invalid")
 	}
-	if err := output.Sync(); err != nil {
-		_ = output.Close()
-		return fmt.Errorf("sync update helper: %w", err)
+	return true, nil
+}
+
+func signalApplyHelperReady(readyPath string) error {
+	file, err := os.OpenFile(readyPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		return fmt.Errorf("create update helper readiness marker: %w", err)
 	}
-	if err := output.Close(); err != nil {
-		return fmt.Errorf("close update helper: %w", err)
+	if _, err := file.Write(applyHelperReadyContent); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("write update helper readiness marker: %w", err)
+	}
+	if err := file.Sync(); err != nil {
+		_ = file.Close()
+		return fmt.Errorf("sync update helper readiness marker: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("close update helper readiness marker: %w", err)
 	}
 	return nil
 }
@@ -108,6 +185,9 @@ func RunApplyPlan(planPath string) error {
 		return fmt.Errorf("decode update plan: %w", err)
 	}
 	if err := validateApplyPlan(plan); err != nil {
+		return err
+	}
+	if err := signalApplyHelperReady(filepath.Join(helperRoot, applyHelperReadyFilename)); err != nil {
 		return err
 	}
 	return applyPlan(plan, processAlive, os.Rename, func(target string) error {

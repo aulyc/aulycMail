@@ -46,6 +46,8 @@ func (a *App) InstallAvailableUpdate() (updater.Status, error) {
 	}
 	status, err := a.updateService.Install(a.ctx)
 	if err != nil {
+		log := logging.WithComponent("app.updater")
+		log.Warn().Err(err).Msg("Update installation failed")
 		return status, err
 	}
 	a.QuitApp()

@@ -1982,6 +1982,7 @@ export namespace updater {
 	    source?: string;
 	    progress?: number;
 	    message?: string;
+	    failureOperation?: string;
 	    canInstall: boolean;
 	    checkedAt?: string;
 
@@ -2000,6 +2001,7 @@ export namespace updater {
 	        this.source = source["source"];
 	        this.progress = source["progress"];
 	        this.message = source["message"];
+	        this.failureOperation = source["failureOperation"];
 	        this.canInstall = source["canInstall"];
 	        this.checkedAt = source["checkedAt"];
 	    }

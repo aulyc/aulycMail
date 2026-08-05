@@ -4,6 +4,16 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Fixed in-app update installation by resolving the containing App bundle
+  correctly, running the replacement helper from the signed installed bundle,
+  and requiring a readiness handshake before the current app exits.
+- Distinguished update-installation failures from update-check failures in the
+  Settings and About status text, and added a sanitized updater warning for
+  diagnostics.
+- Users running 0.6.0 or 0.7.0 must install this release's DMG manually once
+  because the updater embedded in those versions cannot complete replacement;
+  subsequent in-app updates use the repaired handoff.
+
 ## [0.7.0] — 2026-08-05
 
 - Refined Settings keyboard focus indicators, redesigned the About page as a

@@ -92,4 +92,18 @@ test('shares latest/update state, manually checks, and confirms installation', a
   about.querySelector('[data-confirm-action="confirm"]').click()
   await flushAsync()
   assert.equal(backend.install.mock.calls.length, 1)
+
+  runtime.updateListener({
+    state: 'failed', currentVersion: '0.6.0-beta.23', currentBuildNumber: 39,
+    latestVersion: '0.7.0', latestBuildNumber: 40, failureOperation: 'install', canInstall: false,
+  })
+  await flushAsync()
+  assert.match(compact.textContent, /settingsUpdate\.installFailedRetry/)
+
+  runtime.updateListener({
+    state: 'failed', currentVersion: '0.6.0-beta.23', currentBuildNumber: 39,
+    latestVersion: '0.7.0', latestBuildNumber: 40, failureOperation: 'check', canInstall: false,
+  })
+  await flushAsync()
+  assert.match(compact.textContent, /settingsUpdate\.failed/)
 })

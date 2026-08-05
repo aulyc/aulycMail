@@ -172,23 +172,19 @@ func TestProvenanceAndAppValidationRejectMismatches(t *testing.T) {
 	}
 }
 
+func TestApplicationBundlePathUsesTheAppBundleContainingTheExecutable(t *testing.T) {
+	executable := "/Applications/aulycMail.app/Contents/MacOS/aulycMail"
+	if got := applicationBundlePath(executable); got != "/Applications/aulycMail.app" {
+		t.Fatalf("applicationBundlePath() = %q, want /Applications/aulycMail.app", got)
+	}
+}
+
 func TestCommandAndExecutableHelpers(t *testing.T) {
 	if _, err := runCommand(context.Background(), "/usr/bin/true"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := runCommand(context.Background(), "/usr/bin/false"); err == nil {
 		t.Fatal("failing command returned nil")
-	}
-	source := filepath.Join(t.TempDir(), "source")
-	destination := filepath.Join(t.TempDir(), "destination")
-	if err := os.WriteFile(source, []byte("helper"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := copyExecutable(source, destination); err != nil {
-		t.Fatal(err)
-	}
-	if data, _ := os.ReadFile(destination); string(data) != "helper" {
-		t.Fatalf("copied %q", data)
 	}
 	if NewInstaller() == nil {
 		t.Fatal("NewInstaller returned nil")

@@ -21,6 +21,9 @@ const (
 	StateInstalling  = "installing"
 	StateFailed      = "failed"
 
+	FailureOperationCheck   = "check"
+	FailureOperationInstall = "install"
+
 	lastSuccessKey = "update_last_success_at"
 	lastFailureKey = "update_last_failure_at"
 )
@@ -49,6 +52,7 @@ type Status struct {
 	Source             string `json:"source,omitempty"`
 	Progress           int    `json:"progress,omitempty"`
 	Message            string `json:"message,omitempty"`
+	FailureOperation   string `json:"failureOperation,omitempty"`
 	CanInstall         bool   `json:"canInstall"`
 	CheckedAt          string `json:"checkedAt,omitempty"`
 }
@@ -244,7 +248,7 @@ func (s *Service) Check(ctx context.Context) (Status, error) {
 	}
 	s.checking = true
 	base := s.status
-	base.State, base.Message, base.Progress, base.CanInstall = StateChecking, "", 0, false
+	base.State, base.Message, base.FailureOperation, base.Progress, base.CanInstall = StateChecking, "", "", 0, false
 	s.mu.Unlock()
 	s.publish(base)
 
@@ -255,7 +259,7 @@ func (s *Service) Check(ctx context.Context) (Status, error) {
 		s.mu.Unlock()
 		s.writeTimestamp(lastFailureKey)
 		failed := base
-		failed.State, failed.Message, failed.CheckedAt = StateFailed, err.Error(), s.now().UTC().Format(time.RFC3339)
+		failed.State, failed.Message, failed.FailureOperation, failed.CheckedAt = StateFailed, err.Error(), FailureOperationCheck, s.now().UTC().Format(time.RFC3339)
 		return s.publish(failed), err
 	}
 	newer, err := IsNewer(manifest.Version, manifest.BuildNumber, s.currentVersion, s.currentBuild)
@@ -265,7 +269,7 @@ func (s *Service) Check(ctx context.Context) (Status, error) {
 		s.mu.Unlock()
 		s.writeTimestamp(lastFailureKey)
 		failed := base
-		failed.State, failed.Message, failed.CheckedAt = StateFailed, err.Error(), s.now().UTC().Format(time.RFC3339)
+		failed.State, failed.Message, failed.FailureOperation, failed.CheckedAt = StateFailed, err.Error(), FailureOperationCheck, s.now().UTC().Format(time.RFC3339)
 		return s.publish(failed), err
 	}
 	next := Status{
@@ -334,7 +338,7 @@ func (s *Service) Install(ctx context.Context) (Status, error) {
 	manifest := *s.manifest
 	s.installing = true
 	base := s.status
-	base.State, base.CanInstall, base.Progress, base.Message = StateDownloading, false, 0, ""
+	base.State, base.CanInstall, base.Progress, base.Message, base.FailureOperation = StateDownloading, false, 0, "", ""
 	s.mu.Unlock()
 	s.publish(base)
 
@@ -349,7 +353,7 @@ func (s *Service) Install(ctx context.Context) (Status, error) {
 	s.mu.Unlock()
 	if err != nil {
 		failed := base
-		failed.State, failed.Message, failed.Progress = StateFailed, err.Error(), 0
+		failed.State, failed.Message, failed.FailureOperation, failed.Progress = StateFailed, err.Error(), FailureOperationInstall, 0
 		return s.publish(failed), err
 	}
 	installed := base
