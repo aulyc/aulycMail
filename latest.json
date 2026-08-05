@@ -1,0 +1,45 @@
+{
+  "$schema": "urn:codex-engineering-standards:dual-mirror-latest:2",
+  "architecture": "arm64",
+  "artifact": {
+    "downloads": [
+      {
+        "source": "github",
+        "url": "https://github.com/aulyc/aulycMail/releases/download/0.6.0/aulycMail-0.6.0-build.40.dmg"
+      },
+      {
+        "source": "gitee",
+        "url": "https://gitee.com/aulyc/aulycMail/releases/download/0.6.0/aulycMail-0.6.0-build.40.dmg"
+      }
+    ],
+    "file": "aulycMail-0.6.0-build.40.dmg",
+    "sha256": "3ccdc4db761783f18d0fcb192ccaeb317e325c037bfd7f1769b8a8a5715a28b9"
+  },
+  "buildNumber": 40,
+  "bundleIdentifier": "com.aulyc.aulycmail",
+  "commit": "2a686cd1645cae3a29353b49c06884c6836dd8fb",
+  "minimumSystemVersion": "11.0",
+  "pluginIdentifier": null,
+  "policy": "aulyc-dual-mirror-v1",
+  "provenance": {
+    "downloads": [
+      {
+        "source": "github",
+        "url": "https://raw.githubusercontent.com/aulyc/aulycMail/release-channel/updates/0.6.0/aulycMail-0.6.0-build.40.manifest.json"
+      },
+      {
+        "source": "gitee",
+        "url": "https://gitee.com/aulyc/aulycMail/raw/main/updates/0.6.0/aulycMail-0.6.0-build.40.manifest.json"
+      }
+    ],
+    "file": "aulycMail-0.6.0-build.40.manifest.json",
+    "sha256": "62e5838b0a50dbcff5887cd284a441f59706f2368a7f57e337e6fe158846cb08"
+  },
+  "releaseChannel": "formal",
+  "releasePageURL": "https://github.com/aulyc/aulycMail/releases/tag/0.6.0",
+  "releaseProfile": "macos-arm64-app",
+  "schemaVersion": 2,
+  "tag": "0.6.0",
+  "teamIdentifier": "M9M7M2ARFD",
+  "version": "0.6.0"
+}
