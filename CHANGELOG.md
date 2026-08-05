@@ -4,6 +4,18 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Added a signed in-app update flow with GitHub-first and Gitee-fallback
+  discovery, full artifact trust verification, and explicit confirmation before
+  download, installation, or restart.
+- Hardened compose, draft, send, attachment, backup, account, and synchronization
+  workflows, including consistent selectable-folder resolution for Drafts and
+  Sent mail and safer lifecycle handling when the app runs in the background.
+- Improved Settings, composer, contacts, message viewing, keyboard navigation,
+  legal-document links, and update-status feedback across the Svelte interface.
+- Expanded Go integration coverage and browser-like frontend interaction tests,
+  and added fail-closed coverage, lint, dead-code, generated-binding, packaging,
+  and release verification gates.
+
 ## [0.6.0-beta.23] — 2026-07-31
 
 - Fixed scheduled background sync so INBOX, Drafts, and Sent always perform
