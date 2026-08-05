@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { mount, tick, unmount } from 'svelte'
+import { compile } from 'svelte/compiler'
 import { afterEach, beforeEach, test, vi } from 'vitest'
 
 const backend = vi.hoisted(() => {
@@ -204,6 +207,14 @@ test('loads every draft value, navigates by keyboard, saves, and requests restar
   restart.querySelector('[data-confirm-action="confirm"]').click()
   await flushAsync()
   assert.equal(backend.QuitApp.mock.calls.length, 1)
+})
+
+test('keyboard-selected document links have no left inset focus marker', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/lib/components/settings/SettingsDialog.svelte'), 'utf8')
+  const css = compile(source, { filename: 'SettingsDialog.svelte', generate: 'client' }).css.code
+  const focusRule = css.match(/\[data-settings-focus-style='link'\]\[data-settings-keyboard-selected='true'\]\s*\{([^}]+)\}/)
+  assert.ok(focusRule)
+  assert.doesNotMatch(focusRule[1], /box-shadow:\s*inset/i)
 })
 
 test('covers page callbacks, horizontal navigation, input mode, and action-menu routing', async () => {

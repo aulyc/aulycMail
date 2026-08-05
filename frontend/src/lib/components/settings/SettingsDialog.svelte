@@ -862,11 +862,11 @@
     outline: none;
   }
 
-  /* Document-style links use a compact selection marker instead of a large
-     rectangular ring spanning the row. */
+  /* Document-style links use a compact background and underline instead of a
+     large rectangular ring. Avoid a left inset marker: rounded links render it
+     as a distracting crescent. */
   :global([data-settings-focus-style='link'][data-settings-keyboard-selected='true']) {
     background-color: hsl(var(--primary) / 0.1);
-    box-shadow: inset 3px 0 0 hsl(var(--primary));
     outline: none;
     text-decoration-line: underline;
     text-decoration-thickness: 1px;
