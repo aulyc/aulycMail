@@ -45,3 +45,23 @@ func TestProgressEmitterPublishesAtInteractiveCadence(t *testing.T) {
 		t.Fatalf("emitted currents = %v, want [0 26]", currents)
 	}
 }
+
+func TestProgressEmitterPublishesStageTransitionsWithoutDelay(t *testing.T) {
+	now := time.Unix(0, 0)
+	var emitted []Progress
+	emitter := newProgressEmitter(func(progress Progress) {
+		emitted = append(emitted, progress)
+	}, 250*time.Millisecond, func() time.Time { return now })
+
+	emitter.Emit(Progress{Stage: ProgressStageChecking, Current: 0, Total: 100})
+	now = now.Add(time.Millisecond)
+	emitter.Emit(Progress{Stage: ProgressStageChecking, Current: 80, Total: 100})
+	emitter.Emit(Progress{Stage: ProgressStageExporting, Current: 80, Total: 100})
+
+	if len(emitted) != 2 {
+		t.Fatalf("emitted %d progress events, want initial and stage transition", len(emitted))
+	}
+	if emitted[0].Stage != ProgressStageChecking || emitted[1].Stage != ProgressStageExporting {
+		t.Fatalf("emitted stages = [%q, %q], want checking then exporting", emitted[0].Stage, emitted[1].Stage)
+	}
+}

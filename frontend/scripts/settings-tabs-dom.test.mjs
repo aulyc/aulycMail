@@ -225,7 +225,7 @@ test('about tab opens the website and renders every information section', async 
     ['settingsAbout.productDescription', 'settingsAbout.product.featureBackup'],
     ['settingsAbout.privacyPolicy', 'settingsAbout.privacy.localBackups'],
     ['settingsAbout.termsOfUse', 'settingsAbout.terms.responsibilityBackup'],
-    ['settingsAbout.acknowledgementsLabel', 'settingsAbout.acknowledgements.licenseBody'],
+    ['settingsAbout.acknowledgementsLabel', 'settingsAbout.acknowledgements.foundationBody'],
   ]
   for (const [buttonLabel, expected] of cases) {
     buttonWithText(target, buttonLabel).click()
@@ -233,6 +233,10 @@ test('about tab opens the website and renders every information section', async 
     const dialog = target.querySelector('[role="dialog"]')
     assert.ok(dialog)
     assert.match(dialog.textContent, new RegExp(expected.replaceAll('.', '\\.')))
+    if (buttonLabel === 'settingsAbout.acknowledgementsLabel') {
+      buttonWithText(dialog, 'https://github.com/hkdb/aerion').click()
+      assert.deepEqual(runtime.openURL.mock.calls.at(-1), ['https://github.com/hkdb/aerion'])
+    }
     ;[...dialog.querySelectorAll('button')].at(-1).click()
     await flushAsync()
     assert.equal(target.querySelector('[role="dialog"]'), null)

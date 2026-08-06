@@ -85,6 +85,7 @@ type BackupRunResult struct {
 // BackupProgress is emitted as backup:progress while StartEmailBackup executes.
 type BackupProgress struct {
 	Phase        string `json:"phase"`
+	Stage        string `json:"stage,omitempty"`
 	AccountEmail string `json:"accountEmail,omitempty"`
 	FolderPath   string `json:"folderPath,omitempty"`
 	Current      int    `json:"current"`
@@ -122,6 +123,7 @@ func (t *backupRunTracker) start(startedAt string) bool {
 	t.startedAt = startedAt
 	t.progress = &BackupProgress{
 		Phase:   "running",
+		Stage:   mailBackup.ProgressStageChecking,
 		Current: 0,
 		Total:   0,
 		Message: "开始备份",
@@ -331,7 +333,7 @@ func (b *BackupBridge) StartEmailBackup(options BackupRunOptions) (BackupRunStat
 	if !b.job.start(startedAt) {
 		return b.job.snapshot(), errEmailBackupAlreadyRunning
 	}
-	b.emitBackupProgress(BackupProgress{Phase: "running", Current: 0, Total: 0, Message: "开始备份"})
+	b.emitBackupProgress(BackupProgress{Phase: "running", Stage: mailBackup.ProgressStageChecking, Current: 0, Total: 0, Message: "开始核对已有备份"})
 
 	go func() {
 		defer recoverPanic("app.backup", "email backup")
@@ -547,6 +549,7 @@ func backupDoneProgress(result *BackupRunResult) BackupProgress {
 func backupProgressFromInternal(progress mailBackup.Progress) BackupProgress {
 	return BackupProgress{
 		Phase:        progress.Phase,
+		Stage:        progress.Stage,
 		AccountEmail: progress.AccountEmail,
 		FolderPath:   progress.FolderPath,
 		Current:      progress.Current,

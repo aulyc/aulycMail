@@ -324,7 +324,7 @@ func TestRunExportsRawMessagesReportsFailuresAndResumesIncrementally(t *testing.
 	if len(chunks) != 3 || len(chunks[0]) != 1 || len(chunks[1]) != 2 || len(chunks[2]) != 1 {
 		t.Fatalf("unexpected stream chunks: %#v", chunks)
 	}
-	if len(progress) < 2 || progress[0].Message != "开始备份" {
+	if len(progress) < 3 || progress[0].Stage != ProgressStageChecking || progress[1].Stage != ProgressStageExporting {
 		t.Fatalf("unexpected progress: %#v", progress)
 	}
 	lastProgress := progress[len(progress)-1]

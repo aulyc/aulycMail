@@ -126,6 +126,7 @@ func TestBackupSettingsStatusAndAccountResolution(t *testing.T) {
 func TestBackupProgressAndResultConversions(t *testing.T) {
 	progress := backupProgressFromInternal(mailBackup.Progress{
 		Phase:        "running",
+		Stage:        mailBackup.ProgressStageExporting,
 		AccountEmail: "user@example.com",
 		FolderPath:   "INBOX",
 		Current:      3,
@@ -137,7 +138,7 @@ func TestBackupProgressAndResultConversions(t *testing.T) {
 		Failed:       1,
 		Message:      "working",
 	})
-	if progress.Phase != "running" || progress.Current != 3 || progress.Total != 8 || progress.Unavailable != 2 || progress.AccountEmail != "user@example.com" {
+	if progress.Phase != "running" || progress.Stage != mailBackup.ProgressStageExporting || progress.Current != 3 || progress.Total != 8 || progress.Unavailable != 2 || progress.AccountEmail != "user@example.com" {
 		t.Fatalf("converted progress = %#v", progress)
 	}
 	if result := backupRunResultFromInternal(nil); result != nil {

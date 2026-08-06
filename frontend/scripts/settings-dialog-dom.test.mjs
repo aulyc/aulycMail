@@ -216,6 +216,12 @@ test('keyboard-selected document links have no left inset focus marker', () => {
   assert.doesNotMatch(focusRule[1], /box-shadow:\s*inset/i)
 })
 
+test('settings help popover arrow uses the popover background color', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/lib/components/settings/shared/SettingsRow.svelte'), 'utf8')
+  assert.match(source, /<Popover\.Arrow class="text-popover stroke-border" \/>/)
+  assert.doesNotMatch(source, /<Popover\.Arrow class="fill-popover/)
+})
+
 test('covers page callbacks, horizontal navigation, input mode, and action-menu routing', async () => {
   const { target } = await renderDialog()
   pageButton(target, 'backup').click()

@@ -1,10 +1,16 @@
 export type PolicyInfoKind = 'privacy' | 'terms'
 export type InfoKind = 'product' | PolicyInfoKind | 'acknowledgements'
 
+interface InfoLink {
+  label: string
+  url: string
+}
+
 interface InfoSection {
   title: string
   body?: string
   items?: string[]
+  links?: InfoLink[]
 }
 
 export interface InfoContent {
@@ -52,6 +58,11 @@ export function getAboutInfoContent(infoKind: InfoKind, translate: Translate): I
     title: translate('settingsAbout.acknowledgements.title'),
     intro: translate('settingsAbout.acknowledgements.intro'),
     sections: [
+      {
+        title: translate('settingsAbout.acknowledgements.foundationTitle'),
+        body: translate('settingsAbout.acknowledgements.foundationBody'),
+        links: [{ label: 'https://github.com/hkdb/aerion', url: 'https://github.com/hkdb/aerion' }],
+      },
       { title: translate('settingsAbout.acknowledgements.technologyTitle'), items: [translate('settingsAbout.acknowledgements.technologyDesktop'), translate('settingsAbout.acknowledgements.technologyEditor'), translate('settingsAbout.acknowledgements.technologyInterface'), translate('settingsAbout.acknowledgements.technologyData')] },
       { title: translate('settingsAbout.acknowledgements.communityTitle'), body: translate('settingsAbout.acknowledgements.communityBody') },
       { title: translate('settingsAbout.acknowledgements.licenseTitle'), body: translate('settingsAbout.acknowledgements.licenseBody') },

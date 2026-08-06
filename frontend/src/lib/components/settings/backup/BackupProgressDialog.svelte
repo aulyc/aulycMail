@@ -25,6 +25,7 @@
   const active = $derived(preparing || store.running)
   const failed = $derived(startFailed || (!active && progress?.phase === 'error'))
   const finished = $derived(!active && !failed && progress?.phase === 'done')
+  const checkingExisting = $derived(active && progress?.stage === 'checking')
   const percent = $derived(backupProgressPercent(progress?.current ?? 0, progress?.total ?? 0))
   const target = $derived([progress?.accountEmail, progress?.folderPath].filter(Boolean).join(' / '))
   const statistics = $derived(backupStatistics({
@@ -68,6 +69,8 @@
           {$_('settingsBackup.preparingBackup')}
         {:else if failed}
           {$_('settingsBackup.backupFailedDescription')}
+        {:else if checkingExisting}
+          {$_('settingsBackup.checkingExistingDescription')}
         {:else if store.running}
           {$_('settingsBackup.backupInProgressDescription')}
         {:else if statistics.notBackedUp > 0}
@@ -82,7 +85,9 @@
       <div class="space-y-3 py-1">
         <div class="flex items-center justify-between gap-4 text-sm">
           <p class="min-w-0 font-medium tabular-nums text-foreground">
-            {#if active && (progress?.total ?? 0) > 0}
+            {#if checkingExisting}
+              {$_('settingsBackup.checkingExisting')}
+            {:else if active && (progress?.total ?? 0) > 0}
               {$_('settingsBackup.checkedProgress', {
                 values: { current: progress?.current ?? 0, total: progress?.total ?? 0 },
               })}
@@ -94,7 +99,7 @@
               {$_('settingsBackup.backupFailed')}
             {/if}
           </p>
-          {#if percent !== null || finished}
+          {#if !checkingExisting && (percent !== null || finished)}
             <span class="shrink-0 font-semibold tabular-nums text-foreground">{displayedPercent}%</span>
           {/if}
         </div>
@@ -105,9 +110,9 @@
           aria-label={$_('settingsBackup.progressTitle')}
           aria-valuemin="0"
           aria-valuemax="100"
-          aria-valuenow={percent ?? (finished ? 100 : undefined)}
+          aria-valuenow={checkingExisting ? undefined : (percent ?? (finished ? 100 : undefined))}
         >
-          {#if active && percent === null}
+          {#if active && (percent === null || checkingExisting)}
             <div class="backup-progress-indeterminate absolute inset-y-0 w-2/5 rounded-full bg-primary"></div>
           {:else}
             <div
@@ -126,7 +131,7 @@
         </p>
       </div>
 
-      {#if !failed}
+      {#if !failed && !checkingExisting}
         <section class="rounded-lg border border-border bg-muted/20 p-4">
           <div class="flex items-baseline justify-between gap-4">
             <div>

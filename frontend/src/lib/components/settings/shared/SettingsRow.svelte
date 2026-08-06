@@ -41,7 +41,7 @@
             >
               <div class="text-sm font-medium">{label}</div>
               <p class="mt-1 text-xs leading-5 text-muted-foreground">{help}</p>
-              <Popover.Arrow class="fill-popover stroke-border" />
+              <Popover.Arrow class="text-popover stroke-border" />
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>

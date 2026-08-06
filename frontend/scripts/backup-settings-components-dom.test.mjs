@@ -261,12 +261,29 @@ test('progress dialog distinguishes preparing, running, completed-with-issues, a
   buttonWithText(preparing, 'settingsBackup.runInBackground').click()
   assert.equal(runInBackground.mock.calls.length, 1)
 
+  const checking = await render(BackupProgressDialog, {
+    open: true,
+    store: {
+      running: true,
+      progress: {
+        phase: 'running', stage: 'checking', accountEmail: 'a@example.test', folderPath: 'Inbox',
+        current: 17539, total: 21535, exported: 0, skipped: 17539, missing: 0, unavailable: 0, failed: 0,
+      },
+    },
+  })
+  assert.match(checking.textContent, /settingsBackup\.checkingExistingDescription/)
+  assert.match(checking.textContent, /settingsBackup\.checkingExisting/)
+  assert.doesNotMatch(checking.textContent, /17539/)
+  assert.doesNotMatch(checking.textContent, /settingsBackup\.backedUpComposition/)
+  assert.ok(checking.querySelector('.backup-progress-indeterminate'))
+  assert.equal(checking.querySelector('[role="progressbar"]').hasAttribute('aria-valuenow'), false)
+
   const running = await render(BackupProgressDialog, {
     open: true,
     store: {
       running: true,
       progress: {
-        phase: 'running', accountEmail: 'a@example.test', folderPath: 'Inbox',
+        phase: 'running', stage: 'exporting', accountEmail: 'a@example.test', folderPath: 'Inbox',
         current: 3, total: 10, exported: 2, skipped: 1, missing: 0, unavailable: 0, failed: 0,
       },
     },

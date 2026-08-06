@@ -1,12 +1,19 @@
 <script lang="ts">
   import Icon from '@iconify/svelte'
+  import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime'
   import * as Dialog from '$lib/components/ui/dialog'
   import { _ } from '$lib/i18n'
+
+  interface InfoLink {
+    label: string
+    url: string
+  }
 
   interface InfoSection {
     title: string
     body?: string
     items?: string[]
+    links?: InfoLink[]
   }
 
   interface Props {
@@ -58,6 +65,21 @@
             <ul class="list-disc space-y-1.5 pl-5 text-sm leading-6 text-muted-foreground">
               {#each section.items as item (item)}<li>{item}</li>{/each}
             </ul>
+          {/if}
+          {#if section.links?.length}
+            <div class="flex flex-col items-start gap-1">
+              {#each section.links as link (link.url)}
+                <button
+                  type="button"
+                  data-settings-focus-style="link"
+                  class="-mx-2 inline-flex min-h-7 w-fit items-center gap-1 rounded-md px-2 text-left text-sm text-primary transition-colors hover:bg-primary/5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  onclick={() => BrowserOpenURL(link.url)}
+                >
+                  <span>{link.label}</span>
+                  <Icon icon="mdi:open-in-new" class="h-3.5 w-3.5 shrink-0" />
+                </button>
+              {/each}
+            </div>
           {/if}
         </section>
       {/each}

@@ -5,6 +5,7 @@ import type { BackupScope } from '../settingsDraft.svelte'
 
 export interface BackupProgress {
   phase: string
+  stage?: string
   accountEmail?: string
   folderPath?: string
   current: number
@@ -42,7 +43,7 @@ export class BackupRunStore {
   async start(directory: string, scope: BackupScope, selectedAccountIds: string[]): Promise<void> {
     this.loading = true
     this.running = true
-    this.progress = { phase: 'running', current: 0, total: 0, exported: 0, skipped: 0, missing: 0, unavailable: 0, failed: 0 }
+    this.progress = { phase: 'running', stage: 'checking', current: 0, total: 0, exported: 0, skipped: 0, missing: 0, unavailable: 0, failed: 0 }
     try {
       const state = await StartEmailBackup({ directory, scope, selectedAccountIds })
       this.running = Boolean(state?.running)

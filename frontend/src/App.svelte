@@ -788,6 +788,7 @@
 
   interface BackupProgress {
     phase: string
+    stage?: string
     current: number
     total: number
     exported: number

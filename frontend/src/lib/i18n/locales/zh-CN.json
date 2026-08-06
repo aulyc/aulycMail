@@ -343,6 +343,8 @@
     "progressTitle": "备份进度",
     "preparingBackup": "正在保存设置并准备备份…",
     "calculatingScope": "正在计算本次需要核对的邮件…",
+    "checkingExisting": "正在核对已有备份…",
+    "checkingExistingDescription": "正在确认本地同步记录是否已有完整的备份文件。",
     "checkedProgress": "已核对 {current} / {total}",
     "checkedTotal": "本次共核对 {count} 封邮件",
     "backupInProgressDescription": "正在将服务器邮件原文导出到本地备份目录。",
@@ -512,6 +514,8 @@
     "acknowledgements": {
       "title": "致谢",
       "intro": "感谢所有为 aulycMail 所依赖的技术、工具和生态作出贡献的个人与社区。",
+      "foundationTitle": "基础应用",
+      "foundationBody": "特别感谢 Aerion 项目及其贡献者为 aulycMail 提供早期代码基础。aulycMail 在此基础上持续开发并进行了修改。",
       "technologyTitle": "技术与开源生态",
       "technologyDesktop": "Wails、Go 及相关桌面运行时组件",
       "technologyEditor": "Svelte、Vite、TipTap 及其生态",

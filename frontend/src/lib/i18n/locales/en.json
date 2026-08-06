@@ -343,6 +343,8 @@
     "progressTitle": "Backup progress",
     "preparingBackup": "Saving settings and preparing the backup…",
     "calculatingScope": "Calculating the messages to check in this run…",
+    "checkingExisting": "Checking existing backups…",
+    "checkingExistingDescription": "Confirming which locally synced messages already have complete backup files.",
     "checkedProgress": "Checked {current} / {total}",
     "checkedTotal": "Checked {count} messages in this run",
     "backupInProgressDescription": "Exporting original server messages to the local backup directory.",
@@ -512,6 +514,8 @@
     "acknowledgements": {
       "title": "Acknowledgements",
       "intro": "We thank the people and communities who build and maintain the technologies, tools, and ecosystems used by aulycMail.",
+      "foundationTitle": "Foundation Application",
+      "foundationBody": "Special thanks to the Aerion project and its contributors for providing the early codebase on which aulycMail was built and continues to be developed and modified.",
       "technologyTitle": "Technology and Open-Source Ecosystem",
       "technologyDesktop": "Wails, Go, and related desktop runtime components",
       "technologyEditor": "Svelte, Vite, TipTap, and their ecosystems",

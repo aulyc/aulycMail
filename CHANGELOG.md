@@ -4,6 +4,13 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Clarified backup progress by separating existing-backup verification from
+  message export and showing verification as an indeterminate stage.
+- Added an explicit Aerion foundation acknowledgement and official project link
+  to the About page.
+- Matched the Settings help-popover arrow to its background, removing the bright
+  triangle visible in dark appearance.
+
 ## [0.7.4] — 2026-08-06
 
 - Stabilized DMG packaging by retrying Finder registration of newly mounted
