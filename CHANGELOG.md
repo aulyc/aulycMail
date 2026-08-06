@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.7.4-beta.2] — 2026-08-06
+
 - Matched the Settings sidebar's System Update title color to the adjacent
   version summary while preserving semantic colors for update availability.
 
