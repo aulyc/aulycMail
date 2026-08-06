@@ -6,6 +6,7 @@ const makefile = fs.readFileSync(new URL('../Makefile', import.meta.url), 'utf8'
 const wailsConfig = JSON.parse(fs.readFileSync(new URL('../wails.json', import.meta.url), 'utf8'))
 const mainSource = fs.readFileSync(new URL('../main.go', import.meta.url), 'utf8')
 const packageScript = fs.readFileSync(new URL('./package_macos_app.sh', import.meta.url), 'utf8')
+const dmgPackageScript = fs.readFileSync(new URL('./package_macos_dmg.sh', import.meta.url), 'utf8')
 const legalVerifier = fs.readFileSync(new URL('./verify_legal_resources.sh', import.meta.url), 'utf8')
 const proprietaryLicense = fs.readFileSync(new URL('../LICENSE', import.meta.url), 'utf8')
 const thirdPartyNotices = fs.readFileSync(new URL('../THIRD_PARTY_NOTICES.md', import.meta.url), 'utf8')
@@ -57,4 +58,11 @@ test('macOS bundles fail closed on complete Aerion legal resources', () => {
   }
   assert.match(packageScript, /Missing or empty required legal file/)
   assert.match(packageScript, /verify_legal_resources\.sh/)
+})
+
+test('DMG layout waits for Finder to register the mounted installer volume', () => {
+  assert.match(dmgPackageScript, /repeat 20 times/)
+  assert.match(dmgPackageScript, /set finderDisk to get disk diskName/)
+  assert.match(dmgPackageScript, /delay 0\.25/)
+  assert.match(dmgPackageScript, /Finder did not register mounted disk/)
 })

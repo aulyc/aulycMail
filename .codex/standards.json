@@ -225,7 +225,7 @@
     },
     {
       "path": "tools/package_macos_dmg.sh",
-      "sha256": "249dbf13c1d731a8ee5db3972c3aca47f542ab5332d12b1585faef7c8b41b09e"
+      "sha256": "390299d5a236e84ba7431fdfe743309054855600b1a653df3020f35145f1a518"
     },
     {
       "path": "tools/verify_release_candidate.sh",
@@ -233,7 +233,7 @@
     },
     {
       "path": "tools/build-output-layout.test.mjs",
-      "sha256": "3f5fb97fa9ebb731ead0c83ed13110b59d5e7cfd3d1b437c35eac3ca6003dd32"
+      "sha256": "f0d48c8dd8174da2bde03cb773b2a6114c63587072c5a3bfb31fe02cfdacc902"
     },
     {
       "path": "tools/verify_legal_resources.sh",

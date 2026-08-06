@@ -253,7 +253,17 @@ on run argv
   set diskName to item 1 of argv
   set appName to item 2 of argv
   tell application "Finder"
-    tell disk diskName
+    set finderDisk to missing value
+    repeat 20 times
+      try
+        set finderDisk to get disk diskName
+        exit repeat
+      on error
+        delay 0.25
+      end try
+    end repeat
+    if finderDisk is missing value then error "Finder did not register mounted disk " & diskName
+    tell finderDisk
       open
       delay 1
       set current view of container window to icon view

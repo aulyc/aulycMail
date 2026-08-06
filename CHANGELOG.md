@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Stabilized DMG packaging by retrying Finder registration of newly mounted
+  installer volumes before applying the Finder window layout.
+
 ## [0.7.4-beta.2] — 2026-08-06
 
 - Matched the Settings sidebar's System Update title color to the adjacent
