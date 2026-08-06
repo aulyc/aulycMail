@@ -145,3 +145,88 @@ test('removes WebKit-inserted file URIs without deleting adjacent user text', as
   assert.equal(editor.getText(), 'HelloWorld')
   assert.deepEqual(onDropFilePaths.mock.calls.at(-1), [['/tmp/final.txt']])
 })
+
+test('covers optional editor callbacks, mention navigation, and paste fallbacks', () => {
+  const mentionHandler = vi.fn(() => true)
+  const editor = createEditor({ onMentionKeyDown: mentionHandler })
+  const editorProps = editor.options.editorProps
+
+  const handledMention = new KeyboardEvent('keydown', { key: '@', bubbles: true, cancelable: true })
+  assert.equal(editorProps.handleKeyDown(editor.view, handledMention), true)
+  assert.deepEqual(mentionHandler.mock.calls.at(-1), [handledMention])
+
+  mentionHandler.mockReturnValue(false)
+  editor.commands.setContent('<p><span data-contact-mention data-label="Ada">@Ada</span>tail</p>')
+  editor.commands.setTextSelection(1)
+  const right = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
+  assert.equal(editorProps.handleKeyDown(editor.view, right), true)
+  assert.equal(right.defaultPrevented, true)
+  assert.equal(editor.state.selection.from, 2)
+
+  const left = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true })
+  assert.equal(editorProps.handleKeyDown(editor.view, left), true)
+  assert.equal(left.defaultPrevented, true)
+  assert.equal(editor.state.selection.from, 1)
+
+  editor.commands.setTextSelection({ from: 1, to: 2 })
+  assert.equal(editorProps.handleKeyDown(editor.view, new KeyboardEvent('keydown', { key: 'ArrowRight' })), false)
+  assert.equal(editorProps.handleKeyDown(editor.view, new KeyboardEvent('keydown', { key: 'Home' })), false)
+
+  const image = new File(['image'], 'inline.png', { type: 'image/png' })
+  const nullImageItem = pasteEvent({ items: [{ type: 'image/png', getAsFile: () => null }], files: [] })
+  assert.equal(editorProps.handlePaste(editor.view, nullImageItem), true)
+  assert.equal(nullImageItem.preventDefault.mock.calls.length, 1)
+  assert.equal(editorProps.handlePaste(editor.view, { clipboardData: null, preventDefault: vi.fn() }), false)
+  assert.equal(editorProps.handlePaste(editor.view, pasteEvent({ items: [], files: [image] })), true)
+
+  const plainEditor = createEditor()
+  const shiftTab = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+  plainEditor.view.dom.dispatchEvent(shiftTab)
+  assert.equal(shiftTab.defaultPrevented, true)
+  const modEnter = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', ctrlKey: true, bubbles: true, cancelable: true })
+  plainEditor.view.dom.dispatchEvent(modEnter)
+  assert.equal(modEnter.defaultPrevented, true)
+
+  const disabledEditor = createEditor({
+    onShiftTab: vi.fn(),
+    isEnhancedKeyboardNavigationEnabled: () => false,
+  })
+  const disabledShiftTab = new KeyboardEvent('keydown', { key: 'Tab', code: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+  disabledEditor.view.dom.dispatchEvent(disabledShiftTab)
+  assert.equal(disabledShiftTab.defaultPrevented, false)
+})
+
+test('covers drop text fallback, absent handlers, and unchanged WebKit state', async () => {
+  vi.useFakeTimers()
+  const onDropFilePaths = vi.fn()
+  const editor = createEditor({ onDropFilePaths })
+  const editorProps = editor.options.editorProps
+
+  const textDrop = dropEvent({ text: 'file:///tmp/from%20plain.txt' })
+  assert.equal(editorProps.handleDrop(editor.view, textDrop, null, false), true)
+  assert.deepEqual(onDropFilePaths.mock.calls.at(-1), [['/tmp/from plain.txt']])
+
+  const invalidTextDrop = dropEvent({ text: 'https://example.test/not-a-local-file' })
+  assert.equal(editorProps.handleDrop(editor.view, invalidTextDrop, null, false), false)
+  await vi.advanceTimersByTimeAsync(200)
+
+  const image = new File(['image'], 'inline.png', { type: 'image/png' })
+  const documentFile = new File(['pdf'], 'report.pdf', { type: 'application/pdf' })
+  const noHandlersEditor = createEditor()
+  const filesDrop = dropEvent({ files: [image, documentFile] })
+  assert.equal(noHandlersEditor.options.editorProps.handleDrop(noHandlersEditor.view, filesDrop, null, false), true)
+  assert.equal(filesDrop.preventDefault.mock.calls.length, 1)
+  const uriDrop = dropEvent({ uriList: 'file:///tmp/no-handler.txt' })
+  assert.equal(noHandlersEditor.options.editorProps.handleDrop(noHandlersEditor.view, uriDrop, null, false), true)
+
+  editor.commands.setContent('<p>unchanged</p>')
+  assert.equal(editorProps.handleDrop(editor.view, dropEvent(), null, false), false)
+  await vi.advanceTimersByTimeAsync(200)
+  assert.equal(editor.getText(), 'unchanged')
+
+  assert.equal(editorProps.handleDrop(editor.view, dropEvent(), null, false), false)
+  editor.commands.setContent('<p>unchanged plus ordinary text</p>')
+  await vi.advanceTimersByTimeAsync(200)
+  assert.equal(editor.getText(), 'unchanged plus ordinary text')
+  assert.equal(onDropFilePaths.mock.calls.length, 1)
+})

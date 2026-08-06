@@ -85,7 +85,7 @@ GO_PACKAGES := $(shell find . \
 	-name '*.go' -print | xargs -n1 dirname | sort -u | sed 's,^\./,./,')
 
 GO_COVERAGE_PROFILE := .cache/coverage/go.out
-GO_COVERAGE_MIN_PERCENT := 77.5
+GO_COVERAGE_MIN_PERCENT := 79.0
 DEADCODE_VERSION := v0.38.0
 DEADCODE_ALLOWLIST := tools/deadcode-allowlist.txt
 DEADCODE_OUTPUT_DIR := .cache/deadcode

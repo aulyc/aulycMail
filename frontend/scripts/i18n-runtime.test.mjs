@@ -85,8 +85,10 @@ test('date-fns locale loading caches Chinese and ignores English and unknown loc
 })
 
 test('uses user-facing update installation copy without exposing internal verification steps', () => {
-  assert.equal(zhCN.settingsUpdate.systemUpdate, '系统更新')
+  assert.equal(zhCN.settingsUpdate.systemUpdate, '软件更新')
   assert.equal(zhCN.settingsUpdate.availableCompact, '发现新版本')
+  assert.equal(zhCN.settingsAbout.version, '软件版本 {version}')
+  assert.equal(zhCN.settingsAbout.versionTitle, '软件版本')
   assert.equal(
     zhCN.settingsUpdate.confirmDescription,
     '将下载并安装 aulycMail {version}。更新完成后，应用将自动重新启动。',

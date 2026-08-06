@@ -282,6 +282,11 @@ test('accounts tab filters shared mailboxes, tests connections, edits, deletes, 
   assert.deepEqual(accounts.reorderAccounts.mock.calls.at(-1), [['b', 'shared', 'a']])
   assert.deepEqual(onAccountOrderChanged.mock.calls.at(-1), ['a', 'move-down'])
 
+  titledButtons(target, 'settingsAccounts.moveUp')[1].click()
+  await flushAsync()
+  assert.deepEqual(accounts.reorderAccounts.mock.calls.at(-1), [['b', 'shared', 'a']])
+  assert.deepEqual(onAccountOrderChanged.mock.calls.at(-1), ['b', 'move-up'])
+
   titledButtons(target, 'settingsAccounts.editAccount')[0].click()
   await flushAsync()
   assert.ok(target.querySelector('[data-account-dialog]'))
@@ -318,4 +323,23 @@ test('accounts tab reports thrown connection errors and renders loading and empt
   accounts.accounts = []
   const empty = await render(AccountsTab)
   assert.match(empty.target.textContent, /settingsAccounts\.noAccountsConfigured/)
+})
+
+test('accounts tab tolerates connection-history failures and supplies fallback test messages', async () => {
+  accounts.getAccountConnOK
+    .mockReset()
+    .mockRejectedValueOnce(new Error('history unavailable'))
+    .mockResolvedValueOnce('not-a-date')
+  accounts.testAccountConnection.mockResolvedValueOnce({ success: false })
+  const fallback = await render(AccountsTab)
+  assert.match(fallback.target.textContent, /account\.neverConnected/)
+  assert.match(fallback.target.textContent, /account\.lastConnected/)
+  titledButtons(fallback.target, 'account.testConnection')[0].click()
+  await flushAsync()
+  assert.match(fallback.target.querySelector('[data-connection-dialog]').textContent, /account\.connectionFailed/)
+
+  accounts.testAccountConnection.mockRejectedValueOnce('plain failure')
+  titledButtons(fallback.target, 'account.testConnection')[1].click()
+  await flushAsync()
+  assert.match(fallback.target.querySelector('[data-connection-dialog]').textContent, /plain failure/)
 })

@@ -270,6 +270,61 @@ test('ContactList renders loading, retry, empty-search, and loading-more states'
   assert.match(rendered.target.textContent, /common\.loading/)
 })
 
+test('ContactList covers category labels, descending sort, region focus, and pagination guards', async () => {
+  const sourceLabels = [
+    ['', 'contacts.sidebar.all'],
+    ['role:sender', 'contacts.sidebar.roleSender'],
+    ['role:recipient', 'contacts.sidebar.roleRecipient'],
+    ['role:cc', 'contacts.sidebar.roleCc'],
+    ['role:bcc', 'contacts.sidebar.roleBcc'],
+    ['local', 'contacts.sidebar.localAll'],
+    ['local:manual', 'contacts.sidebar.localManual'],
+    ['local:collected', 'contacts.sidebar.localCollected'],
+    ['unknown-source', 'contacts.list.header'],
+  ]
+  for (const [sourceID, label] of sourceLabels) {
+    contacts.view.selectedSourceId = sourceID
+    const rendered = await render(ContactList)
+    assert.equal(rendered.target.querySelector('[role="region"]').getAttribute('aria-label'), label)
+    await unmount(mounted.pop())
+  }
+
+  contacts.view.selectedSourceId = ''
+  contacts.view.sortOrder = 'name-desc'
+  contacts.view.contacts = [
+    listContact('contact-email-only', '', 'only@example.test'),
+    listContact('contact-named', 'Named', 'named@example.test'),
+  ]
+  const { target } = await render(ContactList)
+  assert.equal(namedButton(target, 'contacts.list.addTooltip'), undefined)
+  namedButton(target, 'contacts.list.sortDesc').click()
+  assert.deepEqual(contacts.setSort.mock.calls.at(-1), ['name-asc'])
+  assert.match(target.textContent, /only@example\.test/)
+
+  const region = target.querySelector('[role="region"]')
+  const focusTarget = region.querySelector('[data-keyboard-region-focus-target]')
+  assert.ok(focusTarget)
+  region.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  assert.equal(document.activeElement, focusTarget)
+  assert.deepEqual(keyboard.set.mock.calls.at(-1), ['messageList'])
+
+  const scroller = target.querySelector('[role="listbox"]').firstElementChild
+  Object.defineProperties(scroller, {
+    scrollHeight: { configurable: true, value: 500 },
+    scrollTop: { configurable: true, value: 480 },
+    clientHeight: { configurable: true, value: 50 },
+  })
+  contacts.view.hasMore = false
+  scroller.dispatchEvent(new Event('scroll', { bubbles: true }))
+  contacts.view.hasMore = true
+  contacts.view.loading = true
+  scroller.dispatchEvent(new Event('scroll', { bubbles: true }))
+  contacts.view.loading = false
+  contacts.view.loadingMore = true
+  scroller.dispatchEvent(new Event('scroll', { bubbles: true }))
+  assert.equal(contacts.loadMore.mock.calls.length, 0)
+})
+
 test('ContactDetail renders all contact fields, copies email, opens mail, edits, and deletes', async () => {
   const onEdit = vi.fn()
   const { target } = await render(ContactDetail, { onEdit })

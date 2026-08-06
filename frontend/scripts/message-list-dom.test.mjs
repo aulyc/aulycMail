@@ -827,3 +827,140 @@ test('automatically catches up optional folders and reloads unified inbox for ne
   await flushAsync()
   assert.equal(backend.GetUnifiedInboxConversations.mock.calls.length, before + 1)
 })
+
+test('keeps empty-list keyboard commands safe and reports missing selections consistently', async () => {
+  const onConversationSelect = vi.fn()
+  const { instance } = await renderList({ onConversationSelect })
+
+  instance.selectPrevious()
+  await instance.selectNext()
+  instance.openSelected()
+  instance.toggleCheck()
+  instance.selectPreviousWithCheck()
+  instance.selectNextWithCheck()
+  await instance.openContextMenu()
+  assert.equal(instance.getSelectedThreadId(), null)
+  assert.deepEqual(instance.getSelectedMessageIds(), [])
+  assert.equal(instance.getSelectedConversationInfo(), null)
+  assert.equal(instance.isSelectedStarred(), false)
+  assert.equal(onConversationSelect.mock.calls.length, 0)
+
+  await instance.selectThread('missing-thread')
+  assert.equal(instance.getSelectedThreadId(), 'missing-thread')
+  assert.deepEqual(instance.getSelectedMessageIds(), [])
+  assert.equal(instance.getSelectedConversationInfo(), null)
+  assert.equal(instance.isSelectedStarred(), false)
+  instance.openSelected()
+  await instance.openContextMenu()
+  assert.equal(onConversationSelect.mock.calls.length, 0)
+})
+
+test('cycles all search-focus states and reads fallback message arrays', async () => {
+  vi.useFakeTimers()
+  backend.GetConversations.mockResolvedValue([conversation('fallback', {
+    messageIds: undefined,
+    messages: [{ id: 'fallback-message-1' }, { id: 'fallback-message-2' }],
+  })])
+  backend.GetConversationCount.mockResolvedValue(1)
+  const { instance, target } = await renderList()
+  assert.deepEqual(instance.getSelectedMessageIds(), ['fallback-message-1', 'fallback-message-2'])
+
+  instance.toggleSearchFocus()
+  await vi.advanceTimersByTimeAsync(60)
+  await flushAsync()
+  const input = target.querySelector('input[placeholder="messageList.searchMessages"]')
+  assert.equal(document.activeElement, input)
+
+  target.querySelector('button[title="messageList.showingNewest"]').focus()
+  instance.toggleSearchFocus()
+  assert.equal(document.activeElement, input)
+  instance.toggleSearchFocus()
+  await flushAsync()
+  assert.equal(target.querySelector('input[placeholder="messageList.searchMessages"]'), null)
+})
+
+test('pages keyboard selection across normal and local-search result boundaries', async () => {
+  backend.GetConversations.mockImplementation(async (_accountId, _folderId, offset) => (
+    offset === 0 ? [conversation('normal-first')] : [conversation('normal-second')]
+  ))
+  backend.GetConversationCount.mockResolvedValue(2)
+  let rendered = await renderList()
+  await rendered.instance.selectNext()
+  assert.equal(rendered.instance.getSelectedThreadId(), 'normal-second')
+  assert.equal(backend.GetConversations.mock.calls.at(-1)[2], 1)
+
+  await unmount(mounted.pop())
+  document.body.innerHTML = ''
+  vi.useFakeTimers()
+  backend.GetConversations.mockResolvedValue([conversation('folder-base')])
+  backend.GetConversationCount.mockResolvedValue(1)
+  backend.SearchConversations.mockImplementation(async (_accountId, _folderId, _query, offset) => (
+    offset === 0 ? [conversation('search-first')] : [conversation('search-second')]
+  ))
+  backend.GetSearchCount.mockResolvedValue(2)
+  rendered = await renderList()
+  rendered.instance.toggleSearchFocus()
+  await vi.advanceTimersByTimeAsync(60)
+  await flushAsync()
+  const input = rendered.target.querySelector('input[placeholder="messageList.searchMessages"]')
+  input.value = 'paged query'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  await vi.advanceTimersByTimeAsync(310)
+  await flushAsync()
+  assert.equal(rendered.instance.getSelectedThreadId(), 'search-first')
+
+  await rendered.instance.selectNext()
+  await flushAsync()
+  assert.equal(rendered.instance.getSelectedThreadId(), 'search-second')
+  assert.equal(backend.SearchConversations.mock.calls.at(-1)[3], 50)
+})
+
+test('applies read events buffered during the initial conversation load', async () => {
+  let resolveConversations
+  backend.GetConversations
+    .mockReturnValueOnce(new Promise((resolve) => { resolveConversations = resolve }))
+    .mockResolvedValue([conversation('buffered', { unreadCount: 0 })])
+  backend.GetConversationCount.mockResolvedValue(1)
+
+  const target = document.createElement('div')
+  document.body.appendChild(target)
+  const instance = mount(MessageList, {
+    target,
+    props: {
+      accountId: 'account-1',
+      folderId: 'inbox-1',
+      folderName: 'Inbox',
+      folderType: 'inbox',
+    },
+  })
+  mounted.push(instance)
+  await Promise.resolve()
+  await tick()
+  assert.equal(backend.GetConversations.mock.calls.length, 1)
+
+  runtime.handlers.get('messages:readChanged')({ messageIds: ['message-buffered'], isRead: true })
+  resolveConversations([conversation('buffered', { unreadCount: 1 })])
+  await flushAsync()
+  instance.selectAll()
+  assert.equal(instance.getCheckedHasUnread(), false)
+})
+
+test('blocks server search in unified inbox and moves Enter focus back to the list', async () => {
+  vi.useFakeTimers()
+  backend.GetUnifiedInboxConversations.mockResolvedValue([conversation('unified-search')])
+  backend.GetUnifiedInboxCount.mockResolvedValue(1)
+  const { instance, target } = await renderList({ accountId: 'unified', folderId: 'inbox' })
+  instance.toggleSearchFocus()
+  await vi.advanceTimersByTimeAsync(60)
+  await flushAsync()
+  const input = target.querySelector('input[placeholder="messageList.searchMessages"]')
+  input.value = 'remote query'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true }))
+  await flushAsync()
+  assert.equal(backend.IMAPSearchFolder.mock.calls.length, 0)
+
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+  await flushAsync()
+  assert.notEqual(document.activeElement, input)
+})

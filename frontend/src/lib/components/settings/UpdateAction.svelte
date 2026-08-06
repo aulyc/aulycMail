@@ -77,19 +77,19 @@
 </script>
 
 {#if compact}
-  <button
-    type="button"
-    class="flex w-full flex-col items-start gap-1 rounded-md py-1.5 text-left text-xs transition-colors hover:bg-background/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default"
-    disabled={busy}
-    onclick={activate}
-    aria-label={statusText || $_('settingsUpdate.checkNow')}
-  >
-    <span class="flex min-w-0 items-center gap-2">
-      <span data-update-title class="shrink-0 font-semibold text-muted-foreground">{$_('settingsUpdate.systemUpdate')}</span>
+  <div class="flex w-full items-center gap-2 py-1.5 text-xs">
+    <span data-update-title class="shrink-0 font-semibold text-muted-foreground">{$_('settingsUpdate.systemUpdate')}</span>
+    <button
+      type="button"
+      class="inline-flex min-h-7 min-w-0 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1 font-medium shadow-sm transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default disabled:opacity-60"
+      disabled={busy}
+      onclick={activate}
+      aria-label={statusText || $_('settingsUpdate.checkNow')}
+    >
       {#if busy}<Icon icon="mdi:loading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />{/if}
       <span data-update-status class="truncate {statusClass}">{compactStatusText}</span>
-    </span>
-  </button>
+    </button>
+  </div>
 {:else}
   <button
     type="button"

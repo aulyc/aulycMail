@@ -80,7 +80,7 @@ Support or Keychain storage.
 
 ```text
 make fmt-check       Non-mutating gofmt verification
-make coverage-go     Cross-package Go tests + 77.5% weighted statement coverage floor
+make coverage-go     Cross-package Go tests + 79.0% weighted statement coverage floor
 make deadcode-check  Pinned production reachability gate + exact native-callback allowlist
 make check-go        fmt-check + coverage-go + lint/vet + deadcode-check
 make check-frontend  unit/render tests + full frontend coverage floor + svelte-check + i18n + ESLint + knip
@@ -99,7 +99,7 @@ recreates `frontend/node_modules` from `package-lock.json` and runs
 
 `make coverage-go` writes its ignored profile to `.cache/coverage/go.out` and
 instruments every repository Go package, so calls crossing `app/` and
-`internal/` boundaries count toward the same weighted result. The 77.5% floor is
+`internal/` boundaries count toward the same weighted result. The 79.0% floor is
 the checked-in no-regression baseline, not a claim that the backend is fully
 covered; raise it as high-risk mail paths gain tests.
 
@@ -108,7 +108,7 @@ pipeline. V8 coverage includes every `frontend/src/**/*.ts` and
 `frontend/src/**/*.svelte` source file, including files that no test imports;
 untested files therefore contribute zero instead of disappearing from the
 report. Type declarations are excluded. The checked-in full-inventory floors
-are 91.5% statements, 78.75% branches, 94% functions, and 93.25% lines, with the
+are 92.5% statements, 80.5% branches, 94.5% functions, and 94.5% lines, with the
 JSON summary written to `.cache/coverage/frontend/coverage-summary.json`.
 These are no-regression baselines rather than a claim that the UI is fully
 covered. Happy DOM tests exercise real Svelte client mounting, focus, clicks,

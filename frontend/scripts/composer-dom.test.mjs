@@ -951,3 +951,142 @@ test('searches and selects rich-text mentions and reports stale mention-search f
   await flushAsync()
   assert.ok(error.mock.calls.some(([message]) => message === 'Failed to search contacts for mention:'))
 })
+
+test('deletes an existing draft after successful delivery and applies the never-receipt policy', async () => {
+  const api = createApi({
+    getAccount: vi.fn().mockResolvedValue({ id: 'account-1', readReceiptRequestPolicy: 'never' }),
+  })
+  const { target } = await renderComposer({
+    api,
+    draftId: 'sent-draft',
+    initialMessage: composeMessage({ request_read_receipt: true }),
+  })
+  assert.equal(target.querySelector('input[type="checkbox"]'), null)
+  buttonWithText(target, 'composer.send').click()
+  await flushAsync()
+  assert.deepEqual(api.deleteDraft.mock.calls.at(-1), ['sent-draft'])
+  assert.equal(api.sendMessage.mock.calls.at(-1)[1].request_read_receipt, false)
+})
+
+test('supports Tab navigation, the attach shortcut, and disables custom Tab handling in dialogs', async () => {
+  vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
+  const { target } = await renderComposer({ initialMessage: composeMessage() })
+  const subject = target.querySelector('#composer-subject')
+  const body = target.querySelector('textarea[placeholder="composer.writePlaceholder"]')
+
+  subject.focus()
+  const forwardTab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+  window.dispatchEvent(forwardTab)
+  assert.equal(forwardTab.defaultPrevented, true)
+  assert.equal(document.activeElement, body)
+
+  const backwardTab = new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+  window.dispatchEvent(backwardTab)
+  assert.equal(backwardTab.defaultPrevented, true)
+  assert.equal(document.activeElement, subject)
+
+  window.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 'a', code: 'KeyA', altKey: true, bubbles: true, cancelable: true,
+  }))
+  const shortcutInput = document.body.querySelector('input[type="file"][multiple]')
+  assert.ok(shortcutInput)
+  Object.defineProperty(shortcutInput, 'files', { configurable: true, value: [] })
+  shortcutInput.dispatchEvent(new Event('change', { bubbles: true }))
+  await flushAsync()
+
+  buttonWithText(target, 'composer.close').click()
+  await flushAsync()
+  const dialogTab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+  window.dispatchEvent(dialogTab)
+  assert.equal(dialogTab.defaultPrevented, false)
+})
+
+test('dismisses a plain mention and tracks textarea scrolling', async () => {
+  const api = createApi({
+    searchContacts: vi.fn().mockResolvedValue([
+      { id: 'mention-1', display_name: 'Alice Mention', email: 'alice.mention@example.test' },
+    ]),
+  })
+  const { target } = await renderComposer({ api })
+  const body = target.querySelector('textarea[placeholder="composer.writePlaceholder"]')
+  body.value = '@ali'
+  body.setSelectionRange(4, 4)
+  body.dispatchEvent(new InputEvent('input', { bubbles: true, data: 'i' }))
+  await new Promise((resolve) => setTimeout(resolve, 170))
+  await flushAsync()
+  assert.ok(target.querySelector('[data-composer-mention-menu]'))
+
+  Object.defineProperty(body, 'scrollTop', { configurable: true, value: 12, writable: true })
+  Object.defineProperty(body, 'scrollLeft', { configurable: true, value: 3, writable: true })
+  body.dispatchEvent(new Event('scroll', { bubbles: true }))
+  await tick()
+  assert.match(target.querySelector('.composer-plain-overlay > div').getAttribute('style'), /translate\(-3px, -12px\)/)
+
+  body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+  await flushAsync()
+  assert.equal(target.querySelector('[data-composer-mention-menu]'), null)
+})
+
+test('reports FileReader failures for inline images and attachment picker files', async () => {
+  composerSettings.format = 'rich'
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
+  vi.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function () {
+    this.onerror?.(new ProgressEvent('error'))
+  })
+  const { target } = await renderComposer({ initialMessage: composeMessage() })
+  const editor = editorState.editors[0]
+
+  await editor.__options.onPasteImage(new File(['image'], 'broken.png', { type: 'image/png' }))
+  assert.equal(toast.add.mock.calls.at(-1)[0].message, 'composer.failedToInsertImage')
+
+  await editor.__options.onDropFile(new File(['text'], 'broken.txt', { type: 'text/plain' }))
+  assert.equal(error.mock.calls.some(([message]) => message === 'Failed to read dropped file:'), true)
+
+  buttonWithText(target, 'composer.attachFiles').click()
+  const input = document.body.querySelector('input[type="file"][multiple]')
+  Object.defineProperty(input, 'files', {
+    configurable: true,
+    value: [new File(['attachment'], 'broken-attachment.txt', { type: 'text/plain' })],
+  })
+  input.dispatchEvent(new Event('change', { bubbles: true }))
+  await flushAsync()
+  assert.equal(toast.add.mock.calls.at(-1)[0].message, 'composer.failedToAttachFiles')
+})
+
+test('clears file drag state and stops cleanly when direct path reads fail', async () => {
+  const api = createApi({
+    readFileAsAttachment: vi.fn().mockRejectedValue(new Error('path unavailable')),
+  })
+  const { target } = await renderComposer({ api })
+  const root = target.querySelector('[role="region"]')
+  const fileTransfer = {
+    types: ['Files'],
+    files: [new File(['drop'], 'dragged.txt', { type: 'text/plain' })],
+    dropEffect: 'none',
+    getData: () => '',
+  }
+  dispatchWithDataTransfer(root, 'dragover', fileTransfer)
+  await tick()
+  assert.match(target.textContent, /composer\.dropToAttach/)
+  dispatchWithDataTransfer(root, 'dragleave', fileTransfer)
+  await tick()
+  assert.doesNotMatch(target.textContent, /composer\.dropToAttach/)
+
+  dispatchWithDataTransfer(root, 'dragover', fileTransfer)
+  window.dispatchEvent(new Event('dragend', { bubbles: true }))
+  await tick()
+  assert.doesNotMatch(target.textContent, /composer\.dropToAttach/)
+
+  const uriTransfer = {
+    types: ['text/uri-list'],
+    files: [],
+    getData(type) {
+      return type === 'text/uri-list' ? 'file:///tmp/unavailable.txt' : ''
+    },
+  }
+  dispatchWithDataTransfer(root, 'drop', uriTransfer)
+  await flushAsync()
+  assert.deepEqual(api.readFileAsAttachment.mock.calls.at(-1), ['/tmp/unavailable.txt'])
+  assert.equal(target.textContent.includes('unavailable.txt'), false)
+})

@@ -418,7 +418,7 @@
   },
   "settingsUpdate": {
     "softwareUpdate": "软件更新",
-    "systemUpdate": "系统更新",
+    "systemUpdate": "软件更新",
     "checkNow": "检查更新",
     "checking": "正在检查更新…",
     "upToDate": "已经是最新版本",
@@ -438,8 +438,8 @@
   },
   "settingsAbout": {
     "title": "关于 {name}",
-    "version": "版本 {version}",
-    "versionTitle": "版本",
+    "version": "软件版本 {version}",
+    "versionTitle": "软件版本",
     "compatibilityTitle": "适配",
     "compatibilityValue": "Apple Silicon",
     "systemRequirementTitle": "系统要求",
