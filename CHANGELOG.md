@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.7.5-beta.4] — 2026-08-06
+
 - 将“关于”页的“适配”改为“适配芯片”，并按标签内容自动收紧元数据列宽，使版本、芯片和系统要求信息更靠左对齐。
 
 ## [0.7.5-beta.3] — 2026-08-06
