@@ -440,7 +440,7 @@
     "title": "关于 {name}",
     "version": "软件版本 {version}",
     "versionTitle": "软件版本",
-    "compatibilityTitle": "适配",
+    "compatibilityTitle": "适配芯片",
     "compatibilityValue": "Apple Silicon",
     "systemRequirementTitle": "系统要求",
     "systemRequirementValue": "macOS 11+",

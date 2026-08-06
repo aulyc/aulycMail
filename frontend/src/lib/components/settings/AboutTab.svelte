@@ -47,7 +47,7 @@
 
       <div data-about-scroll-region class="min-h-0 flex-1 overflow-y-auto pr-2 scrollbar-thin">
         <div class="space-y-8 pb-6">
-          <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm" data-about-section="metadata">
+          <dl class="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm" data-about-section="metadata">
             <dt class="font-semibold text-foreground">{$_('settingsAbout.versionTitle')}</dt>
             <dd class="text-muted-foreground">{versionValue}</dd>
             <dt class="font-semibold text-foreground">{$_('settingsAbout.compatibilityTitle')}</dt>
