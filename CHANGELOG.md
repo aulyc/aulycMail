@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.7.5-beta.1] — 2026-08-06
+
 - Clarified backup progress by separating existing-backup verification from
   message export and showing verification as an indeterminate stage.
 - Added an explicit Aerion foundation acknowledgement and official project link
