@@ -63,12 +63,17 @@ afterEach(async () => {
 })
 
 test('shares latest/update state, manually checks, and confirms installation', async () => {
+  let finishInstall
   backend.getStatus.mockResolvedValue({ state: 'idle', currentVersion: '0.6.0-beta.23', currentBuildNumber: 39, canInstall: false })
   backend.check.mockResolvedValue({ state: 'upToDate', currentVersion: '0.7.0', currentBuildNumber: 40, latestVersion: '0.7.0', latestBuildNumber: 40, canInstall: false })
-  backend.install.mockResolvedValue({ state: 'installing', currentVersion: '0.6.0-beta.23', currentBuildNumber: 39, latestVersion: '0.7.0', latestBuildNumber: 40, canInstall: false })
+  backend.install.mockImplementation(() => new Promise((resolve) => { finishInstall = resolve }))
 
   const compact = render({ compact: true })
   await flushAsync()
+  assert.match(compact.querySelector('[data-update-title]').textContent, /settingsUpdate\.systemUpdate/)
+  assert.match(compact.querySelector('[data-update-status]').textContent, /settingsUpdate\.checkNow/)
+  assert.ok(compact.querySelector('button').classList.contains('items-start'))
+  assert.ok(compact.querySelector('button').classList.contains('text-left'))
   assert.match(compact.textContent, /settingsUpdate\.checkNow/)
   compact.querySelector('button').click()
   await flushAsync()
@@ -82,6 +87,8 @@ test('shares latest/update state, manually checks, and confirms installation', a
   })
   await flushAsync()
   assert.match(compact.textContent, /settingsUpdate\.available/)
+  assert.match(compact.querySelector('[data-update-status]').textContent, /settingsUpdate\.availableCompact/)
+  assert.doesNotMatch(compact.querySelector('[data-update-status]').textContent, /0\.7\.0/)
   assert.ok(compact.querySelector('.text-red-500'))
 
   const about = render()
@@ -92,6 +99,38 @@ test('shares latest/update state, manually checks, and confirms installation', a
   about.querySelector('[data-confirm-action="confirm"]').click()
   await flushAsync()
   assert.equal(backend.install.mock.calls.length, 1)
+
+  runtime.updateListener({
+    state: 'downloading', progress: 37, currentVersion: '0.6.0-beta.23', currentBuildNumber: 39,
+    latestVersion: '0.7.0', latestBuildNumber: 40, canInstall: false,
+  })
+  await flushAsync()
+  let progress = about.querySelector('[data-confirm-progress]')
+  assert.ok(progress)
+  assert.match(progress.textContent, /settingsUpdate\.downloadingProgress/)
+  assert.equal(progress.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '37')
+  assert.equal(about.querySelector('[data-confirm-action="confirm"]').dataset.confirmFixedWidth, 'true')
+
+  runtime.updateListener({
+    state: 'verifying', progress: 82, currentVersion: '0.6.0-beta.23', currentBuildNumber: 39,
+    latestVersion: '0.7.0', latestBuildNumber: 40, canInstall: false,
+  })
+  await flushAsync()
+  progress = about.querySelector('[data-confirm-progress]')
+  assert.match(progress.textContent, /settingsUpdate\.verifying/)
+  assert.equal(progress.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '82')
+
+  runtime.updateListener({
+    state: 'installing', progress: 100, currentVersion: '0.6.0-beta.23', currentBuildNumber: 39,
+    latestVersion: '0.7.0', latestBuildNumber: 40, canInstall: false,
+  })
+  await flushAsync()
+  progress = about.querySelector('[data-confirm-progress]')
+  assert.match(progress.textContent, /settingsUpdate\.installing/)
+  assert.equal(progress.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '100')
+
+  finishInstall({ state: 'installing', progress: 100, currentVersion: '0.6.0-beta.23', currentBuildNumber: 39, latestVersion: '0.7.0', latestBuildNumber: 40, canInstall: false })
+  await flushAsync()
 
   runtime.updateListener({
     state: 'failed', currentVersion: '0.6.0-beta.23', currentBuildNumber: 39,

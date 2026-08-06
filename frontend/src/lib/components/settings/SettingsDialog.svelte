@@ -774,7 +774,7 @@
             {/each}
           </div>
         </nav>
-        <div class="mt-auto px-1 pt-4 text-center text-xs text-muted-foreground">
+        <div class="mt-auto px-1 pt-4 text-left text-xs text-muted-foreground">
           <UpdateAction compact />
           <div class="mt-1">{$_('settingsAbout.version', { values: { version: appInfo?.version ?? '—' } })}</div>
         </div>

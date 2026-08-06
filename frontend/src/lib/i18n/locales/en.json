@@ -416,11 +416,14 @@
   },
   "settingsUpdate": {
     "softwareUpdate": "Software Update",
+    "systemUpdate": "System Update",
     "checkNow": "Check for Updates",
     "checking": "Checking for updates…",
     "upToDate": "Up to date",
     "available": "Version {version} is available",
+    "availableCompact": "New version available",
     "downloading": "Downloading {progress}%",
+    "downloadingProgress": "Downloading update…",
     "verifying": "Verifying update…",
     "installing": "Installing and preparing to restart…",
     "failed": "Check failed; click to retry",
@@ -428,7 +431,7 @@
     "checkFailed": "Unable to check for updates. Please try again later.",
     "installFailed": "Update installation failed. The current version was not replaced.",
     "confirmTitle": "Install Software Update?",
-    "confirmDescription": "aulycMail {version} will be downloaded and strictly verified. After verification, the current app will be replaced and restarted.",
+    "confirmDescription": "aulycMail {version} will be downloaded and installed. The app will restart automatically when the update is complete.",
     "updateAndRestart": "Update and Restart"
   },
   "settingsAbout": {

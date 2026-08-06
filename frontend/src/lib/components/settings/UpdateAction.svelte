@@ -12,6 +12,8 @@
   updateStore.start()
 
   const busy = $derived(['checking', 'downloading', 'verifying', 'installing'].includes(updateStore.status.state))
+  const installingUpdate = $derived(['downloading', 'verifying', 'installing'].includes(updateStore.status.state))
+  const installProgress = $derived(Math.max(0, Math.min(100, Math.round(updateStore.status.progress ?? 0))))
   const statusText = $derived.by(() => {
     const status = updateStore.status
     switch (status.state) {
@@ -25,6 +27,19 @@
         ? $_('settingsUpdate.installFailedRetry')
         : $_('settingsUpdate.failed')
       default: return compact ? $_('settingsUpdate.checkNow') : ''
+    }
+  })
+  const compactStatusText = $derived(
+    updateStore.status.state === 'available'
+      ? $_('settingsUpdate.availableCompact')
+      : statusText,
+  )
+  const installProgressText = $derived.by(() => {
+    switch (updateStore.status.state) {
+      case 'downloading': return $_('settingsUpdate.downloadingProgress')
+      case 'verifying': return $_('settingsUpdate.verifying')
+      case 'installing': return $_('settingsUpdate.installing')
+      default: return ''
     }
   })
   const statusClass = $derived(
@@ -64,13 +79,16 @@
 {#if compact}
   <button
     type="button"
-    class="flex w-full flex-col items-center gap-1 rounded-md px-1 py-1.5 text-center text-xs transition-colors hover:bg-background/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default"
+    class="flex w-full flex-col items-start gap-1 rounded-md py-1.5 text-left text-xs transition-colors hover:bg-background/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default"
     disabled={busy}
     onclick={activate}
     aria-label={statusText || $_('settingsUpdate.checkNow')}
   >
-    {#if busy}<Icon icon="mdi:loading" class="h-3.5 w-3.5 animate-spin text-muted-foreground" />{/if}
-    <span class={statusClass}>{statusText}</span>
+    <span class="flex min-w-0 items-center gap-2">
+      <span data-update-title class="shrink-0 font-semibold text-foreground">{$_('settingsUpdate.systemUpdate')}</span>
+      {#if busy}<Icon icon="mdi:loading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />{/if}
+      <span data-update-status class="truncate {statusClass}">{compactStatusText}</span>
+    </span>
   </button>
 {:else}
   <button
@@ -91,7 +109,10 @@
   description={$_('settingsUpdate.confirmDescription', { values: { version: updateStore.status.latestVersion ?? '' } })}
   confirmLabel={$_('settingsUpdate.updateAndRestart')}
   cancelLabel={$_('common.cancel')}
-  loading={updateStore.status.state === 'downloading' || updateStore.status.state === 'verifying'}
+  loading={installingUpdate}
+  loadingPresentation="footer-progress"
+  loadingLabel={installProgressText}
+  loadingProgress={installProgress}
   onConfirm={install}
   onCancel={() => confirmOpen = false}
 />

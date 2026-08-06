@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { beforeEach, test, vi } from 'vitest'
 
 const runtime = vi.hoisted(() => ({
@@ -30,6 +32,9 @@ import {
   getDateFnsLocale,
   loadDateFnsLocale,
 } from '../src/lib/i18n/dateFnsLocale.ts'
+
+const zhCN = JSON.parse(readFileSync(resolve(process.cwd(), 'src/lib/i18n/locales/zh-CN.json'), 'utf8'))
+const en = JSON.parse(readFileSync(resolve(process.cwd(), 'src/lib/i18n/locales/en.json'), 'utf8'))
 
 function setNavigatorLanguage(language) {
   Object.defineProperty(navigator, 'language', { configurable: true, value: language })
@@ -77,4 +82,17 @@ test('date-fns locale loading caches Chinese and ignores English and unknown loc
   assert.equal(getDateFnsLocale('zh-CN'), first)
   assert.equal(await loadDateFnsLocale('fr-FR'), undefined)
   assert.equal(getDateFnsLocale('fr-FR'), undefined)
+})
+
+test('uses user-facing update installation copy without exposing internal verification steps', () => {
+  assert.equal(zhCN.settingsUpdate.systemUpdate, '系统更新')
+  assert.equal(zhCN.settingsUpdate.availableCompact, '发现新版本')
+  assert.equal(
+    zhCN.settingsUpdate.confirmDescription,
+    '将下载并安装 aulycMail {version}。更新完成后，应用将自动重新启动。',
+  )
+  assert.equal(
+    en.settingsUpdate.confirmDescription,
+    'aulycMail {version} will be downloaded and installed. The app will restart automatically when the update is complete.',
+  )
 })

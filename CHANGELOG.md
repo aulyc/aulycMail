@@ -4,6 +4,12 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Improved the software-update confirmation with user-facing installation copy,
+  a compact real-time progress bar, and a fixed-width restart button throughout
+  download, verification, and installation.
+- Added a titled, left-aligned system-update status beside the Settings version
+  summary, including distinct up-to-date and new-version states.
+
 ## [0.7.3] — 2026-08-05
 
 - Simplified Settings by auto-saving ordinary preferences, removing the bottom

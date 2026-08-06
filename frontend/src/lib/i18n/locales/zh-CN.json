@@ -416,11 +416,14 @@
   },
   "settingsUpdate": {
     "softwareUpdate": "软件更新",
+    "systemUpdate": "系统更新",
     "checkNow": "检查更新",
     "checking": "正在检查更新…",
     "upToDate": "已经是最新版本",
     "available": "发现新版本 {version}",
+    "availableCompact": "发现新版本",
     "downloading": "正在下载 {progress}%",
+    "downloadingProgress": "正在下载更新…",
     "verifying": "正在验证更新…",
     "installing": "正在安装并准备重启…",
     "failed": "检查失败，点击重试",
@@ -428,7 +431,7 @@
     "checkFailed": "检查更新失败，请稍后重试",
     "installFailed": "更新安装失败，当前版本未被替换",
     "confirmTitle": "安装软件更新？",
-    "confirmDescription": "将下载并严格验证 aulycMail {version}，验证通过后替换当前应用并自动重启。",
+    "confirmDescription": "将下载并安装 aulycMail {version}。更新完成后，应用将自动重新启动。",
     "updateAndRestart": "更新并重启"
   },
   "settingsAbout": {
