@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.7.4-beta.1] — 2026-08-06
+
 - Improved the software-update confirmation with user-facing installation copy,
   a compact real-time progress bar, and a fixed-width restart button throughout
   download, verification, and installation.
