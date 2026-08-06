@@ -70,7 +70,10 @@ test('shares latest/update state, manually checks, and confirms installation', a
 
   const compact = render({ compact: true })
   await flushAsync()
-  assert.match(compact.querySelector('[data-update-title]').textContent, /settingsUpdate\.systemUpdate/)
+  const updateTitle = compact.querySelector('[data-update-title]')
+  assert.match(updateTitle.textContent, /settingsUpdate\.systemUpdate/)
+  assert.ok(updateTitle.classList.contains('text-muted-foreground'))
+  assert.equal(updateTitle.classList.contains('text-foreground'), false)
   assert.match(compact.querySelector('[data-update-status]').textContent, /settingsUpdate\.checkNow/)
   assert.ok(compact.querySelector('button').classList.contains('items-start'))
   assert.ok(compact.querySelector('button').classList.contains('text-left'))

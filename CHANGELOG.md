@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- Matched the Settings sidebar's System Update title color to the adjacent
+  version summary while preserving semantic colors for update availability.
+
 ## [0.7.4-beta.1] — 2026-08-06
 
 - Improved the software-update confirmation with user-facing installation copy,

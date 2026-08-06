@@ -85,7 +85,7 @@
     aria-label={statusText || $_('settingsUpdate.checkNow')}
   >
     <span class="flex min-w-0 items-center gap-2">
-      <span data-update-title class="shrink-0 font-semibold text-foreground">{$_('settingsUpdate.systemUpdate')}</span>
+      <span data-update-title class="shrink-0 font-semibold text-muted-foreground">{$_('settingsUpdate.systemUpdate')}</span>
       {#if busy}<Icon icon="mdi:loading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />{/if}
       <span data-update-status class="truncate {statusClass}">{compactStatusText}</span>
     </span>
