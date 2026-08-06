@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- 将设置页帮助提示改为一体式气泡，让箭头、边框、背景和阴影呈现为连续的整体轮廓。
+
 ## [0.7.5-beta.1] — 2026-08-06
 
 - Clarified backup progress by separating existing-backup verification from
