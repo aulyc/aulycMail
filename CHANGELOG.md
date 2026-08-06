@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.7.4] — 2026-08-06
+
 - Stabilized DMG packaging by retrying Finder registration of newly mounted
   installer volumes before applying the Finder window layout.
 
