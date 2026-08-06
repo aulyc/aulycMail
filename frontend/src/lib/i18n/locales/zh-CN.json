@@ -466,7 +466,7 @@
       "featurePrivacy": "控制远程图片加载，降低邮件跟踪与隐私风险",
       "featureBackup": "将邮件导出为标准 .eml 文件，并记录同步和备份日志",
       "dataTitle": "数据与连接",
-      "dataBody": "应用直接与您配置的邮件服务商通信。邮件、索引、联系人、设置和日志保存在本机；账户密码或应用专用密码保存在系统钥匙串中，不经过 aulyc 的服务器。"
+      "dataBody": "应用直接与您配置的邮件服务商通信。邮件、索引、联系人、设置和日志保存在本机；账户密码或应用专用密码由用户自行保存和管理。aulyc 不设用于接收、存储或处理本应用数据的服务器；应用不建立任何用于遥测、统计分析、广告跟踪或向 aulyc 回传用户数据的连接。"
     },
     "privacy": {
       "title": "隐私政策",
@@ -479,13 +479,13 @@
       "noCollectionSale": "不出售或共享用户数据",
       "localTitle": "本地存储",
       "localMail": "已同步邮件、文件夹元数据、本地搜索索引、附件和草稿",
-      "localAccount": "邮箱账户配置；密码或应用专用密码保存在系统钥匙串",
+      "localAccount": "邮箱账户配置；密码或应用专用密码由用户自行保存和管理",
       "localContacts": "您创建的联系人以及从已发送邮件中在本地收集的地址",
       "localSettings": "主题、窗口状态和其他应用偏好",
       "localLogs": "同步与备份任务的日志元数据；日志不包含邮件正文、附件或凭据",
       "localBackups": "您选择目录中的标准 .eml 备份文件和备份索引",
       "securityTitle": "数据安全与第三方服务",
-      "securityBody": "数据安全取决于设备安全、系统钥匙串以及连接邮件服务商时使用的 TLS/SSL。aulycMail 仅连接您配置的 IMAP/SMTP 服务；这些服务受其各自条款和隐私政策约束。",
+      "securityBody": "数据安全取决于设备安全、用户对账户凭据的妥善管理，以及连接邮件服务商时使用的 TLS/SSL。aulycMail 仅连接您配置的 IMAP/SMTP 服务；这些服务受其各自条款和隐私政策约束。",
       "retentionTitle": "保留与删除",
       "retentionBody": "数据会保留在设备上，直至您主动删除。卸载应用可能不会自动删除应用支持目录中的本地邮件数据。日志可在设置中清理，默认最多保留 30 天和最新 1,000 条；导出的备份文件会一直保留在您选择的目录中。",
       "contactTitle": "更新与联系",
@@ -514,6 +514,12 @@
     "acknowledgements": {
       "title": "致谢",
       "intro": "感谢所有为 aulycMail 所依赖的技术、工具和生态作出贡献的个人与社区。",
+      "specialTitle": "特别致谢",
+      "aiEra": "感谢伟大的 AI 时代，让更多想法得以更快成为现实",
+      "aiCollaboration": "致敬 Codex 与 Claude，在创作与开发中持续并肩协作",
+      "userContributions": "感谢每一位提交需求、报告问题和提出改进建议的用户",
+      "openSource": "感谢开源社区与开发工具带来的启发和帮助",
+      "aulycJourney": "感谢 aulyc 一路以来的坚持与灵感",
       "foundationTitle": "基础应用",
       "foundationBody": "特别感谢 Aerion 项目及其贡献者为 aulycMail 提供早期代码基础。aulycMail 在此基础上持续开发并进行了修改。",
       "technologyTitle": "技术与开源生态",
@@ -521,8 +527,6 @@
       "technologyEditor": "Svelte、Vite、TipTap 及其生态",
       "technologyInterface": "Iconify、bits-ui、Tailwind CSS 和 Nunito 字体",
       "technologyData": "SQLite、邮件协议库及其他 Go 与前端依赖",
-      "communityTitle": "用户与反馈",
-      "communityBody": "感谢每一位使用、测试并提出意见的用户。你们对稳定性、易用性和细节的关注持续推动产品改进。",
       "licenseTitle": "第三方声明",
       "licenseBody": "aulycMail 应用整体为专有软件；源自 Aerion 的部分继续受 Apache-2.0 约束，其他第三方组件继续受各自许可约束。完整许可证、署名、修改及无背书声明随应用一同提供在应用包的 Legal 资源目录中。"
     }

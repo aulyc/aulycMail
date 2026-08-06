@@ -466,7 +466,7 @@
       "featurePrivacy": "Control remote-image loading to reduce tracking and privacy risks",
       "featureBackup": "Export mail as standard .eml files and retain synchronization and backup logs",
       "dataTitle": "Data and Connections",
-      "dataBody": "The application communicates directly with the mail providers you configure. Messages, indexes, contacts, settings, and logs stay on your device; passwords and app-specific passwords are stored in the system keychain and do not pass through aulyc servers."
+      "dataBody": "The application communicates directly with the mail providers you configure. Messages, indexes, contacts, settings, and logs stay on your device; account passwords and app-specific passwords are saved and managed by the user. aulyc does not operate servers that receive, store, or process application data, and the application does not establish connections for telemetry, analytics, advertising tracking, or sending user data back to aulyc."
     },
     "privacy": {
       "title": "Privacy Policy",
@@ -479,13 +479,13 @@
       "noCollectionSale": "We do not sell or share user data",
       "localTitle": "Information Stored Locally",
       "localMail": "Synchronized messages, folder metadata, local search indexes, attachments, and drafts",
-      "localAccount": "Mail-account configuration; passwords and app-specific passwords stay in the system keychain",
+      "localAccount": "Mail-account configuration; account passwords and app-specific passwords are saved and managed by the user",
       "localContacts": "Contacts you create and addresses collected locally from sent mail",
       "localSettings": "Theme, window state, and other application preferences",
       "localLogs": "Synchronization and backup log metadata; logs do not contain message bodies, attachments, or credentials",
       "localBackups": "Standard .eml backup files and indexes in directories you select",
       "securityTitle": "Data Security and Third-Party Services",
-      "securityBody": "Security depends on your device, the system keychain, and TLS/SSL connections to your mail providers. aulycMail connects only to IMAP/SMTP services you configure; those services are governed by their own terms and privacy policies.",
+      "securityBody": "Security depends on your device, your management of account credentials, and TLS/SSL connections to your mail providers. aulycMail connects only to IMAP/SMTP services you configure; those services are governed by their own terms and privacy policies.",
       "retentionTitle": "Retention and Deletion",
       "retentionBody": "Data remains on your device until you delete it. Uninstalling the application may leave local mail data in its application-support directory. Logs can be cleared in Settings and are limited to 30 days and the newest 1,000 entries by default. Exported backups remain in the directory you selected.",
       "contactTitle": "Changes and Contact",
@@ -514,6 +514,12 @@
     "acknowledgements": {
       "title": "Acknowledgements",
       "intro": "We thank the people and communities who build and maintain the technologies, tools, and ecosystems used by aulycMail.",
+      "specialTitle": "Special Thanks",
+      "aiEra": "Thank you to the remarkable AI era for helping more ideas become reality faster",
+      "aiCollaboration": "A tribute to Codex and Claude for working alongside us throughout creation and development",
+      "userContributions": "Thank you to every user who submits requests, reports issues, and suggests improvements",
+      "openSource": "Thank you to the open-source community and developer tools for their inspiration and support",
+      "aulycJourney": "Thank you to aulyc for the persistence and inspiration throughout this journey",
       "foundationTitle": "Foundation Application",
       "foundationBody": "Special thanks to the Aerion project and its contributors for providing the early codebase on which aulycMail was built and continues to be developed and modified.",
       "technologyTitle": "Technology and Open-Source Ecosystem",
@@ -521,8 +527,6 @@
       "technologyEditor": "Svelte, Vite, TipTap, and their ecosystems",
       "technologyInterface": "Iconify, bits-ui, Tailwind CSS, and the Nunito font",
       "technologyData": "SQLite, e-mail protocol libraries, and other Go and frontend dependencies",
-      "communityTitle": "Users and Feedback",
-      "communityBody": "Thank you to everyone who uses, tests, and provides feedback on aulycMail. Your attention to stability, usability, and detail continues to improve the product.",
       "licenseTitle": "Third-Party Notices",
       "licenseBody": "aulycMail as a whole is proprietary software. Aerion-derived portions remain under Apache-2.0, and other third-party components remain under their respective licenses. Complete licenses, attribution, modification, and non-endorsement notices are distributed in the application's Legal resources directory."
     }

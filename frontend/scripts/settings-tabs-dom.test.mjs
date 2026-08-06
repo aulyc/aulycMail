@@ -225,7 +225,7 @@ test('about tab opens the website and renders every information section', async 
     ['settingsAbout.productDescription', 'settingsAbout.product.featureBackup'],
     ['settingsAbout.privacyPolicy', 'settingsAbout.privacy.localBackups'],
     ['settingsAbout.termsOfUse', 'settingsAbout.terms.responsibilityBackup'],
-    ['settingsAbout.acknowledgementsLabel', 'settingsAbout.acknowledgements.foundationBody'],
+    ['settingsAbout.acknowledgementsLabel', 'settingsAbout.acknowledgements.aiEra'],
   ]
   for (const [buttonLabel, expected] of cases) {
     buttonWithText(target, buttonLabel).click()

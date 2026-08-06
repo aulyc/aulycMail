@@ -216,16 +216,15 @@ test('keyboard-selected document links have no left inset focus marker', () => {
   assert.doesNotMatch(focusRule[1], /box-shadow:\s*inset/i)
 })
 
-test('settings help popover renders as one integrated bubble silhouette', () => {
+test('settings help popover opens to the right with centered alignment and no pointer', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/lib/components/settings/shared/SettingsRow.svelte'), 'utf8')
-  const css = compile(source, { filename: 'SettingsRow.svelte', generate: 'client' }).css.code
   assert.match(source, /data-settings-help-popover/)
+  assert.match(source, /side="right"/)
+  assert.match(source, /align="center"/)
+  assert.match(source, /sideOffset=\{8\}/)
   assert.doesNotMatch(source, /<Popover\.Arrow/)
-  assert.match(css, /\[data-settings-help-popover\]::after/)
-  assert.match(css, /filter:\s*drop-shadow/)
-  assert.match(css, /background:\s*hsl\(var\(--popover\)\)/)
-  assert.match(css, /\[data-settings-help-popover\]\[data-side='top'\]::after/)
-  assert.match(css, /border-bottom:\s*1px solid hsl\(var\(--border\)\)/)
+  assert.doesNotMatch(source, /::after/)
+  assert.match(source, /shadow-xl/)
 })
 
 test('covers page callbacks, horizontal navigation, input mode, and action-menu routing', async () => {

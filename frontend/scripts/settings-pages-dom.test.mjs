@@ -120,6 +120,19 @@ test('general settings keep background and menu-bar requirements consistent', as
   assert.equal(draftState(target).developerMode, 'true')
 })
 
+test('general settings help opens on the trigger right with vertical centers aligned', async () => {
+  const target = await renderPage('general')
+  const trigger = target.querySelector('[data-settings-help-trigger]')
+  assert.ok(trigger)
+  trigger.click()
+  await flushAsync()
+
+  const popover = document.body.querySelector('[data-settings-help-popover]')
+  assert.ok(popover)
+  assert.equal(popover.dataset.side, 'right')
+  assert.equal(popover.dataset.align, 'center')
+})
+
 test('appearance settings update theme, mail rendering, accent, and density drafts', async () => {
   const target = await renderPage('appearance')
   target.querySelector('[data-settings-select][data-value="pop-dark"] [data-settings-select-change]').click()

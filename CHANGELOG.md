@@ -4,6 +4,9 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- 移除设置项帮助提示的三角指针，并将提示窗放到问号右侧、保持垂直居中对齐。
+- 更新“关于”和隐私说明，明确账户密码由用户自行保存和管理、aulyc 不接收应用数据且应用不建立遥测回传连接，并补充 AI、Codex、Claude、用户、开源社区及 aulyc 的致谢。
+
 ## [0.7.5-beta.2] — 2026-08-06
 
 - 将设置页帮助提示改为一体式气泡，让箭头、边框、背景和阴影呈现为连续的整体轮廓。
