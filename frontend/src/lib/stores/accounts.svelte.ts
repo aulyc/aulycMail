@@ -159,10 +159,7 @@ class AccountStore {
     // Clear the account-level progress entry even when no folder:synced event
     // was needed, and also cover folder-list failures and cancellation.
     EventsOn('sync:accountFinished', (data: { accountId: string; succeeded: boolean }) => {
-      if (this.syncProgress[data.accountId]) {
-        delete this.syncProgress[data.accountId]
-        this.syncProgress = { ...this.syncProgress }
-      }
+      this.clearAccountSyncProgress(data.accountId)
 
       const acc = this.accounts.find((a) => a.account.id === data.accountId)
       if (acc) {
@@ -221,6 +218,12 @@ class AccountStore {
     EventsOn('network:offline', () => {
       this.isOnline = false
     })
+  }
+
+  private clearAccountSyncProgress(accountId: string): void {
+    if (!this.syncProgress[accountId]) return
+    delete this.syncProgress[accountId]
+    this.syncProgress = { ...this.syncProgress }
   }
 
   /**
@@ -364,10 +367,15 @@ class AccountStore {
       acc.lastCompleteSync = new Date()
       // Reload folders after sync
       await this.loadFolders(accountId)
+      if (!this.syncProgress[accountId] || Object.keys(this.syncProgress[accountId]).length === 0) {
+        acc.syncing = false
+      }
     } catch (err) {
       acc.error = err instanceof Error ? err.message : String(err)
       console.error(`Failed to sync account ${accountId}:`, err)
-      // Clear syncing on error (event handlers won't clear it)
+      // A folder-list failure or account deadline may not carry a folder ID,
+      // so no folder:syncError event can clear the last visible 0% entry.
+      this.clearAccountSyncProgress(accountId)
       acc.syncing = false
       throw err
     }
@@ -397,15 +405,31 @@ class AccountStore {
       for (const acc of this.accounts) {
         await this.loadFolders(acc.account.id)
       }
+      for (const acc of this.accounts) {
+        if (!this.syncProgress[acc.account.id] || Object.keys(this.syncProgress[acc.account.id]).length === 0) {
+          acc.syncing = false
+        }
+      }
     } catch (err) {
       // Parse which account(s) actually failed and only set error on those
       const errorMsg = err instanceof Error ? err.message : String(err)
+      let matchedAccount = false
       // Backend returns format like: "sync errors: email@example.com: error; email2@example.com: error"
       for (const acc of this.accounts) {
         // Check if this account's email appears in the error message
         if (errorMsg.includes(acc.account.email + ':')) {
+          matchedAccount = true
           acc.error = errorMsg
-          // Clear syncing on error for failed accounts
+          this.clearAccountSyncProgress(acc.account.id)
+          acc.syncing = false
+        }
+      }
+      // Failures before the backend identifies an account (for example,
+      // loading the account list) must not leave every account spinning.
+      if (!matchedAccount) {
+        this.syncProgress = {}
+        for (const acc of this.accounts) {
+          acc.error = errorMsg
           acc.syncing = false
         }
       }
@@ -420,6 +444,7 @@ class AccountStore {
    */
   async cancelAllSyncs(): Promise<void> {
     await CancelAllSyncs()
+    this.syncProgress = {}
     // Mark all accounts as not syncing
     for (const acc of this.accounts) {
       acc.syncing = false

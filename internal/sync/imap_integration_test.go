@@ -352,6 +352,51 @@ func TestEngineSyncFetchAndRawExportAgainstMemoryIMAP(t *testing.T) {
 	}
 }
 
+func TestHeaderFetchReturnsCancellationInsteadOfReportingSuccess(t *testing.T) {
+	fixture := newSyncIntegrationFixture(t)
+	uid := fixture.harness.append(t, syncPlainMessage)
+	conn, err := fixture.pool.GetConnection(context.Background(), syncAccountID)
+	if err != nil {
+		t.Fatalf("GetConnection() error = %v", err)
+	}
+	defer fixture.pool.Discard(conn)
+	if _, err := conn.Client().SelectMailbox(context.Background(), "INBOX"); err != nil {
+		t.Fatalf("SelectMailbox() error = %v", err)
+	}
+
+	canceled, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = fixture.engine.fetchMessageHeaders(
+		canceled,
+		conn.Client().RawClient(),
+		syncAccountID,
+		syncFolderID,
+		[]uint32{uid},
+	)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("fetchMessageHeaders(canceled) error = %v, want context.Canceled", err)
+	}
+}
+
+func TestHeaderBatchTimeoutFailsFastAndDiscardsStalledConnection(t *testing.T) {
+	fixture := newSyncIntegrationFixture(t)
+	fixture.harness.append(t, syncPlainMessage)
+	fixture.engine.headerBatchTimeout = time.Nanosecond
+
+	_, err := fixture.engine.SyncMessagesWithOptionsResult(
+		context.Background(),
+		syncAccountID,
+		syncFolderID,
+		MessageSyncOptions{Strategy: account.SyncStrategyFull},
+	)
+	if err == nil || !strings.Contains(err.Error(), "header fetch timed out") {
+		t.Fatalf("SyncMessagesWithOptionsResult() error = %v, want header timeout", err)
+	}
+	if stats := fixture.pool.GetStats(); stats.TotalConnections != 0 {
+		t.Fatalf("pool stats after header timeout = %+v, want no stale connections", stats)
+	}
+}
+
 func TestEngineIncrementalFlagsDeletionAndErrorsAgainstMemoryIMAP(t *testing.T) {
 	fixture := newSyncIntegrationFixture(t)
 	uid1 := fixture.harness.append(t, syncPlainMessage)

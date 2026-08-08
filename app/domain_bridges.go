@@ -16,6 +16,10 @@ type SyncBridge struct {
 	lastRequest map[string]time.Time
 	cancelled   bool
 	wakeSyncing bool
+
+	// accountSyncTimeout is configurable only for deterministic tests. A zero
+	// value uses the production default.
+	accountSyncTimeout time.Duration
 }
 
 func (a *App) initSyncBridge() {

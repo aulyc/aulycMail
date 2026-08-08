@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	stdsync "sync"
+	"time"
 
 	"aulyc.local/aulycmail/internal/account"
 	"aulyc.local/aulycmail/internal/contact"
@@ -29,6 +30,13 @@ func init() {
 // Batch sizes for incremental sync
 const (
 	headerBatchSize = 50 // Messages per batch for header fetch
+
+	// Header batches are small and must finish within a bounded interval. Body
+	// downloads intentionally use the longer connection read timeout, but a
+	// header FETCH must be cut off sooner so the UI cannot remain at 0%
+	// indefinitely on a half-open TCP connection.
+	defaultHeaderBatchTimeout = 90 * time.Second
+	maxHeaderTimeoutRetries   = 1
 )
 
 // Body fetch batch limits (hybrid byte + count based, like Geary)
@@ -74,16 +82,17 @@ type ProgressCallback func(progress SyncProgress)
 
 // Engine handles synchronization between IMAP server and local storage
 type Engine struct {
-	pool             *imapPkg.Pool
-	accountStore     *account.Store
-	folderStore      *folder.Store
-	messageStore     *message.Store
-	attachmentStore  *message.AttachmentStore
-	contactStore     *contact.Store
-	attachExtractor  *email.AttachmentExtractor
-	sanitizer        *email.Sanitizer
-	log              zerolog.Logger
-	progressCallback ProgressCallback
+	pool               *imapPkg.Pool
+	accountStore       *account.Store
+	folderStore        *folder.Store
+	messageStore       *message.Store
+	attachmentStore    *message.AttachmentStore
+	contactStore       *contact.Store
+	attachExtractor    *email.AttachmentExtractor
+	sanitizer          *email.Sanitizer
+	log                zerolog.Logger
+	progressCallback   ProgressCallback
+	headerBatchTimeout time.Duration
 
 	messageSyncMu stdsync.Mutex
 	messageSyncs  map[messageSyncKey]chan struct{}
@@ -97,16 +106,17 @@ type messageSyncKey struct {
 // NewEngine creates a new sync engine
 func NewEngine(pool *imapPkg.Pool, accountStore *account.Store, folderStore *folder.Store, messageStore *message.Store, attachmentStore *message.AttachmentStore, contactStore *contact.Store) *Engine {
 	return &Engine{
-		pool:            pool,
-		accountStore:    accountStore,
-		folderStore:     folderStore,
-		messageStore:    messageStore,
-		attachmentStore: attachmentStore,
-		contactStore:    contactStore,
-		attachExtractor: email.NewAttachmentExtractor(),
-		sanitizer:       email.NewSanitizer(),
-		log:             logging.WithComponent("sync"),
-		messageSyncs:    make(map[messageSyncKey]chan struct{}),
+		pool:               pool,
+		accountStore:       accountStore,
+		folderStore:        folderStore,
+		messageStore:       messageStore,
+		attachmentStore:    attachmentStore,
+		contactStore:       contactStore,
+		attachExtractor:    email.NewAttachmentExtractor(),
+		sanitizer:          email.NewSanitizer(),
+		log:                logging.WithComponent("sync"),
+		messageSyncs:       make(map[messageSyncKey]chan struct{}),
+		headerBatchTimeout: defaultHeaderBatchTimeout,
 	}
 }
 

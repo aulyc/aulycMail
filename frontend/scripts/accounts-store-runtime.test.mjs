@@ -100,16 +100,19 @@ test('account store manages loading, trees, live events, sync lifecycle, mutatio
   backend.SyncAccountComplete.mockResolvedValue(undefined)
   await accountStore.syncAccount('a')
   assert.equal(accountStore.getAccount('a').lastCompleteSync instanceof Date, true)
-  assert.equal(accountStore.getAccount('a').syncing, true)
+  assert.equal(accountStore.getAccount('a').syncing, false)
   await accountStore.syncAccount('missing')
+  events.get('sync:progress')({ accountId: 'a', folderId: 'inbox', fetched: 0, total: 2, phase: 'headers' })
   backend.SyncAccountComplete.mockRejectedValueOnce(new Error('single sync failed'))
   await assert.rejects(accountStore.syncAccount('a'), /single sync failed/)
   assert.equal(accountStore.getAccount('a').syncing, false)
   assert.equal(accountStore.getAccount('a').error, 'single sync failed')
+  assert.equal(accountStore.getSyncProgress('a'), null)
 
   backend.SyncAllComplete.mockResolvedValueOnce(undefined)
   await accountStore.syncAllComplete()
   assert.equal(accountStore.accounts.every((item) => item.lastCompleteSync instanceof Date), true)
+  assert.equal(accountStore.accounts.every((item) => !item.syncing), true)
   const oldest = new Date('2026-01-01T00:00:00Z')
   const newer = new Date('2026-01-02T00:00:00Z')
   accountStore.accounts[0].lastCompleteSync = newer
@@ -122,8 +125,12 @@ test('account store manages loading, trees, live events, sync lifecycle, mutatio
   await assert.rejects(accountStore.syncAllComplete(), /unavailable/)
   assert.equal(accountStore.getAccount('b').syncing, false)
   assert.match(accountStore.getAccount('b').error, /unavailable/)
+  events.get('sync:progress')({ accountId: 'a', folderId: 'inbox', fetched: 0, total: 2, phase: 'headers' })
+  events.get('sync:progress')({ accountId: 'b', folderId: 'inbox', fetched: 0, total: 2, phase: 'headers' })
   await accountStore.cancelAllSyncs()
   assert.equal(accountStore.accounts.every((item) => !item.syncing), true)
+  assert.equal(accountStore.getSyncProgress('a'), null)
+  assert.equal(accountStore.getSyncProgress('b'), null)
 
   const accountC = { id: 'c', email: 'c@example.com', name: 'Account C', enabled: true }
   backend.AddAccount.mockResolvedValue(accountC)

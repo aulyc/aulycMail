@@ -15,6 +15,8 @@ import (
 	syncengine "aulyc.local/aulycmail/internal/sync"
 )
 
+const defaultAccountSyncTimeout = 30 * time.Minute
+
 // ============================================================================
 // Sync API - Exposed to frontend via Wails bindings
 // ============================================================================
@@ -33,12 +35,12 @@ func (s *SyncBridge) SyncFolder(accountID, folderID string) error {
 	s.lastRequest[syncKey] = time.Now()
 	s.mu.Unlock()
 
-	return s.coordinateAccountSync(accountID, syncengine.TriggerManual, func() error {
-		return s.syncFolderDirect(accountID, folderID)
+	return s.coordinateAccountSync(accountID, syncengine.TriggerManual, func(ctx context.Context) error {
+		return s.syncFolderDirect(ctx, accountID, folderID)
 	})
 }
 
-func (s *SyncBridge) syncFolderDirect(accountID, folderID string) error {
+func (s *SyncBridge) syncFolderDirect(parent context.Context, accountID, folderID string) error {
 	log := logging.WithComponent("app")
 	folderObj, err := s.app.requireSelectableFolder(folderID)
 	if err != nil {
@@ -63,14 +65,35 @@ func (s *SyncBridge) syncFolderDirect(accountID, folderID string) error {
 		s.mu.Lock()
 	}
 
-	// Create new cancellable context for this sync
-	ctx, cancel := context.WithCancel(s.app.ctx)
+	if parent == nil {
+		parent = s.app.ctx
+		if parent == nil {
+			parent = context.Background()
+		}
+	}
+
+	// Create a cancellable context for the header phase. It inherits the
+	// coordinator/account deadline so a preempted or timed-out sync cannot keep
+	// consuming a connection after its caller has already stopped waiting.
+	ctx, cancel := context.WithCancel(parent)
 	s.contexts[syncKey] = cancel
 
 	s.mu.Unlock()
+	headerContextOwned := true
+	defer func() {
+		if !headerContextOwned {
+			return
+		}
+		cancel()
+		s.mu.Lock()
+		if currentCancel, exists := s.contexts[syncKey]; exists && sameCancelFunc(currentCancel, cancel) {
+			delete(s.contexts, syncKey)
+		}
+		s.mu.Unlock()
+	}()
 
-	// NOTE: Don't cleanup syncContexts here - body sync runs in goroutine
-	// and needs the context to remain cancellable. Cleanup happens in the goroutine.
+	// Header-phase contexts are cleaned on every return. If background body
+	// fetching starts, ownership is transferred to a detached body context.
 
 	// Get account to determine sync period
 	acc, err := s.app.accountStore.Get(accountID)
@@ -131,12 +154,6 @@ func (s *SyncBridge) syncFolderDirect(accountID, folderID string) error {
 
 	bodyFetch := syncengine.BodyFetchOptionsFromAccount(acc)
 	if !bodyFetch.Enabled {
-		s.mu.Lock()
-		if currentCancel, exists := s.contexts[syncKey]; exists && fmt.Sprintf("%p", currentCancel) == fmt.Sprintf("%p", cancel) {
-			delete(s.contexts, syncKey)
-		}
-		s.mu.Unlock()
-
 		s.app.emitEvent("folder:synced", map[string]interface{}{
 			"accountId": accountID,
 			"folderId":  folderID,
@@ -145,14 +162,39 @@ func (s *SyncBridge) syncFolderDirect(accountID, folderID string) error {
 		return nil
 	}
 
+	// Body fetching intentionally outlives the coordinator request that handled
+	// the header phase. Transfer the cancellation slot to a fresh app-lifetime
+	// context before returning; explicit CancelFolderSync/CancelAllSyncs still
+	// cancel it, while a normal coordinator cleanup no longer aborts it.
+	bodyParent := s.app.ctx
+	if bodyParent == nil {
+		bodyParent = context.Background()
+	}
+	bodyCtx, bodyCancel := context.WithCancel(bodyParent)
+	s.mu.Lock()
+	currentCancel, exists := s.contexts[syncKey]
+	if !exists || !sameCancelFunc(currentCancel, cancel) || ctx.Err() != nil {
+		s.mu.Unlock()
+		bodyCancel()
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		return context.Canceled
+	}
+	s.contexts[syncKey] = bodyCancel
+	s.mu.Unlock()
+	headerContextOwned = false
+	cancel()
+
 	// Start background body fetching (emits progress events for "bodies" phase)
-	// Pass ctx so body fetch can also be cancelled
+	// Pass bodyCtx so body fetch can also be cancelled explicitly.
 	go func(syncCtx context.Context, syncDays int, cancelFn context.CancelFunc, key string, result syncengine.MessageSyncResult) {
+		defer cancelFn()
 		// Cleanup sync context when goroutine completes
 		defer func() {
 			s.mu.Lock()
 			// Only delete if it's still our cancel function (not replaced by newer sync)
-			if currentCancel, exists := s.contexts[key]; exists && fmt.Sprintf("%p", currentCancel) == fmt.Sprintf("%p", cancelFn) {
+			if currentCancel, exists := s.contexts[key]; exists && sameCancelFunc(currentCancel, cancelFn) {
 				delete(s.contexts, key)
 			}
 			s.mu.Unlock()
@@ -200,9 +242,13 @@ func (s *SyncBridge) syncFolderDirect(accountID, folderID string) error {
 			})
 			s.recordSyncActivity(accountID, folderID, result, activitylog.StatusSuccess, nil)
 		}
-	}(ctx, bodyFetch.Days, cancel, syncKey, messageResult)
+	}(bodyCtx, bodyFetch.Days, bodyCancel, syncKey, messageResult)
 
 	return nil
+}
+
+func sameCancelFunc(left, right context.CancelFunc) bool {
+	return fmt.Sprintf("%p", left) == fmt.Sprintf("%p", right)
 }
 
 func syncActivitySummary(result syncengine.MessageSyncResult, status string) string {
@@ -261,12 +307,12 @@ func (s *SyncBridge) recordSyncActivity(accountID, folderID string, result synce
 // This is useful when attachments weren't extracted properly (e.g., after a fix)
 // or when message content needs to be re-parsed.
 func (s *SyncBridge) ForceSyncFolder(accountID, folderID string) error {
-	return s.coordinateAccountSync(accountID, syncengine.TriggerManual, func() error {
-		return s.forceSyncFolderDirect(accountID, folderID)
+	return s.coordinateAccountSync(accountID, syncengine.TriggerManual, func(ctx context.Context) error {
+		return s.forceSyncFolderDirect(ctx, accountID, folderID)
 	})
 }
 
-func (s *SyncBridge) forceSyncFolderDirect(accountID, folderID string) error {
+func (s *SyncBridge) forceSyncFolderDirect(ctx context.Context, accountID, folderID string) error {
 	log := logging.WithComponent("app")
 	log.Info().Str("accountID", accountID).Str("folderID", folderID).Msg("Starting force re-sync of folder")
 
@@ -296,19 +342,21 @@ func (s *SyncBridge) forceSyncFolderDirect(accountID, folderID string) error {
 	log.Info().Int64("attachmentsDeleted", attachmentsDeleted).Msg("Deleted attachments")
 
 	// Step 3: Trigger normal folder sync (which will re-fetch bodies and extract attachments)
-	return s.syncFolderDirect(accountID, folderID)
+	return s.syncFolderDirect(ctx, accountID, folderID)
 }
 
 // SyncAccountComplete performs a comprehensive sync of an account:
 // 1. Syncs folder list from IMAP
 // 2. Syncs core folders' messages (Inbox, Drafts, Sent)
 func (s *SyncBridge) SyncAccountComplete(accountID string) error {
-	return s.coordinateAccountSync(accountID, syncengine.TriggerManual, func() error {
-		return s.syncAccountCompleteDirect(accountID)
+	return s.coordinateAccountSync(accountID, syncengine.TriggerManual, func(ctx context.Context) error {
+		return s.runAccountSyncWithTimeout(ctx, accountID, func(syncCtx context.Context) error {
+			return s.syncAccountCompleteDirect(syncCtx, accountID)
+		})
 	})
 }
 
-func (s *SyncBridge) syncAccountCompleteDirect(accountID string) error {
+func (s *SyncBridge) syncAccountCompleteDirect(ctx context.Context, accountID string) error {
 	log := logging.WithComponent("app.masterSync")
 	log.Info().Str("accountID", accountID).Msg("Starting complete account sync")
 
@@ -323,7 +371,7 @@ func (s *SyncBridge) syncAccountCompleteDirect(accountID string) error {
 	}
 
 	// 1. Sync folder list first (required for message sync)
-	if err := s.app.syncFoldersDirect(accountID); err != nil {
+	if err := s.app.syncFoldersDirect(ctx, accountID); err != nil {
 		status := activitylog.StatusFailed
 		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			status = activitylog.StatusCancelled
@@ -349,6 +397,7 @@ func (s *SyncBridge) syncAccountCompleteDirect(accountID string) error {
 	var errorsMu gosync.Mutex
 	var wg gosync.WaitGroup
 
+folderLoop:
 	for _, f := range foldersToSync {
 		// Check if sync was cancelled between folders
 		s.mu.Lock()
@@ -359,15 +408,22 @@ func (s *SyncBridge) syncAccountCompleteDirect(accountID string) error {
 			break
 		}
 
+		select {
+		case sem <- struct{}{}: // Acquire semaphore
+		case <-ctx.Done():
+			errorsMu.Lock()
+			syncErrors = append(syncErrors, ctx.Err().Error())
+			errorsMu.Unlock()
+			break folderLoop
+		}
 		wg.Add(1)
-		sem <- struct{}{} // Acquire semaphore
 		go func(f *folder.Folder) {
 			defer recoverPanic("app.sync", "sync folder")
 			defer wg.Done()
 			defer func() { <-sem }() // Release semaphore
 
 			log.Info().Str("path", f.Path).Str("id", f.ID).Msg("Syncing folder")
-			if syncErr := s.syncFolderDirect(accountID, f.ID); syncErr != nil {
+			if syncErr := s.syncFolderDirect(ctx, accountID, f.ID); syncErr != nil {
 				log.Warn().Err(syncErr).Str("folder", f.Path).Msg("Message sync failed")
 				errorsMu.Lock()
 				syncErrors = append(syncErrors, fmt.Sprintf("%s: %v", f.Path, syncErr))
@@ -483,8 +539,10 @@ func (s *SyncBridge) syncAllComplete(trigger syncengine.Trigger) error {
 			break
 		}
 
-		if err := s.coordinateAccountSync(acc.ID, trigger, func() error {
-			return s.syncAccountCompleteDirect(acc.ID)
+		if err := s.coordinateAccountSync(acc.ID, trigger, func(ctx context.Context) error {
+			return s.runAccountSyncWithTimeout(ctx, acc.ID, func(syncCtx context.Context) error {
+				return s.syncAccountCompleteDirect(syncCtx, acc.ID)
+			})
 		}); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", acc.Email, err))
 			// Continue with other accounts
@@ -504,21 +562,66 @@ func (s *SyncBridge) syncAllComplete(trigger syncengine.Trigger) error {
 	return nil
 }
 
-func (s *SyncBridge) coordinateAccountSync(accountID string, trigger syncengine.Trigger, work func() error) error {
-	if s.app.syncCoordinator == nil {
-		return work()
-	}
+func (s *SyncBridge) coordinateAccountSync(accountID string, trigger syncengine.Trigger, work func(context.Context) error) error {
 	parent := s.app.ctx
 	if parent == nil {
 		parent = context.Background()
 	}
-	err := s.app.syncCoordinator.Do(parent, accountID, trigger, func(context.Context) error {
-		return work()
-	})
+	if s.app.syncCoordinator == nil {
+		return work(parent)
+	}
+	err := s.app.syncCoordinator.Do(parent, accountID, trigger, work)
 	if errors.Is(err, syncengine.ErrCoalesced) {
 		return nil
 	}
 	return err
+}
+
+func (s *SyncBridge) runAccountSyncWithTimeout(
+	parent context.Context,
+	accountID string,
+	work func(context.Context) error,
+) error {
+	if parent == nil {
+		parent = context.Background()
+	}
+	timeout := s.accountSyncTimeout
+	if timeout <= 0 {
+		timeout = defaultAccountSyncTimeout
+	}
+
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	watchdogDone := make(chan struct{})
+	stopWatchdog := context.AfterFunc(ctx, func() {
+		defer close(watchdogDone)
+		log := logging.WithComponent("app.masterSync")
+		log.Warn().
+			Err(ctx.Err()).
+			Str("accountID", accountID).
+			Dur("timeout", timeout).
+			Msg("Account sync deadline reached; closing stale IMAP connections")
+		if s.app.imapPool != nil {
+			s.app.imapPool.CloseAccount(accountID)
+		}
+	})
+
+	err := work(ctx)
+	contextErr := ctx.Err()
+	if !stopWatchdog() {
+		<-watchdogDone
+	}
+	cancel()
+
+	if errors.Is(contextErr, context.DeadlineExceeded) {
+		return fmt.Errorf("account sync timed out: %w", context.DeadlineExceeded)
+	}
+	if contextErr != nil {
+		return contextErr
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // CancelFolderSync cancels a running sync for a specific folder

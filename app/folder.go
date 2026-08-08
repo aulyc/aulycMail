@@ -40,16 +40,18 @@ func (a *App) GetFolderTree(accountID string) ([]*folder.FolderTree, error) {
 
 // syncFolders synchronizes the folder list with the IMAP server.
 func (a *App) syncFolders(accountID string) error {
-	return a.coordinateAccountSync(accountID, syncengine.TriggerManual, func() error {
-		return a.syncFoldersDirect(accountID)
+	return a.coordinateAccountSync(accountID, syncengine.TriggerManual, func(ctx context.Context) error {
+		return a.syncFoldersDirect(ctx, accountID)
 	})
 }
 
-func (a *App) syncFoldersDirect(accountID string) error {
+func (a *App) syncFoldersDirect(ctx context.Context, accountID string) error {
 	log := logging.WithComponent("app")
-	ctx := a.ctx
 	if ctx == nil {
-		ctx = context.Background()
+		ctx = a.ctx
+		if ctx == nil {
+			ctx = context.Background()
+		}
 	}
 	err := a.syncEngine.SyncFolders(ctx, accountID)
 	if err == nil {

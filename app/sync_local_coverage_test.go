@@ -63,17 +63,34 @@ func TestSyncSelectionCancellationAndOwnershipGuards(t *testing.T) {
 	}
 
 	sentinel := errors.New("synthetic coordinated failure")
-	if err := a.coordinateAccountSync(acc.ID, syncengine.TriggerManual, func() error { return sentinel }); !errors.Is(err, sentinel) {
+	if err := a.coordinateAccountSync(acc.ID, syncengine.TriggerManual, func(context.Context) error { return sentinel }); !errors.Is(err, sentinel) {
 		t.Fatalf("coordinateAccountSync without coordinator = %v", err)
 	}
 	a.syncCoordinator = syncengine.NewCoordinator()
 	ran := false
-	if err := a.coordinateAccountSync(acc.ID, syncengine.TriggerManual, func() error {
+	if err := a.coordinateAccountSync(acc.ID, syncengine.TriggerManual, func(ctx context.Context) error {
+		if ctx == nil {
+			t.Fatal("coordinateAccountSync passed a nil context")
+		}
 		ran = true
 		return nil
 	}); err != nil || !ran {
 		t.Fatalf("coordinateAccountSync = (%v, ran %v)", err, ran)
 	}
+
+	a.SyncBridge.accountSyncTimeout = 10 * time.Millisecond
+	started := time.Now()
+	err = a.runAccountSyncWithTimeout(context.Background(), acc.ID, func(ctx context.Context) error {
+		<-ctx.Done()
+		return ctx.Err()
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("runAccountSyncWithTimeout error = %v, want context.DeadlineExceeded", err)
+	}
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("runAccountSyncWithTimeout elapsed = %v, want bounded return", elapsed)
+	}
+	a.SyncBridge.accountSyncTimeout = 0
 
 	if err := a.SyncFolder("wrong-account", "sync-inbox"); err == nil || !strings.Contains(err.Error(), "does not belong") {
 		t.Fatalf("SyncFolder(cross-account) error = %v", err)

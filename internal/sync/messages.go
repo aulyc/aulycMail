@@ -3,6 +3,7 @@ package sync
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -379,8 +380,9 @@ func (e *Engine) syncMessagesWithOptions(ctx context.Context, accountID, folderI
 
 			// Fetch headers for this batch with retry on connection error
 			batchRetries := 0
+			batchTimeoutRetries := 0
 			for {
-				err := e.fetchMessageHeaders(ctx, conn.Client().RawClient(), accountID, folderID, batch)
+				err := e.fetchMessageHeadersWithTimeout(ctx, conn, accountID, folderID, batch)
 				if err == nil {
 					break // Success
 				}
@@ -391,8 +393,17 @@ func (e *Engine) syncMessagesWithOptions(ctx context.Context, accountID, folderI
 					return ctx.Err()
 				}
 
-				// Check if this is a connection error
-				if imapPkg.IsConnectionError(err) {
+				if errors.Is(err, context.DeadlineExceeded) {
+					batchTimeoutRetries++
+					if batchTimeoutRetries > maxHeaderTimeoutRetries {
+						return fmt.Errorf("header fetch timed out after %d attempts: %w", batchTimeoutRetries, err)
+					}
+				}
+
+				// Check if this is a connection error. A batch deadline also
+				// requires a fresh socket because the watchdog force-closed the
+				// half-open connection that stopped producing header data.
+				if errors.Is(err, context.DeadlineExceeded) || imapPkg.IsConnectionError(err) {
 					headerConnectionFailures++
 					batchRetries++
 
@@ -813,6 +824,57 @@ func (e *Engine) fetchUIDsAfter(ctx context.Context, client *imapclient.Client, 
 	}
 }
 
+func (e *Engine) fetchMessageHeadersWithTimeout(
+	ctx context.Context,
+	conn *imapPkg.PooledConnection,
+	accountID, folderID string,
+	uids []uint32,
+) error {
+	client := conn.Client()
+	if client == nil || client.RawClient() == nil {
+		return fmt.Errorf("header fetch connection is closed")
+	}
+	rawClient := client.RawClient()
+	timeout := e.headerBatchTimeout
+	if timeout <= 0 {
+		timeout = defaultHeaderBatchTimeout
+	}
+
+	batchCtx, cancel := context.WithTimeout(ctx, timeout)
+	watchdogDone := make(chan struct{})
+	stopWatchdog := context.AfterFunc(batchCtx, func() {
+		defer close(watchdogDone)
+		e.log.Warn().
+			Err(batchCtx.Err()).
+			Str("account", accountID).
+			Str("folderID", folderID).
+			Dur("timeout", timeout).
+			Msg("Header fetch exceeded its batch deadline; discarding connection")
+		if e.pool != nil {
+			e.pool.Discard(conn)
+		}
+	})
+
+	err := e.fetchMessageHeaders(batchCtx, rawClient, accountID, folderID, uids)
+	timedOut := errors.Is(batchCtx.Err(), context.DeadlineExceeded)
+	contextErr := batchCtx.Err()
+	if !stopWatchdog() {
+		<-watchdogDone
+	}
+	cancel()
+
+	if timedOut {
+		return fmt.Errorf("header fetch timed out after %s: %w", timeout, context.DeadlineExceeded)
+	}
+	if err != nil {
+		return err
+	}
+	if contextErr != nil {
+		return contextErr
+	}
+	return nil
+}
+
 // fetchMessageHeaders fetches only headers (envelope, flags) for the given UIDs.
 // Messages are saved with BodyFetched=false, bodies to be fetched later.
 func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Client, accountID, folderID string, uids []uint32) error {
@@ -865,16 +927,16 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 	// This allows cancellation between messages and prevents indefinite blocking
 	var savedMessages []*message.Message
 	fetchedCount := 0
+	var terminalErr error
 
 	for {
 		// Check for cancellation between messages
 		if ctx.Err() != nil {
-			fetchCmd.Close()
 			e.log.Warn().
 				Int("fetched", fetchedCount).
 				Int("requested", len(uids)).
 				Msg("Header fetch cancelled, saved partial results")
-			// Don't return error - we saved what we got
+			terminalErr = ctx.Err()
 			break
 		}
 
@@ -955,8 +1017,8 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 		fetchedCount++
 	}
 
-	if err := fetchCmd.Close(); err != nil {
-		e.log.Warn().Err(err).
+	if closeErr := fetchCmd.Close(); closeErr != nil {
+		e.log.Warn().Err(closeErr).
 			Int("fetched", fetchedCount).
 			Int("requested", len(uids)).
 			Msg("Header fetch close error, continuing with saved messages")
@@ -965,7 +1027,7 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 		// space where "" or NIL should be for an empty subject — see issue #209). Only
 		// triggers on this specific parse error signature; everything else falls through
 		// to the existing "log + continue with partial results" behavior.
-		if strings.Contains(err.Error(), `expected string, got " "`) && fetchedCount < len(uids) {
+		if strings.Contains(closeErr.Error(), `expected string, got " "`) && fetchedCount < len(uids) {
 			savedUIDs := make(map[uint32]bool, len(savedMessages))
 			for _, m := range savedMessages {
 				savedUIDs[m.UID] = true
@@ -979,9 +1041,18 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 			recovered, recErr := e.recoverFailedHeaderBatch(ctx, client, accountID, folderID, missing)
 			if recErr != nil {
 				e.log.Warn().Err(recErr).Msg("Header recovery returned error")
+				if terminalErr == nil {
+					terminalErr = recErr
+				}
 			}
 			savedMessages = append(savedMessages, recovered...)
 			fetchedCount += len(recovered)
+			if recErr == nil && fetchedCount == len(uids) {
+				closeErr = nil
+			}
+		}
+		if terminalErr == nil && closeErr != nil {
+			terminalErr = closeErr
 		}
 	}
 
@@ -1033,7 +1104,7 @@ func (e *Engine) fetchMessageHeaders(ctx context.Context, client *imapclient.Cli
 		}
 	}
 
-	return nil
+	return terminalErr
 }
 
 /*

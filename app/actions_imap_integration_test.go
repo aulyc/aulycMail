@@ -1197,6 +1197,28 @@ func TestCompleteSyncMessageSourceBodyAndAttachmentFlowsAgainstMemoryIMAP(t *tes
 	}
 }
 
+func TestCompleteSyncKeepsBackgroundBodyFetchAliveAfterCoordinatorReturns(t *testing.T) {
+	fixture := newPublicActionFixture(t)
+	fixture.app.syncCoordinator = mailSync.NewCoordinator()
+	if _, err := fixture.app.db.Exec(`UPDATE accounts SET body_download_policy = 'all' WHERE id = ?`, fixture.account.ID); err != nil {
+		t.Fatalf("enable background body download: %v", err)
+	}
+
+	raw := []byte("From: remote@example.com\r\nTo: actions@example.com\r\nSubject: detached body fetch\r\nMessage-ID: <detached-body-fetch@example.com>\r\nDate: Mon, 03 Aug 2026 09:00:00 +0800\r\n\r\nbody fetched after header coordinator returns\r\n")
+	uid := fixture.harness.append(t, raw)
+	if err := fixture.app.SyncAccountComplete(fixture.account.ID); err != nil {
+		t.Fatalf("SyncAccountComplete() error = %v", err)
+	}
+
+	waitForActionCondition(t, "detached background body fetch", func() bool {
+		stored, err := fixture.messages.GetByUID(fixture.folders[folder.TypeInbox].ID, uid)
+		return err == nil && stored != nil && stored.BodyFetched && strings.Contains(stored.BodyText, "coordinator returns")
+	})
+	if !fixture.events.has("folder:synced") {
+		t.Fatalf("background body completion events = %v", fixture.events.snapshot())
+	}
+}
+
 func TestEmailBackupExportsSkipsAndClassifiesUnavailableMemoryIMAPMessages(t *testing.T) {
 	fixture := newPublicActionFixture(t)
 	fixture.app.settingsStore = settings.NewStore(fixture.app.db)
