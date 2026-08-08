@@ -20,6 +20,7 @@ import (
 	"aulyc.local/aulycmail/internal/imap"
 	"aulyc.local/aulycmail/internal/logging"
 	"aulyc.local/aulycmail/internal/message"
+	"aulyc.local/aulycmail/internal/platform"
 	"aulyc.local/aulycmail/internal/smtp"
 	syncengine "aulyc.local/aulycmail/internal/sync"
 	goImap "github.com/emersion/go-imap/v2"
@@ -307,6 +308,30 @@ func readFileAsAttachment(filePath string) (*ComposerAttachment, error) {
 		Size:        len(content),
 		Data:        encoded,
 	}, nil
+}
+
+func filterClipboardFilePaths(paths []string) []string {
+	filtered := make([]string, 0, len(paths))
+	seen := make(map[string]struct{}, len(paths))
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		path = filepath.Clean(path)
+		if !filepath.IsAbs(path) {
+			continue
+		}
+		if _, exists := seen[path]; exists {
+			continue
+		}
+		info, err := os.Stat(path)
+		if err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		seen[path] = struct{}{}
+		filtered = append(filtered, path)
+	}
+	return filtered
 }
 
 // pickAttachmentFiles opens a file picker dialog and returns the selected files as attachments.
@@ -731,6 +756,17 @@ func (a *App) PickAttachmentFiles() ([]ComposerAttachment, error) {
 // ReadFileAsAttachment reads a file and creates a ComposerAttachment
 func (a *App) ReadFileAsAttachment(filePath string) (*ComposerAttachment, error) {
 	return readFileAsAttachment(filePath)
+}
+
+// GetClipboardFilePaths returns regular files currently copied from Finder.
+// File contents remain unread until the composer explicitly converts a path
+// through ReadFileAsAttachment.
+func (a *App) GetClipboardFilePaths() ([]string, error) {
+	paths, err := platform.ClipboardFilePaths()
+	if err != nil {
+		return nil, err
+	}
+	return filterClipboardFilePaths(paths), nil
 }
 
 // ============================================================================

@@ -12,6 +12,7 @@ import {
   DeleteDraft,
   GetAccount,
   GetAllAccountIdentities,
+  GetClipboardFilePaths,
   GetIdentities,
   PickAttachmentFiles,
   ReadFileAsAttachment,
@@ -47,6 +48,9 @@ export interface ComposerApi {
 
   /** Read a file from a filesystem path as an attachment */
   readFileAsAttachment: (filePath: string) => Promise<app.ComposerAttachment | null>
+
+  /** Read Finder-copied regular file paths from the native macOS pasteboard */
+  getClipboardFilePaths?: () => Promise<string[]>
 
   /** Get all accounts with their identities (for the cross-account From dropdown) */
   getAllAccountIdentities?: () => Promise<app.AccountIdentityGroup[]>
@@ -95,6 +99,10 @@ export function createMainWindowApi(): ComposerApi {
 
     readFileAsAttachment: async (filePath: string) => {
       return ReadFileAsAttachment(filePath)
+    },
+
+    getClipboardFilePaths: async () => {
+      return await GetClipboardFilePaths() || []
     },
 
     getAllAccountIdentities: async () => {

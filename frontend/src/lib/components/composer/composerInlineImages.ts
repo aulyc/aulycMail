@@ -1,6 +1,5 @@
 import type { InlineImage } from './composerAttachments'
-
-export const MAX_INLINE_IMAGE_SIZE = 10 * 1024 * 1024
+import { base64DecodedSize } from './composerInlineImagePolicy'
 
 export function createInlineImageCID(index: number, now = Date.now()): string {
   return `image${index}-${now}@aulycmail`
@@ -41,6 +40,7 @@ export function createInlineImageFromDataUrl(options: {
     contentType: parsed.contentType,
     data: parsed.data,
     filename: options.filename || `${options.fallbackPrefix ?? 'image'}${options.counter}.${inlineImageExtension(parsed.contentType)}`,
+    size: base64DecodedSize(parsed.data),
   }
 }
 
@@ -50,6 +50,7 @@ export function createInlineImageFromAttachment(options: {
   contentType: string
   data: string
   filename: string
+  size?: number
 }): InlineImage {
   return {
     cid: options.cid,
@@ -57,5 +58,6 @@ export function createInlineImageFromAttachment(options: {
     contentType: options.contentType,
     data: options.data,
     filename: options.filename,
+    size: options.size ?? base64DecodedSize(options.data),
   }
 }

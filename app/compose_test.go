@@ -442,6 +442,30 @@ func TestAppAttachmentPickerCoversSelectionCancellationAndErrors(t *testing.T) {
 	}
 }
 
+func TestFilterClipboardFilePathsKeepsUniqueRegularFiles(t *testing.T) {
+	dir := t.TempDir()
+	first := filepath.Join(dir, "first.pdf")
+	second := filepath.Join(dir, "second.txt")
+	if err := os.WriteFile(first, []byte("pdf"), 0o600); err != nil {
+		t.Fatalf("write first clipboard file: %v", err)
+	}
+	if err := os.WriteFile(second, []byte("text"), 0o600); err != nil {
+		t.Fatalf("write second clipboard file: %v", err)
+	}
+
+	got := filterClipboardFilePaths([]string{
+		"",
+		first,
+		filepath.Join(dir, ".", "first.pdf"),
+		dir,
+		filepath.Join(dir, "missing.pdf"),
+		second,
+	})
+	if !reflect.DeepEqual(got, []string{first, second}) {
+		t.Fatalf("filterClipboardFilePaths() = %#v, want %#v", got, []string{first, second})
+	}
+}
+
 func TestComposeAddressAndReferenceCompatibilityHelpers(t *testing.T) {
 	jsonAddresses := addressListToJSON([]smtp.Address{{Name: "Alice", Address: "alice@example.com"}})
 	if got := parseAddressList(jsonAddresses); len(got) != 1 || got[0].Name != "Alice" || got[0].Address != "alice@example.com" {

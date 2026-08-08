@@ -3,6 +3,7 @@
   import Icon from '@iconify/svelte'
   import type { Editor } from '@tiptap/core'
   import { createComposerEditor } from './composerEditor'
+  import { readComposerClipboardFiles } from './composerClipboard'
   // @ts-ignore - Wails generated imports
   import { smtp, account, app, contact } from '../../../../wailsjs/go/models'
   // @ts-ignore - Wails runtime for events
@@ -29,8 +30,6 @@
   } from './composerUtils'
   import {
     backendAttachmentToComposerAttachment,
-    estimateBase64DecodedSize,
-    fileToDataUrl,
     fileToComposerAttachment,
     hasFileDropPayload,
     isRecipientChipDrag,
@@ -90,8 +89,12 @@
     createInlineImageFromAttachment,
     createInlineImageFromDataUrl,
     createInlineImageCID,
-    MAX_INLINE_IMAGE_SIZE,
   } from './composerInlineImages'
+  import {
+    base64DecodedSize,
+    evaluateInlineImageBatch,
+    formatInlineImageSize,
+  } from './composerInlineImagePolicy'
   import {
     buildComposeMessage,
     restoreBlockedRemoteImages,
@@ -185,6 +188,7 @@
   // Inline images (embedded in HTML body)
   let inlineImages = $state<InlineImage[]>([])
   let inlineImageCounter = 0  // Counter for generating unique CIDs
+  let acknowledgedInlineImageBytes = 0
 
   // Read receipt request
   let requestReadReceipt = $state(false)
@@ -301,7 +305,14 @@
   let showEmptySubjectDialog = $state(false)
   let showMissingAttachmentDialog = $state(false)
   let showCloseConfirm = $state(false)
+  let showInlineImageSizeDialog = $state(false)
+  let inlineImageSizeDescription = $state('')
   let closeLoading = $state<'discard' | 'save' | null>(null)
+  type InlineImageChoice = 'inline' | 'attachment' | 'cancel'
+  let inlineImageChoiceResolver: ((choice: InlineImageChoice) => void) | null = null
+  let imageBatchQueue = Promise.resolve()
+  let imageBatchPending = 0
+  let untrackedImageScanTimer: ReturnType<typeof setTimeout> | null = null
 
   // Get only the user-composed text, excluding quoted/forwarded content
   function getUserComposedText(): string {
@@ -591,6 +602,33 @@
     handleMentionKeydown(e)
   }
 
+  async function readClipboardFilePaths(): Promise<string[]> {
+    try {
+      return await api.getClipboardFilePaths?.() || []
+    } catch {
+      return []
+    }
+  }
+
+  function handlePlainTextPaste(e: ClipboardEvent) {
+    const payload = readComposerClipboardFiles(e.clipboardData)
+    if (payload.files.length > 0) {
+      e.preventDefault()
+      void queueComposerFiles(payload.files, false)
+      return
+    }
+    if (payload.paths.length > 0) {
+      e.preventDefault()
+      void handlePastedAttachmentPaths(payload.paths)
+      return
+    }
+
+    if (payload.advertisesFiles) e.preventDefault()
+    void readClipboardFilePaths().then(paths => {
+      if (paths.length > 0) void handlePastedAttachmentPaths(paths)
+    })
+  }
+
   function handleBodyKeydown(e: KeyboardEvent) {
     handleMentionKeydown(e)
   }
@@ -608,6 +646,7 @@
     if (e?.isComposing) return
     scheduleDraftSave()
     updateRichMention()
+    scheduleUntrackedInlineImageScan()
   }
 
   function handleComposerCompositionStart() {
@@ -694,16 +733,32 @@
     return { image: result.image, added: result.added }
   }
 
-  // Collect any images in the editor DOM that aren't tracked in inlineImages.
-  // WebKitGTK doesn't expose pasted screenshots via clipboardData, so TipTap's
-  // default handler inserts them with a webkit-fake-url:// src. This function
-  // extracts the pixel data via canvas and registers them for CID conversion.
-  function collectUnregisteredInlineImages(html: string): string {
+  interface UntrackedInlineImage {
+    source: string
+    image: InlineImage
+  }
+
+  function hasPotentialUntrackedInlineImages(): boolean {
     const editorEl = editor?.view?.dom
-    if (!editorEl) return html
+    if (!editorEl) return false
+    return Array.from(editorEl.querySelectorAll('img')).some(img => {
+      const src = img.getAttribute('src') || ''
+      if (!src || src.startsWith('cid:') || src.startsWith('http://') || src.startsWith('https://')) return false
+      if (img.hasAttribute('data-original-src')) return false
+      return !inlineImages.some(image => image.dataUrl === src)
+    })
+  }
+
+  // WebKit can insert data:, blob:, or webkit-fake-url images without exposing
+  // File objects. Normalize those images so they enter the same 5/10 MiB batch
+  // policy as Finder paste, drag-and-drop, and the image picker.
+  function findUntrackedInlineImages(): UntrackedInlineImage[] {
+    const editorEl = editor?.view?.dom
+    if (!editorEl) return []
 
     const imgs = editorEl.querySelectorAll('img')
-    let result = html
+    const results: UntrackedInlineImage[] = []
+    const seenData = new Set(inlineImages.map(image => image.data))
 
     for (const img of imgs) {
       const src = img.getAttribute('src') || ''
@@ -713,51 +768,43 @@
       if (img.hasAttribute('data-original-src')) continue
       if (inlineImages.some(i => i.dataUrl === src)) continue
 
-      // data: URLs — parse and register directly
+      let candidate: InlineImage | null
       if (src.startsWith('data:')) {
         const cid = generateCID()
-        const inlineImage = createInlineImageFromDataUrl({
+        candidate = createInlineImageFromDataUrl({
           cid,
           dataUrl: src,
           counter: inlineImageCounter,
           fallbackPrefix: 'pasted-image',
         })
-        if (!inlineImage) continue
-        addInlineImage(inlineImage)
-        continue
+      } else {
+        // webkit-fake-url://, blob:, etc. — extract via canvas.
+        if (!img.complete || img.naturalWidth === 0) continue
+        try {
+          const canvas = document.createElement('canvas')
+          canvas.width = img.naturalWidth
+          canvas.height = img.naturalHeight
+          const ctx = canvas.getContext('2d')
+          if (!ctx) continue
+          ctx.drawImage(img, 0, 0)
+          const cid = generateCID()
+          candidate = createInlineImageFromDataUrl({
+            cid,
+            dataUrl: canvas.toDataURL('image/png'),
+            counter: inlineImageCounter,
+            fallbackPrefix: 'pasted-image',
+          })
+        } catch {
+          continue
+        }
       }
 
-      // webkit-fake-url://, blob:, etc. — extract via canvas
-      if (!img.complete || img.naturalWidth === 0) continue
-      try {
-        const canvas = document.createElement('canvas')
-        canvas.width = img.naturalWidth
-        canvas.height = img.naturalHeight
-        const ctx = canvas.getContext('2d')
-        if (!ctx) continue
-        ctx.drawImage(img, 0, 0)
-        const dataUrl = canvas.toDataURL('image/png')
-
-        // If the same canvas-extracted content was already registered
-        // (e.g. user pasted the same screenshot twice), reuse that cid —
-        // the viewer is what handles same-cid resolution (see
-        // EmailBody.svelte querySelectorAll fix).
-        const cid = generateCID()
-        const inlineImage = createInlineImageFromDataUrl({
-          cid,
-          dataUrl,
-          counter: inlineImageCounter,
-          fallbackPrefix: 'pasted-image',
-        })
-        if (!inlineImage) continue
-        const registered = addInlineImage(inlineImage)
-        result = result.replaceAll(src, registered.image.dataUrl)
-      } catch {
-        continue
-      }
+      if (!candidate || seenData.has(candidate.data)) continue
+      seenData.add(candidate.data)
+      results.push({ source: src, image: candidate })
     }
 
-    return result
+    return results
   }
 
   // Convert HTML with data URLs to use CID references for inline images
@@ -779,9 +826,9 @@
       htmlContent = ''  // No HTML version when composing in plain text
     } else {
       // In rich text mode, we have both
-      // Collect any untracked pasted images (WebKitGTK webkit-fake-url, etc.),
-      // add paragraph styles for email clients, then convert data URLs to CID references
-      const rawHtml = collectUnregisteredInlineImages(editor?.getHTML() || '')
+      // Untracked WebKit images are normalized asynchronously before this
+      // synchronous message builder runs.
+      const rawHtml = editor?.getHTML() || ''
       htmlContent = convertDataUrlsToCid(addParagraphStyles(rawHtml))
       textContent = editor?.getText() || ''
     }
@@ -1106,6 +1153,10 @@
     unsubscribeDraftSync = null
     mentionSearchController.destroy()
     draftSaveController.destroy()
+    if (untrackedImageScanTimer) clearTimeout(untrackedImageScanTimer)
+    untrackedImageScanTimer = null
+    inlineImageChoiceResolver?.('cancel')
+    inlineImageChoiceResolver = null
     editor?.destroy()
   })
 
@@ -1155,6 +1206,7 @@
             contentType: att.content_type,
             data: base64Data,
             filename: att.filename,
+            size: base64DecodedSize(base64Data),
           }]
           htmlBody = htmlBody.replaceAll(`cid:${att.content_id}`, dataUrl)
         } else if (!att.inline) {
@@ -1239,6 +1291,19 @@
     sending = true
 
     try {
+      const needsImagePreparation = imageBatchPending > 0 || (!isPlainTextMode && (
+        untrackedImageScanTimer !== null || hasPotentialUntrackedInlineImages()
+      ))
+      if (needsImagePreparation) {
+        if (untrackedImageScanTimer) {
+          clearTimeout(untrackedImageScanTimer)
+          untrackedImageScanTimer = null
+        }
+        await imageBatchQueue
+        if (!await processUntrackedInlineImages(false)) return
+      }
+      if (!isPlainTextMode && !await enforceTrackedInlineImagePolicyBeforeSend()) return
+
       const message = buildMessage()
       await api.sendMessage(activeAccountId, message)
 
@@ -1266,6 +1331,25 @@
   }
 
   // Handlers for confirmation dialogs
+  function requestInlineImageChoice(projectedBytes: number, count: number): Promise<InlineImageChoice> {
+    inlineImageChoiceResolver?.('cancel')
+    inlineImageSizeDescription = $_('composer.inlineImageSizeDescription', {
+      values: { size: formatInlineImageSize(projectedBytes), count },
+    })
+    showInlineImageSizeDialog = true
+    return new Promise(resolve => {
+      inlineImageChoiceResolver = resolve
+    })
+  }
+
+  function resolveInlineImageChoice(choice: InlineImageChoice) {
+    const resolve = inlineImageChoiceResolver
+    if (!resolve) return
+    inlineImageChoiceResolver = null
+    showInlineImageSizeDialog = false
+    resolve(choice)
+  }
+
   function handleConfirmEmptySubject() {
     showEmptySubjectDialog = false
     // Check for missing attachment next (if applicable)
@@ -1345,7 +1429,7 @@
       input.remove()
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
-        await handleInlineImageFile(file)
+        await queueComposerFiles([file], true)
       }
     }
     input.click()
@@ -1372,6 +1456,7 @@
       disabled: !composerRootElement ||
         showEmptySubjectDialog ||
         showMissingAttachmentDialog ||
+        showInlineImageSizeDialog ||
         showCloseConfirm,
       activeElement: document.activeElement,
     })
@@ -1385,10 +1470,9 @@
     editor = createComposerEditor(editorElement, {
       onUpdate: handleRichEditorUpdate,
       onMentionKeyDown: handleMentionKeydown,
-      onPasteImage: handleInlineImageFile,
-      onDropImage: handleInlineImageFile,
-      onDropFile: handleDroppedFile,
-      onDropFilePaths: handleDroppedFilePaths,
+      onFiles: (files) => queueComposerFiles(files, true),
+      onFilePaths: handleDroppedFilePaths,
+      readClipboardFilePaths,
       onShiftTab: () => document.getElementById('composer-subject')?.focus(),
       isEnhancedKeyboardNavigationEnabled: getEnhancedKeyboardNavigation,
       getDarkFilterMode: getDisplayMode,
@@ -1473,102 +1557,238 @@
     return createInlineImageCID(inlineImageCounter)
   }
 
-  // Handle an inline image file (from paste or drop)
-  async function handleInlineImageFile(file: File) {
-    if (file.size > MAX_INLINE_IMAGE_SIZE) {
-      addToast({
-        type: 'error',
-        message: $_('composer.imageTooLarge'),
-      })
+  function scheduleUntrackedInlineImageScan() {
+    if (untrackedImageScanTimer) clearTimeout(untrackedImageScanTimer)
+    untrackedImageScanTimer = setTimeout(() => {
+      untrackedImageScanTimer = null
+      void enqueueImageBatch(() => processUntrackedInlineImages(true).then(() => {}))
+    }, 0)
+  }
+
+  function enqueueImageBatch(run: () => Promise<void>): Promise<void> {
+    imageBatchPending++
+    const task = imageBatchQueue.then(run).finally(() => {
+      imageBatchPending--
+    })
+    imageBatchQueue = task.catch(() => {})
+    return task
+  }
+
+  async function chooseInlineImageHandling(
+    images: Array<{ data: string, size?: number }>,
+    current: Array<{ data: string, size?: number }> = inlineImages,
+  ) {
+    const policy = evaluateInlineImageBatch(current, images)
+    let choice: InlineImageChoice = policy.decision === 'attachment' ? 'attachment' : 'inline'
+    if (policy.decision === 'confirm' && policy.projectedBytes > acknowledgedInlineImageBytes) {
+      choice = await requestInlineImageChoice(policy.projectedBytes, images.length)
+    }
+    if (choice === 'inline') {
+      acknowledgedInlineImageBytes = Math.max(acknowledgedInlineImageBytes, policy.projectedBytes)
+    }
+    return { choice, policy }
+  }
+
+  function notifyAutomaticImageAttachments(projectedBytes: number, count: number) {
+    addToast({
+      type: 'info',
+      message: $_('composer.inlineImagesAttachedAutomatically', {
+        values: { size: formatInlineImageSize(projectedBytes), count },
+      }),
+    })
+  }
+
+  function updateUntrackedImageMarkup(entries: UntrackedInlineImage[], keepInline: boolean) {
+    if (!editor || entries.length === 0) return
+    const container = document.createElement('div')
+    container.innerHTML = editor.getHTML()
+    const bySource = new Map(entries.map(entry => [entry.source, entry.image]))
+    for (const img of container.querySelectorAll('img')) {
+      const source = img.getAttribute('src') || ''
+      const image = bySource.get(source)
+      if (!image) continue
+      if (keepInline) {
+        img.setAttribute('src', image.dataUrl)
+      } else {
+        img.remove()
+      }
+    }
+    editor.commands.setContent(container.innerHTML)
+  }
+
+  async function processUntrackedInlineImages(removeOnCancel: boolean): Promise<boolean> {
+    const entries = findUntrackedInlineImages()
+    if (entries.length === 0) return true
+
+    const { choice, policy } = await chooseInlineImageHandling(entries.map(entry => entry.image))
+    if (choice === 'cancel') {
+      if (removeOnCancel) {
+        updateUntrackedImageMarkup(entries, false)
+        scheduleDraftSave()
+      }
+      return false
+    }
+
+    if (choice === 'attachment') {
+      attachments = [
+        ...attachments,
+        ...entries.map(({ image }) => ({
+          filename: image.filename,
+          contentType: image.contentType,
+          size: image.size,
+          data: image.data,
+        })),
+      ]
+      updateUntrackedImageMarkup(entries, false)
+      if (policy.decision === 'attachment') {
+        notifyAutomaticImageAttachments(policy.projectedBytes, entries.length)
+      }
+    } else {
+      for (const { image } of entries) addInlineImage(image)
+      updateUntrackedImageMarkup(entries, true)
+    }
+
+    scheduleDraftSave()
+    return true
+  }
+
+  function convertTrackedInlineImagesToAttachments() {
+    if (!editor || inlineImages.length === 0) return
+    const converted = inlineImages.map(image => ({
+      filename: image.filename,
+      contentType: image.contentType,
+      size: image.size,
+      data: image.data,
+    }))
+    const inlineSources = new Set(inlineImages.map(image => image.dataUrl))
+    const container = document.createElement('div')
+    container.innerHTML = editor.getHTML()
+    for (const img of container.querySelectorAll('img')) {
+      if (inlineSources.has(img.getAttribute('src') || '')) img.remove()
+    }
+    editor.commands.setContent(container.innerHTML)
+    attachments = [...attachments, ...converted]
+    inlineImages = []
+    acknowledgedInlineImageBytes = 0
+    scheduleDraftSave()
+  }
+
+  async function enforceTrackedInlineImagePolicyBeforeSend(): Promise<boolean> {
+    if (inlineImages.length === 0) return true
+    const images = [...inlineImages]
+    const { choice, policy } = await chooseInlineImageHandling(images, [])
+    if (choice === 'cancel') return false
+    if (choice === 'inline') return true
+
+    convertTrackedInlineImagesToAttachments()
+    if (policy.decision === 'attachment') {
+      notifyAutomaticImageAttachments(policy.projectedBytes, images.length)
+    }
+    return true
+  }
+
+  function queueComposerFiles(files: File[], inlineEligible: boolean): Promise<void> {
+    return enqueueImageBatch(() => processComposerFiles(files, inlineEligible))
+  }
+
+  function queueComposerPaths(paths: string[], inlineEligible: boolean): Promise<void> {
+    return enqueueImageBatch(() => processComposerPaths(paths, inlineEligible))
+  }
+
+  async function processComposerFiles(files: File[], inlineEligible: boolean) {
+    const prepared: ComposerAttachment[] = []
+    for (const file of files) {
+      try {
+        prepared.push(await fileToComposerAttachment(file))
+      } catch (err) {
+        if (file.type.startsWith('image/')) {
+          console.error('Failed to process inline image:', err)
+          addToast({ type: 'error', message: $_('composer.failedToInsertImage') })
+        } else {
+          console.error('Failed to read dropped file:', err)
+        }
+      }
+    }
+    await processComposerAttachments(prepared, inlineEligible)
+  }
+
+  async function processComposerPaths(paths: string[], inlineEligible: boolean) {
+    const prepared: ComposerAttachment[] = []
+    for (const filePath of paths) {
+      try {
+        const attachment = await api.readFileAsAttachment(filePath)
+        if (attachment) prepared.push(backendAttachmentToComposerAttachment(attachment))
+      } catch {
+        // Continue through a multi-file Finder copy when one path becomes
+        // unreadable between copy and paste.
+      }
+    }
+    await processComposerAttachments(prepared, inlineEligible)
+  }
+
+  function insertInlineImageAttachments(images: ComposerAttachment[]) {
+    for (const image of images) {
+      const dataUrl = `data:${image.contentType};base64,${image.data}`
+      const cid = generateCID()
+      const registered = addInlineImage(createInlineImageFromAttachment({
+        cid,
+        dataUrl,
+        contentType: image.contentType,
+        data: image.data,
+        filename: image.filename,
+        size: image.size,
+      }))
+      editor?.chain().focus().setImage({
+        src: registered.image.dataUrl,
+        alt: registered.image.filename,
+      }).run()
+    }
+  }
+
+  async function processComposerAttachments(prepared: ComposerAttachment[], inlineEligible: boolean) {
+    if (prepared.length === 0) return
+    if (!inlineEligible) {
+      attachments = [...attachments, ...prepared]
+      scheduleDraftSave()
       return
     }
 
-    try {
-      const dataUrl = await fileToDataUrl(file)
+    const images = prepared.filter(attachment => attachment.contentType.startsWith('image/'))
+    const regularAttachments = prepared.filter(attachment => !attachment.contentType.startsWith('image/'))
+    let changed = false
 
-      // Dedup by content (dataUrl): same image pasted twice produces a
-      // single inlineImage entry, so the sent MIME has one inline
-      // attachment instead of leaving the second cid orphaned. The editor
-      // still gets a second <img> with the same dataUrl src — the viewer
-      // side is what handles same-cid resolution (see EmailBody.svelte).
-      const cid = generateCID()
-      const inlineImage = createInlineImageFromDataUrl({
-        cid,
-        dataUrl,
-        counter: inlineImageCounter,
-        filename: file.name,
-      })
-      if (!inlineImage) {
-        console.error('Invalid data URL format')
-        return
-      }
-      const registered = addInlineImage(inlineImage)
-
-      // Insert the image into the editor with the data URL (for display)
-      // When sending, we'll convert data URLs to cid: references
-      editor?.chain().focus().setImage({ src: registered.image.dataUrl, alt: registered.image.filename }).run()
-
-      scheduleDraftSave()
-    } catch (err) {
-      console.error('Failed to process inline image:', err)
-      addToast({
-        type: 'error',
-        message: $_('composer.failedToInsertImage'),
-      })
+    if (regularAttachments.length > 0) {
+      attachments = [...attachments, ...regularAttachments]
+      changed = true
     }
-  }
 
-  // Handle a non-image File dropped on the editor (add as attachment)
-  async function handleDroppedFile(file: File) {
-    try {
-      attachments = [...attachments, await fileToComposerAttachment(file)]
-      scheduleDraftSave()
-    } catch (err) {
-      console.error('Failed to read dropped file:', err)
-    }
-  }
+    if (images.length > 0) {
+      const { choice, policy } = await chooseInlineImageHandling(images)
 
-  // Handle file paths dropped on the editor (from text/uri-list parsing)
-  // Images are inserted inline, other files are added as attachments
-  async function handleDroppedFilePaths(paths: string[]) {
-    for (const filePath of paths) {
-      try {
-        const att = await api.readFileAsAttachment(filePath)
-        if (!att) continue
-
-        if (att.contentType.startsWith('image/')) {
-          // Check size before inserting inline
-          const imageBytes = estimateBase64DecodedSize(att.data)
-          if (imageBytes > MAX_INLINE_IMAGE_SIZE) {
-            addToast({
-              type: 'error',
-              message: $_('composer.imageTooLarge'),
-            })
-            continue
-          }
-          // Insert as inline image
-          const dataUrl = `data:${att.contentType};base64,${att.data}`
-
-          // Dedup by content; mirrors handleInlineImageFile. Same image
-          // dropped twice ⇒ one inline attachment (no orphan cid in MIME).
-          const cid = generateCID()
-          const registered = addInlineImage(createInlineImageFromAttachment({
-            cid,
-            dataUrl,
-            contentType: att.contentType,
-            data: att.data,
-            filename: att.filename,
-          }))
-          editor?.chain().focus().setImage({ src: registered.image.dataUrl, alt: registered.image.filename }).run()
-          continue
+      if (choice === 'attachment') {
+        attachments = [...attachments, ...images]
+        changed = true
+        if (policy.decision === 'attachment') {
+          notifyAutomaticImageAttachments(policy.projectedBytes, images.length)
         }
-        // Add as regular attachment
-        attachments = [...attachments, backendAttachmentToComposerAttachment(att)]
-      } catch {
-        return
+      } else if (choice === 'inline') {
+        insertInlineImageAttachments(images)
+        changed = true
       }
     }
-    scheduleDraftSave()
+
+    if (changed) scheduleDraftSave()
+  }
+
+  // Plain-text messages cannot carry inline images. Finder-copied paths are
+  // therefore attached as ordinary files regardless of MIME type.
+  function handlePastedAttachmentPaths(paths: string[]) {
+    return queueComposerPaths(paths, false)
+  }
+
+  // Files dropped or pasted inside the rich editor share the same batch policy.
+  function handleDroppedFilePaths(paths: string[]) {
+    return queueComposerPaths(paths, true)
   }
 
   // Attachment handling via the browser file input.
@@ -1898,6 +2118,7 @@
         placeholder={$_('composer.writePlaceholder')}
         class="relative z-10 w-full h-full p-3 bg-transparent resize-none focus:outline-none font-mono text-sm caret-foreground selection:bg-primary/30 placeholder:text-muted-foreground {isPlainTextMode ? 'text-transparent' : 'hidden'}"
         oninput={handlePlainTextInput}
+        onpaste={handlePlainTextPaste}
         onkeydown={handlePlainTextKeydown}
         onkeyup={handlePlainTextCursorChange}
         onmouseup={handlePlainTextCursorChange}
@@ -2015,9 +2236,14 @@
   bind:showEmptySubjectDialog
   bind:showMissingAttachmentDialog
   bind:showCloseConfirm
+  bind:showInlineImageSizeDialog
+  {inlineImageSizeDescription}
   {closeLoading}
   onConfirmEmptySubject={handleConfirmEmptySubject}
   onConfirmMissingAttachment={handleConfirmMissingAttachment}
+  onKeepImagesInline={() => resolveInlineImageChoice('inline')}
+  onAttachImagesInstead={() => resolveInlineImageChoice('attachment')}
+  onCancelInlineImages={() => resolveInlineImageChoice('cancel')}
   onDiscardAndClose={handleDiscardAndClose}
   onSaveAndClose={handleSaveAndClose}
   onKeepEditing={handleKeepEditing}

@@ -11,8 +11,14 @@ import {
   createInlineImageCID,
   createInlineImageFromAttachment,
   createInlineImageFromDataUrl,
-  MAX_INLINE_IMAGE_SIZE,
 } from '../src/lib/components/composer/composerInlineImages.ts'
+import {
+  INLINE_IMAGE_ATTACHMENT_SIZE,
+  INLINE_IMAGE_WARNING_SIZE,
+  base64DecodedSize,
+  evaluateInlineImageBatch,
+  formatInlineImageSize,
+} from '../src/lib/components/composer/composerInlineImagePolicy.ts'
 import {
   buildComposeMessage,
   restoreBlockedRemoteImages,
@@ -116,7 +122,6 @@ test('file readers resolve data URLs and base64 or reject reader failures', asyn
 })
 
 test('inline image factories validate data URLs and derive stable metadata', () => {
-  assert.equal(MAX_INLINE_IMAGE_SIZE, 10 * 1024 * 1024)
   assert.equal(createInlineImageCID(2, 1234), 'image2-1234@aulycmail')
   assert.equal(createInlineImageFromDataUrl({ cid: 'cid', dataUrl: 'invalid', counter: 1 }), null)
   assert.deepEqual(createInlineImageFromDataUrl({
@@ -129,6 +134,7 @@ test('inline image factories validate data URLs and derive stable metadata', () 
     contentType: 'image/jpeg',
     data: 'YWJj',
     filename: 'image3.jpeg',
+    size: 3,
   })
   assert.equal(createInlineImageFromDataUrl({
     cid: 'cid',
@@ -145,8 +151,56 @@ test('inline image factories validate data URLs and derive stable metadata', () 
   assert.deepEqual(createInlineImageFromAttachment({
     cid: 'cid', dataUrl: 'data:image/png;base64,AA==', contentType: 'image/png', data: 'AA==', filename: 'a.png',
   }), {
-    cid: 'cid', dataUrl: 'data:image/png;base64,AA==', contentType: 'image/png', data: 'AA==', filename: 'a.png',
+    cid: 'cid', dataUrl: 'data:image/png;base64,AA==', contentType: 'image/png', data: 'AA==', filename: 'a.png', size: 1,
   })
+})
+
+test('inline image policy applies exact 5 MiB and 10 MiB cumulative boundaries', () => {
+  assert.equal(INLINE_IMAGE_WARNING_SIZE, 5 * 1024 * 1024)
+  assert.equal(INLINE_IMAGE_ATTACHMENT_SIZE, 10 * 1024 * 1024)
+
+  assert.equal(evaluateInlineImageBatch([], [
+    { data: 'five', size: INLINE_IMAGE_WARNING_SIZE },
+  ]).decision, 'inline')
+  assert.equal(evaluateInlineImageBatch([], [
+    { data: 'over-five', size: INLINE_IMAGE_WARNING_SIZE + 1 },
+  ]).decision, 'confirm')
+  assert.equal(evaluateInlineImageBatch([], [
+    { data: 'ten', size: INLINE_IMAGE_ATTACHMENT_SIZE },
+  ]).decision, 'confirm')
+  assert.equal(evaluateInlineImageBatch([], [
+    { data: 'over-ten', size: INLINE_IMAGE_ATTACHMENT_SIZE + 1 },
+  ]).decision, 'attachment')
+})
+
+test('inline image policy counts current and batched unique image bytes once', () => {
+  const MiB = 1024 * 1024
+  const current = [{ data: 'existing', size: 4 * MiB }]
+  const batch = [
+    { data: 'new-image', size: 2 * MiB },
+    { data: 'new-image', size: 2 * MiB },
+    { data: 'existing', size: 4 * MiB },
+  ]
+
+  assert.deepEqual(evaluateInlineImageBatch(current, batch), {
+    decision: 'confirm',
+    currentBytes: 4 * MiB,
+    batchBytes: 2 * MiB,
+    projectedBytes: 6 * MiB,
+  })
+  assert.equal(evaluateInlineImageBatch(
+    [{ data: 'existing', size: 9 * MiB }],
+    [{ data: 'new-image', size: 2 * MiB }],
+  ).decision, 'attachment')
+})
+
+test('inline image policy derives decoded bytes accurately from padded base64', () => {
+  assert.equal(base64DecodedSize(''), 0)
+  assert.equal(base64DecodedSize('YQ=='), 1)
+  assert.equal(base64DecodedSize('YWI='), 2)
+  assert.equal(base64DecodedSize('YWJj'), 3)
+  assert.equal(base64DecodedSize('YWJj\r\n'), 3)
+  assert.equal(formatInlineImageSize(6 * 1024 * 1024), '6.0 MB')
 })
 
 test('composer message assembly restores remote images and serializes attachment payloads', () => {
@@ -170,7 +224,7 @@ test('composer message assembly restores remote images and serializes attachment
     attachments: [{ filename: 'report.pdf', contentType: 'application/pdf', size: 3, data: 'YWJj' }],
     inlineImages: [{
       cid: 'image@example.test', dataUrl: 'data:image/png;base64,AA==',
-      contentType: 'image/png', data: 'AA==', filename: 'inline.png',
+      contentType: 'image/png', data: 'AA==', filename: 'inline.png', size: 1,
     }],
     inReplyTo: 'parent@example.test',
     references: ['root@example.test'],

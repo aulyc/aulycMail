@@ -76,13 +76,12 @@ test('creates a real TipTap editor and preserves legacy mail markup', () => {
   assert.ok(onUpdate.mock.calls.length > 0)
 })
 
-test('routes keyboard, paste, and file-drop behavior through configured handlers', () => {
+test('routes keyboard, paste, and file-drop behavior through configured handlers', async () => {
   const handlers = {
     onMentionKeyDown: vi.fn(() => false),
-    onPasteImage: vi.fn(),
-    onDropImage: vi.fn(),
-    onDropFile: vi.fn(),
-    onDropFilePaths: vi.fn(),
+    onFiles: vi.fn(),
+    onFilePaths: vi.fn(),
+    readClipboardFilePaths: vi.fn().mockResolvedValue([]),
     onShiftTab: vi.fn(),
     isEnhancedKeyboardNavigationEnabled: vi.fn(() => true),
   }
@@ -96,25 +95,48 @@ test('routes keyboard, paste, and file-drop behavior through configured handlers
     files: [],
   })
   assert.equal(editorProps.handlePaste(editor.view, itemPaste), true)
-  assert.deepEqual(handlers.onPasteImage.mock.calls.at(-1), [image])
+  assert.deepEqual(handlers.onFiles.mock.calls.at(-1), [[image]])
   assert.equal(itemPaste.preventDefault.mock.calls.length, 1)
 
   const fallbackPaste = pasteEvent({ items: [], files: [image] })
   assert.equal(editorProps.handlePaste(editor.view, fallbackPaste), true)
-  assert.equal(handlers.onPasteImage.mock.calls.length, 2)
+  assert.equal(handlers.onFiles.mock.calls.length, 2)
 
-  const textPaste = pasteEvent({ items: [], files: [documentFile] })
-  assert.equal(editorProps.handlePaste(editor.view, textPaste), false)
+  const documentPaste = pasteEvent({ items: [], files: [documentFile] })
+  assert.equal(editorProps.handlePaste(editor.view, documentPaste), true)
+  assert.deepEqual(handlers.onFiles.mock.calls.at(-1), [[documentFile]])
+  assert.equal(documentPaste.preventDefault.mock.calls.length, 1)
+
+  const uriPaste = {
+    clipboardData: {
+      items: [],
+      files: [],
+      types: ['text/uri-list'],
+      getData: vi.fn((type) => type === 'text/uri-list' ? 'file:///tmp/copied%20report.pdf' : ''),
+    },
+    preventDefault: vi.fn(),
+  }
+  assert.equal(editorProps.handlePaste(editor.view, uriPaste), true)
+  assert.deepEqual(handlers.onFilePaths.mock.calls.at(-1), [['/tmp/copied report.pdf']])
+  assert.equal(uriPaste.preventDefault.mock.calls.length, 1)
+
+  handlers.readClipboardFilePaths.mockResolvedValueOnce(['/tmp/copied-one.pdf', '/tmp/copied-two.txt'])
+  const nativeFilePaste = pasteEvent({ items: [], files: [] })
+  assert.equal(editorProps.handlePaste(editor.view, nativeFilePaste), false)
+  await vi.waitFor(() => {
+    assert.deepEqual(handlers.onFilePaths.mock.calls.at(-1), [
+      ['/tmp/copied-one.pdf', '/tmp/copied-two.txt'],
+    ])
+  })
 
   const fileDrop = dropEvent({ files: [image, documentFile] })
   assert.equal(editorProps.handleDrop(editor.view, fileDrop, null, false), true)
-  assert.deepEqual(handlers.onDropImage.mock.calls.at(-1), [image])
-  assert.deepEqual(handlers.onDropFile.mock.calls.at(-1), [documentFile])
+  assert.deepEqual(handlers.onFiles.mock.calls.at(-1), [[image, documentFile]])
   assert.equal(fileDrop.preventDefault.mock.calls.length, 1)
 
   const uriDrop = dropEvent({ uriList: 'file:///tmp/report%20one.pdf\nfile:///tmp/image.png' })
   assert.equal(editorProps.handleDrop(editor.view, uriDrop, null, false), true)
-  assert.deepEqual(handlers.onDropFilePaths.mock.calls.at(-1), [
+  assert.deepEqual(handlers.onFilePaths.mock.calls.at(-1), [
     ['/tmp/report one.pdf', '/tmp/image.png'],
   ])
   assert.equal(editorProps.handleDrop(editor.view, dropEvent(), null, true), false)
@@ -127,8 +149,8 @@ test('routes keyboard, paste, and file-drop behavior through configured handlers
 
 test('removes WebKit-inserted file URIs without deleting adjacent user text', async () => {
   vi.useFakeTimers()
-  const onDropFilePaths = vi.fn()
-  const editor = createEditor({ onDropFilePaths })
+  const onFilePaths = vi.fn()
+  const editor = createEditor({ onFilePaths })
   const editorProps = editor.options.editorProps
   editor.commands.setContent('<p>HelloWorld</p>')
 
@@ -137,13 +159,13 @@ test('removes WebKit-inserted file URIs without deleting adjacent user text', as
   await vi.advanceTimersByTimeAsync(200)
 
   assert.equal(editor.getText(), 'HelloWorld')
-  assert.deepEqual(onDropFilePaths.mock.calls.at(-1), [['/tmp/report one.pdf']])
+  assert.deepEqual(onFilePaths.mock.calls.at(-1), [['/tmp/report one.pdf']])
 
   assert.equal(editorProps.handleDrop(editor.view, dropEvent(), null, false), false)
   editor.commands.setContent('<p>HelloWorldfile:///tmp/final.txt</p>')
   await vi.advanceTimersByTimeAsync(200)
   assert.equal(editor.getText(), 'HelloWorld')
-  assert.deepEqual(onDropFilePaths.mock.calls.at(-1), [['/tmp/final.txt']])
+  assert.deepEqual(onFilePaths.mock.calls.at(-1), [['/tmp/final.txt']])
 })
 
 test('covers optional editor callbacks, mention navigation, and paste fallbacks', () => {
@@ -198,13 +220,13 @@ test('covers optional editor callbacks, mention navigation, and paste fallbacks'
 
 test('covers drop text fallback, absent handlers, and unchanged WebKit state', async () => {
   vi.useFakeTimers()
-  const onDropFilePaths = vi.fn()
-  const editor = createEditor({ onDropFilePaths })
+  const onFilePaths = vi.fn()
+  const editor = createEditor({ onFilePaths })
   const editorProps = editor.options.editorProps
 
   const textDrop = dropEvent({ text: 'file:///tmp/from%20plain.txt' })
   assert.equal(editorProps.handleDrop(editor.view, textDrop, null, false), true)
-  assert.deepEqual(onDropFilePaths.mock.calls.at(-1), [['/tmp/from plain.txt']])
+  assert.deepEqual(onFilePaths.mock.calls.at(-1), [['/tmp/from plain.txt']])
 
   const invalidTextDrop = dropEvent({ text: 'https://example.test/not-a-local-file' })
   assert.equal(editorProps.handleDrop(editor.view, invalidTextDrop, null, false), false)
@@ -228,5 +250,5 @@ test('covers drop text fallback, absent handlers, and unchanged WebKit state', a
   editor.commands.setContent('<p>unchanged plus ordinary text</p>')
   await vi.advanceTimersByTimeAsync(200)
   assert.equal(editor.getText(), 'unchanged plus ordinary text')
-  assert.equal(onDropFilePaths.mock.calls.length, 1)
+  assert.equal(onFilePaths.mock.calls.length, 1)
 })

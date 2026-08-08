@@ -188,7 +188,7 @@ test('attachment helpers preserve metadata and recognize drag payloads', () => {
   const attachment = { filename: 'a.pdf', contentType: 'application/pdf', size: 3, data: 'YWJj' }
   assert.deepEqual(backendAttachmentToComposerAttachment(attachment), attachment)
   assert.equal(estimateBase64DecodedSize('YWJj'), 3)
-  assert.equal(estimateBase64DecodedSize('YQ=='), 3)
+  assert.equal(estimateBase64DecodedSize('YQ=='), 1)
   assert.equal(isRecipientChipDrag({ dataTransfer: { types: ['application/x-aulycmail-recipient'] } }), true)
   assert.equal(isRecipientChipDrag({}), false)
   assert.equal(hasFileDropPayload({ dataTransfer: { types: ['Files'] } }), true)

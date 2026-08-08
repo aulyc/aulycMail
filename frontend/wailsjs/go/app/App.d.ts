@@ -102,6 +102,8 @@ export function GetBackupViewerCatalog(arg1:string):Promise<app.BackupViewerCata
 
 export function GetBackupViewerMessage(arg1:string,arg2:string):Promise<app.BackupViewerMessageDetail>;
 
+export function GetClipboardFilePaths():Promise<Array<string>>;
+
 export function GetComposerFormat():Promise<string>;
 
 export function GetContactMessages(arg1:string,arg2:number):Promise<Array<message.ContactMessage>>;

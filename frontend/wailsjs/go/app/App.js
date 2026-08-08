@@ -178,6 +178,10 @@ export function GetBackupViewerMessage(arg1, arg2) {
   return window['go']['app']['App']['GetBackupViewerMessage'](arg1, arg2);
 }
 
+export function GetClipboardFilePaths() {
+  return window['go']['app']['App']['GetClipboardFilePaths']();
+}
+
 export function GetComposerFormat() {
   return window['go']['app']['App']['GetComposerFormat']();
 }

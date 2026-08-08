@@ -7,9 +7,14 @@
     showEmptySubjectDialog: boolean
     showMissingAttachmentDialog: boolean
     showCloseConfirm: boolean
+    showInlineImageSizeDialog: boolean
+    inlineImageSizeDescription: string
     closeLoading?: 'discard' | 'save' | null
     onConfirmEmptySubject: () => void
     onConfirmMissingAttachment: () => void
+    onKeepImagesInline: () => void
+    onAttachImagesInstead: () => void
+    onCancelInlineImages: () => void
     onDiscardAndClose: () => void | Promise<void>
     onSaveAndClose: () => void | Promise<void>
     onKeepEditing: () => void
@@ -19,9 +24,14 @@
     showEmptySubjectDialog = $bindable(false),
     showMissingAttachmentDialog = $bindable(false),
     showCloseConfirm = $bindable(false),
+    showInlineImageSizeDialog = $bindable(false),
+    inlineImageSizeDescription,
     closeLoading = null,
     onConfirmEmptySubject,
     onConfirmMissingAttachment,
+    onKeepImagesInline,
+    onAttachImagesInstead,
+    onCancelInlineImages,
     onDiscardAndClose,
     onSaveAndClose,
     onKeepEditing,
@@ -57,6 +67,20 @@
     </AlertDialog.Footer>
   </AlertDialog.Content>
 </AlertDialog.Root>
+
+<ThreeOptionDialog
+  bind:open={showInlineImageSizeDialog}
+  title={$_('composer.inlineImageSizeTitle')}
+  description={inlineImageSizeDescription}
+  option1Label={$_('composer.keepImagesInline')}
+  option2Label={$_('composer.attachImagesInstead')}
+  option3Label={$_('common.cancel')}
+  option1Variant="default"
+  option2Variant="default"
+  onOption1={onKeepImagesInline}
+  onOption2={onAttachImagesInstead}
+  onOption3={onCancelInlineImages}
+/>
 
 <ThreeOptionDialog
   bind:open={showCloseConfirm}

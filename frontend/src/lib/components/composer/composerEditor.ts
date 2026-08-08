@@ -18,6 +18,7 @@ import TableCell from '@tiptap/extension-table-cell'
 import TableHeader from '@tiptap/extension-table-header'
 import FontSize from 'tiptap-extension-font-size'
 import { parseFileUris } from './composerUtils'
+import { readComposerClipboardFiles } from './composerClipboard'
 import { get } from 'svelte/store'
 import { _ } from 'svelte-i18n'
 import {
@@ -224,10 +225,9 @@ const ExtendedTableHeader = TableHeader.extend({
 export interface ComposerEditorHandlers {
   onUpdate?: () => void
   onMentionKeyDown?: (event: KeyboardEvent) => boolean
-  onPasteImage?: (file: File) => void
-  onDropImage?: (file: File) => void
-  onDropFile?: (file: File) => void
-  onDropFilePaths?: (paths: string[]) => void
+  onFiles?: (files: File[]) => void | Promise<void>
+  onFilePaths?: (paths: string[]) => void | Promise<void>
+  readClipboardFilePaths?: () => Promise<string[]>
   onShiftTab?: () => void
   isEnhancedKeyboardNavigationEnabled?: () => boolean
   getDarkFilterMode?: () => ComposerDarkFilterMode
@@ -361,38 +361,30 @@ export function createComposerEditor(
         }
         return false
       },
-      // Handle paste events for images
+      // Handle paste events for inline images and regular attachments.
       handlePaste: (view, event) => {
-        // Try clipboardData.items first
-        const items = event.clipboardData?.items
-        if (items) {
-          for (const item of items) {
-            if (item.type.startsWith('image/')) {
-              event.preventDefault()
-              const file = item.getAsFile()
-              if (file && handlers.onPasteImage) {
-                handlers.onPasteImage(file)
-              }
-              return true
-            }
-          }
+        const payload = readComposerClipboardFiles(event.clipboardData)
+        if (payload.files.length > 0) {
+          event.preventDefault()
+          void handlers.onFiles?.(payload.files)
+          return true
+        }
+        if (payload.paths.length > 0) {
+          event.preventDefault()
+          void handlers.onFilePaths?.(payload.paths)
+          return true
         }
 
-        // Fallback: try clipboardData.files (WebKitGTK may populate this instead of items)
-        const files = event.clipboardData?.files
-        if (files && files.length > 0) {
-          for (const file of Array.from(files)) {
-            if (file.type.startsWith('image/')) {
-              event.preventDefault()
-              if (handlers.onPasteImage) {
-                handlers.onPasteImage(file)
-              }
-              return true
-            }
-          }
+        const nativeRead = handlers.readClipboardFilePaths
+        if (!nativeRead) {
+          if (payload.advertisesFiles) event.preventDefault()
+          return payload.advertisesFiles
         }
-
-        return false
+        if (payload.advertisesFiles) event.preventDefault()
+        void nativeRead().then(paths => {
+          if (paths.length > 0) void handlers.onFilePaths?.(paths)
+        })
+        return payload.advertisesFiles
       },
       // Handle drop events for files (images inline, others as attachments)
       //
@@ -478,7 +470,7 @@ export function createComposerEditor(
 
           const paths = uris.map(uri => decodeURIComponent(uri.slice(7)))
           if (paths.length > 0) {
-            handlers.onDropFilePaths?.(paths)
+            void handlers.onFilePaths?.(paths)
           }
         }, 200)
 
@@ -486,13 +478,7 @@ export function createComposerEditor(
         const files = event.dataTransfer?.files
         if (files?.length) {
           event.preventDefault()
-          for (const file of Array.from(files)) {
-            if (file.type.startsWith('image/')) {
-              handlers.onDropImage?.(file)
-              continue
-            }
-            handlers.onDropFile?.(file)
-          }
+          void handlers.onFiles?.(Array.from(files))
           return true
         }
 
@@ -504,7 +490,7 @@ export function createComposerEditor(
           const paths = parseFileUris(pathData)
           if (paths.length > 0) {
             event.preventDefault()
-            handlers.onDropFilePaths?.(paths)
+            void handlers.onFilePaths?.(paths)
             return true
           }
         }

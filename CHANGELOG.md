@@ -4,6 +4,11 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- 修复增量备份在仍有邮件待处理时提前显示 100% 的问题，并让导出阶段按本次实际待处理邮件显示进度。
+- 修复 IMAP 邮件头获取因失效连接长期停留在 0% 的问题，增加批次与账号超时、连接重建和进度清理。
+- 新增从 Finder 复制文件后在写信窗口按 Cmd+V 添加附件；富文本图片仍可粘贴到正文。
+- 富文本正文图片累计超过 5 MB 时提示选择，超过 10 MB 时自动转为附件，并覆盖批量粘贴和发送前兜底。
+
 ## [0.7.5] — 2026-08-06
 
 - Promoted 0.7.5-beta.4 to a stable release.

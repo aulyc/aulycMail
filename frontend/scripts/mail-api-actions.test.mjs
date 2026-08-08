@@ -8,6 +8,7 @@ const wails = vi.hoisted(() => ({
   DeletePermanently: vi.fn(),
   GetAccount: vi.fn(),
   GetAllAccountIdentities: vi.fn(),
+  GetClipboardFilePaths: vi.fn(),
   GetIdentities: vi.fn(),
   GetSearchCount: vi.fn(),
   GetSearchCountUnifiedInbox: vi.fn(),
@@ -78,6 +79,7 @@ test('main-window composer API delegates every operation and normalizes missing 
   wails.PickAttachmentFiles.mockResolvedValue(attachments)
   wails.GetAccount.mockResolvedValue(account)
   wails.ReadFileAsAttachment.mockResolvedValue(null)
+  wails.GetClipboardFilePaths.mockResolvedValue(['/tmp/copied.pdf'])
   wails.GetAllAccountIdentities.mockResolvedValue(groups)
 
   const api = createMainWindowApi()
@@ -90,6 +92,7 @@ test('main-window composer API delegates every operation and normalizes missing 
   assert.equal(await api.pickAttachmentFiles(), attachments)
   assert.equal(await api.getAccount('account'), account)
   assert.equal(await api.readFileAsAttachment('/tmp/a.pdf'), null)
+  assert.deepEqual(await api.getClipboardFilePaths(), ['/tmp/copied.pdf'])
   assert.equal(await api.getAllAccountIdentities(), groups)
 
   assert.deepEqual(wails.SendMessage.mock.calls[0], ['account', message])
@@ -97,6 +100,10 @@ test('main-window composer API delegates every operation and normalizes missing 
   assert.deepEqual(wails.SaveDraft.mock.calls[0], ['account', message, ''])
   assert.deepEqual(wails.DeleteDraft.mock.calls[0], ['draft'])
   assert.deepEqual(wails.ReadFileAsAttachment.mock.calls[0], ['/tmp/a.pdf'])
+  assert.equal(wails.GetClipboardFilePaths.mock.calls.length, 1)
+
+  wails.GetClipboardFilePaths.mockResolvedValue(null)
+  assert.deepEqual(await api.getClipboardFilePaths(), [])
 })
 
 test('composer API preserves draft identity and sync state returned by the backend', async () => {

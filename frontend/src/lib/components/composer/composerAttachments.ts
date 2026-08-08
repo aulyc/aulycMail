@@ -2,6 +2,7 @@ import {
   readFileAsBase64,
   readFileAsDataUrl,
 } from './composerUtils'
+import { base64DecodedSize } from './composerInlineImagePolicy'
 
 export interface ComposerAttachment {
   filename: string
@@ -16,6 +17,7 @@ export interface InlineImage {
   contentType: string
   data: string
   filename: string
+  size: number
 }
 
 export async function fileToComposerAttachment(file: File): Promise<ComposerAttachment> {
@@ -56,7 +58,7 @@ export function backendAttachmentToComposerAttachment(att: {
 }
 
 export function estimateBase64DecodedSize(base64: string): number {
-  return Math.ceil((base64.length * 3) / 4)
+  return base64DecodedSize(base64)
 }
 
 export async function fileToDataUrl(file: File): Promise<string> {

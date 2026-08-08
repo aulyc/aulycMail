@@ -9,6 +9,7 @@ const backend = vi.hoisted(() => ({
   GetAccount: vi.fn(),
   GetAllAccountIdentities: vi.fn(),
   GetIdentities: vi.fn(),
+  GetClipboardFilePaths: vi.fn(),
   PickAttachmentFiles: vi.fn(),
   ReadFileAsAttachment: vi.fn(),
   SaveDraft: vi.fn(),
@@ -157,6 +158,7 @@ function createApi(overrides = {}) {
     getIdentities: vi.fn().mockResolvedValue([userIdentity]),
     saveDraft: vi.fn().mockResolvedValue({ id: 'draft-saved', syncStatus: 'pending' }),
     deleteDraft: vi.fn().mockResolvedValue(undefined),
+    getClipboardFilePaths: vi.fn().mockResolvedValue([]),
     pickAttachmentFiles: vi.fn().mockResolvedValue([]),
     getAccount: vi.fn().mockResolvedValue({ id: 'account-1', readReceiptRequestPolicy: 'ask' }),
     readFileAsAttachment: vi.fn().mockResolvedValue(null),
@@ -221,6 +223,32 @@ afterEach(async () => {
   while (mounted.length > 0) await unmount(mounted.pop())
   vi.useRealTimers()
   vi.restoreAllMocks()
+})
+
+test('adds Finder-copied PDF files as attachments from the plain-text body', async () => {
+  composerSettings.format = 'plain'
+  const api = createApi({
+    getClipboardFilePaths: vi.fn().mockResolvedValue(['/private/tmp/copied-report.pdf']),
+    readFileAsAttachment: vi.fn().mockResolvedValue({
+      filename: 'copied-report.pdf',
+      contentType: 'application/pdf',
+      size: 3,
+      data: 'cGRm',
+    }),
+  })
+  const { target } = await renderComposer({ api })
+  const body = target.querySelector('textarea[placeholder="composer.writePlaceholder"]')
+  const paste = new Event('paste', { bubbles: true, cancelable: true })
+  Object.defineProperty(paste, 'clipboardData', {
+    configurable: true,
+    value: { items: [], files: [], getData: () => '' },
+  })
+
+  body.dispatchEvent(paste)
+  await vi.waitFor(() => {
+    assert.match(target.textContent, /copied-report\.pdf/)
+  })
+  assert.deepEqual(api.readFileAsAttachment.mock.calls.at(-1), ['/private/tmp/copied-report.pdf'])
 })
 
 test('accepts recipients through the real input and sends the visible plain-text message', async () => {
@@ -526,13 +554,13 @@ test('restores, removes, drops, and sends regular and inline attachments through
   assert.match(target.textContent, /path-note\.txt/)
 
   const editor = editorState.editors[0]
-  await editor.__options.onDropFilePaths(['/tmp/path-image.png', '/tmp/path-note.txt', '/tmp/ignored.bin'])
+  await editor.__options.onFilePaths(['/tmp/path-image.png', '/tmp/path-note.txt', '/tmp/ignored.bin'])
   await flushAsync()
   assert.equal(editor.__insertedImages.some((item) => item.alt === 'path-image.png'), true)
 
   const inlineFile = new File(['inline image'], 'inline.png', { type: 'image/png' })
-  await editor.__options.onPasteImage(inlineFile)
-  await editor.__options.onDropImage(inlineFile)
+  await editor.__options.onFiles([inlineFile])
+  await editor.__options.onFiles([inlineFile])
   await flushAsync()
   assert.equal(editor.__insertedImages.filter((item) => item.alt === 'inline.png').length, 2)
 
@@ -604,13 +632,129 @@ test('handles rich/plain display controls, Cc/Bcc, read receipts, and composer k
   assert.match(document.body.textContent, /composer\.closeTitle/)
 })
 
-test('rejects oversized inline images and ignores recipient-chip drags at the composer drop surface', async () => {
+test('warns once for a 6 MiB image batch and automatically attaches a batch projected over 10 MiB', async () => {
+  composerSettings.format = 'rich'
+  vi.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function (file) {
+    const payload = file.name === 'first.png' ? 'Zmlyc3Q=' : file.name === 'second.png' ? 'c2Vjb25k' : 'dGhpcmQ='
+    Object.defineProperty(this, 'result', {
+      configurable: true,
+      value: `data:image/png;base64,${payload}`,
+    })
+    this.onload?.(new ProgressEvent('load'))
+  })
+  const { target } = await renderComposer({ initialMessage: composeMessage() })
+  const editor = editorState.editors[0]
+  const MiB = 1024 * 1024
+  const sizedImage = (name, size) => {
+    const file = new File(['image'], name, { type: 'image/png' })
+    Object.defineProperty(file, 'size', { configurable: true, value: size })
+    return file
+  }
+
+  const warningBatch = editor.__options.onFiles([
+    sizedImage('first.png', 3 * MiB),
+    sizedImage('second.png', 3 * MiB),
+  ])
+  await vi.waitFor(() => {
+    assert.match(document.body.textContent, /composer\.inlineImageSizeTitle/)
+  })
+  assert.equal(editor.__insertedImages.length, 0)
+
+  buttonWithText(document.body, 'composer.keepImagesInline').click()
+  await warningBatch
+  await flushAsync()
+  assert.equal(editor.__insertedImages.length, 2)
+
+  await editor.__options.onFiles([sizedImage('third.png', 5 * MiB)])
+  await flushAsync()
+  assert.match(target.textContent, /third\.png/)
+  assert.equal(editor.__insertedImages.some((image) => image.alt === 'third.png'), false)
+  assert.equal(toast.add.mock.calls.at(-1)[0].type, 'info')
+  assert.match(toast.add.mock.calls.at(-1)[0].message, /^composer\.inlineImagesAttachedAutomatically/)
+})
+
+test('offers attachment and cancel actions for the 5–10 MiB inline-image warning', async () => {
+  composerSettings.format = 'rich'
+  vi.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function (file) {
+    const payload = file.name === 'attach.png' ? 'YXR0YWNo' : 'Y2FuY2Vs'
+    Object.defineProperty(this, 'result', {
+      configurable: true,
+      value: `data:image/png;base64,${payload}`,
+    })
+    this.onload?.(new ProgressEvent('load'))
+  })
+  const { target } = await renderComposer({ initialMessage: composeMessage() })
+  const editor = editorState.editors[0]
+  const sizedImage = (name) => {
+    const file = new File(['image'], name, { type: 'image/png' })
+    Object.defineProperty(file, 'size', { configurable: true, value: 6 * 1024 * 1024 })
+    return file
+  }
+
+  const attachBatch = editor.__options.onFiles([sizedImage('attach.png')])
+  await flushAsync()
+  buttonWithText(document.body, 'composer.attachImagesInstead').click()
+  await attachBatch
+  await flushAsync()
+  assert.match(target.textContent, /attach\.png/)
+  assert.equal(editor.__insertedImages.length, 0)
+
+  const cancelBatch = editor.__options.onFiles([sizedImage('cancel.png')])
+  await flushAsync()
+  buttonWithText(document.body, 'common.cancel').click()
+  await cancelBatch
+  await flushAsync()
+  assert.equal(target.textContent.includes('cancel.png'), false)
+  assert.equal(editor.__insertedImages.length, 0)
+})
+
+test('routes WebKit-inserted data images through the same cumulative-size policy', async () => {
   composerSettings.format = 'rich'
   const { target } = await renderComposer({ initialMessage: composeMessage() })
   const editor = editorState.editors[0]
-  const oversized = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'huge.png', { type: 'image/png' })
-  await editor.__options.onPasteImage(oversized)
-  assert.deepEqual(toast.add.mock.calls.at(-1)[0], { type: 'error', message: 'composer.imageTooLarge' })
+  const sixMiBBase64 = 'A'.repeat(8 * 1024 * 1024)
+
+  editor.commands.setContent(`<p>Before</p><img src="data:image/png;base64,${sixMiBBase64}"><p>After</p>`)
+  editor.__options.onUpdate()
+  await vi.waitFor(() => {
+    assert.match(document.body.textContent, /composer\.inlineImageSizeTitle/)
+  })
+
+  buttonWithText(document.body, 'composer.attachImagesInstead').click()
+  await vi.waitFor(() => {
+    assert.match(target.textContent, /pasted-image1\.png/)
+  })
+  assert.equal(editor.getHTML().includes('data:image/png;base64,'), false)
+})
+
+test('converts legacy draft inline images over 10 MiB to attachments before sending', async () => {
+  composerSettings.format = 'rich'
+  const elevenMiBBase64 = 'A'.repeat(Math.ceil((11 * 1024 * 1024) / 3) * 4)
+  const initialMessage = composeMessage({
+    html_body: '<p>Legacy draft</p><img src="cid:legacy-inline">',
+    attachments: [{
+      filename: 'legacy-large.png',
+      content_type: 'image/png',
+      content_base64: elevenMiBBase64,
+      content_id: 'legacy-inline',
+      inline: true,
+    }],
+  })
+  const { target, api } = await renderComposer({ initialMessage })
+
+  buttonWithText(target, 'composer.send').click()
+  await vi.waitFor(() => {
+    assert.equal(api.sendMessage.mock.calls.length, 1)
+  })
+  const sent = api.sendMessage.mock.calls[0][1]
+  assert.equal(sent.attachments.some(item => item.filename === 'legacy-large.png' && item.inline), false)
+  assert.equal(sent.attachments.some(item => item.filename === 'legacy-large.png' && !item.inline), true)
+  assert.equal(sent.html_body.includes('legacy-inline'), false)
+})
+
+test('ignores recipient-chip drags at the composer drop surface', async () => {
+  composerSettings.format = 'rich'
+  const { target } = await renderComposer({ initialMessage: composeMessage() })
 
   const root = target.querySelector('[role="region"]')
   const recipientTransfer = {
@@ -1037,10 +1181,10 @@ test('reports FileReader failures for inline images and attachment picker files'
   const { target } = await renderComposer({ initialMessage: composeMessage() })
   const editor = editorState.editors[0]
 
-  await editor.__options.onPasteImage(new File(['image'], 'broken.png', { type: 'image/png' }))
+  await editor.__options.onFiles([new File(['image'], 'broken.png', { type: 'image/png' })])
   assert.equal(toast.add.mock.calls.at(-1)[0].message, 'composer.failedToInsertImage')
 
-  await editor.__options.onDropFile(new File(['text'], 'broken.txt', { type: 'text/plain' }))
+  await editor.__options.onFiles([new File(['text'], 'broken.txt', { type: 'text/plain' })])
   assert.equal(error.mock.calls.some(([message]) => message === 'Failed to read dropped file:'), true)
 
   buttonWithText(target, 'composer.attachFiles').click()
