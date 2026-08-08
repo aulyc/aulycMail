@@ -135,7 +135,12 @@ func safeRedirect(request *http.Request, via []*http.Request) error {
 		return fmt.Errorf("unsafe update redirect")
 	}
 	host := strings.ToLower(request.URL.Hostname())
-	allowed := host == "github.com" || host == "objects.githubusercontent.com" || host == "release-assets.githubusercontent.com" || host == "gitee.com"
+	allowed := host == "github.com" ||
+		host == "objects.githubusercontent.com" ||
+		host == "release-assets.githubusercontent.com" ||
+		host == "gitee.com" ||
+		host == "raw.giteeusercontent.com" ||
+		host == "foruda.gitee.com"
 	if !allowed {
 		return fmt.Errorf("update redirect host is not allowed")
 	}

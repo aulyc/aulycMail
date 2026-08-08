@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- 修复 Gitee 更新清单和安装包跳转被安全白名单误拦截的问题，并在 GitHub、Gitee 均不可用时显示明确提示。
+
 ## [0.8.0] — 2026-08-08
 
 - 修复增量备份在仍有邮件待处理时提前显示 100% 的问题，并让导出阶段按本次实际待处理邮件显示进度。

@@ -435,6 +435,7 @@
     "failed": "检查失败，点击重试",
     "installFailedRetry": "更新失败，点击重试",
     "checkFailed": "检查更新失败，请稍后重试",
+    "sourcesUnavailable": "GitHub 和 Gitee 更新源暂时都无法访问，请检查网络后重试",
     "installFailed": "更新安装失败，当前版本未被替换",
     "confirmTitle": "安装软件更新？",
     "confirmDescription": "将下载并安装 aulycMail {version}。更新完成后，应用将自动重新启动。",

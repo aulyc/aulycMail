@@ -148,7 +148,14 @@ test('shares latest/update state, manually checks, and confirms installation', a
   runtime.updateListener({
     state: 'failed', currentVersion: '0.6.0-beta.23', currentBuildNumber: 39,
     latestVersion: '0.7.0', latestBuildNumber: 40, failureOperation: 'check', canInstall: false,
+    message: 'all update sources failed: github: connection failed; gitee: connection failed',
   })
   await flushAsync()
   assert.match(compact.textContent, /settingsUpdate\.failed/)
+  assert.match(compact.querySelector('button').getAttribute('title'), /settingsUpdate\.sourcesUnavailable/)
+
+  backend.check.mockRejectedValueOnce(new Error('all update sources failed: github: connection failed; gitee: connection failed'))
+  compact.querySelector('button').click()
+  await flushAsync()
+  assert.deepEqual(toast.add.mock.calls.at(-1), [{ type: 'error', message: 'settingsUpdate.sourcesUnavailable' }])
 })

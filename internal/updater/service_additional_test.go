@@ -140,6 +140,42 @@ func TestSafeRedirectRejectsCredentialedAndExcessiveChains(t *testing.T) {
 	}
 }
 
+func TestSafeRedirectAllowsOnlyKnownGiteeDeliveryHosts(t *testing.T) {
+	allowed := []string{
+		"https://raw.giteeusercontent.com/aulyc/aulycMail/raw/main/latest.json",
+		"https://foruda.gitee.com/attach_file/release/aulycMail.dmg",
+	}
+	for _, target := range allowed {
+		t.Run(target, func(t *testing.T) {
+			request, err := http.NewRequest(http.MethodGet, target, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := safeRedirect(request, nil); err != nil {
+				t.Fatalf("safeRedirect() rejected known delivery host: %v", err)
+			}
+		})
+	}
+
+	rejected := []string{
+		"https://raw.giteeusercontent.com.example.test/latest.json",
+		"https://evil.raw.giteeusercontent.com/latest.json",
+		"https://foruda.gitee.com.example.test/aulycMail.dmg",
+		"http://raw.giteeusercontent.com/latest.json",
+	}
+	for _, target := range rejected {
+		t.Run(target, func(t *testing.T) {
+			request, err := http.NewRequest(http.MethodGet, target, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := safeRedirect(request, nil); err == nil {
+				t.Fatal("safeRedirect() accepted an unsafe delivery host")
+			}
+		})
+	}
+}
+
 func TestFetchManifestRejectsHTTPAndBodyFailures(t *testing.T) {
 	tests := []struct {
 		name   string

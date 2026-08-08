@@ -435,6 +435,7 @@
     "failed": "Check failed; click to retry",
     "installFailedRetry": "Update failed; click to retry",
     "checkFailed": "Unable to check for updates. Please try again later.",
+    "sourcesUnavailable": "The GitHub and Gitee update sources are temporarily unavailable. Check your network and try again.",
     "installFailed": "Update installation failed. The current version was not replaced.",
     "confirmTitle": "Install Software Update?",
     "confirmDescription": "aulycMail {version} will be downloaded and installed. The app will restart automatically when the update is complete.",

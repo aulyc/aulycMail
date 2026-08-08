@@ -42,6 +42,24 @@
       default: return ''
     }
   })
+  function errorMessage(error: unknown): string {
+    if (typeof error === 'string') return error
+    if (error instanceof Error) return error.message
+    if (error && typeof error === 'object' && 'message' in error) return String(error.message ?? '')
+    return ''
+  }
+  function localizedCheckFailure(error: unknown): string {
+    const detail = `${updateStore.status.message ?? ''} ${errorMessage(error)}`
+    return detail.includes('all update sources failed')
+      ? $_('settingsUpdate.sourcesUnavailable')
+      : $_('settingsUpdate.checkFailed')
+  }
+  const failureDetail = $derived.by(() => {
+    if (updateStore.status.state !== 'failed') return ''
+    return updateStore.status.failureOperation === 'install'
+      ? $_('settingsUpdate.installFailed')
+      : localizedCheckFailure(updateStore.status.message)
+  })
   const statusClass = $derived(
     updateStore.status.state === 'upToDate'
       ? 'text-emerald-500'
@@ -62,7 +80,7 @@
       await updateStore.check()
     } catch (error) {
       console.error('Failed to check for updates:', error)
-      addToast({ type: 'error', message: $_('settingsUpdate.checkFailed') })
+      addToast({ type: 'error', message: localizedCheckFailure(error) })
     }
   }
 
@@ -84,7 +102,8 @@
       class="inline-flex min-h-7 min-w-0 items-center justify-center gap-1.5 rounded-md border border-input bg-background px-2.5 py-1 font-medium shadow-sm transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default disabled:opacity-60"
       disabled={busy}
       onclick={activate}
-      aria-label={statusText || $_('settingsUpdate.checkNow')}
+      aria-label={failureDetail || statusText || $_('settingsUpdate.checkNow')}
+      title={failureDetail || undefined}
     >
       {#if busy}<Icon icon="mdi:loading" class="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground" />{/if}
       <span data-update-status class="truncate {statusClass}">{compactStatusText}</span>
@@ -97,6 +116,8 @@
     class="-mx-2 inline-flex min-h-7 w-fit items-center gap-2 rounded-md px-2 text-left text-sm text-primary transition-colors hover:bg-primary/5 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-default disabled:no-underline"
     disabled={busy}
     onclick={activate}
+    aria-label={failureDetail || statusText || $_('settingsUpdate.checkNow')}
+    title={failureDetail || undefined}
   >
     <span>{$_('settingsUpdate.softwareUpdate')}</span>
     {#if statusText}<span class="ml-1 text-xs no-underline {statusClass}">{statusText}</span>{/if}
