@@ -51,6 +51,8 @@ test('honours the legacy completed counter when detailed success counters are ab
 
 test('calculates a bounded determinate backup percentage', () => {
   assert.equal(backupProgressPercent(25, 100), 25)
+  assert.equal(backupProgressPercent(21537, 21542), 99)
+  assert.equal(backupProgressPercent(21542, 21542), 100)
   assert.equal(backupProgressPercent(200, 100), 100)
   assert.equal(backupProgressPercent(-1, 100), 0)
   assert.equal(backupProgressPercent(0, 0), null)

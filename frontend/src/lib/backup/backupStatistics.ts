@@ -43,5 +43,6 @@ export function backupStatistics(input: BackupCounterInput): BackupStatistics {
 export function backupProgressPercent(current: number, total: number): number | null {
   if (!Number.isFinite(total) || total <= 0) return null
   if (!Number.isFinite(current)) return 0
-  return Math.min(100, Math.max(0, Math.round(current / total * 100)))
+  if (current >= total) return 100
+  return Math.min(99, Math.max(0, Math.round(current / total * 100)))
 }

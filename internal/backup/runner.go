@@ -22,6 +22,8 @@ const (
 type Progress struct {
 	Phase        string
 	Stage        string
+	StageCurrent int
+	StageTotal   int
 	AccountEmail string
 	FolderPath   string
 	Current      int
@@ -142,7 +144,7 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 			}
 			result.Skipped++
 			processed++
-			progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ProgressStageChecking, ""))
+			progressEmitter.Emit(progressForRow(row, result, processed, len(rows), 0, 0, ProgressStageChecking, ""))
 			continue
 		}
 		if !row.Selectable {
@@ -171,20 +173,20 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 				result.Failed++
 				failures = append(failures, FailureFromRow(row, lookupErr))
 				processed++
-				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ProgressStageChecking, lookupErr.Error()))
+				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), 0, 0, ProgressStageChecking, lookupErr.Error()))
 				continue
 			}
 			if recoverable {
 				result.Skipped++
 				processed++
-				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ProgressStageChecking, ""))
+				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), 0, 0, ProgressStageChecking, ""))
 				continue
 			}
 			reason := fmt.Errorf("raw message unavailable: hierarchy-only folder has no indexed backup file")
 			result.Unavailable++
 			unavailable = append(unavailable, FailureFromRow(row, reason))
 			processed++
-			progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ProgressStageChecking, reason.Error()))
+			progressEmitter.Emit(progressForRow(row, result, processed, len(rows), 0, 0, ProgressStageChecking, reason.Error()))
 			continue
 		}
 
@@ -192,18 +194,21 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 	}
 
 	progressEmitter.Emit(Progress{
-		Phase:       "running",
-		Stage:       ProgressStageExporting,
-		Current:     processed,
-		Total:       len(rows),
-		Exported:    result.Exported,
-		Skipped:     result.Skipped,
-		Missing:     result.Missing,
-		Unavailable: result.Unavailable,
-		Failed:      result.Failed,
-		Message:     "开始导出待备份邮件",
+		Phase:        "running",
+		Stage:        ProgressStageExporting,
+		StageCurrent: 0,
+		StageTotal:   len(pendingRows),
+		Current:      processed,
+		Total:        len(rows),
+		Exported:     result.Exported,
+		Skipped:      result.Skipped,
+		Missing:      result.Missing,
+		Unavailable:  result.Unavailable,
+		Failed:       result.Failed,
+		Message:      "开始导出待备份邮件",
 	})
 
+	exportProcessed := 0
 	for _, group := range GroupMessageRows(pendingRows) {
 		for offset := 0; offset < len(group.Rows); offset += options.RawFetchBatchSize {
 			select {
@@ -230,7 +235,8 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 					result.Failed++
 					failures = append(failures, FailureFromRow(row, err))
 					processed++
-					progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ProgressStageExporting, err.Error()))
+					exportProcessed++
+					progressEmitter.Emit(progressForRow(row, result, processed, len(rows), exportProcessed, len(pendingRows), ProgressStageExporting, err.Error()))
 				}
 				continue
 			}
@@ -252,7 +258,8 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 						failures = append(failures, FailureFromRow(row, err))
 					}
 					processed++
-					progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ProgressStageExporting, err.Error()))
+					exportProcessed++
+					progressEmitter.Emit(progressForRow(row, result, processed, len(rows), exportProcessed, len(pendingRows), ProgressStageExporting, err.Error()))
 					continue
 				}
 
@@ -276,7 +283,8 @@ func Run(ctx context.Context, db *database.DB, options RunOptions) (*RunResult, 
 				}
 				result.Exported++
 				processed++
-				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), ProgressStageExporting, ""))
+				exportProcessed++
+				progressEmitter.Emit(progressForRow(row, result, processed, len(rows), exportProcessed, len(pendingRows), ProgressStageExporting, ""))
 			}
 		}
 	}
@@ -398,10 +406,12 @@ func ListMessageRows(db *database.DB, accountIDs []string) ([]MessageRow, error)
 	return messages, nil
 }
 
-func progressForRow(row MessageRow, result *RunResult, current, total int, stage, message string) Progress {
+func progressForRow(row MessageRow, result *RunResult, current, total, stageCurrent, stageTotal int, stage, message string) Progress {
 	return Progress{
 		Phase:        "running",
 		Stage:        stage,
+		StageCurrent: stageCurrent,
+		StageTotal:   stageTotal,
 		AccountEmail: row.AccountEmail,
 		FolderPath:   row.FolderPath,
 		Current:      current,

@@ -327,8 +327,11 @@ func TestRunExportsRawMessagesReportsFailuresAndResumesIncrementally(t *testing.
 	if len(progress) < 3 || progress[0].Stage != ProgressStageChecking || progress[1].Stage != ProgressStageExporting {
 		t.Fatalf("unexpected progress: %#v", progress)
 	}
+	if progress[1].StageCurrent != 0 || progress[1].StageTotal != 4 {
+		t.Fatalf("export stage started at %d/%d, want 0/4", progress[1].StageCurrent, progress[1].StageTotal)
+	}
 	lastProgress := progress[len(progress)-1]
-	if lastProgress.Current != 4 || lastProgress.Exported != 1 || lastProgress.Missing != 1 || lastProgress.Failed != 2 {
+	if lastProgress.Current != 4 || lastProgress.StageCurrent != 4 || lastProgress.StageTotal != 4 || lastProgress.Exported != 1 || lastProgress.Missing != 1 || lastProgress.Failed != 2 {
 		t.Fatalf("unexpected final progress: %#v", lastProgress)
 	}
 
@@ -382,18 +385,35 @@ func TestRunExportsRawMessagesReportsFailuresAndResumesIncrementally(t *testing.
 
 	firstPass = false
 	chunks = nil
+	progress = nil
 	result, err = Run(context.Background(), db, RunOptions{
 		Directory:         directory,
 		StartedAt:         "2026-07-16T00:00:00Z",
 		AccountIDs:        []string{"acct"},
 		RawFetchBatchSize: 2,
 		StreamRawMessages: stream,
+		EmitProgress:      func(p Progress) { progress = append(progress, p) },
 	})
 	if err != nil {
 		t.Fatalf("Run incremental pass: %v", err)
 	}
 	if result.Mode != "incremental" || result.Total != 4 || result.Exported != 3 || result.Skipped != 1 || result.Missing != 0 || result.Failed != 0 {
 		t.Fatalf("unexpected incremental result: %#v", result)
+	}
+	var exportProgress []Progress
+	for _, item := range progress {
+		if item.Stage == ProgressStageExporting {
+			exportProgress = append(exportProgress, item)
+		}
+	}
+	if len(exportProgress) < 2 {
+		t.Fatalf("incremental export progress = %#v, want start and finish", exportProgress)
+	}
+	if first := exportProgress[0]; first.Current != 1 || first.Total != 4 || first.StageCurrent != 0 || first.StageTotal != 3 {
+		t.Fatalf("incremental export started at overall %d/%d and stage %d/%d, want overall 1/4 and stage 0/3", first.Current, first.Total, first.StageCurrent, first.StageTotal)
+	}
+	if last := exportProgress[len(exportProgress)-1]; last.Current != 4 || last.StageCurrent != 3 || last.StageTotal != 3 {
+		t.Fatalf("incremental export finished at overall %d/%d and stage %d/%d, want overall 4/4 and stage 3/3", last.Current, last.Total, last.StageCurrent, last.StageTotal)
 	}
 	idx, found, err = LoadIndex(directory)
 	if err != nil || !found || len(idx.Messages) != 4 {

@@ -284,13 +284,15 @@ test('progress dialog distinguishes preparing, running, completed-with-issues, a
       running: true,
       progress: {
         phase: 'running', stage: 'exporting', accountEmail: 'a@example.test', folderPath: 'Inbox',
-        current: 3, total: 10, exported: 2, skipped: 1, missing: 0, unavailable: 0, failed: 0,
+        current: 21537, total: 21542, stageCurrent: 9, stageTotal: 14,
+        exported: 5, skipped: 21528, missing: 4, unavailable: 0, failed: 0,
       },
     },
   })
-  assert.equal(running.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '30')
+  assert.equal(running.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '64')
   assert.match(running.textContent, /a@example\.test \/ Inbox/)
-  assert.match(running.textContent, /30%/)
+  assert.match(running.textContent, /64%/)
+  assert.doesNotMatch(running.textContent, /100%/)
 
   const completed = await render(BackupProgressDialog, {
     open: true,

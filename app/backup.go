@@ -86,6 +86,8 @@ type BackupRunResult struct {
 type BackupProgress struct {
 	Phase        string `json:"phase"`
 	Stage        string `json:"stage,omitempty"`
+	StageCurrent int    `json:"stageCurrent"`
+	StageTotal   int    `json:"stageTotal"`
 	AccountEmail string `json:"accountEmail,omitempty"`
 	FolderPath   string `json:"folderPath,omitempty"`
 	Current      int    `json:"current"`
@@ -550,6 +552,8 @@ func backupProgressFromInternal(progress mailBackup.Progress) BackupProgress {
 	return BackupProgress{
 		Phase:        progress.Phase,
 		Stage:        progress.Stage,
+		StageCurrent: progress.StageCurrent,
+		StageTotal:   progress.StageTotal,
 		AccountEmail: progress.AccountEmail,
 		FolderPath:   progress.FolderPath,
 		Current:      progress.Current,

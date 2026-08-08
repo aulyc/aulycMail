@@ -392,6 +392,8 @@ export namespace app {
 	export class BackupProgress {
 	    phase: string;
 	    stage?: string;
+	    stageCurrent: number;
+	    stageTotal: number;
 	    accountEmail?: string;
 	    folderPath?: string;
 	    current: number;
@@ -411,6 +413,8 @@ export namespace app {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.phase = source["phase"];
 	        this.stage = source["stage"];
+	        this.stageCurrent = source["stageCurrent"];
+	        this.stageTotal = source["stageTotal"];
 	        this.accountEmail = source["accountEmail"];
 	        this.folderPath = source["folderPath"];
 	        this.current = source["current"];

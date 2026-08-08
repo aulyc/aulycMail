@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"aulyc.local/aulycmail/internal/account"
@@ -127,6 +129,8 @@ func TestBackupProgressAndResultConversions(t *testing.T) {
 	progress := backupProgressFromInternal(mailBackup.Progress{
 		Phase:        "running",
 		Stage:        mailBackup.ProgressStageExporting,
+		StageCurrent: 2,
+		StageTotal:   5,
 		AccountEmail: "user@example.com",
 		FolderPath:   "INBOX",
 		Current:      3,
@@ -138,8 +142,22 @@ func TestBackupProgressAndResultConversions(t *testing.T) {
 		Failed:       1,
 		Message:      "working",
 	})
-	if progress.Phase != "running" || progress.Stage != mailBackup.ProgressStageExporting || progress.Current != 3 || progress.Total != 8 || progress.Unavailable != 2 || progress.AccountEmail != "user@example.com" {
+	if progress.Phase != "running" || progress.Stage != mailBackup.ProgressStageExporting || progress.StageCurrent != 2 || progress.StageTotal != 5 || progress.Current != 3 || progress.Total != 8 || progress.Unavailable != 2 || progress.AccountEmail != "user@example.com" {
 		t.Fatalf("converted progress = %#v", progress)
+	}
+	initialExportJSON, err := json.Marshal(backupProgressFromInternal(mailBackup.Progress{
+		Phase:        "running",
+		Stage:        mailBackup.ProgressStageExporting,
+		StageCurrent: 0,
+		StageTotal:   5,
+		Current:      3,
+		Total:        8,
+	}))
+	if err != nil {
+		t.Fatalf("marshal initial export progress: %v", err)
+	}
+	if !strings.Contains(string(initialExportJSON), `"stageCurrent":0`) {
+		t.Fatalf("initial export progress omitted zero stage current: %s", initialExportJSON)
 	}
 	if result := backupRunResultFromInternal(nil); result != nil {
 		t.Fatalf("nil internal result = %#v", result)

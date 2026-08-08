@@ -26,7 +26,13 @@
   const failed = $derived(startFailed || (!active && progress?.phase === 'error'))
   const finished = $derived(!active && !failed && progress?.phase === 'done')
   const checkingExisting = $derived(active && progress?.stage === 'checking')
-  const percent = $derived(backupProgressPercent(progress?.current ?? 0, progress?.total ?? 0))
+  const progressCurrent = $derived(progress?.stage === 'exporting'
+    ? (progress.stageCurrent ?? progress.current)
+    : (progress?.current ?? 0))
+  const progressTotal = $derived(progress?.stage === 'exporting'
+    ? (progress.stageTotal ?? progress.total)
+    : (progress?.total ?? 0))
+  const percent = $derived(backupProgressPercent(progressCurrent, progressTotal))
   const target = $derived([progress?.accountEmail, progress?.folderPath].filter(Boolean).join(' / '))
   const statistics = $derived(backupStatistics({
     total: progress?.total,

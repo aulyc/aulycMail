@@ -6,6 +6,8 @@ import type { BackupScope } from '../settingsDraft.svelte'
 export interface BackupProgress {
   phase: string
   stage?: string
+  stageCurrent?: number
+  stageTotal?: number
   accountEmail?: string
   folderPath?: string
   current: number
