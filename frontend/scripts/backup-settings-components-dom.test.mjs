@@ -237,6 +237,16 @@ test('scope picker filters shared mailboxes and updates all and selected labels'
   await flushAsync()
   assert.match(toggle.textContent, /settingsBackup\.scopeAll/)
 
+  const menu = target.querySelector('.absolute')
+  assert.ok(menu)
+  buttonWithText(menu, 'settingsBackup.scopeAll').click()
+  await flushAsync()
+  assert.match(toggle.textContent, /settingsBackup\.selectedMailboxes:.*"count":0/)
+
+  buttonWithText(menu, 'settingsBackup.scopeAll').click()
+  await flushAsync()
+  assert.match(toggle.textContent, /settingsBackup\.scopeAll/)
+
   buttonWithText(target, 'a@example.test').click()
   await flushAsync()
   assert.match(toggle.textContent, /b@example\.test/)
@@ -278,6 +288,23 @@ test('progress dialog distinguishes preparing, running, completed-with-issues, a
   assert.ok(checking.querySelector('.backup-progress-indeterminate'))
   assert.equal(checking.querySelector('[role="progressbar"]').hasAttribute('aria-valuenow'), false)
 
+  const waitingForFirstBatch = await render(BackupProgressDialog, {
+    open: true,
+    store: {
+      running: true,
+      progress: {
+        phase: 'running', stage: 'exporting', accountEmail: 'a@example.test', folderPath: 'Inbox',
+        current: 14861, total: 14890, stageCurrent: 0, stageTotal: 29,
+        exported: 0, skipped: 14861, missing: 0, unavailable: 0, failed: 0,
+      },
+    },
+  })
+  assert.equal(waitingForFirstBatch.querySelector('[role="progressbar"]').getAttribute('aria-valuenow'), '0')
+  assert.match(waitingForFirstBatch.textContent, /settingsBackup\.working/)
+  assert.ok(waitingForFirstBatch.querySelector('.backup-working-indicator'))
+  assert.ok(waitingForFirstBatch.querySelector('.backup-working-ellipsis'))
+  assert.match(waitingForFirstBatch.textContent, /0%/)
+
   const running = await render(BackupProgressDialog, {
     open: true,
     store: {
@@ -305,6 +332,7 @@ test('progress dialog distinguishes preparing, running, completed-with-issues, a
     },
   })
   assert.match(completed.textContent, /settingsBackup\.backupFinishedWithIssues/)
+  assert.doesNotMatch(completed.textContent, /settingsBackup\.working/)
   assert.match(completed.textContent, /100%/)
   const completedText = completed.textContent.replace(/\s+/g, ' ')
   assert.match(completedText, /settingsBackup\.backedUpComposition 6/)

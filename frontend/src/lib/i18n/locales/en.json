@@ -347,6 +347,7 @@
     "progressTitle": "Backup progress",
     "preparingBackup": "Saving settings and preparing the backup…",
     "calculatingScope": "Calculating the messages to check in this run…",
+    "working": "Working",
     "checkingExisting": "Checking existing backups…",
     "checkingExistingDescription": "Confirming which locally synced messages already have complete backup files.",
     "checkedProgress": "Checked {current} / {total}",

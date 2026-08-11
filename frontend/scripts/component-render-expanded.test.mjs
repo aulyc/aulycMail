@@ -89,6 +89,9 @@ test('settings shared components render optional metadata, framing, help, and co
   }).body
   assert.match(header, /General preferences/)
   assert.match(header, /<button>Reset<\/button>/)
+  assert.match(header, /data-settings-page-header/)
+  assert.match(header, /data-settings-page-header-action/)
+  assert.match(header, /\bpr-10\b/)
 
   const framed = render(SettingsSection, {
     props: {

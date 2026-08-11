@@ -105,9 +105,16 @@
               {$_('settingsBackup.backupFailed')}
             {/if}
           </p>
-          {#if !checkingExisting && (percent !== null || finished)}
-            <span class="shrink-0 font-semibold tabular-nums text-foreground">{displayedPercent}%</span>
-          {/if}
+          <div class="flex shrink-0 items-center gap-3">
+            {#if active}
+              <span class="backup-working-indicator text-xs font-medium text-primary" role="status">
+                {$_('settingsBackup.working')}<span class="backup-working-ellipsis" aria-hidden="true">…</span>
+              </span>
+            {/if}
+            {#if !checkingExisting && (percent !== null || finished)}
+              <span class="font-semibold tabular-nums text-foreground">{displayedPercent}%</span>
+            {/if}
+          </div>
         </div>
 
         <div
@@ -198,12 +205,23 @@
     to { transform: translateX(250%); }
   }
 
+  @keyframes backup-working-pulse {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 1; }
+  }
+
   .backup-progress-indeterminate {
     animation: backup-progress-slide 1.2s ease-in-out infinite;
   }
 
+  .backup-working-ellipsis {
+    display: inline-block;
+    animation: backup-working-pulse 1s ease-in-out infinite;
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .backup-progress-indeterminate {
+    .backup-progress-indeterminate,
+    .backup-working-ellipsis {
       animation: none;
     }
   }

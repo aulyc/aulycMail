@@ -347,6 +347,7 @@
     "progressTitle": "备份进度",
     "preparingBackup": "正在保存设置并准备备份…",
     "calculatingScope": "正在计算本次需要核对的邮件…",
+    "working": "工作中",
     "checkingExisting": "正在核对已有备份…",
     "checkingExistingDescription": "正在确认本地同步记录是否已有完整的备份文件。",
     "checkedProgress": "已核对 {current} / {total}",
