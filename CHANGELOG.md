@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.8.3] — 2026-08-16
+
 - 移除设置弹窗所有页面右上角的关闭按钮，保留 Esc 关闭，并让页面标题和操作区域使用完整宽度。
 
 ## [0.8.2] — 2026-08-16
