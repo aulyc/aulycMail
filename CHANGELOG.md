@@ -4,6 +4,10 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+## [0.8.2] — 2026-08-16
+
+- Promoted 0.8.2-beta.1 to a stable release.
+
 ## [0.8.2-beta.1] — 2026-08-11
 
 - 修复设置页操作按钮与右上角关闭按钮重叠的问题，为页面级操作保留安全间距。
