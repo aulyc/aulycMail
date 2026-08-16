@@ -11,13 +11,23 @@
     onOpenAutoFocus?: (e: Event) => void
     /** Prevent focus from returning to trigger element on close */
     preventCloseAutoFocus?: boolean
+    /** Hide the built-in close button when the dialog provides another close path. */
+    showCloseButton?: boolean
     onpointerdown?: (event: PointerEvent) => void
     /** Handler for clicks/touches outside the dialog. Call e.preventDefault()
      *  to prevent the dialog from closing on outside interaction. */
     onInteractOutside?: (e: Event) => void
   }
 
-  let { class: className, children, onOpenAutoFocus, preventCloseAutoFocus = false, onpointerdown, onInteractOutside }: Props = $props()
+  let {
+    class: className,
+    children,
+    onOpenAutoFocus,
+    preventCloseAutoFocus = false,
+    showCloseButton = true,
+    onpointerdown,
+    onInteractOutside,
+  }: Props = $props()
 
   function handleCloseAutoFocus(e: Event) {
     if (preventCloseAutoFocus) {
@@ -42,12 +52,14 @@
       {#if children}
         {@render children()}
       {/if}
-      <DialogPrimitive.Close
-        class="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-      >
-        <Icon icon="mdi:close" class="h-4 w-4" />
-        <span class="sr-only">Close</span>
-      </DialogPrimitive.Close>
+      {#if showCloseButton}
+        <DialogPrimitive.Close
+          class="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+        >
+          <Icon icon="mdi:close" class="h-4 w-4" />
+          <span class="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      {/if}
     </DialogPrimitive.Content>
   </div>
 </DialogPrimitive.Portal>

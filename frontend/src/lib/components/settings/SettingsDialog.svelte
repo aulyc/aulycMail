@@ -43,7 +43,6 @@
   let navigationRegionEl = $state<HTMLElement | null>(null)
   let contentRegionEl = $state<HTMLElement | null>(null)
   let contentPanelEl = $state<HTMLElement | null>(null)
-  let closeButtonEl = $state<HTMLButtonElement | null>(null)
   let selectStateObserver: MutationObserver | null = null
   let autoSaveBlocked = $state(false)
   let closeInProgress = false
@@ -205,12 +204,8 @@
         }
       }
 
-      const closeAction = getSettingsControls().find((control) => (
-        control.dataset.settingsControlId === 'settings-close'
-      ))
-      if (!closeAction) return
       contentRegionEl?.focus({ preventScroll: true })
-      selectSettingsControlForTarget(closeAction)
+      selectSettingsControl(selectedSettingsControlIndex, false)
     }))
   }
 
@@ -264,7 +259,6 @@
       const ordered = [...entries].sort((left, right) => left.order - right.order)
       slots.forEach((slot, index) => { controls[slot] = ordered[index].control })
     }
-    if (closeButtonEl && isAvailableSettingsControl(closeButtonEl)) controls.push(closeButtonEl)
     return controls
   }
 
@@ -478,7 +472,7 @@
   function settingsControlForTarget(target: EventTarget | null): HTMLElement | null {
     if (!(target instanceof Element)) return null
     const control = target.closest<HTMLElement>(SETTINGS_CONTROL_SELECTOR)
-    return control && (contentPanelEl?.contains(control) || control === closeButtonEl) ? control : null
+    return control && contentPanelEl?.contains(control) ? control : null
   }
 
   function isNativeSettingsControlTarget(target: EventTarget | null): boolean {
@@ -724,7 +718,7 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={handleOpenChange}>
-  <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0 !outline-none focus:!outline-none focus-visible:!outline-none focus:ring-0 focus-visible:ring-0 [&>button]:hidden" onOpenAutoFocus={handleOpenAutoFocus} preventCloseAutoFocus onpointerdown={keepDialogFromTakingPointerFocus} onInteractOutside={(event) => event.preventDefault()}>
+  <Dialog.Content class="h-[min(680px,88vh)] max-h-[88vh] w-[min(980px,94vw)] max-w-none gap-0 overflow-hidden p-0 !outline-none focus:!outline-none focus-visible:!outline-none focus:ring-0 focus-visible:ring-0" onOpenAutoFocus={handleOpenAutoFocus} preventCloseAutoFocus showCloseButton={false} onpointerdown={keepDialogFromTakingPointerFocus} onInteractOutside={(event) => event.preventDefault()}>
     <Dialog.Title class="sr-only">{$_('settings.title')}</Dialog.Title>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="grid min-h-0 flex-1 grid-cols-[210px_minmax(0,1fr)]" onkeydowncapture={handleSettingsKeydown}>
@@ -814,18 +808,6 @@
             <span>{$_('settings.saving')}</span>
           </div>
         {/if}
-        <button
-          bind:this={closeButtonEl}
-          type="button"
-          data-settings-close
-          data-settings-control-id="settings-close"
-          aria-label={$_('common.close')}
-          title={$_('common.close')}
-          class="absolute right-5 top-5 flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-          onclick={() => void close()}
-        >
-          <Icon icon="mdi:close" class="h-4 w-4" />
-        </button>
       </div>
     </div>
   </Dialog.Content>

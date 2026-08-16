@@ -197,9 +197,7 @@ test('loads every draft value, navigates by keyboard, autosaves, and requests re
 
   assert.deepEqual(backend.SetNativeTitleBar.mock.calls.at(-1), [true])
   assert.equal(target.querySelector('[data-settings-footer-actions]'), null)
-  const closeAction = target.querySelector('[data-settings-close]')
-  assert.ok(closeAction)
-  assert.equal(closeAction.closest('[role="tabpanel"]'), null)
+  assert.equal(target.querySelector('[data-settings-close]'), null)
   assert.equal(toast.add.mock.calls.some(([entry]) => entry.message === 'toast.settingsSaved'), false)
   const restart = target.querySelector('[data-confirm-dialog]')
   assert.ok(restart)
@@ -214,6 +212,15 @@ test('keyboard-selected document links have no left inset focus marker', () => {
   const focusRule = css.match(/\[data-settings-focus-style='link'\]\[data-settings-keyboard-selected='true'\]\s*\{([^}]+)\}/)
   assert.ok(focusRule)
   assert.doesNotMatch(focusRule[1], /box-shadow:\s*inset/i)
+})
+
+test('settings disables both shared and custom close buttons', () => {
+  const settingsSource = readFileSync(resolve(process.cwd(), 'src/lib/components/settings/SettingsDialog.svelte'), 'utf8')
+  const dialogSource = readFileSync(resolve(process.cwd(), 'src/lib/components/ui/dialog/dialog-content.svelte'), 'utf8')
+  assert.match(settingsSource, /showCloseButton=\{false\}/)
+  assert.doesNotMatch(settingsSource, /data-settings-close/)
+  assert.match(dialogSource, /showCloseButton = true/)
+  assert.match(dialogSource, /\{#if showCloseButton\}/)
 })
 
 test('settings help popover opens to the right with centered alignment and no pointer', () => {
@@ -284,7 +291,7 @@ test('reports load and save failures and restores main scope when closed', async
   assert.ok(backend.GetThemeMode.mock.calls.length >= 2)
   assert.equal(rendered.target.querySelector('[data-confirm-dialog]'), null)
 
-  rendered.target.querySelector('[data-settings-close]').click()
+  key(rendered.target.querySelector('[data-settings-region="content"]'), 'Escape')
   await flushAsync()
   assert.equal(onClose.mock.calls.length, 1)
   assert.equal(keyboard.scope, 'main')
@@ -308,7 +315,10 @@ test('restores activity pagination selection and honors pointer-focus and root-d
 
   target.querySelector('[data-test-action="load-finished"]').click()
   await flushAsync()
-  assert.equal(target.querySelector('[data-settings-close]').dataset.settingsKeyboardSelected, 'true')
+  assert.equal(
+    target.querySelector('[data-settings-control-id="activity-load-more"]').dataset.settingsKeyboardSelected,
+    'true',
+  )
   assert.equal(document.activeElement, content)
 
   const dialog = target.querySelector('[role="dialog"]')
@@ -319,7 +329,7 @@ test('restores activity pagination selection and honors pointer-focus and root-d
   dialog.dispatchEvent(secondaryPointer)
   assert.equal(secondaryPointer.defaultPrevented, false)
   const buttonPointer = new PointerEvent('pointerdown', { button: 0, bubbles: true, cancelable: true })
-  target.querySelector('[data-settings-close]').dispatchEvent(buttonPointer)
+  target.querySelector('[data-settings-control-id="activity-load-more"]').dispatchEvent(buttonPointer)
   assert.equal(buttonPointer.defaultPrevented, false)
 
   target.querySelector('[data-dialog-root-dismiss]').click()
@@ -328,7 +338,7 @@ test('restores activity pagination selection and honors pointer-focus and root-d
   assert.equal(target.querySelector('[role="dialog"]'), null)
 })
 
-test('moves among content, close, explicit, adjacent, fallback, and outside horizontal targets', async () => {
+test('moves among content, explicit, adjacent, and outside horizontal targets without a close control', async () => {
   const { target } = await renderDialog()
   const navigation = target.querySelector('[data-settings-region="navigation"]')
   const content = target.querySelector('[data-settings-region="content"]')
@@ -336,8 +346,9 @@ test('moves among content, close, explicit, adjacent, fallback, and outside hori
   await flushAsync()
 
   assert.equal(target.querySelector('[data-settings-footer-actions]'), null)
+  assert.equal(target.querySelector('[data-settings-close]'), null)
   key(content, 'End')
-  assert.equal(target.querySelector('[data-settings-close]').dataset.settingsKeyboardSelected, 'true')
+  assert.equal(target.querySelector('[data-test-action="order-changed"]').dataset.settingsKeyboardSelected, 'true')
 
   const firstGroup = target.querySelector('[data-settings-horizontal-context="synthetic-account"]')
   firstGroup.querySelector('[data-settings-horizontal-action="move-up"]').focus()
@@ -351,7 +362,7 @@ test('moves among content, close, explicit, adjacent, fallback, and outside hori
   assert.equal(target.querySelector('[data-settings-control-id="activity-load-more"]').dataset.settingsKeyboardSelected, 'true')
   explicit.focus()
   key(content, 'ArrowDown')
-  assert.equal(target.querySelector('[data-settings-close]').dataset.settingsKeyboardSelected, 'true')
+  assert.equal(target.querySelector('[data-settings-horizontal-action="outside"]').dataset.settingsKeyboardSelected, 'true')
 
   const outside = target.querySelector('[data-settings-horizontal-action="outside"]')
   outside.focus()
