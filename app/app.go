@@ -449,8 +449,8 @@ func (a *App) Startup(ctx context.Context) {
 	}
 
 	// macOS background mode: re-show the window when the app is reactivated
-	// (Dock-icon click or Cmd+Tab) while it's hidden. Hiding uses orderOut,
-	// which AppKit won't restore on a Dock click by itself.
+	// (Dock-icon click or Cmd+Tab) while it's hidden. The native background
+	// window controller also cancels a pending hide during full-screen exit.
 	platform.SetActivationHandler(func() {
 		if a.windowHidden.Load() {
 			a.showWindow()
@@ -697,7 +697,7 @@ func (a *App) BeforeClose(ctx context.Context) bool {
 		log.Info().Msg("Window close requested, hiding to background")
 		if a.hideWindowAction != nil {
 			a.hideWindowAction()
-		} else {
+		} else if !platform.HideWindowForBackground() {
 			wailsRuntime.WindowHide(a.ctx)
 		}
 		a.windowHidden.Store(true)
@@ -754,7 +754,7 @@ func (a *App) showWindow() {
 	}
 	if a.nativeShowWindowAction != nil {
 		a.nativeShowWindowAction()
-	} else {
+	} else if !platform.ShowWindowFromBackground() {
 		wailsRuntime.WindowShow(a.ctx)
 	}
 	a.windowHidden.Store(false)

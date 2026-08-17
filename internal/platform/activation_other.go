@@ -14,3 +14,11 @@ func InstallTerminateHook() {}
 
 // RealQuitRequested always reports false outside macOS (no terminate: hook).
 func RealQuitRequested() bool { return false }
+
+// HideWindowForBackground lets non-macOS callers fall back to the Wails
+// window runtime.
+func HideWindowForBackground() bool { return false }
+
+// ShowWindowFromBackground lets non-macOS callers fall back to the Wails
+// window runtime.
+func ShowWindowFromBackground() bool { return false }

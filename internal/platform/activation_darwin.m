@@ -111,13 +111,65 @@ void installTerminateHook(void) {
 // Firing on activation (Dock-icon click, Cmd+Tab back) lets the app re-show
 // a window that background mode hid via orderOut — AppKit won't restore an
 // ordered-out window on Dock click by itself.
+static NSWindow *gBackgroundWindow = nil;
+
 @interface AulycActivationObserver : NSObject
+{
+    NSWindow *pendingBackgroundHideWindow;
+}
+- (void)scheduleBackgroundHideForWindow:(NSWindow *)window;
+- (void)cancelPendingBackgroundHide;
 @end
 
 @implementation AulycActivationObserver
 - (void)appActivated:(NSNotification *)note {
     (void)note;
     goAppActivated();
+}
+
+- (void)backgroundWindowDidExitFullScreen:(NSNotification *)note {
+    NSWindow *window = (NSWindow *)[note object];
+    if (window == nil || window != pendingBackgroundHideWindow) {
+        return;
+    }
+
+    [self cancelPendingBackgroundHide];
+    [window orderOut:nil];
+}
+
+- (void)scheduleBackgroundHideForWindow:(NSWindow *)window {
+    [self cancelPendingBackgroundHide];
+    if (window == nil) {
+        return;
+    }
+    // keyWindow/mainWindow may both become nil after orderOut. Keep the
+    // application-owned Wails window identity so a later Dock click can show
+    // the same window again.
+    gBackgroundWindow = window;
+
+    if (([window styleMask] & NSWindowStyleMaskFullScreen) == NSWindowStyleMaskFullScreen) {
+        pendingBackgroundHideWindow = window;
+        [[NSNotificationCenter defaultCenter]
+            addObserver:self
+               selector:@selector(backgroundWindowDidExitFullScreen:)
+                   name:NSWindowDidExitFullScreenNotification
+                 object:window];
+        [window toggleFullScreen:nil];
+        return;
+    }
+
+    [window orderOut:nil];
+}
+
+- (void)cancelPendingBackgroundHide {
+    if (pendingBackgroundHideWindow == nil) {
+        return;
+    }
+    [[NSNotificationCenter defaultCenter]
+        removeObserver:self
+                  name:NSWindowDidExitFullScreenNotification
+                object:pendingBackgroundHideWindow];
+    pendingBackgroundHideWindow = nil;
 }
 @end
 
@@ -133,4 +185,45 @@ void startActivationObserver(void) {
            selector:@selector(appActivated:)
                name:NSApplicationDidBecomeActiveNotification
              object:nil];
+}
+
+static NSWindow *aulycForegroundWindow(void) {
+    NSWindow *window = [NSApp keyWindow];
+    if (window == nil) {
+        window = [NSApp mainWindow];
+    }
+    if (window == nil) {
+        for (NSWindow *candidate in [NSApp orderedWindows]) {
+            if ([candidate isVisible]) {
+                return candidate;
+            }
+        }
+    }
+    return window;
+}
+
+void hideWindowForBackground(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (gAulycActivationObserver == nil) {
+            startActivationObserver();
+        }
+        [gAulycActivationObserver scheduleBackgroundHideForWindow:aulycForegroundWindow()];
+    });
+}
+
+void showWindowFromBackground(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (gAulycActivationObserver == nil) {
+            startActivationObserver();
+        }
+        [gAulycActivationObserver cancelPendingBackgroundHide];
+        NSWindow *window = gBackgroundWindow;
+        if (window == nil) {
+            window = aulycForegroundWindow();
+        }
+        if (window != nil) {
+            [window makeKeyAndOrderFront:nil];
+        }
+        [NSApp activateIgnoringOtherApps:YES];
+    });
 }

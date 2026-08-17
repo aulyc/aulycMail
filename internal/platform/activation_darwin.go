@@ -13,6 +13,8 @@ package platform
 void startActivationObserver(void);
 void installTerminateHook(void);
 bool aulycRealQuitRequested(void);
+void hideWindowForBackground(void);
+void showWindowFromBackground(void);
 */
 import "C"
 
@@ -65,4 +67,21 @@ func InstallTerminateHook() {
 // asked to actually quit, not just close the window.
 func RealQuitRequested() bool {
 	return bool(C.aulycRealQuitRequested())
+}
+
+// HideWindowForBackground hides the Wails window without leaving an empty
+// macOS full-screen Space behind. Full-screen exit is asynchronous, so the
+// native implementation waits for NSWindowDidExitFullScreenNotification
+// before ordering the window out.
+func HideWindowForBackground() bool {
+	C.hideWindowForBackground()
+	return true
+}
+
+// ShowWindowFromBackground cancels any pending hide-after-full-screen-exit
+// action before bringing the window forward. This prevents a quick Dock click
+// during the full-screen transition from being undone by the delayed hide.
+func ShowWindowFromBackground() bool {
+	C.showWindowFromBackground()
+	return true
 }

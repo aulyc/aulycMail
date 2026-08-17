@@ -4,6 +4,8 @@ All notable changes to aulycMail are documented here.
 
 ## [Unreleased]
 
+- 修复 macOS 全屏状态关闭主窗口后留下黑色全屏空间的问题；窗口会先退出全屏再隐藏，并可从 Dock 正常重新显示。
+
 ## [0.8.3] — 2026-08-16
 
 - 移除设置弹窗所有页面右上角的关闭按钮，保留 Esc 关闭，并让页面标题和操作区域使用完整宽度。
